@@ -100,6 +100,7 @@
 <header>
   <h1>🙏 Prayer Ministry Scheduler</h1>
   <span class="who" id="whoami"></span>
+  <button class="btn secondary" id="btnSignOut" style="padding:8px 14px;min-height:36px;">Sign Out</button>
 </header>
 <nav>
   <button data-tab="schedule" class="active">Schedule</button>
@@ -275,7 +276,7 @@ const MSAL_CONFIG = {
     authority: "https://login.microsoftonline.com/b9e447ab-c42c-4b04-92c8-d629b0ce320d",
     redirectUri: window.location.origin + window.location.pathname
   },
-  cache: { cacheLocation: "localStorage" }
+  cache: { cacheLocation: "sessionStorage" }
 };
 const GRAPH_SCOPES = ["Sites.ReadWrite.All", "User.Read"];
 const SITE_URL = "https://creeksidechurch.sharepoint.com/sites/FreedomPrayer";
@@ -306,6 +307,9 @@ async function init(){
     await afterSignIn();
   }
 }
+function clearStuckMsalState(){
+  Object.keys(sessionStorage).filter(k=>k.startsWith('msal.')).forEach(k=>sessionStorage.removeItem(k));
+}
 document.getElementById('btnSignIn').addEventListener('click', async ()=>{
   await msalReady;
   try{
@@ -313,6 +317,11 @@ document.getElementById('btnSignIn').addEventListener('click', async ()=>{
     account = result.account;
     await afterSignIn();
   }catch(e){
+    if(e.errorCode === 'interaction_in_progress'){
+      clearStuckMsalState();
+      document.getElementById('signinMsg').textContent = 'Cleared a stuck sign-in state — please click Sign In again.';
+      return;
+    }
     document.getElementById('signinMsg').textContent = 'Sign-in failed: ' + e.message;
   }
 });
@@ -332,6 +341,14 @@ async function afterSignIn(){
   document.getElementById('signinScreen').style.display = 'none';
   document.getElementById('appRoot').style.display = 'block';
   document.getElementById('whoami').textContent = 'Signed in as ' + (account.name || account.username);
+  document.getElementById('btnSignOut').onclick = async ()=>{
+    await msalInstance.logoutPopup({ account });
+    account = null;
+    clearStuckMsalState();
+    document.getElementById('appRoot').style.display = 'none';
+    document.getElementById('signinScreen').style.display = 'flex';
+    document.getElementById('signinMsg').textContent = 'Signed out. Sign in with your Microsoft 365 account to continue.';
+  };
   try{
     await resolveSiteAndLists();
     await loadAll();
@@ -454,7 +471,10 @@ function durationHours(s){ const start=new Date(s.date+'T'+s.time), end=new Date
 
 function renderAll(){ renderSchedule(); renderRoster(); renderBlackouts(); renderProspects(); renderOverview(); renderCompleted(); }
 
+let appWired = false;
 function wireApp(){
+  if(appWired) return;
+  appWired = true;
   document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click', ()=>switchTab(b.dataset.tab)));
   $('#btnRefresh').addEventListener('click', loadAll);
   $('#search').addEventListener('input', renderSchedule);
