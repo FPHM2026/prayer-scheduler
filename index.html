@@ -395,7 +395,7 @@ async function resolveSiteAndLists(){
 
 async function listItems(key){
   const resp = await graphFetch(`/sites/${siteId}/lists/${listIds[key]}/items?$expand=fields&$top=999`);
-  return resp.value.map(i => ({ id: i.id, ...i.fields }));
+  return resp.value.map(i => ({ ...i.fields, id: parseInt(i.id, 10) }));
 }
 async function createItem(key, fields){
   const resp = await graphFetch(`/sites/${siteId}/lists/${listIds[key]}/items`, {
