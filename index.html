@@ -1,1 +1,872 @@
-<h1>Coming soon</h1>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prayer Ministry Scheduler</title>
+<script src="https://alcdn.msauth.net/browser/3.18.0/js/msal-browser.min.js"></script>
+<style>
+  :root{
+    --navy:#1f3a5f; --gold:#e07b00; --bg:#f5f6f8; --card:#fff; --border:#e1e4ea;
+    --text:#26303d; --muted:#6b7280; --danger:#c0392b; --danger-bg:#fdecea;
+    --ok:#2e7d32; --ok-bg:#e9f7ec;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:16px;}
+  header{background:var(--navy);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;}
+  header h1{margin:0;font-size:20px;}
+  header .who{font-size:13px;color:#cdd8e6;}
+  nav{display:flex;gap:6px;padding:8px 16px 0;background:#fff;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+  nav button{background:var(--gold);color:#1a1a1a;border:none;padding:12px 18px;border-radius:6px 6px 0 0;font-weight:700;cursor:pointer;margin-bottom:4px;font-size:14px;min-height:44px;}
+  nav button.active{background:var(--navy);color:#fff;}
+  main{max-width:960px;margin:0 auto;padding:18px 16px 60px;}
+  .panel{display:none;} .panel.active{display:block;}
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}
+  input,select,textarea{font-family:inherit;font-size:16px;padding:10px 12px;border:1px solid var(--border);border-radius:6px;min-height:44px;}
+  textarea{min-height:60px;}
+  button.btn{background:var(--gold);color:#1a1a1a;border:none;padding:12px 18px;border-radius:6px;font-weight:700;cursor:pointer;font-size:15px;min-height:44px;}
+  button.btn.secondary{background:#fff;border:1px solid var(--navy);color:var(--navy);}
+  button.btn:disabled{opacity:.5;cursor:not-allowed;}
+  button.icon-btn{background:none;border:none;cursor:pointer;font-size:20px;padding:8px 10px;color:var(--muted);min-width:44px;min-height:44px;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px;}
+  .card .recip{font-weight:700;font-size:16px;}
+  .card .meta{color:var(--muted);font-size:14px;margin-top:3px;}
+  .card .row{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+  .tag{display:inline-block;background:#eef4fb;color:var(--navy);border-radius:10px;padding:2px 9px;font-size:11px;font-weight:700;margin-right:6px;}
+  .tag.completed{background:var(--ok-bg);color:var(--ok);}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:14px;font-weight:700;margin-bottom:5px;}
+  .field input,.field select,.field textarea{width:100%;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .minister-list{border:1px solid var(--border);border-radius:6px;padding:6px;max-height:280px;overflow:auto;}
+  .minister-row{display:flex;align-items:center;gap:10px;padding:10px 6px;border-bottom:1px solid #f0f1f3;font-size:15px;flex-wrap:wrap;}
+  .minister-row .dot{width:22px;height:22px;border-radius:50%;border:2px solid var(--gold);display:inline-flex;align-items:center;justify-content:center;font-size:12px;color:#fff;flex-shrink:0;cursor:pointer;}
+  .minister-row.checked .dot{background:var(--gold);}
+  .minister-row .mname{cursor:pointer;}
+  .minister-row .flag{color:var(--danger);font-size:13px;margin-left:auto;}
+  .role-toggle{display:flex;gap:4px;margin-left:auto;}
+  .role-btn{border:1px solid var(--border);background:#fff;color:var(--muted);border-radius:14px;padding:4px 10px;font-size:12px;cursor:pointer;}
+  .role-btn.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+  .errbox{background:var(--danger-bg);color:var(--danger);border-radius:6px;padding:10px 12px;font-size:14px;margin-bottom:10px;}
+  .okbox{background:var(--ok-bg);color:var(--ok);border-radius:6px;padding:10px 12px;font-size:14px;margin-bottom:10px;}
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  table{width:100%;border-collapse:collapse;font-size:15px;min-width:480px;}
+  th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--border);}
+  th{color:var(--muted);font-size:12px;text-transform:uppercase;}
+  .modal-bg{display:none;position:fixed;inset:0;background:rgba(20,25,35,.5);align-items:center;justify-content:center;z-index:50;padding:12px;}
+  .modal-bg.open{display:flex;}
+  .modal{background:#fff;border-radius:10px;max-width:560px;width:100%;max-height:92vh;overflow:auto;padding:18px;}
+  .modal.small{max-width:360px;}
+  .helptext{font-size:13px;color:var(--muted);}
+  .followup-hit{padding:10px 4px;cursor:pointer;color:var(--navy);text-decoration:underline;font-size:14px;min-height:44px;}
+  .sameday-box{background:#eef4fb;border:1px solid #cddcec;border-radius:6px;padding:10px 12px;font-size:14px;margin:8px 0;}
+  .sameday-box .title{font-weight:700;font-size:13px;color:var(--navy);margin-bottom:4px;}
+  .workload-badge{margin-left:auto;font-size:12px;color:var(--muted);background:#f0f1f3;border-radius:10px;padding:3px 9px;}
+  #dayLabel{display:block;margin-top:4px;}
+  .slot-btn{background:#fff;border:1px solid var(--navy);color:var(--navy);border-radius:16px;padding:6px 14px;font-size:13px;cursor:pointer;margin:6px 6px 0 0;min-height:36px;}
+  .slot-btn.chosen{background:var(--navy);color:#fff;}
+  .prospect-card,.overview-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px;}
+  .overview-card .name{font-weight:700;font-size:16px;margin-bottom:2px;}
+  .overview-card .stats{font-size:13px;color:var(--muted);margin-bottom:8px;}
+  .overview-card .sess-row{font-size:14px;padding:4px 0;border-top:1px solid #f0f1f3;}
+  .overview-card .none{color:var(--muted);font-size:13px;}
+  .inline-add{font-size:13px;color:var(--navy);text-decoration:underline;cursor:pointer;margin-left:8px;}
+  .wa-toggle{cursor:pointer;color:var(--muted);}
+  .wa-toggle.on{color:var(--ok);font-weight:700;}
+  #signinScreen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;padding:20px;}
+  #signinScreen button.btn{margin-top:16px;}
+  #appRoot{display:none;}
+  @media (max-width: 640px){
+    header h1{font-size:18px;}
+    main{padding:14px 10px 50px;}
+    .row2{grid-template-columns:1fr;}
+    .toolbar{flex-direction:column;align-items:stretch;}
+    .toolbar > *{width:100%;}
+    nav{padding:8px 10px 0;}
+    nav button{flex:1 1 auto;padding:10px 8px;font-size:13px;}
+    .modal{padding:14px;max-height:96vh;}
+  }
+</style>
+</head>
+<body>
+
+<div id="signinScreen">
+  <h1>🙏 Prayer Ministry Scheduler</h1>
+  <p class="helptext" id="signinMsg">Sign in with your Microsoft 365 account to continue.</p>
+  <button class="btn" id="btnSignIn">Sign in with Microsoft</button>
+  <div id="setupBox" style="display:none;margin-top:24px;text-align:left;max-width:420px;">
+    <p class="helptext"><strong>First time setup:</strong> paste your SharePoint site URL below (e.g. https://yourtenant.sharepoint.com/sites/YourSite). This is only needed once per device.</p>
+    <input id="siteUrlInput" placeholder="https://yourtenant.sharepoint.com/sites/YourSite" style="width:100%;">
+    <button class="btn secondary" id="btnSaveSiteUrl" style="margin-top:8px;">Save</button>
+  </div>
+</div>
+
+<div id="appRoot">
+<header>
+  <h1>🙏 Prayer Ministry Scheduler</h1>
+  <span class="who" id="whoami"></span>
+</header>
+<nav>
+  <button data-tab="schedule" class="active">Schedule</button>
+  <button data-tab="completed">Completed Sessions</button>
+  <button data-tab="planning">Planning</button>
+  <button data-tab="overview">Minister Overview</button>
+  <button data-tab="roster">Prayer Ministers</button>
+  <button data-tab="blackouts">Blackout Dates</button>
+</nav>
+<main>
+
+  <section class="panel active" id="panel-schedule">
+    <div id="loadError"></div>
+    <div class="toolbar">
+      <button class="btn" id="btnNew">+ New Session</button>
+      <input id="search" placeholder="Search by minister or recipient...">
+      <select id="range"><option>Upcoming</option><option>All</option><option>Past</option></select>
+      <button class="btn secondary" id="btnRefresh">↻ Refresh</button>
+    </div>
+    <div id="scheduleList"></div>
+  </section>
+
+  <section class="panel" id="panel-completed">
+    <p class="helptext">Sessions marked Completed.</p>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Date / Day</th><th>Time</th><th>PR</th><th>PM(s)</th><th>Location</th></tr></thead>
+      <tbody id="completedTable"></tbody>
+    </table>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-planning">
+    <p class="helptext">A holding space for people who've asked for a session but aren't scheduled yet — plus any notes to yourself.</p>
+    <button class="btn" id="btnAddProspect">+ Add Prospect</button>
+    <div id="prospectList" style="margin-top:12px;"></div>
+  </section>
+
+  <section class="panel" id="panel-overview">
+    <p class="helptext">Each prayer minister, their upcoming sessions, and stats for a date range (includes both Scheduled and Completed sessions).</p>
+    <div class="toolbar">
+      <label class="helptext" style="margin:0;">From <input type="date" id="statsFrom"></label>
+      <label class="helptext" style="margin:0;">To <input type="date" id="statsTo"></label>
+    </div>
+    <div id="overviewList"></div>
+  </section>
+
+  <section class="panel" id="panel-roster">
+    <button class="btn" id="btnAddMinister">+ Add Minister</button>
+    <div class="table-wrap" style="margin-top:12px;">
+    <table id="rosterTable">
+      <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Status</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-blackouts">
+    <p class="helptext">Submitted by ministers via the Microsoft Forms link. Read-only here except for removing resolved entries.</p>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Minister</th><th>Date</th><th>Notes</th><th></th></tr></thead>
+      <tbody id="blackoutTable"></tbody>
+    </table>
+    </div>
+  </section>
+
+</main>
+</div>
+
+<div class="modal-bg" id="sessionModal">
+  <div class="modal">
+    <h2 id="modalTitle">New Session</h2>
+    <div id="modalMsg"></div>
+    <div class="field">
+      <label>Follow-up to a previous recipient? (optional)</label>
+      <input id="followupSearch" placeholder="Type a name...">
+      <div id="followupResults"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Recipient Name *</label><input id="recipName"></div>
+      <div class="field"><label>Recipient Contact</label><input id="recipContact"></div>
+    </div>
+    <p class="helptext" id="lastSeenHint" style="margin-top:-8px;"></p>
+    <div class="row2">
+      <div class="field"><label>Appointment Type</label>
+        <select id="apptType"><option value="First">First Appointment</option><option value="Follow-up">Follow-up</option></select>
+      </div>
+      <div class="field" id="statusField" style="display:none;">
+        <label>Status</label>
+        <select id="sessStatus"><option value="Scheduled">Scheduled</option><option value="Completed">Completed</option></select>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Date *</label><input type="date" id="sessDate"><span class="helptext" id="dayLabel"></span></div>
+      <div class="field"><label>Location</label>
+        <select id="sessLocation"></select>
+        <span class="inline-add" id="btnAddLocation">+ Add new location</span>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Start Time *</label><input type="time" id="sessTime" step="1800"></div>
+      <div class="field"><label>End Time *</label><input type="time" id="sessEndTime" step="1800"></div>
+    </div>
+    <div id="slotButtons"></div>
+    <div id="sameDayPanel"></div>
+    <p class="helptext" id="endPreview"></p>
+    <div class="field">
+      <label>Prayer Ministers (2–4) *</label>
+      <div class="minister-list" id="ministerList"></div>
+      <p class="helptext" id="selCount">0 selected</p>
+      <p class="helptext">Tap a name to select; use the Lead/Support pills to mark who's leading.</p>
+    </div>
+    <div class="field"><label>Notes</label><textarea id="notes" rows="2"></textarea></div>
+    <div class="field">
+      <label style="display:flex;align-items:center;gap:8px;font-weight:700;">
+        <input type="checkbox" id="waCreated" style="width:auto;min-height:auto;"> WhatsApp group created for this session
+      </label>
+      <input id="waLink" placeholder="Paste the group invite link (optional)" style="margin-top:6px;">
+    </div>
+    <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+      <button class="btn secondary" id="btnCancel">Cancel</button>
+      <button class="btn" id="btnSave">Save Session</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="ministerModal">
+  <div class="modal">
+    <h2 id="minModalTitle">Add Minister</h2>
+    <div class="field"><label>Name *</label><input id="minName"></div>
+    <div class="field"><label>Email</label><input id="minEmail"></div>
+    <div class="field"><label>Phone</label><input id="minPhone"></div>
+    <div class="field"><label>Status</label><select id="minStatus"><option>Active</option><option>Inactive</option></select></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;">
+      <button class="btn secondary" id="btnMinCancel">Cancel</button>
+      <button class="btn" id="btnMinSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="prospectModal">
+  <div class="modal">
+    <h2>Add Prospect</h2>
+    <div class="field"><label>Recipient Name *</label><input id="prospName"></div>
+    <div class="field"><label>Contact</label><input id="prospContact"></div>
+    <div class="field"><label>Notes to self</label><textarea id="prospNotes" rows="3"></textarea></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;">
+      <button class="btn secondary" id="btnProspCancel">Cancel</button>
+      <button class="btn" id="btnProspSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="locationModal">
+  <div class="modal small">
+    <h2>Add Location</h2>
+    <div class="field"><label>Location Name *</label><input id="newLocationName" placeholder="e.g. Prayer Room C"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;">
+      <button class="btn secondary" id="btnLocCancel">Cancel</button>
+      <button class="btn" id="btnLocSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   CONFIG — from your Azure AD app registration
+========================================================================= */
+const MSAL_CONFIG = {
+  auth: {
+    clientId: "549f5207-d7f8-4924-9bde-30532d90c1d2",
+    authority: "https://login.microsoftonline.com/b9e447ab-c42c-4b04-92c8-d629b0ce320d",
+    redirectUri: window.location.origin + window.location.pathname
+  },
+  cache: { cacheLocation: "localStorage" }
+};
+const GRAPH_SCOPES = ["Sites.ReadWrite.All", "User.Read"];
+
+// List display names as created in SharePoint — edit here if yours differ.
+const LIST_NAMES = {
+  ministers: "PrayerMinisters",
+  sessions: "PrayerSessions",
+  blackouts: "BlackoutDates",
+  locations: "Locations",
+  prospects: "Prospects"
+};
+
+const msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
+let account = null;
+let siteId = null;
+let listIds = {};
+
+/* =========================================================================
+   AUTH
+========================================================================= */
+async function init(){
+  const savedSite = localStorage.getItem('psSiteUrl');
+  if(!savedSite){
+    document.getElementById('setupBox').style.display = 'block';
+  }
+  const accounts = msalInstance.getAllAccounts();
+  if(accounts.length > 0){
+    account = accounts[0];
+    await afterSignIn();
+  }
+}
+document.getElementById('btnSaveSiteUrl').addEventListener('click', ()=>{
+  const v = document.getElementById('siteUrlInput').value.trim().replace(/\/$/,'');
+  if(!v) return;
+  localStorage.setItem('psSiteUrl', v);
+  document.getElementById('setupBox').style.display = 'none';
+});
+document.getElementById('btnSignIn').addEventListener('click', async ()=>{
+  if(!localStorage.getItem('psSiteUrl')){
+    document.getElementById('setupBox').style.display = 'block';
+    document.getElementById('signinMsg').textContent = 'Please enter your SharePoint site URL first.';
+    return;
+  }
+  try{
+    const result = await msalInstance.loginPopup({ scopes: GRAPH_SCOPES });
+    account = result.account;
+    await afterSignIn();
+  }catch(e){
+    document.getElementById('signinMsg').textContent = 'Sign-in failed: ' + e.message;
+  }
+});
+
+async function getToken(){
+  const req = { scopes: GRAPH_SCOPES, account };
+  try{
+    const res = await msalInstance.acquireTokenSilent(req);
+    return res.accessToken;
+  }catch(e){
+    const res = await msalInstance.acquireTokenPopup(req);
+    return res.accessToken;
+  }
+}
+
+async function afterSignIn(){
+  document.getElementById('signinScreen').style.display = 'none';
+  document.getElementById('appRoot').style.display = 'block';
+  document.getElementById('whoami').textContent = 'Signed in as ' + (account.name || account.username);
+  try{
+    await resolveSiteAndLists();
+    await loadAll();
+    wireApp();
+  }catch(e){
+    document.getElementById('loadError').innerHTML = `<div class="errbox">Could not load data: ${e.message}. Check the SharePoint site URL in setup and that your admin has granted consent for Sites.ReadWrite.All.</div>`;
+  }
+}
+
+/* =========================================================================
+   GRAPH HELPERS
+========================================================================= */
+async function graphFetch(path, options={}){
+  const token = await getToken();
+  const res = await fetch('https://graph.microsoft.com/v1.0' + path, {
+    ...options,
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Content-Type': 'application/json',
+      ...(options.headers||{})
+    }
+  });
+  if(!res.ok){
+    const text = await res.text();
+    throw new Error(`Graph ${options.method||'GET'} ${path} failed (${res.status}): ${text.slice(0,300)}`);
+  }
+  if(res.status === 204) return null;
+  return res.json();
+}
+
+async function resolveSiteAndLists(){
+  const siteUrl = new URL(localStorage.getItem('psSiteUrl'));
+  const hostname = siteUrl.hostname;
+  const sitePath = siteUrl.pathname; // e.g. /sites/YourSite
+  const site = await graphFetch(`/sites/${hostname}:${sitePath}`);
+  siteId = site.id;
+  const listsResp = await graphFetch(`/sites/${siteId}/lists?$select=id,displayName`);
+  for(const key of Object.keys(LIST_NAMES)){
+    const match = listsResp.value.find(l => l.displayName === LIST_NAMES[key]);
+    if(!match) throw new Error(`List "${LIST_NAMES[key]}" not found on this site.`);
+    listIds[key] = match.id;
+  }
+}
+
+async function listItems(key){
+  const resp = await graphFetch(`/sites/${siteId}/lists/${listIds[key]}/items?$expand=fields&$top=999`);
+  return resp.value.map(i => ({ id: i.id, ...i.fields }));
+}
+async function createItem(key, fields){
+  const resp = await graphFetch(`/sites/${siteId}/lists/${listIds[key]}/items`, {
+    method:'POST', body: JSON.stringify({ fields })
+  });
+  return resp;
+}
+async function updateItem(key, itemId, fields){
+  return graphFetch(`/sites/${siteId}/lists/${listIds[key]}/items/${itemId}/fields`, {
+    method:'PATCH', body: JSON.stringify(fields)
+  });
+}
+async function deleteItem(key, itemId){
+  return graphFetch(`/sites/${siteId}/lists/${listIds[key]}/items/${itemId}`, { method:'DELETE' });
+}
+
+/* =========================================================================
+   DATA CACHE (refreshed from Graph after loads/writes)
+========================================================================= */
+let ministers=[], sessions=[], blackouts=[], locations=[], prospects=[];
+let editingId=null, prevId=null, selectedMinisters=[]; // selectedMinisters: [{id, role}]
+
+async function loadAll(){
+  const [rawMin, rawSess, rawBlack, rawLoc, rawProsp] = await Promise.all([
+    listItems('ministers'), listItems('sessions'), listItems('blackouts'), listItems('locations'), listItems('prospects')
+  ]);
+  ministers = rawMin.map(m => ({ id: m.id, name: m.Title, email: m.Email||'', phone: m.Phone||'', status: m.Status||'Active' }));
+  locations = rawLoc.map(l => ({ id: l.id, name: l.Title }));
+  prospects = rawProsp.map(p => ({ id: p.id, name: p.Title, contact: p.Contact||'', notes: p.Notes||'', dateAdded: (p.DateAdded||'').split('T')[0] }));
+  blackouts = rawBlack.map(b => ({ id: b.id, ministerName: b.Title, date: (b.BlackoutDate||'').split('T')[0], notes: b.Notes||'' }));
+  sessions = rawSess.map(s => {
+    const allIds = (s.AssignedMinisterIDs||'').split(',').map(x=>x.trim()).filter(Boolean);
+    const leadIds = new Set((s.LeadMinisterIDs||'').split(',').map(x=>x.trim()).filter(Boolean));
+    return {
+      id: s.id,
+      recipName: s.RecipientName||'', recipContact: s.RecipientContact||'',
+      date: (s.SessionDate||'').split('T')[0], time: toHM(s.SessionDate),
+      endTime: toHM(s.SessionEndDate),
+      location: (locations.find(l=>l.name===s.LocationName)||{}).id || null,
+      notes: s.Notes||'',
+      ministers: allIds.map(id=>({ id: parseInt(id,10), role: leadIds.has(id) ? 'Lead' : 'Support' })),
+      apptType: s.ApptType||'First', status: s.Status||'Scheduled',
+      prevId: s.PreviousSessionId||null,
+      waCreated: !!s.WaCreated, waLink: s.WaLink||''
+    };
+  });
+  renderAll();
+}
+function toHM(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}
+
+/* =========================================================================
+   Everything below mirrors the prototype's UI logic, adapted to call
+   the async Graph functions above instead of mutating in-memory arrays.
+========================================================================= */
+const $ = s => document.querySelector(s);
+function fmtDate(d){ return d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}); }
+function fmtTime(d){ return d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}); }
+function fmt12(t){ const [h,m]=t.split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); return fmtTime(d); }
+function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function ministerIdsOf(s){ return s.ministers.map(m=>m.id); }
+function ministerNamesOf(s){
+  return s.ministers.map(m=>{
+    const min = ministers.find(x=>x.id===m.id);
+    return (min?min.name:'?') + (m.role==='Lead' ? ' (Lead)' : '');
+  }).join(', ');
+}
+function locationName(id){ const l = locations.find(x=>x.id===id); return l?l.name:''; }
+function durationHours(s){ const start=new Date(s.date+'T'+s.time), end=new Date(s.date+'T'+s.endTime); return Math.max(0,(end-start)/3600000); }
+
+function renderAll(){ renderSchedule(); renderRoster(); renderBlackouts(); renderProspects(); renderOverview(); renderCompleted(); }
+
+function wireApp(){
+  document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click', ()=>switchTab(b.dataset.tab)));
+  $('#btnRefresh').addEventListener('click', loadAll);
+  $('#search').addEventListener('input', renderSchedule);
+  $('#range').addEventListener('change', renderSchedule);
+  $('#btnNew').addEventListener('click', ()=>openModal());
+  $('#btnCancel').addEventListener('click', ()=>$('#sessionModal').classList.remove('open'));
+  $('#sessDate').addEventListener('change', ()=>{ renderMinisterList(); updateEndPreview(); renderSameDay(); renderDayLabel(); renderSlotButtons(); });
+  $('#sessTime').addEventListener('change', ()=>{ autoSetEndTime(); renderSlotButtons(); });
+  $('#sessEndTime').addEventListener('change', updateEndPreview);
+  $('#recipName').addEventListener('input', updateLastSeen);
+  $('#followupSearch').addEventListener('input', onFollowupSearch);
+  $('#btnSave').addEventListener('click', onSaveSession);
+  $('#btnAddLocation').addEventListener('click', ()=>{ $('#newLocationName').value=''; $('#locationModal').classList.add('open'); });
+  $('#btnLocCancel').addEventListener('click', ()=>$('#locationModal').classList.remove('open'));
+  $('#btnLocSave').addEventListener('click', onSaveLocation);
+  $('#btnAddMinister').addEventListener('click', ()=>openMinisterModal());
+  $('#btnMinCancel').addEventListener('click', ()=>$('#ministerModal').classList.remove('open'));
+  $('#btnMinSave').addEventListener('click', onSaveMinister);
+  $('#btnAddProspect').addEventListener('click', ()=>{ $('#prospName').value=''; $('#prospContact').value=''; $('#prospNotes').value=''; $('#prospectModal').classList.add('open'); });
+  $('#btnProspCancel').addEventListener('click', ()=>$('#prospectModal').classList.remove('open'));
+  $('#btnProspSave').addEventListener('click', onSaveProspect);
+  $('#statsFrom').addEventListener('change', renderOverview);
+  $('#statsTo').addEventListener('change', renderOverview);
+}
+
+function switchTab(tab){
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+  document.querySelectorAll('main .panel').forEach(p=>p.classList.toggle('active', p.id==='panel-'+tab));
+}
+
+/* ---- SCHEDULE ---- */
+function renderSchedule(){
+  const q = $('#search').value.trim().toLowerCase();
+  const range = $('#range').value;
+  const now = new Date();
+  let list = sessions.map(s=>({...s, _start:new Date(s.date+'T'+s.time), _end:new Date(s.date+'T'+s.endTime)}));
+  if(range==='Upcoming') list = list.filter(s=>s._end>=now);
+  if(range==='Past') list = list.filter(s=>s._end<now);
+  if(q) list = list.filter(s => (s.recipName+' '+ministerNamesOf(s)).toLowerCase().includes(q));
+  list.sort((a,b)=>a._start-b._start);
+  const box = $('#scheduleList');
+  if(!list.length){ box.innerHTML = '<p class="helptext">No sessions found.</p>'; return; }
+  box.innerHTML = list.map(s=>`
+    <div class="card">
+      <div class="row">
+        <div>
+          <div class="recip">${escapeHtml(s.recipName)}
+            <span class="tag">${s.apptType==='Follow-up'?'Follow-up':'First Appt'}</span>
+            ${s.status==='Completed'?'<span class="tag completed">Completed</span>':''}
+          </div>
+          <div class="meta">${fmtDate(s._start)} · ${fmtTime(s._start)} – ${fmtTime(s._end)} · ${escapeHtml(locationName(s.location))}</div>
+          <div class="meta">${escapeHtml(ministerNamesOf(s))}</div>
+          <div class="meta">
+            <span class="wa-toggle ${s.waCreated?'on':''}" onclick="toggleWa(${s.id})">💬 ${s.waCreated?'WhatsApp group created':'No WhatsApp group yet — tap to mark created'}</span>
+            ${s.waCreated && s.waLink ? ` · <a href="${escapeHtml(s.waLink)}" target="_blank" rel="noopener">open chat</a>` : ''}
+          </div>
+        </div>
+        <div>
+          <button class="icon-btn" onclick="openFollowup(${s.id})" title="Follow-up">🔁</button>
+          <button class="icon-btn" onclick="editSession(${s.id})" title="Edit">✏️</button>
+          <button class="icon-btn" onclick="deleteSession(${s.id})" title="Delete">🗑️</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+window.deleteSession = async function(id){
+  if(!confirm('Delete this session?')) return;
+  await deleteItem('sessions', id);
+  await loadAll();
+};
+window.toggleWa = async function(id){
+  const s = sessions.find(x=>x.id===id);
+  const newVal = !s.waCreated;
+  await updateItem('sessions', id, { WaCreated: newVal, WaLink: newVal ? s.waLink : '' });
+  await loadAll();
+};
+window.editSession = function(id){ openModal(sessions.find(s=>s.id===id)); };
+window.openFollowup = function(id){ openModal(null, sessions.find(s=>s.id===id)); };
+
+function renderCompleted(){
+  const done = sessions.filter(s=>s.status==='Completed').sort((a,b)=> (b.date+b.time).localeCompare(a.date+a.time));
+  $('#completedTable').innerHTML = done.map(s=>{
+    const d = new Date(s.date+'T'+s.time);
+    return `<tr><td>${fmtDate(d)}</td><td>${fmt12(s.time)}–${fmt12(s.endTime)}</td><td>${escapeHtml(s.recipName)}</td><td>${escapeHtml(ministerNamesOf(s))}</td><td>${escapeHtml(locationName(s.location))}</td></tr>`;
+  }).join('') || `<tr><td colspan="5" class="helptext">No completed sessions yet.</td></tr>`;
+}
+
+/* ---- SESSION MODAL ---- */
+function recipSessionCount(name, excludeId){
+  if(!name) return 0;
+  return sessions.filter(s=> s.recipName.toLowerCase()===name.toLowerCase() && s.id!==excludeId).length;
+}
+function populateLocationSelect(){
+  $('#sessLocation').innerHTML = locations.map(l=>`<option value="${l.id}">${escapeHtml(l.name)}</option>`).join('');
+}
+function openModal(existing, followFrom){
+  editingId = existing ? existing.id : null;
+  prevId = followFrom ? followFrom.id : null;
+  $('#modalTitle').textContent = existing ? 'Edit Session' : (followFrom ? 'Follow-up Session' : 'New Session');
+  $('#modalMsg').innerHTML='';
+  $('#followupSearch').value=''; $('#followupResults').innerHTML='';
+  $('#recipName').value = existing ? existing.recipName : (followFrom ? followFrom.recipName : '');
+  $('#recipContact').value = existing ? existing.recipContact : (followFrom ? followFrom.recipContact : '');
+  $('#sessDate').value = existing ? existing.date : '';
+  $('#sessTime').value = existing ? existing.time : '';
+  $('#sessEndTime').value = existing ? existing.endTime : '';
+  $('#notes').value = existing ? existing.notes : '';
+  $('#waCreated').checked = existing ? !!existing.waCreated : false;
+  $('#waLink').value = existing ? (existing.waLink||'') : '';
+  populateLocationSelect();
+  $('#sessLocation').value = existing ? existing.location : (followFrom ? followFrom.location : (locations[0]?locations[0].id:''));
+  const priorCount = recipSessionCount($('#recipName').value, editingId);
+  $('#apptType').value = existing ? existing.apptType : (priorCount>0 ? 'Follow-up' : 'First');
+  $('#statusField').style.display = existing ? 'block' : 'none';
+  $('#sessStatus').value = existing ? existing.status : 'Scheduled';
+  selectedMinisters = existing ? existing.ministers.map(m=>({...m})) : (followFrom ? followFrom.ministers.map(m=>({...m})) : []);
+  renderMinisterList(); updateEndPreview(); renderSameDay(); updateLastSeen(); renderDayLabel(); renderSlotButtons();
+  $('#sessionModal').classList.add('open');
+}
+function onFollowupSearch(e){
+  const q = e.target.value.trim().toLowerCase();
+  const box = $('#followupResults');
+  if(q.length<2){ box.innerHTML=''; return; }
+  const hits = sessions.filter(s=>s.recipName.toLowerCase().includes(q)).slice(0,5);
+  box.innerHTML = hits.map(s=>`<div class="followup-hit" onclick="fillFollowup(${s.id})">${escapeHtml(s.recipName)} — ${s.date}</div>`).join('') || '<div class="helptext">No matches</div>';
+}
+window.fillFollowup = function(id){
+  const s = sessions.find(x=>x.id===id);
+  prevId = id;
+  $('#recipName').value = s.recipName; $('#recipContact').value = s.recipContact;
+  $('#apptType').value = 'Follow-up';
+  selectedMinisters = s.ministers.map(m=>({...m}));
+  renderMinisterList(); updateLastSeen();
+  $('#followupResults').innerHTML = `<div class="helptext">Loaded ministers from ${s.date} session.</div>`;
+};
+function updateLastSeen(){
+  const name = $('#recipName').value.trim();
+  const hint = $('#lastSeenHint');
+  if(!name){ hint.textContent=''; return; }
+  const matches = sessions.filter(s=> s.recipName.toLowerCase()===name.toLowerCase() && s.id!==editingId);
+  const count = matches.length;
+  if(!count){ hint.textContent = 'No prior sessions found for this name — this would be their 1st.'; return; }
+  const last = matches.sort((a,b)=> b.date.localeCompare(a.date))[0];
+  hint.textContent = `${count} prior session${count===1?'':'s'} with ${last.recipName} — last on ${last.date}. This would be session #${count+1}.`;
+}
+async function onSaveLocation(){
+  const name = $('#newLocationName').value.trim();
+  if(!name){ alert('Location name is required.'); return; }
+  const created = await createItem('locations', { Title: name });
+  locations.push({ id: created.id, name });
+  populateLocationSelect();
+  $('#sessLocation').value = created.id;
+  $('#locationModal').classList.remove('open');
+}
+function upcomingCountFor(ministerId){
+  const now = new Date();
+  return sessions.filter(s=>{
+    if(editingId && s.id===editingId) return false;
+    if(!ministerIdsOf(s).includes(ministerId)) return false;
+    return new Date(s.date+'T'+s.time) >= now;
+  }).length;
+}
+function renderMinisterList(){
+  const dateVal = $('#sessDate').value;
+  const blackedOutNames = new Set(blackouts.filter(b=>b.date===dateVal).map(b=>b.ministerName));
+  const box = $('#ministerList');
+  const active = ministers.filter(m=>m.status==='Active');
+  box.innerHTML = active.map(m=>{
+    const sel = selectedMinisters.find(x=>x.id===m.id);
+    const checked = !!sel;
+    const out = blackedOutNames.has(m.name);
+    const load = upcomingCountFor(m.id);
+    return `<div class="minister-row ${checked?'checked':''}">
+      <span class="dot" onclick="toggleMinister(${m.id})">${checked?'✓':''}</span>
+      <span class="mname" onclick="toggleMinister(${m.id})">${escapeHtml(m.name)}</span>
+      ${out?'<span class="flag">⚠ unavailable this date</span>':(checked?'':`<span class="workload-badge">${load} upcoming</span>`)}
+      ${checked?`<div class="role-toggle">
+        <button type="button" class="role-btn ${sel.role==='Lead'?'active':''}" onclick="setRole(${m.id},'Lead')">Lead</button>
+        <button type="button" class="role-btn ${sel.role!=='Lead'?'active':''}" onclick="setRole(${m.id},'Support')">Support</button>
+      </div>`:''}
+    </div>`;
+  }).join('');
+  $('#selCount').textContent = `${selectedMinisters.length} selected (choose 2–4)`;
+  $('#selCount').style.color = (selectedMinisters.length<2||selectedMinisters.length>4) ? 'var(--danger)' : 'var(--muted)';
+}
+window.toggleMinister = function(id){
+  const idx = selectedMinisters.findIndex(x=>x.id===id);
+  if(idx>-1) selectedMinisters.splice(idx,1); else selectedMinisters.push({id, role:'Support'});
+  renderMinisterList();
+};
+window.setRole = function(id, role){ const sel=selectedMinisters.find(x=>x.id===id); if(sel) sel.role=role; renderMinisterList(); };
+
+const DAY_WINDOWS = {
+  0: { label:'Sunday', start:'16:00', end:'19:00', presets:['16:00','17:00','17:30'] },
+  2: { label:'Tuesday', start:'18:00', end:'19:30', presets:['18:00'] },
+};
+function slotStartsFor(dateStr){
+  if(!dateStr) return [];
+  const dow = new Date(dateStr+'T00:00').getDay();
+  const win = DAY_WINDOWS[dow];
+  return win ? win.presets : [];
+}
+function renderDayLabel(){
+  const d = $('#sessDate').value; const lbl = $('#dayLabel');
+  if(!d){ lbl.textContent=''; return; }
+  const dow = new Date(d+'T00:00').getDay();
+  const dayName = new Date(d+'T00:00').toLocaleDateString(undefined,{weekday:'long'});
+  const win = DAY_WINDOWS[dow];
+  lbl.textContent = dayName + (win ? ` — usual window ${fmt12(win.start)}–${fmt12(win.end)}` : '');
+}
+function renderSlotButtons(){
+  const d = $('#sessDate').value; const box = $('#slotButtons');
+  const starts = slotStartsFor(d);
+  if(!starts.length){ box.innerHTML = d ? '<p class="helptext">No preset window for this day — pick any custom start/end time above.</p>' : ''; return; }
+  box.innerHTML = starts.map(t=>`<button type="button" class="slot-btn ${$('#sessTime').value===t?'chosen':''}" onclick="pickSlot('${t}')">${fmt12(t)}</button>`).join('');
+}
+window.pickSlot = function(t){ $('#sessTime').value = t; autoSetEndTime(); renderSlotButtons(); };
+function autoSetEndTime(){
+  const t = $('#sessTime').value; if(!t) return;
+  const [h,m] = t.split(':').map(Number); const total = h*60+m+90;
+  $('#sessEndTime').value = String(Math.floor(total/60)%24).padStart(2,'0')+':'+String(total%60).padStart(2,'0');
+  updateEndPreview();
+}
+function updateEndPreview(){
+  const d=$('#sessDate').value, t=$('#sessTime').value, et=$('#sessEndTime').value;
+  if(!d||!t||!et){ $('#endPreview').textContent=''; return; }
+  const start=new Date(d+'T'+t), end=new Date(d+'T'+et); const hrs=(end-start)/3600000;
+  $('#endPreview').textContent = hrs>0 ? `Duration: ${hrs} hour${hrs===1?'':'s'}` : 'End time must be after start time.';
+  $('#endPreview').style.color = hrs>0 ? 'var(--muted)' : 'var(--danger)';
+}
+function renderSameDay(){
+  const dateVal = $('#sessDate').value; const box = $('#sameDayPanel');
+  if(!dateVal){ box.innerHTML=''; return; }
+  const same = sessions.filter(s=> s.date===dateVal && !(editingId && s.id===editingId));
+  if(!same.length){ box.innerHTML = `<div class="sameday-box"><div class="title">Also on this date</div>Nothing else scheduled.</div>`; return; }
+  box.innerHTML = `<div class="sameday-box"><div class="title">Also on this date (${same.length})</div>` +
+    same.sort((a,b)=>a.time.localeCompare(b.time)).map(s=>
+      `<div>${fmt12(s.time)}–${fmt12(s.endTime)} — ${escapeHtml(s.recipName)} <span class="helptext">(${escapeHtml(ministerNamesOf(s))}, ${escapeHtml(locationName(s.location))})</span></div>`
+    ).join('') + `</div>`;
+}
+
+async function onSaveSession(){
+  const msg = $('#modalMsg'); msg.innerHTML='';
+  const recipName = $('#recipName').value.trim();
+  const recipContact = $('#recipContact').value.trim();
+  const date = $('#sessDate').value, time = $('#sessTime').value, endTime = $('#sessEndTime').value;
+  const notes = $('#notes').value.trim();
+  const locationId = parseInt($('#sessLocation').value,10);
+  const apptType = $('#apptType').value;
+  const status = editingId ? $('#sessStatus').value : 'Scheduled';
+
+  if(!recipName||!date||!time||!endTime){ msg.innerHTML='<div class="errbox">Please fill in recipient name, date, start time, and end time.</div>'; return; }
+  const mp = parseInt(time.split(':')[1],10);
+  if(mp!==0 && mp!==30){ msg.innerHTML='<div class="errbox">Start time must be on the hour or half-hour.</div>'; return; }
+  const emp = parseInt(endTime.split(':')[1],10);
+  if(emp!==0 && emp!==30){ msg.innerHTML='<div class="errbox">End time must be on the hour or half-hour.</div>'; return; }
+  const start=new Date(date+'T'+time), end=new Date(date+'T'+endTime);
+  if(end<=start){ msg.innerHTML='<div class="errbox">End time must be after the start time.</div>'; return; }
+  if(selectedMinisters.length<2||selectedMinisters.length>4){ msg.innerHTML='<div class="errbox">Please select between 2 and 4 prayer ministers.</div>'; return; }
+
+  const selIds = selectedMinisters.map(m=>m.id);
+  const conflictSessions = sessions.filter(s=>{
+    if(editingId && s.id===editingId) return false;
+    const sStart=new Date(s.date+'T'+s.time), sEnd=new Date(s.date+'T'+s.endTime);
+    if(!(start<sEnd && end>sStart)) return false;
+    return ministerIdsOf(s).some(id=>selIds.includes(id));
+  });
+  if(conflictSessions.length){
+    const names = new Set();
+    conflictSessions.forEach(s=> ministerIdsOf(s).forEach(id=>{ if(selIds.includes(id)){ const m=ministers.find(x=>x.id===id); if(m) names.add(m.name); } }));
+    msg.innerHTML = `<div class="errbox">${[...names].join(', ')} ${names.size===1?'is':'are'} already booked at this time (with ${conflictSessions.map(s=>s.recipName).join(', ')}).</div>`;
+    return;
+  }
+
+  const fields = {
+    Title: recipName + ' - ' + date,
+    RecipientName: recipName, RecipientContact: recipContact,
+    SessionDate: start.toISOString(), SessionEndDate: end.toISOString(),
+    AssignedMinisterIDs: selectedMinisters.map(m=>m.id).join(','),
+    LeadMinisterIDs: selectedMinisters.filter(m=>m.role==='Lead').map(m=>m.id).join(','),
+    LocationName: locationName(locationId),
+    Notes: notes, ApptType: apptType, Status: status,
+    PreviousSessionId: prevId || null,
+    WaCreated: $('#waCreated').checked, WaLink: $('#waLink').value.trim()
+  };
+  try{
+    if(editingId) await updateItem('sessions', editingId, fields);
+    else await createItem('sessions', fields);
+    $('#sessionModal').classList.remove('open');
+    await loadAll();
+  }catch(e){
+    msg.innerHTML = `<div class="errbox">Save failed: ${e.message}</div>`;
+  }
+}
+
+/* ---- ROSTER ---- */
+function renderRoster(){
+  $('#rosterTable tbody').innerHTML = ministers.map(m=>`
+    <tr><td>${escapeHtml(m.name)}</td><td>${escapeHtml(m.email)}</td><td>${escapeHtml(m.phone)}</td><td>${m.status}</td>
+    <td><button class="icon-btn" onclick="editMinister(${m.id})">✏️</button></td></tr>`).join('');
+}
+let editingMinisterId=null;
+window.editMinister = function(id){ openMinisterModal(ministers.find(m=>m.id===id)); };
+function openMinisterModal(m){
+  editingMinisterId = m ? m.id : null;
+  $('#minModalTitle').textContent = m ? 'Edit Minister' : 'Add Minister';
+  $('#minName').value = m ? m.name : ''; $('#minEmail').value = m ? m.email : '';
+  $('#minPhone').value = m ? m.phone : ''; $('#minStatus').value = m ? m.status : 'Active';
+  $('#ministerModal').classList.add('open');
+}
+async function onSaveMinister(){
+  const name = $('#minName').value.trim();
+  if(!name){ alert('Name is required.'); return; }
+  const fields = { Title:name, Email:$('#minEmail').value.trim(), Phone:$('#minPhone').value.trim(), Status:$('#minStatus').value };
+  if(editingMinisterId) await updateItem('ministers', editingMinisterId, fields);
+  else await createItem('ministers', fields);
+  $('#ministerModal').classList.remove('open');
+  await loadAll();
+}
+
+/* ---- BLACKOUT DATES ---- */
+function renderBlackouts(){
+  $('#blackoutTable').innerHTML = blackouts.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(b=>`
+    <tr><td>${escapeHtml(b.ministerName)}</td><td>${b.date}</td><td>${escapeHtml(b.notes)}</td>
+    <td><button class="icon-btn" onclick="deleteBlackout(${b.id})">🗑️</button></td></tr>`).join('');
+}
+window.deleteBlackout = async function(id){
+  if(!confirm('Remove this blackout date?')) return;
+  await deleteItem('blackouts', id);
+  await loadAll();
+};
+
+/* ---- PLANNING ---- */
+function renderProspects(){
+  const box = $('#prospectList');
+  if(!prospects.length){ box.innerHTML = '<p class="helptext">Nobody in the queue right now.</p>'; return; }
+  box.innerHTML = prospects.map(p=>`
+    <div class="prospect-card">
+      <div style="font-weight:700;font-size:16px;">${escapeHtml(p.name)}</div>
+      <div class="helptext">${escapeHtml(p.contact||'No contact info')} · added ${p.dateAdded}</div>
+      <div style="font-size:14px;white-space:pre-wrap;">${escapeHtml(p.notes)}</div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button class="btn" onclick="scheduleFromProspect(${p.id})">Schedule Session</button>
+        <button class="btn secondary" onclick="deleteProspect(${p.id})">Remove</button>
+      </div>
+    </div>`).join('');
+}
+async function onSaveProspect(){
+  const name = $('#prospName').value.trim();
+  if(!name){ alert('Name is required.'); return; }
+  await createItem('prospects', { Title:name, Contact:$('#prospContact').value.trim(), Notes:$('#prospNotes').value.trim(), DateAdded: new Date().toISOString() });
+  $('#prospectModal').classList.remove('open');
+  await loadAll();
+}
+window.deleteProspect = async function(id){
+  if(!confirm('Remove this prospect?')) return;
+  await deleteItem('prospects', id);
+  await loadAll();
+};
+window.scheduleFromProspect = function(id){
+  const p = prospects.find(x=>x.id===id);
+  openModal();
+  $('#recipName').value = p.name; $('#recipContact').value = p.contact;
+  updateLastSeen();
+};
+
+/* ---- MINISTER OVERVIEW ---- */
+function renderOverview(){
+  const now = new Date();
+  const fromVal = $('#statsFrom').value, toVal = $('#statsTo').value;
+  const box = $('#overviewList');
+  box.innerHTML = ministers.map(m=>{
+    const upcoming = sessions.filter(s=> ministerIdsOf(s).includes(m.id) && new Date(s.date+'T'+s.time) >= now)
+                              .sort((a,b)=> (a.date+a.time).localeCompare(b.date+b.time));
+    const inRange = sessions.filter(s=>{
+      if(!ministerIdsOf(s).includes(m.id)) return false;
+      if(fromVal && s.date < fromVal) return false;
+      if(toVal && s.date > toVal) return false;
+      return true;
+    });
+    const led = inRange.filter(s=> s.ministers.find(x=>x.id===m.id && x.role==='Lead')).length;
+    const supported = inRange.length - led;
+    const hours = inRange.reduce((sum,s)=> sum + durationHours(s), 0);
+    const rangeLabel = (fromVal||toVal) ? `${fromVal||'…'} to ${toVal||'…'}` : 'all time';
+    return `<div class="overview-card">
+      <div class="name">${escapeHtml(m.name)} ${m.status==='Inactive'?'<span class="helptext">(inactive)</span>':''}</div>
+      <div class="stats">${inRange.length} sessions in range (${led} led, ${supported} supporting) · ${hours.toFixed(1)} hrs · range: ${rangeLabel}</div>
+      ${upcoming.length ? upcoming.map(s=>{
+        const d = new Date(s.date+'T'+s.time);
+        return `<div class="sess-row">${fmtDate(d)}, ${fmt12(s.time)}–${fmt12(s.endTime)} — ${escapeHtml(s.recipName)}</div>`;
+      }).join('') : '<div class="none">No upcoming sessions.</div>'}
+    </div>`;
+  }).join('');
+}
+
+init();
+</script>
+</body>
+</html>
