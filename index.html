@@ -283,6 +283,7 @@ const MSAL_CONFIG = {
   cache: { cacheLocation: "localStorage" }
 };
 const GRAPH_SCOPES = ["Sites.ReadWrite.All", "User.Read"];
+const SITE_URL = "https://creeksidechurch.sharepoint.com/sites/FreedomPrayer";
 
 // List display names as created in SharePoint — edit here if yours differ.
 const LIST_NAMES = {
@@ -294,6 +295,7 @@ const LIST_NAMES = {
 };
 
 const msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
+const msalReady = msalInstance.initialize();
 let account = null;
 let siteId = null;
 let listIds = {};
@@ -302,28 +304,15 @@ let listIds = {};
    AUTH
 ========================================================================= */
 async function init(){
-  const savedSite = localStorage.getItem('psSiteUrl');
-  if(!savedSite){
-    document.getElementById('setupBox').style.display = 'block';
-  }
+  await msalReady;
   const accounts = msalInstance.getAllAccounts();
   if(accounts.length > 0){
     account = accounts[0];
     await afterSignIn();
   }
 }
-document.getElementById('btnSaveSiteUrl').addEventListener('click', ()=>{
-  const v = document.getElementById('siteUrlInput').value.trim().replace(/\/$/,'');
-  if(!v) return;
-  localStorage.setItem('psSiteUrl', v);
-  document.getElementById('setupBox').style.display = 'none';
-});
 document.getElementById('btnSignIn').addEventListener('click', async ()=>{
-  if(!localStorage.getItem('psSiteUrl')){
-    document.getElementById('setupBox').style.display = 'block';
-    document.getElementById('signinMsg').textContent = 'Please enter your SharePoint site URL first.';
-    return;
-  }
+  await msalReady;
   try{
     const result = await msalInstance.loginPopup({ scopes: GRAPH_SCOPES });
     account = result.account;
@@ -379,7 +368,7 @@ async function graphFetch(path, options={}){
 }
 
 async function resolveSiteAndLists(){
-  const siteUrl = new URL(localStorage.getItem('psSiteUrl'));
+  const siteUrl = new URL(SITE_URL);
   const hostname = siteUrl.hostname;
   const sitePath = siteUrl.pathname; // e.g. /sites/YourSite
   const site = await graphFetch(`/sites/${hostname}:${sitePath}`);
