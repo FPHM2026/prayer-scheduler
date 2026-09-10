@@ -164,8 +164,10 @@
 <div id="appRoot">
 <header>
   <h1>Prayer Ministry Scheduler</h1>
-  <span class="who" id="whoami"></span>
-  <button class="btn secondary" id="btnSignOut" style="padding:8px 14px;min-height:36px;">Sign Out</button>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span class="who" id="whoami"></span>
+    <button class="btn secondary" id="btnSignOut" style="padding:8px 14px;min-height:36px;">Sign Out</button>
+  </div>
 </header>
 <nav aria-label="Primary">
   <button data-tab="schedule" class="active" aria-current="page">Schedule</button>
@@ -539,7 +541,8 @@ function fmt12(t){ const [h,m]=t.split(':').map(Number); const d=new Date(); d.s
 function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function ministerIdsOf(s){ return s.ministers.map(m=>m.id); }
 function ministerNamesOf(s){
-  return s.ministers.map(m=>{
+  const sorted = [...s.ministers].sort((a,b)=> (a.role==='Lead'?0:1) - (b.role==='Lead'?0:1));
+  return sorted.map(m=>{
     const min = ministers.find(x=>x.id===m.id);
     return (min?min.name:'?') + (m.role==='Lead' ? ' (Lead)' : '');
   }).join(', ');
