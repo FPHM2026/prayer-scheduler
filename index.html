@@ -346,7 +346,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-10.5";
+const APP_VERSION = "2026-09-10.6";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -975,20 +975,32 @@ async function onSaveSession(){
     return;
   }
 
+  // Kept separate from the rest of the fields below — see the dedicated
+  // patch after save. selectedMinisters already holds every selected id,
+  // in full (not just the last one); this is just the payload shape.
+  const ministerFields = {
+    AssignedMinisterIDs: selectedMinisters.map(m=>m.id).join(','),
+    LeadMinisterIDs: selectedMinisters.filter(m=>m.role==='Lead').map(m=>m.id).join(',')
+  };
   const fields = {
     Title: recipName + ' - ' + date,
     RecipientName: recipName, RecipientContact: recipContact,
     SessionDate: start.toISOString(), SessionEndDate: end.toISOString(),
-    AssignedMinisterIDs: selectedMinisters.map(m=>m.id).join(','),
-    LeadMinisterIDs: selectedMinisters.filter(m=>m.role==='Lead').map(m=>m.id).join(','),
     LocationName: locationName(locationId),
     Notes: notes, ApptType: apptType, Status: status,
     PreviousSessionId: prevId || null,
-    WaCreated: $('#waCreated').checked, WaLink: $('#waLink').value.trim()
+    WaCreated: $('#waCreated').checked, WaLink: $('#waLink').value.trim(),
+    ...ministerFields
   };
   try{
+    let sessionId = editingId;
     if(editingId) await updateItem('sessions', editingId, fields);
-    else await createItem('sessions', fields);
+    else sessionId = (await createItem('sessions', fields)).id;
+    // Belt-and-suspenders: AssignedMinisterIDs/LeadMinisterIDs have been
+    // reported as unreliable when written bundled with the rest of the
+    // fields in one request. Finish with a PATCH that touches only those
+    // two, so the very last write to the item is minimal and isolated.
+    await updateItem('sessions', sessionId, ministerFields);
     $('#sessionModal').classList.remove('open');
     hideConflictToast();
     await loadAll();
