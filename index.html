@@ -18,7 +18,8 @@
      so every rule that references it grows on larger screens automatically. */
   :root{
     --navy:#474747; --navy-dark:#333; --gold:#aa5a3c; --gold-dark:#8a4a30;
-    --cream:#e7e2cf; --bg:#faf8f4; --card:#fff; --border:#e6e0d4;
+    --primary:#f28a00; --primary-dark:#ce7500; --on-primary:#1a1a1a;
+    --cream:#e7e2cf; --bg:#faf8f4; --card:#fff; --border:#ddd5c4;
     --text:#565656; --muted:#7a7a7a; --danger:#c0392b; --danger-bg:#fdecea;
     --ok:#2e7d32; --ok-bg:#e9f7ec;
     --shadow-sm:0 1px 2px rgba(35,28,20,.07),0 1px 1px rgba(35,28,20,.05);
@@ -58,11 +59,12 @@
   .toolbar{display:flex;flex-direction:column;align-items:stretch;gap:10px;margin-bottom:14px;}
   .toolbar > *{width:100%;}
   .toolbar #search{flex:1 1 220px;}
-  input,select,textarea{font-family:inherit;font-size:var(--fs-base);padding:10px 12px;border:1px solid var(--border);border-radius:6px;min-height:44px;}
+  input,select,textarea{font-family:inherit;font-size:var(--fs-base);padding:10px 12px;border:1px solid var(--border);border-radius:6px;min-height:44px;background:#fff;color:var(--text);}
   input:hover,select:hover,textarea:hover{border-color:var(--gold);}
+  input:focus,select:focus,textarea:focus{border-color:var(--gold);}
   textarea{min-height:60px;}
-  button.btn{background:var(--gold);color:#fff;border:none;padding:12px 18px;border-radius:6px;font-weight:700;cursor:pointer;font-size:var(--fs-md);min-height:44px;}
-  button.btn:hover:not(:disabled){background:var(--gold-dark);box-shadow:var(--shadow-sm);}
+  button.btn{background:var(--primary);color:var(--on-primary);border:none;padding:12px 18px;border-radius:6px;font-weight:700;cursor:pointer;font-size:var(--fs-md);min-height:44px;}
+  button.btn:hover:not(:disabled){background:var(--primary-dark);box-shadow:var(--shadow-sm);}
   button.btn.secondary{background:#fff;border:1px solid var(--navy);color:var(--navy);}
   button.btn.secondary:hover:not(:disabled){background:#faf7f1;}
   button.btn:disabled{opacity:.5;cursor:not-allowed;}
@@ -75,6 +77,9 @@
   .card .row{display:flex;justify-content:space-between;align-items:center;gap:10px;}
   .tag{display:inline-block;background:#f2ece1;color:var(--navy);border-radius:10px;padding:2px 9px;font-size:var(--fs-2xs);font-weight:700;margin-right:6px;}
   .tag.completed{background:var(--ok-bg);color:var(--ok);}
+  .tag.first{background:rgba(242,138,0,.16);color:#8a4a00;}
+  .tag.active{background:var(--ok-bg);color:var(--ok);}
+  .tag.inactive{background:#f1ede4;color:var(--muted);}
   .field{margin-bottom:14px;}
   .field label{display:block;font-size:var(--fs-sm);font-weight:700;margin-bottom:5px;}
   .field input,.field select,.field textarea{width:100%;}
@@ -90,10 +95,6 @@
   .role-btn.active{background:var(--navy);color:#fff;border-color:var(--navy);}
   .errbox{background:var(--danger-bg);color:var(--danger);border-radius:6px;padding:10px 12px;font-size:var(--fs-sm);margin-bottom:10px;}
   .okbox{background:var(--ok-bg);color:var(--ok);border-radius:6px;padding:10px 12px;font-size:var(--fs-sm);margin-bottom:10px;}
-  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-  table{width:100%;border-collapse:collapse;font-size:var(--fs-sm);min-width:480px;}
-  th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--border);}
-  th{color:var(--muted);font-size:var(--fs-2xs);text-transform:uppercase;}
   .modal-bg{display:none;position:fixed;inset:0;background:rgba(35,30,24,.55);align-items:center;justify-content:center;z-index:50;padding:12px;}
   .modal-bg.open{display:flex;}
   .modal{background:#fff;border-radius:10px;max-width:560px;width:100%;max-height:96vh;overflow:auto;padding:14px;box-shadow:var(--shadow-lg);}
@@ -133,34 +134,35 @@
     .row2{grid-template-columns:1fr 1fr;}
     .modal{padding:22px;max-height:92vh;}
     .modal.small{max-width:400px;}
+    #prospectList,#overviewList,#completedList,#rosterList,#blackoutList{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;align-items:start;}
+    #prospectList .prospect-card,#overviewList .overview-card,#completedList .card,#rosterList .card,#blackoutList .card{margin-bottom:0;}
   }
 
-  /* ---- Desktop: widen the shell and let card lists flow into columns ---- */
+  /* ---- Desktop: widen the shell ---- */
   @media (min-width:1024px){
     main{max-width:1100px;}
-    #prospectList,#overviewList{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;align-items:start;}
-    #prospectList .prospect-card,#overviewList .overview-card{margin-bottom:0;}
+    #prospectList,#overviewList,#completedList,#rosterList,#blackoutList{grid-template-columns:repeat(auto-fill,minmax(320px,1fr));}
   }
 </style>
 </head>
 <body>
 
 <div id="signinScreen">
-  <h1>🙏 Prayer Ministry Scheduler</h1>
+  <h1>Prayer Ministry Scheduler</h1>
   <p class="helptext" id="signinMsg">Sign in with your Microsoft 365 account to continue.</p>
   <button class="btn" id="btnSignIn">Sign in with Microsoft</button>
 </div>
 
 <div id="appRoot">
 <header>
-  <h1>🙏 Prayer Ministry Scheduler</h1>
+  <h1>Prayer Ministry Scheduler</h1>
   <span class="who" id="whoami"></span>
   <button class="btn secondary" id="btnSignOut" style="padding:8px 14px;min-height:36px;">Sign Out</button>
 </header>
 <nav aria-label="Primary">
   <button data-tab="schedule" class="active" aria-current="page">Schedule</button>
-  <button data-tab="completed">Completed Sessions</button>
   <button data-tab="planning">Planning</button>
+  <button data-tab="completed">Completed Sessions</button>
   <button data-tab="overview">Minister Overview</button>
   <button data-tab="roster">Prayer Ministers</button>
   <button data-tab="blackouts">Blackout Dates</button>
@@ -180,12 +182,7 @@
 
   <section class="panel" id="panel-completed">
     <p class="helptext">Sessions marked Completed.</p>
-    <div class="table-wrap">
-    <table>
-      <thead><tr><th>Date / Day</th><th>Time</th><th>PR</th><th>PM(s)</th><th>Location</th></tr></thead>
-      <tbody id="completedTable"></tbody>
-    </table>
-    </div>
+    <div id="completedList"></div>
   </section>
 
   <section class="panel" id="panel-planning">
@@ -205,22 +202,12 @@
 
   <section class="panel" id="panel-roster">
     <button class="btn" id="btnAddMinister">+ Add Minister</button>
-    <div class="table-wrap" style="margin-top:12px;">
-    <table id="rosterTable">
-      <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Status</th><th></th></tr></thead>
-      <tbody></tbody>
-    </table>
-    </div>
+    <div id="rosterList" style="margin-top:12px;"></div>
   </section>
 
   <section class="panel" id="panel-blackouts">
     <p class="helptext">Submitted by ministers via the Microsoft Forms link. Read-only here except for removing resolved entries.</p>
-    <div class="table-wrap">
-    <table>
-      <thead><tr><th>Minister</th><th>Date</th><th>Notes</th><th></th></tr></thead>
-      <tbody id="blackoutTable"></tbody>
-    </table>
-    </div>
+    <div id="blackoutList"></div>
   </section>
 
 </main>
@@ -614,7 +601,7 @@ function renderSchedule(){
       <div class="row">
         <div>
           <div class="recip">${escapeHtml(s.recipName)}
-            <span class="tag">${s.apptType==='Follow-up'?'Follow-up':'First Appt'}</span>
+            <span class="tag ${s.apptType==='Follow-up'?'':'first'}">${s.apptType==='Follow-up'?'Follow-up':'First Appt'}</span>
             ${s.status==='Completed'?'<span class="tag completed">Completed</span>':''}
           </div>
           <div class="meta">${fmtDate(s._start)} · ${fmtTime(s._start)} – ${fmtTime(s._end)} · ${escapeHtml(locationName(s.location))}</div>
@@ -648,10 +635,18 @@ window.openFollowup = function(id){ openModal(null, sessions.find(s=>s.id===id))
 
 function renderCompleted(){
   const done = sessions.filter(s=>s.status==='Completed').sort((a,b)=> (b.date+b.time).localeCompare(a.date+a.time));
-  $('#completedTable').innerHTML = done.map(s=>{
+  const box = $('#completedList');
+  if(!done.length){ box.innerHTML = '<p class="helptext">No completed sessions yet.</p>'; return; }
+  box.innerHTML = done.map(s=>{
     const d = new Date(s.date+'T'+s.time);
-    return `<tr><td>${fmtDate(d)}</td><td>${fmt12(s.time)}–${fmt12(s.endTime)}</td><td>${escapeHtml(s.recipName)}</td><td>${escapeHtml(ministerNamesOf(s))}</td><td>${escapeHtml(locationName(s.location))}</td></tr>`;
-  }).join('') || `<tr><td colspan="5" class="helptext">No completed sessions yet.</td></tr>`;
+    return `<div class="card">
+      <div class="recip">${escapeHtml(s.recipName)}
+        <span class="tag ${s.apptType==='Follow-up'?'':'first'}">${s.apptType==='Follow-up'?'Follow-up':'First Appt'}</span>
+      </div>
+      <div class="meta">${fmtDate(d)} · ${fmt12(s.time)} – ${fmt12(s.endTime)} · ${escapeHtml(locationName(s.location))}</div>
+      <div class="meta">${escapeHtml(ministerNamesOf(s))}</div>
+    </div>`;
+  }).join('');
 }
 
 /* ---- SESSION MODAL ---- */
@@ -868,9 +863,19 @@ async function onSaveSession(){
 
 /* ---- ROSTER ---- */
 function renderRoster(){
-  $('#rosterTable tbody').innerHTML = ministers.map(m=>`
-    <tr><td>${escapeHtml(m.name)}</td><td>${escapeHtml(m.email)}</td><td>${escapeHtml(m.phone)}</td><td>${m.status}</td>
-    <td><button class="icon-btn" onclick="editMinister(${m.id})" aria-label="Edit ${escapeHtml(m.name)}">${ICONS.pencil}</button></td></tr>`).join('');
+  const box = $('#rosterList');
+  if(!ministers.length){ box.innerHTML = '<p class="helptext">No prayer ministers added yet.</p>'; return; }
+  box.innerHTML = ministers.map(m=>`
+    <div class="card">
+      <div class="row">
+        <div>
+          <div class="recip">${escapeHtml(m.name)} <span class="tag ${m.status==='Active'?'active':'inactive'}">${escapeHtml(m.status)}</span></div>
+          <div class="meta">${escapeHtml(m.email) || 'No email on file'}</div>
+          <div class="meta">${escapeHtml(m.phone) || 'No phone on file'}</div>
+        </div>
+        <div><button class="icon-btn" onclick="editMinister(${m.id})" aria-label="Edit ${escapeHtml(m.name)}">${ICONS.pencil}</button></div>
+      </div>
+    </div>`).join('');
 }
 let editingMinisterId=null;
 window.editMinister = function(id){ openMinisterModal(ministers.find(m=>m.id===id)); };
@@ -896,9 +901,20 @@ async function onSaveMinister(){
 
 /* ---- BLACKOUT DATES ---- */
 function renderBlackouts(){
-  $('#blackoutTable').innerHTML = blackouts.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(b=>`
-    <tr><td>${escapeHtml(b.ministerName)}</td><td>${b.date}</td><td>${escapeHtml(b.notes)}</td>
-    <td><button class="icon-btn" onclick="deleteBlackout(${b.id})" aria-label="Remove blackout date for ${escapeHtml(b.ministerName)}">${ICONS.trash}</button></td></tr>`).join('');
+  const box = $('#blackoutList');
+  const list = blackouts.slice().sort((a,b)=>a.date.localeCompare(b.date));
+  if(!list.length){ box.innerHTML = '<p class="helptext">No blackout dates submitted yet.</p>'; return; }
+  box.innerHTML = list.map(b=>`
+    <div class="card">
+      <div class="row">
+        <div>
+          <div class="recip">${escapeHtml(b.ministerName)}</div>
+          <div class="meta">${b.date}</div>
+          ${b.notes ? `<div class="meta">${escapeHtml(b.notes)}</div>` : ''}
+        </div>
+        <div><button class="icon-btn" onclick="deleteBlackout(${b.id})" aria-label="Remove blackout date for ${escapeHtml(b.ministerName)}">${ICONS.trash}</button></div>
+      </div>
+    </div>`).join('');
 }
 window.deleteBlackout = async function(id){
   if(!confirm('Remove this blackout date?')) return;
