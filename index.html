@@ -46,10 +46,10 @@
   button{font-family:inherit;}
   button,input,select,textarea,.card,.prospect-card,.overview-card{transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease,transform .15s ease,color .15s ease;}
   body{margin:0;font-family:'Jost','Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text);font-size:var(--fs-base);line-height:1.55;}
-  header{background:var(--cream);color:var(--navy);padding:16px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;border-bottom:1px solid rgba(0,0,0,.06);}
+  header{max-width:960px;margin:0 auto;background:var(--cream);color:var(--navy);padding:16px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;border-bottom:1px solid rgba(0,0,0,.06);}
   header h1,#signinScreen h1{margin:0;font-size:var(--fs-xl);font-family:'Playfair Display',Georgia,serif;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--gold);}
   header .who{font-size:var(--fs-xs);color:var(--navy);}
-  nav{display:flex;gap:6px;padding:8px 10px 0;background:#fff;border-bottom:1px solid var(--border);box-shadow:var(--shadow-sm);flex-wrap:wrap;position:relative;z-index:1;}
+  nav{max-width:960px;margin:0 auto;display:flex;gap:6px;padding:8px 10px 0;background:#fff;border-bottom:1px solid var(--border);box-shadow:var(--shadow-sm);flex-wrap:wrap;position:relative;z-index:1;}
   nav button{background:var(--gold);color:#fff;border:none;border-bottom:4px solid transparent;padding:10px 14px;border-radius:6px 6px 0 0;font-weight:700;cursor:pointer;margin-bottom:4px;font-size:var(--fs-sm);min-height:44px;flex:1 1 auto;}
   nav button:hover{background:var(--gold-dark);}
   nav button.active{background:var(--navy);color:#fff;border-bottom-color:var(--primary);}
@@ -148,7 +148,7 @@
 
   /* ---- Desktop: widen the shell ---- */
   @media (min-width:1024px){
-    main{max-width:1100px;}
+    header,nav,main{max-width:1100px;}
     #prospectList,#overviewList,#completedList,#rosterList,#blackoutList{grid-template-columns:repeat(auto-fill,minmax(320px,1fr));}
   }
 </style>
