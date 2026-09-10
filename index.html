@@ -276,7 +276,7 @@
     <div id="sameDayPanel"></div>
     <p class="helptext" id="endPreview"></p>
     <fieldset class="field" style="border:none;padding:0;margin:0 0 14px;">
-      <legend style="font-size:14px;font-weight:700;margin-bottom:5px;padding:0;">Prayer Ministers (2–4) *</legend>
+      <legend style="font-size:14px;font-weight:700;margin-bottom:5px;padding:0;">Prayer Ministers (2 or more) *</legend>
       <div class="minister-list" id="ministerList"></div>
       <p class="helptext" id="selCount">0 selected</p>
       <p class="helptext">Tap a name to select; use the Lead/Support pills to mark who's leading.</p>
@@ -350,7 +350,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-10.8";
+const APP_VERSION = "2026-09-10.9";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -845,8 +845,8 @@ function renderMinisterList(){
       </div>`:''}
     </div>`;
   }).join('');
-  $('#selCount').textContent = `${selectedMinisters.length} selected (choose 2–4)`;
-  $('#selCount').style.color = (selectedMinisters.length<2||selectedMinisters.length>4) ? 'var(--danger)' : 'var(--muted)';
+  $('#selCount').textContent = `${selectedMinisters.length} selected (choose 2 or more)`;
+  $('#selCount').style.color = (selectedMinisters.length<2) ? 'var(--danger)' : 'var(--muted)';
   renderConflictCheck();
 }
 window.toggleMinister = function(id){
@@ -985,7 +985,7 @@ async function onSaveSession(){
   // the roster) get counted or written back out, even if one somehow ended
   // up in selectedMinisters.
   selectedMinisters = selectedMinisters.filter(m=>ministers.some(x=>x.id===m.id));
-  if(selectedMinisters.length<2||selectedMinisters.length>4){ msg.innerHTML='<div class="errbox" role="alert">Please select between 2 and 4 prayer ministers.</div>'; return; }
+  if(selectedMinisters.length<2){ msg.innerHTML='<div class="errbox" role="alert">Please select at least 2 prayer ministers.</div>'; return; }
 
   const selIds = selectedMinisters.map(m=>m.id);
   const conflictSessions = sessions.filter(s=>{
