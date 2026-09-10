@@ -265,6 +265,7 @@
       <div class="field"><label for="sessEndTime">End Time *</label><input type="time" id="sessEndTime"></div>
     </div>
     <div id="slotButtons"></div>
+    <div id="conflictPanel"></div>
     <div id="sameDayPanel"></div>
     <p class="helptext" id="endPreview"></p>
     <fieldset class="field" style="border:none;padding:0;margin:0 0 14px;">
@@ -342,7 +343,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-10.2";
+const APP_VERSION = "2026-09-10.3";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -604,10 +605,11 @@ function wireApp(){
   $('#range').addEventListener('change', renderSchedule);
   $('#btnNew').addEventListener('click', ()=>openModal());
   $('#btnCancel').addEventListener('click', ()=>$('#sessionModal').classList.remove('open'));
-  $('#sessDate').addEventListener('change', ()=>{ renderMinisterList(); updateEndPreview(); renderSameDay(); renderDayLabel(); renderSlotButtons(); });
-  $('#sessTime').addEventListener('change', ()=>{ autoSetEndTime(); renderSlotButtons(); });
-  $('#sessEndTime').addEventListener('change', updateEndPreview);
-  $('#recipName').addEventListener('input', updateLastSeen);
+  $('#sessDate').addEventListener('change', ()=>{ renderMinisterList(); updateEndPreview(); renderSameDay(); renderConflictCheck(); renderDayLabel(); renderSlotButtons(); });
+  $('#sessTime').addEventListener('change', ()=>{ autoSetEndTime(); renderSlotButtons(); renderConflictCheck(); });
+  $('#sessEndTime').addEventListener('change', ()=>{ updateEndPreview(); renderConflictCheck(); });
+  $('#sessLocation').addEventListener('change', renderConflictCheck);
+  $('#recipName').addEventListener('input', ()=>{ updateLastSeen(); renderConflictCheck(); });
   $('#followupSearch').addEventListener('input', onFollowupSearch);
   $('#btnSave').addEventListener('click', ()=>withLoading($('#btnSave'), 'Saving…', onSaveSession));
   $('#btnAddLocation').addEventListener('click', ()=>{ $('#newLocationName').value=''; $('#locModalMsg').innerHTML=''; $('#locationModal').classList.add('open'); $('#newLocationName').focus(); });
@@ -815,6 +817,7 @@ function renderMinisterList(){
   }).join('');
   $('#selCount').textContent = `${selectedMinisters.length} selected (choose 2–4)`;
   $('#selCount').style.color = (selectedMinisters.length<2||selectedMinisters.length>4) ? 'var(--danger)' : 'var(--muted)';
+  renderConflictCheck();
 }
 window.toggleMinister = function(id){
   const idx = selectedMinisters.findIndex(x=>x.id===id);
@@ -870,6 +873,51 @@ function renderSameDay(){
     same.sort((a,b)=>a.time.localeCompare(b.time)).map(s=>
       `<div>${fmt12(s.time)}–${fmt12(s.endTime)} — ${escapeHtml(s.recipName)} <span class="helptext">(${escapeHtml(ministerNamesOf(s))}, ${escapeHtml(locationName(s.location))})</span></div>`
     ).join('') + `</div>`;
+}
+function renderConflictCheck(){
+  const box = $('#conflictPanel');
+  const dateVal = $('#sessDate').value, t = $('#sessTime').value, et = $('#sessEndTime').value;
+  if(!dateVal || !t || !et){ box.innerHTML=''; return; }
+  const start = new Date(dateVal+'T'+t), end = new Date(dateVal+'T'+et);
+  if(!(end>start)){ box.innerHTML=''; return; }
+
+  const overlapping = sessions.filter(s=>{
+    if(editingId && s.id===editingId) return false;
+    if(s.date!==dateVal) return false;
+    const sStart=new Date(s.date+'T'+s.time), sEnd=new Date(s.date+'T'+s.endTime);
+    return start<sEnd && end>sStart;
+  });
+  if(!overlapping.length){ box.innerHTML=''; return; }
+
+  const conflicts = [];
+
+  const selIds = selectedMinisters.map(m=>m.id);
+  const minNames = new Set();
+  overlapping.forEach(s=> ministerIdsOf(s).forEach(id=>{
+    if(selIds.includes(id)){ const m=ministers.find(x=>x.id===id); if(m) minNames.add(m.name); }
+  }));
+  if(minNames.size){
+    conflicts.push(`Prayer minister — <strong>${[...minNames].map(escapeHtml).join(', ')}</strong> ${minNames.size===1?'is':'are'} already booked this time.`);
+  }
+
+  const locationId = parseInt($('#sessLocation').value,10);
+  if(locationId){
+    const roomHit = overlapping.find(s=>s.location===locationId);
+    if(roomHit){
+      conflicts.push(`Room — <strong>${escapeHtml(locationName(locationId))}</strong> is already booked ${fmt12(roomHit.time)}–${fmt12(roomHit.endTime)} with ${escapeHtml(roomHit.recipName)}.`);
+    }
+  }
+
+  const recipName = $('#recipName').value.trim().toLowerCase();
+  if(recipName){
+    const recipHit = overlapping.find(s=>s.recipName.trim().toLowerCase()===recipName);
+    if(recipHit){
+      conflicts.push(`Recipient — <strong>${escapeHtml(recipHit.recipName)}</strong> already has a session ${fmt12(recipHit.time)}–${fmt12(recipHit.endTime)} at this time.`);
+    }
+  }
+
+  if(!conflicts.length){ box.innerHTML=''; return; }
+  box.innerHTML = `<div class="errbox" role="alert"><div style="font-weight:700;margin-bottom:4px;">Scheduling conflict</div>${conflicts.map(c=>`<div>${c}</div>`).join('')}</div>`;
 }
 
 async function onSaveSession(){
