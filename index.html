@@ -132,6 +132,10 @@
   #appRoot{display:none;}
   #updateBanner{position:sticky;top:0;z-index:60;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;background:var(--navy);color:#fff;padding:10px 16px;font-size:var(--fs-sm);text-align:center;}
   #updateBanner .btn{background:var(--primary);color:var(--on-primary);padding:6px 14px;min-height:auto;font-size:var(--fs-xs);}
+  #conflictToast{position:fixed;top:14px;left:50%;z-index:100;width:520px;max-width:92vw;display:flex;align-items:flex-start;gap:10px;background:var(--danger-bg);color:var(--danger);border:1px solid #f3c6c0;border-radius:8px;box-shadow:var(--shadow-lg);padding:12px 14px;font-size:var(--fs-sm);opacity:0;pointer-events:none;transform:translate(-50%,-16px);transition:opacity .2s ease,transform .2s ease;}
+  #conflictToast.show{opacity:1;pointer-events:auto;transform:translate(-50%,0);}
+  .conflict-toast-body{flex:1;}
+  .conflict-toast-dismiss{background:none;border:none;color:var(--danger);font-size:22px;line-height:1;cursor:pointer;padding:0 2px;flex-shrink:0;min-height:auto;}
 
   /* ---- Tablet and up ---- */
   @media (min-width:640px){
@@ -265,7 +269,6 @@
       <div class="field"><label for="sessEndTime">End Time *</label><input type="time" id="sessEndTime"></div>
     </div>
     <div id="slotButtons"></div>
-    <div id="conflictPanel"></div>
     <div id="sameDayPanel"></div>
     <p class="helptext" id="endPreview"></p>
     <fieldset class="field" style="border:none;padding:0;margin:0 0 14px;">
@@ -343,7 +346,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-10.3";
+const APP_VERSION = "2026-09-10.4";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -604,7 +607,7 @@ function wireApp(){
   $('#search').addEventListener('input', renderSchedule);
   $('#range').addEventListener('change', renderSchedule);
   $('#btnNew').addEventListener('click', ()=>openModal());
-  $('#btnCancel').addEventListener('click', ()=>$('#sessionModal').classList.remove('open'));
+  $('#btnCancel').addEventListener('click', ()=>{ $('#sessionModal').classList.remove('open'); hideConflictToast(); });
   $('#sessDate').addEventListener('change', ()=>{ renderMinisterList(); updateEndPreview(); renderSameDay(); renderConflictCheck(); renderDayLabel(); renderSlotButtons(); });
   $('#sessTime').addEventListener('change', ()=>{ autoSetEndTime(); renderSlotButtons(); renderConflictCheck(); });
   $('#sessEndTime').addEventListener('change', ()=>{ updateEndPreview(); renderConflictCheck(); });
@@ -630,13 +633,14 @@ function wireApp(){
 document.querySelectorAll('.modal-bg').forEach(bg=>{
   bg.addEventListener('click', (e)=>{
     if(e.target!==bg) return;
-    if(bg.id==='confirmModal') closeConfirm(false); else bg.classList.remove('open');
+    if(bg.id==='confirmModal') closeConfirm(false); else { bg.classList.remove('open'); hideConflictToast(); }
   });
 });
 document.addEventListener('keydown', (e)=>{
   if(e.key!=='Escape') return;
   if($('#confirmModal').classList.contains('open')) closeConfirm(false);
   document.querySelectorAll('.modal-bg.open').forEach(bg=>bg.classList.remove('open'));
+  hideConflictToast();
 });
 
 function switchTab(tab){
@@ -827,7 +831,7 @@ window.toggleMinister = function(id){
 window.setRole = function(id, role){ const sel=selectedMinisters.find(x=>x.id===id); if(sel) sel.role=role; renderMinisterList(); };
 
 const DAY_WINDOWS = {
-  0: { label:'Sunday', start:'16:00', end:'19:00', presets:['16:00','17:00','17:30'] },
+  0: { label:'Sunday', start:'16:00', end:'19:00', presets:['16:00','17:00','17:30','18:00'] },
   2: { label:'Tuesday', start:'18:00', end:'19:30', presets:['18:00'] },
 };
 function slotStartsFor(dateStr){
@@ -850,7 +854,7 @@ function renderSlotButtons(){
   if(!starts.length){ box.innerHTML = d ? '<p class="helptext">No preset window for this day — pick any custom start/end time above.</p>' : ''; return; }
   box.innerHTML = starts.map(t=>`<button type="button" class="slot-btn ${$('#sessTime').value===t?'chosen':''}" onclick="pickSlot('${t}')">${fmt12(t)}</button>`).join('');
 }
-window.pickSlot = function(t){ $('#sessTime').value = t; autoSetEndTime(); renderSlotButtons(); };
+window.pickSlot = function(t){ $('#sessTime').value = t; autoSetEndTime(); renderSlotButtons(); renderConflictCheck(); };
 function autoSetEndTime(){
   const t = $('#sessTime').value; if(!t) return;
   const [h,m] = t.split(':').map(Number); const total = h*60+m+90;
@@ -874,20 +878,42 @@ function renderSameDay(){
       `<div>${fmt12(s.time)}–${fmt12(s.endTime)} — ${escapeHtml(s.recipName)} <span class="helptext">(${escapeHtml(ministerNamesOf(s))}, ${escapeHtml(locationName(s.location))})</span></div>`
     ).join('') + `</div>`;
 }
+let conflictToastTimer = null;
+function showConflictToast(html){
+  let toast = document.getElementById('conflictToast');
+  if(!toast){
+    toast = document.createElement('div');
+    toast.id = 'conflictToast';
+    toast.setAttribute('role', 'alert');
+    toast.innerHTML = `<div class="conflict-toast-body"></div><button type="button" class="conflict-toast-dismiss" aria-label="Dismiss">&times;</button>`;
+    toast.querySelector('.conflict-toast-dismiss').addEventListener('click', hideConflictToast);
+    document.body.appendChild(toast);
+  }
+  toast.querySelector('.conflict-toast-body').innerHTML = html;
+  toast.classList.add('show');
+  clearTimeout(conflictToastTimer);
+  conflictToastTimer = setTimeout(hideConflictToast, 5000);
+}
+function hideConflictToast(){
+  clearTimeout(conflictToastTimer);
+  const toast = document.getElementById('conflictToast');
+  if(toast) toast.classList.remove('show');
+}
 function renderConflictCheck(){
-  const box = $('#conflictPanel');
   const dateVal = $('#sessDate').value, t = $('#sessTime').value, et = $('#sessEndTime').value;
-  if(!dateVal || !t || !et){ box.innerHTML=''; return; }
+  if(!dateVal || !t || !et){ hideConflictToast(); return; }
   const start = new Date(dateVal+'T'+t), end = new Date(dateVal+'T'+et);
-  if(!(end>start)){ box.innerHTML=''; return; }
+  if(!(end>start)){ hideConflictToast(); return; }
 
+  // Only sessions on the same date AND whose time range actually overlaps
+  // this one count — same day at a different time is not a conflict.
   const overlapping = sessions.filter(s=>{
     if(editingId && s.id===editingId) return false;
     if(s.date!==dateVal) return false;
     const sStart=new Date(s.date+'T'+s.time), sEnd=new Date(s.date+'T'+s.endTime);
     return start<sEnd && end>sStart;
   });
-  if(!overlapping.length){ box.innerHTML=''; return; }
+  if(!overlapping.length){ hideConflictToast(); return; }
 
   const conflicts = [];
 
@@ -916,8 +942,8 @@ function renderConflictCheck(){
     }
   }
 
-  if(!conflicts.length){ box.innerHTML=''; return; }
-  box.innerHTML = `<div class="errbox" role="alert"><div style="font-weight:700;margin-bottom:4px;">Scheduling conflict</div>${conflicts.map(c=>`<div>${c}</div>`).join('')}</div>`;
+  if(!conflicts.length){ hideConflictToast(); return; }
+  showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Scheduling conflict</div>${conflicts.map(c=>`<div>${c}</div>`).join('')}`);
 }
 
 async function onSaveSession(){
@@ -968,6 +994,7 @@ async function onSaveSession(){
     if(editingId) await updateItem('sessions', editingId, fields);
     else await createItem('sessions', fields);
     $('#sessionModal').classList.remove('open');
+    hideConflictToast();
     await loadAll();
   }catch(e){
     msg.innerHTML = `<div class="errbox" role="alert">Save failed: ${e.message}</div>`;
