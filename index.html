@@ -129,6 +129,8 @@
   #signinScreen .helptext{color:var(--navy);font-size:var(--fs-sm);}
   #signinScreen button.btn{margin-top:16px;}
   #appRoot{display:none;}
+  #updateBanner{position:sticky;top:0;z-index:60;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;background:var(--navy);color:#fff;padding:10px 16px;font-size:var(--fs-sm);text-align:center;}
+  #updateBanner .btn{background:var(--primary);color:var(--on-primary);padding:6px 14px;min-height:auto;font-size:var(--fs-xs);}
 
   /* ---- Tablet and up ---- */
   @media (min-width:640px){
@@ -254,8 +256,8 @@
       </div>
     </div>
     <div class="row2">
-      <div class="field"><label for="sessTime">Start Time *</label><input type="time" id="sessTime" step="1800"></div>
-      <div class="field"><label for="sessEndTime">End Time *</label><input type="time" id="sessEndTime" step="1800"></div>
+      <div class="field"><label for="sessTime">Start Time *</label><input type="time" id="sessTime"></div>
+      <div class="field"><label for="sessEndTime">End Time *</label><input type="time" id="sessEndTime"></div>
     </div>
     <div id="slotButtons"></div>
     <div id="sameDayPanel"></div>
@@ -333,6 +335,10 @@
 </div>
 
 <script>
+// Bump this string every time you publish a change — open tabs poll for it
+// and prompt the user to reload once it no longer matches what's deployed.
+const APP_VERSION = "2026-09-10.1";
+
 /* =========================================================================
    CONFIG — from your Azure AD app registration
 ========================================================================= */
@@ -473,6 +479,12 @@ async function createItem(key, fields){
   const resp = await graphFetch(`/sites/${siteId}/lists/${listIds[key]}/items`, {
     method:'POST', body: JSON.stringify({ fields })
   });
+  // Graph's create endpoint doesn't always reliably persist every field from
+  // the initial POST (seen with AssignedMinisterIDs/LeadMinisterIDs landing
+  // blank or stale right after creation). A follow-up PATCH through the same
+  // path updateItem() uses reliably sets them, so every create is immediately
+  // confirmed via update rather than trusting the POST alone.
+  await updateItem(key, resp.id, fields);
   return resp;
 }
 async function updateItem(key, itemId, fields){
@@ -649,6 +661,7 @@ function renderSchedule(){
           </div>
           <div class="meta">${fmtDate(s._start)} · ${fmtTime(s._start)} – ${fmtTime(s._end)} · ${escapeHtml(locationName(s.location))}</div>
           <div class="meta">${escapeHtml(ministerNamesOf(s))}</div>
+          ${s.notes ? `<div class="meta">${escapeHtml(s.notes)}</div>` : ''}
           <div class="meta">
             <button type="button" class="wa-toggle ${s.waCreated?'on':''}" aria-pressed="${s.waCreated?'true':'false'}" onclick="toggleWa(${s.id})">${ICONS.chat} ${s.waCreated?'WhatsApp group created':'No WhatsApp group yet — tap to mark created'}</button>
             ${s.waCreated && s.waLink ? ` · <a href="${escapeHtml(s.waLink)}" target="_blank" rel="noopener">open chat</a>` : ''}
@@ -689,6 +702,7 @@ function renderCompleted(){
       </div>
       <div class="meta">${fmtDate(d)} · ${fmt12(s.time)} – ${fmt12(s.endTime)} · ${escapeHtml(locationName(s.location))}</div>
       <div class="meta">${escapeHtml(ministerNamesOf(s))}</div>
+      ${s.notes ? `<div class="meta">${escapeHtml(s.notes)}</div>` : ''}
     </div>`;
   }).join('');
 }
@@ -862,10 +876,6 @@ async function onSaveSession(){
   const status = editingId ? $('#sessStatus').value : 'Scheduled';
 
   if(!recipName||!date||!time||!endTime){ msg.innerHTML='<div class="errbox" role="alert">Please fill in recipient name, date, start time, and end time.</div>'; return; }
-  const mp = parseInt(time.split(':')[1],10);
-  if(mp!==0 && mp!==30){ msg.innerHTML='<div class="errbox" role="alert">Start time must be on the hour or half-hour.</div>'; return; }
-  const emp = parseInt(endTime.split(':')[1],10);
-  if(emp!==0 && emp!==30){ msg.innerHTML='<div class="errbox" role="alert">End time must be on the hour or half-hour.</div>'; return; }
   const start=new Date(date+'T'+time), end=new Date(date+'T'+endTime);
   if(end<=start){ msg.innerHTML='<div class="errbox" role="alert">End time must be after the start time.</div>'; return; }
   if(selectedMinisters.length<2||selectedMinisters.length>4){ msg.innerHTML='<div class="errbox" role="alert">Please select between 2 and 4 prayer ministers.</div>'; return; }
@@ -1031,6 +1041,33 @@ function renderOverview(){
     </div>`;
   }).join('');
 }
+
+/* =========================================================================
+   UPDATE CHECK — polls the deployed index.html for a newer APP_VERSION
+========================================================================= */
+let updateBannerShown = false;
+async function checkForUpdate(){
+  if(updateBannerShown) return;
+  try{
+    const res = await fetch(location.pathname + '?_=' + Date.now(), { cache: 'no-store' });
+    if(!res.ok) return;
+    const text = await res.text();
+    const match = text.match(/const APP_VERSION\s*=\s*"([^"]+)"/);
+    if(match && match[1] !== APP_VERSION) showUpdateBanner();
+  }catch(e){ /* offline or blocked — just try again next interval */ }
+}
+function showUpdateBanner(){
+  if(updateBannerShown) return;
+  updateBannerShown = true;
+  const bar = document.createElement('div');
+  bar.id = 'updateBanner';
+  bar.setAttribute('role', 'status');
+  bar.innerHTML = `<span>A new version of this app is available.</span><button type="button" class="btn" id="btnReloadApp">Reload</button>`;
+  document.body.prepend(bar);
+  document.getElementById('btnReloadApp').addEventListener('click', ()=>location.reload());
+}
+setInterval(checkForUpdate, 5*60*1000);
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') checkForUpdate(); });
 
 init();
 </script>
