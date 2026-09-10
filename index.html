@@ -48,6 +48,7 @@
   body{margin:0;font-family:'Jost','Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text);font-size:var(--fs-base);line-height:1.55;}
   header{max-width:960px;margin:0 auto;background:var(--cream);color:var(--navy);padding:16px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;border-bottom:1px solid rgba(0,0,0,.06);}
   header h1,#signinScreen h1{margin:0;font-size:var(--fs-xl);font-family:'Playfair Display',Georgia,serif;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--gold);}
+  .version-tag{margin:2px 0 0;font-family:'Jost','Segoe UI',Arial,sans-serif;font-size:var(--fs-2xs);font-weight:400;letter-spacing:normal;text-transform:none;color:var(--muted);}
   header .who{font-size:var(--fs-xs);color:var(--navy);}
   nav{max-width:960px;margin:0 auto;display:flex;gap:6px;padding:8px 10px 0;background:#fff;border-bottom:1px solid var(--border);box-shadow:var(--shadow-sm);flex-wrap:wrap;position:relative;z-index:1;}
   nav button{background:var(--gold);color:#fff;border:none;border-bottom:4px solid transparent;padding:10px 14px;border-radius:6px 6px 0 0;font-weight:700;cursor:pointer;margin-bottom:4px;font-size:var(--fs-sm);min-height:44px;flex:1 1 auto;}
@@ -159,13 +160,17 @@
 
 <div id="signinScreen">
   <h1>Prayer Ministry Scheduler</h1>
+  <p class="version-tag" id="versionTagSignin"></p>
   <p class="helptext" id="signinMsg">Sign in with your Microsoft 365 account to continue.</p>
   <button class="btn" id="btnSignIn">Sign in with Microsoft</button>
 </div>
 
 <div id="appRoot">
 <header>
-  <h1>Prayer Ministry Scheduler</h1>
+  <div>
+    <h1>Prayer Ministry Scheduler</h1>
+    <span class="version-tag" id="versionTagHeader"></span>
+  </div>
   <div style="display:flex;align-items:center;gap:12px;">
     <span class="who" id="whoami"></span>
     <button class="btn secondary" id="btnSignOut" style="padding:8px 14px;min-height:36px;">Sign Out</button>
@@ -337,7 +342,8 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-10.1";
+const APP_VERSION = "2026-09-10.2";
+document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
    CONFIG — from your Azure AD app registration
@@ -520,7 +526,8 @@ async function loadAll(){
       endTime: toHM(s.SessionEndDate),
       location: (locations.find(l=>l.name===s.LocationName)||{}).id || null,
       notes: s.Notes||'',
-      ministers: allIds.map(id=>({ id: parseInt(id,10), role: leadIds.has(id) ? 'Lead' : 'Support' })),
+      ministers: allIds.map(id=>({ id: parseInt(id,10), role: leadIds.has(id) ? 'Lead' : 'Support' }))
+        .filter(m=>!isNaN(m.id) && ministers.some(x=>x.id===m.id)),
       apptType: s.ApptType||'First', status: s.Status||'Scheduled',
       prevId: s.PreviousSessionId||null,
       waCreated: !!s.WaCreated, waLink: s.WaLink||''
@@ -878,6 +885,10 @@ async function onSaveSession(){
   if(!recipName||!date||!time||!endTime){ msg.innerHTML='<div class="errbox" role="alert">Please fill in recipient name, date, start time, and end time.</div>'; return; }
   const start=new Date(date+'T'+time), end=new Date(date+'T'+endTime);
   if(end<=start){ msg.innerHTML='<div class="errbox" role="alert">End time must be after the start time.</div>'; return; }
+  // Defensive: never let a stale/invalid id (e.g. a minister no longer on
+  // the roster) get counted or written back out, even if one somehow ended
+  // up in selectedMinisters.
+  selectedMinisters = selectedMinisters.filter(m=>ministers.some(x=>x.id===m.id));
   if(selectedMinisters.length<2||selectedMinisters.length>4){ msg.innerHTML='<div class="errbox" role="alert">Please select between 2 and 4 prayer ministers.</div>'; return; }
 
   const selIds = selectedMinisters.map(m=>m.id);
