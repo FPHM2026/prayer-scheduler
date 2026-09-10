@@ -350,7 +350,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-10.7";
+const APP_VERSION = "2026-09-10.8";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -525,8 +525,13 @@ async function loadAll(){
   prospects = rawProsp.map(p => ({ id: p.id, name: p.Title, contact: p.Contact||'', notes: p.Notes||'', dateAdded: (p.DateAdded||'').split('T')[0] }));
   blackouts = rawBlack.map(b => ({ id: b.id, ministerName: b.Title, date: (b.BlackoutDate||'').split('T')[0], notes: b.Notes||'' }));
   sessions = rawSess.map(s => {
-    const allIds = (s.AssignedMinisterIDs||'').split(',').map(x=>x.trim()).filter(Boolean);
-    const leadIds = new Set((s.LeadMinisterIDs||'').split(',').map(x=>x.trim()).filter(Boolean));
+    // Defensive against the "Multiple lines of text" defaulting to Rich Text
+    // gotcha (see CLAUDE.md #5): if LeadMinisterIDs/AssignedMinisterIDs ever
+    // comes back HTML-wrapped (e.g. "<div>3</div>"), the raw id would never
+    // string-match its plain-text counterpart and no one would show as Lead.
+    const stripHtml = v => String(v||'').replace(/<[^>]*>/g, '');
+    const allIds = stripHtml(s.AssignedMinisterIDs).split(',').map(x=>x.trim()).filter(Boolean);
+    const leadIds = new Set(stripHtml(s.LeadMinisterIDs).split(',').map(x=>x.trim()).filter(Boolean));
     return {
       id: s.id,
       recipName: s.RecipientName||'', recipContact: s.RecipientContact||'',
