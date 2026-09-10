@@ -346,7 +346,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-10.4";
+const APP_VERSION = "2026-09-10.5";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -878,7 +878,6 @@ function renderSameDay(){
       `<div>${fmt12(s.time)}–${fmt12(s.endTime)} — ${escapeHtml(s.recipName)} <span class="helptext">(${escapeHtml(ministerNamesOf(s))}, ${escapeHtml(locationName(s.location))})</span></div>`
     ).join('') + `</div>`;
 }
-let conflictToastTimer = null;
 function showConflictToast(html){
   let toast = document.getElementById('conflictToast');
   if(!toast){
@@ -891,11 +890,8 @@ function showConflictToast(html){
   }
   toast.querySelector('.conflict-toast-body').innerHTML = html;
   toast.classList.add('show');
-  clearTimeout(conflictToastTimer);
-  conflictToastTimer = setTimeout(hideConflictToast, 5000);
 }
 function hideConflictToast(){
-  clearTimeout(conflictToastTimer);
   const toast = document.getElementById('conflictToast');
   if(toast) toast.classList.remove('show');
 }
