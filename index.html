@@ -167,8 +167,8 @@
   #updateBanner .btn:hover:not(:disabled){background:var(--navy-dark);}
 
   /* ---- Preview-build badge: hidden until a newer preview/ build exists ---- */
-  .preview-badge{display:inline-flex;align-items:center;gap:6px;background:var(--gold);color:#fff;padding:7px 13px;border-radius:20px;font-size:var(--fs-xs);font-weight:700;text-decoration:none;white-space:nowrap;box-shadow:var(--shadow-sm);}
-  .preview-badge:hover{background:var(--gold-dark);color:#fff;}
+  .preview-badge{display:inline-flex;align-items:center;gap:6px;background:var(--primary);color:var(--on-primary);padding:7px 13px;border-radius:20px;font-size:var(--fs-xs);font-weight:700;text-decoration:none;white-space:nowrap;box-shadow:var(--shadow-sm);}
+  .preview-badge:hover{background:var(--primary-dark);color:var(--on-primary);}
   #previewModeBanner{position:sticky;top:0;z-index:65;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;background:var(--navy);color:#fff;padding:14px 20px;font-size:var(--fs-sm);text-align:center;border-bottom:3px solid var(--gold);}
   #previewModeBanner strong{color:var(--gold);}
   #previewModeBanner a.btn{background:#fff;color:var(--navy);padding:7px 16px;min-height:auto;font-size:var(--fs-xs);font-weight:800;text-decoration:none;border-radius:6px;display:inline-block;}
@@ -524,7 +524,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-11.3";
+const APP_VERSION = "2026-09-11.4";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1755,10 +1755,12 @@ setInterval(checkForUpdate, 5*60*1000);
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') checkForUpdate(); });
 
 /* =========================================================================
-   PREVIEW BADGE — polls preview/index.html for a build newer than the one
-   you've already clicked into. Stays hidden until there's something new.
+   PREVIEW BADGE — polls preview/index.html's own APP_VERSION and compares
+   it against THIS page's APP_VERSION (a factual "are they in sync" check,
+   not a per-browser dismissal): different means preview has something
+   beyond what's live, so the badge shows; once preview is merged back into
+   production and both carry the same version, it disappears for everyone.
 ========================================================================= */
-const PREVIEW_SEEN_KEY = 'fphm_seenPreviewVersion';
 async function checkForPreview(){
   const badge = document.getElementById('previewBadge');
   if(!badge) return;
@@ -1768,11 +1770,7 @@ async function checkForPreview(){
     const text = await res.text();
     const match = text.match(/const APP_VERSION\s*=\s*"([^"]+)"/);
     if(!match){ badge.hidden = true; return; }
-    const previewVersion = match[1];
-    let seen = null;
-    try{ seen = localStorage.getItem(PREVIEW_SEEN_KEY); }catch(e){}
-    badge.hidden = (previewVersion === seen);
-    badge.onclick = () => { try{ localStorage.setItem(PREVIEW_SEEN_KEY, previewVersion); }catch(e){} };
+    badge.hidden = (match[1] === APP_VERSION);
   }catch(e){ badge.hidden = true; /* no preview build deployed right now, or offline */ }
 }
 setInterval(checkForPreview, 5*60*1000);
