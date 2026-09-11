@@ -20,7 +20,7 @@
     --navy:#474747; --navy-dark:#333; --gold:#aa5a3c; --gold-dark:#8a4a30;
     --primary:#f28a00; --primary-dark:#ce7500; --on-primary:#1a1a1a;
     --cream:#e7e2cf; --bg:#faf8f4; --card:#fff; --border:#ddd5c4;
-    --text:#565656; --muted:#7a7a7a; --danger:#c0392b; --danger-bg:#fdecea;
+    --text:#565656; --muted:#7a7a7a; --muted-bar:#cdc4ac; --danger:#c0392b; --danger-bg:#fdecea;
     --ok:#2e7d32; --ok-bg:#e9f7ec;
     --shadow-sm:0 1px 2px rgba(35,28,20,.07),0 1px 1px rgba(35,28,20,.05);
     --shadow-md:0 6px 18px rgba(35,28,20,.10);
@@ -49,7 +49,7 @@
 
   /* ---- Header + nav: minimal, mobile-first, sticky single-row tab strip.
      Desktop (1024px+) restores the fuller header/nav treatment. ---- */
-  header{max-width:1100px;margin:0 auto;background:var(--cream);color:var(--navy);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid rgba(0,0,0,.06);}
+  header{max-width:1100px;margin:0 auto;background:var(--cream);color:var(--navy);padding:10px 14px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid rgba(0,0,0,.06);}
   header h1,#signinScreen h1{margin:0;font-size:17px;font-family:'Playfair Display',Georgia,serif;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:var(--gold);}
   #signinScreen h1{font-size:var(--fs-xl);letter-spacing:.03em;}
   .version-tag{display:none;font-family:'Jost','Segoe UI',Arial,sans-serif;font-weight:400;text-transform:none;color:var(--muted);}
@@ -57,8 +57,7 @@
   #btnSignOut{background:var(--navy);color:#fff;border-color:var(--navy);}
   #btnSignOut:hover:not(:disabled){background:var(--navy-dark);border-color:var(--navy-dark);}
 
-  nav[aria-label="Primary"]{position:sticky;top:0;z-index:20;max-width:1100px;margin:0 auto;display:flex;gap:4px;padding:6px 10px 0;background:#fff;border-bottom:1px solid var(--border);box-shadow:var(--shadow-sm);flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
-  nav[aria-label="Primary"]::-webkit-scrollbar{display:none;}
+  nav[aria-label="Primary"]{position:sticky;top:0;z-index:20;max-width:1100px;margin:0 auto;display:flex;gap:4px;flex-wrap:wrap;padding:6px 10px 0;background:#fff;border-bottom:1px solid var(--border);box-shadow:var(--shadow-sm);}
   nav[aria-label="Primary"] button{flex:0 0 auto;background:var(--gold);color:#fff;border:none;border-bottom:4px solid transparent;padding:9px 13px;border-radius:6px 6px 0 0;font-weight:700;cursor:pointer;margin-bottom:4px;font-size:var(--fs-xs);min-height:40px;white-space:nowrap;}
   nav[aria-label="Primary"] button:hover{background:var(--gold-dark);}
   nav[aria-label="Primary"] button.active{background:var(--navy);color:#fff;border-bottom-color:var(--primary);}
@@ -68,7 +67,7 @@
     header h1{font-size:var(--fs-xl);letter-spacing:.03em;}
     .version-tag{display:block;margin:2px 0 0;font-size:var(--fs-2xs);}
     header .who{display:inline;}
-    nav[aria-label="Primary"]{padding:8px 16px 0;flex-wrap:wrap;overflow-x:visible;}
+    nav[aria-label="Primary"]{padding:8px 16px 0;}
     nav[aria-label="Primary"] button{padding:12px 18px;font-size:var(--fs-sm);min-height:44px;}
   }
 
@@ -208,22 +207,33 @@
   .stat-line b{font-variant-numeric:tabular-nums;}
 
   /* ---- Completed Sessions: stat tiles + monthly trend ---- */
-  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px;}
-  .stat-tile{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;box-shadow:var(--shadow-sm);}
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px;align-items:stretch;}
+  .stat-tile{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;}
   .stat-label{font-size:var(--fs-2xs);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;}
   .stat-value{font-size:28px;line-height:1.2;font-weight:700;color:var(--text);margin-top:4px;font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
   .stat-delta{font-size:var(--fs-2xs);font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap;}
   .stat-delta.up{background:var(--ok-bg);color:var(--ok);}
   .stat-delta.down{background:#f1ede4;color:var(--muted);}
-  .stat-sub{font-size:var(--fs-2xs);color:var(--muted);margin-top:3px;}
-  .split-bar{height:6px;border-radius:3px;background:#f1ede4;margin-top:9px;overflow:hidden;}
+  /* Pinned to the bottom of the tile via margin-top:auto, regardless of how
+     much content (a split-bar, a delta badge) sits above it in a given
+     card - keeps the date line flush across every card in the row. */
+  .stat-sub{font-size:var(--fs-2xs);color:var(--muted);margin-top:auto;padding-top:10px;}
+  .stat-split-label{font-size:var(--fs-2xs);color:var(--muted);margin-top:8px;}
+  .split-bar{height:6px;border-radius:3px;background:#f1ede4;margin-top:6px;overflow:hidden;}
   .split-bar span{display:block;height:100%;background:var(--primary);}
 
   .trend-chart{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:18px;box-shadow:var(--shadow-sm);}
-  .trend-title{font-size:var(--fs-2xs);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;margin-bottom:14px;}
+  .trend-title-row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+  .trend-title{font-size:var(--fs-2xs);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;}
+  .trend-legend{display:flex;align-items:center;gap:5px;font-size:var(--fs-2xs);color:var(--muted);font-weight:600;white-space:nowrap;}
+  .trend-legend .legend-dot{width:9px;height:9px;border-radius:2px;display:inline-block;}
+  .trend-legend .legend-dot.this{background:var(--primary);}
+  .trend-legend .legend-dot.last{background:var(--muted-bar);margin-left:10px;}
   .trend-bars{display:flex;align-items:flex-end;gap:10px;height:76px;}
   .trend-bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;}
-  .trend-bar-fill{width:100%;max-width:28px;background:var(--primary);border-radius:4px 4px 2px 2px;}
+  .trend-bar-pair{display:flex;align-items:flex-end;justify-content:center;gap:3px;height:54px;}
+  .trend-bar-fill{width:100%;max-width:16px;background:var(--primary);border-radius:3px 3px 2px 2px;}
+  .trend-bar-fill.last{background:var(--muted-bar);}
   .trend-value{font-size:var(--fs-2xs);color:var(--text);font-weight:700;margin-bottom:4px;font-variant-numeric:tabular-nums;}
   .trend-label{font-size:var(--fs-2xs);color:var(--muted);margin-top:6px;}
 
@@ -251,7 +261,7 @@
   .overview-filters .search-wrap input{width:100%;}
   .overview-filters .date-wrap{min-width:150px;}
   .overview-filters .date-wrap label{display:block;font-size:var(--fs-sm);font-weight:700;margin-bottom:5px;}
-  @media (max-width:640px){ .overview-filters{flex-direction:column;align-items:stretch;} }
+  @media (max-width:640px){ .overview-filters{flex-direction:column;align-items:stretch;} .overview-filters .search-wrap{flex:none;} }
 
   .subtabs{display:flex;gap:20px;margin:4px 0 16px;border-bottom:1px solid var(--border);}
   .subtabs button{background:none;border:none;border-bottom:3px solid transparent;padding:8px 2px;font-weight:700;font-size:var(--fs-sm);color:var(--muted);cursor:pointer;}
@@ -529,7 +539,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-11.1-preview.1";
+const APP_VERSION = "2026-09-11.4-preview.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1060,11 +1070,16 @@ function completedStats(){
   const ytdThis = between(thisYearStart, now);
   const ytdLast = between(lastYearStart, lastYearSameDay);
   const firstTime = ytdThis.filter(s=>sessionNumberOf(s)===1).length;
+  const firstTimeLast = ytdLast.filter(s=>sessionNumberOf(s)===1).length;
   const monthCount = now.getMonth()+1;
   const monthly = Array.from({length:monthCount},(_,m)=> ytdThis.filter(s=> new Date(s.date+'T00:00').getMonth()===m).length);
+  const monthlyLast = Array.from({length:monthCount},(_,m)=> ytdLast.filter(s=> new Date(s.date+'T00:00').getMonth()===m).length);
   return { ytdThis: ytdThis.length, ytdLast: ytdLast.length,
     uniqueRecipients: new Set(ytdThis.map(s=>s.recipName.trim().toLowerCase())).size,
-    firstTime, returning: ytdThis.length-firstTime, monthly, now };
+    uniqueRecipientsLast: new Set(ytdLast.map(s=>s.recipName.trim().toLowerCase())).size,
+    firstTime, returning: ytdThis.length-firstTime,
+    firstTimeLast, returningLast: ytdLast.length-firstTimeLast,
+    monthly, monthlyLast, now };
 }
 function renderCompletedStats(){
   const st = completedStats();
@@ -1074,13 +1089,19 @@ function renderCompletedStats(){
   const delta = st.ytdLast===0 ? null : Math.round((st.ytdThis-st.ytdLast)/st.ytdLast*100);
   const deltaHtml = delta===null ? '' : `<span class="stat-delta ${delta>=0?'up':'down'}">${delta>=0?'▲':'▼'} ${Math.abs(delta)}%</span>`;
   const returningPct = st.ytdThis ? Math.round(st.returning/st.ytdThis*100) : 0;
+  const returningPctLast = st.ytdLast ? Math.round(st.returningLast/st.ytdLast*100) : 0;
   const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const maxMonthly = Math.max(1, ...st.monthly);
+  const maxMonthly = Math.max(1, ...st.monthly, ...st.monthlyLast);
   const bars = st.monthly.map((v,i)=>{
+    const vLast = st.monthlyLast[i] || 0;
     const h = Math.max(6, Math.round(v/maxMonthly*54));
-    return `<div class="trend-bar" title="${monthNames[i]}: ${v} completed">
+    const hLast = Math.max(vLast>0?4:0, Math.round(vLast/maxMonthly*54));
+    return `<div class="trend-bar" title="${monthNames[i]} ${now.getFullYear()}: ${v} completed · ${monthNames[i]} ${now.getFullYear()-1}: ${vLast} completed">
       <span class="trend-value">${v}</span>
-      <span class="trend-bar-fill" style="height:${h}px;"></span>
+      <div class="trend-bar-pair">
+        <span class="trend-bar-fill last" style="height:${hLast}px;"></span>
+        <span class="trend-bar-fill" style="height:${h}px;"></span>
+      </div>
       <span class="trend-label">${monthNames[i]}</span>
     </div>`;
   }).join('');
@@ -1088,10 +1109,28 @@ function renderCompletedStats(){
     <div class="stat-grid">
       <div class="stat-tile"><div class="stat-label">This Year (YTD)</div><div class="stat-value">${st.ytdThis}</div><div class="stat-sub">${rangeLabel}</div></div>
       <div class="stat-tile"><div class="stat-label">Same Period Last Year</div><div class="stat-value">${st.ytdLast} ${deltaHtml}</div><div class="stat-sub">${lastYearLabel}</div></div>
-      <div class="stat-tile"><div class="stat-label">Unique Recipients (YTD)</div><div class="stat-value">${st.uniqueRecipients}</div><div class="stat-sub">${rangeLabel}</div></div>
-      <div class="stat-tile"><div class="stat-label">First-Time / Returning</div><div class="stat-value">${st.firstTime} / ${st.returning}</div><div class="split-bar"><span style="width:${returningPct}%"></span></div></div>
+      <div class="stat-tile">
+        <div class="stat-label">Unique Recipients (YTD)</div>
+        <div class="stat-value">${st.uniqueRecipients}</div>
+        <div class="stat-split-label">${st.firstTime} first-time &middot; ${st.returning} returning</div>
+        <div class="split-bar"><span style="width:${returningPct}%"></span></div>
+        <div class="stat-sub">${rangeLabel}</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-label">Unique Recipients (Last Year)</div>
+        <div class="stat-value">${st.uniqueRecipientsLast}</div>
+        <div class="stat-split-label">${st.firstTimeLast} first-time &middot; ${st.returningLast} returning</div>
+        <div class="split-bar"><span style="width:${returningPctLast}%"></span></div>
+        <div class="stat-sub">${lastYearLabel}</div>
+      </div>
     </div>
-    <div class="trend-chart"><div class="trend-title">Completed sessions by month — ${now.getFullYear()}</div><div class="trend-bars">${bars}</div></div>`;
+    <div class="trend-chart">
+      <div class="trend-title-row">
+        <div class="trend-title">Completed sessions by month</div>
+        <div class="trend-legend"><span class="legend-dot this"></span>${now.getFullYear()}<span class="legend-dot last"></span>${now.getFullYear()-1}</div>
+      </div>
+      <div class="trend-bars">${bars}</div>
+    </div>`;
 }
 
 /* ---- PLANNING (Waiting-status sessions) ---- */
