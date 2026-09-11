@@ -49,7 +49,7 @@
 
   /* ---- Header + nav: minimal, mobile-first, sticky single-row tab strip.
      Desktop (1024px+) restores the fuller header/nav treatment. ---- */
-  header{max-width:1100px;margin:0 auto;background:var(--cream);color:var(--navy);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid rgba(0,0,0,.06);}
+  header{max-width:1100px;margin:0 auto;background:var(--cream);color:var(--navy);padding:10px 14px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid rgba(0,0,0,.06);}
   header h1,#signinScreen h1{margin:0;font-size:17px;font-family:'Playfair Display',Georgia,serif;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:var(--gold);}
   #signinScreen h1{font-size:var(--fs-xl);letter-spacing:.03em;}
   .version-tag{display:none;font-family:'Jost','Segoe UI',Arial,sans-serif;font-weight:400;text-transform:none;color:var(--muted);}
@@ -57,19 +57,22 @@
   #btnSignOut{background:var(--navy);color:#fff;border-color:var(--navy);}
   #btnSignOut:hover:not(:disabled){background:var(--navy-dark);border-color:var(--navy-dark);}
 
-  nav[aria-label="Primary"]{position:sticky;top:0;z-index:20;max-width:1100px;margin:0 auto;display:flex;gap:4px;padding:6px 10px 0;background:#fff;border-bottom:1px solid var(--border);box-shadow:var(--shadow-sm);flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
-  nav[aria-label="Primary"]::-webkit-scrollbar{display:none;}
-  nav[aria-label="Primary"] button{flex:0 0 auto;background:var(--gold);color:#fff;border:none;border-bottom:4px solid transparent;padding:9px 13px;border-radius:6px 6px 0 0;font-weight:700;cursor:pointer;margin-bottom:4px;font-size:var(--fs-xs);min-height:40px;white-space:nowrap;}
+  nav[aria-label="Primary"]{position:sticky;top:0;z-index:20;max-width:1100px;margin:0 auto;display:flex;gap:4px;flex-wrap:wrap;padding:6px 10px 0;background:#fff;border-bottom:1px solid var(--border);box-shadow:var(--shadow-sm);}
+  nav[aria-label="Primary"] button{flex:1 1 auto;background:var(--gold);color:#fff;border:none;border-bottom:4px solid transparent;padding:9px 8px;border-radius:6px 6px 0 0;font-weight:700;cursor:pointer;margin-bottom:4px;font-size:var(--fs-xs);min-height:40px;white-space:nowrap;}
   nav[aria-label="Primary"] button:hover{background:var(--gold-dark);}
   nav[aria-label="Primary"] button.active{background:var(--navy);color:#fff;border-bottom-color:var(--primary);}
   nav[aria-label="Primary"] button.active:hover{background:var(--navy-dark);}
+  nav[aria-label="Primary"] .tab-full{display:none;}
+  nav[aria-label="Primary"] .tab-short{display:inline;}
   @media (min-width:1024px){
     header{padding:16px 24px;}
     header h1{font-size:var(--fs-xl);letter-spacing:.03em;}
     .version-tag{display:block;margin:2px 0 0;font-size:var(--fs-2xs);}
     header .who{display:inline;}
-    nav[aria-label="Primary"]{padding:8px 16px 0;flex-wrap:wrap;overflow-x:visible;}
-    nav[aria-label="Primary"] button{padding:12px 18px;font-size:var(--fs-sm);min-height:44px;}
+    nav[aria-label="Primary"]{padding:8px 16px 0;}
+    nav[aria-label="Primary"] button{flex:0 0 auto;padding:12px 18px;font-size:var(--fs-sm);min-height:44px;}
+    nav[aria-label="Primary"] .tab-full{display:inline;}
+    nav[aria-label="Primary"] .tab-short{display:none;}
   }
 
   main{max-width:1100px;margin:0 auto;padding:14px 12px 50px;}
@@ -251,7 +254,7 @@
   .overview-filters .search-wrap input{width:100%;}
   .overview-filters .date-wrap{min-width:150px;}
   .overview-filters .date-wrap label{display:block;font-size:var(--fs-sm);font-weight:700;margin-bottom:5px;}
-  @media (max-width:640px){ .overview-filters{flex-direction:column;align-items:stretch;} }
+  @media (max-width:640px){ .overview-filters{flex-direction:column;align-items:stretch;} .overview-filters .search-wrap{flex:none;} }
 
   .subtabs{display:flex;gap:20px;margin:4px 0 16px;border-bottom:1px solid var(--border);}
   .subtabs button{background:none;border:none;border-bottom:3px solid transparent;padding:8px 2px;font-weight:700;font-size:var(--fs-sm);color:var(--muted);cursor:pointer;}
@@ -304,10 +307,10 @@
 <nav aria-label="Primary">
   <button data-tab="schedule" class="active" aria-current="page">Schedule</button>
   <button data-tab="planning">Planning</button>
-  <button data-tab="completed">Completed Sessions</button>
-  <button data-tab="overview">Minister Overview</button>
-  <button data-tab="roster">Prayer Ministers</button>
-  <button data-tab="blackouts">Blackout Dates</button>
+  <button data-tab="completed"><span class="tab-full">Completed Sessions</span><span class="tab-short">Completed</span></button>
+  <button data-tab="overview"><span class="tab-full">Minister Overview</span><span class="tab-short">Overview</span></button>
+  <button data-tab="roster"><span class="tab-full">Prayer Ministers</span><span class="tab-short">Ministers</span></button>
+  <button data-tab="blackouts"><span class="tab-full">Blackout Dates</span><span class="tab-short">Blackouts</span></button>
 </nav>
 <main>
 <div id="loadError"></div>
@@ -525,7 +528,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-11.1";
+const APP_VERSION = "2026-09-11.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
