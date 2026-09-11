@@ -44,7 +44,7 @@
   a:hover{color:var(--navy);}
   :focus-visible{outline:3px solid var(--navy);outline-offset:2px;}
   button{font-family:inherit;}
-  button,input,select,textarea,.group,.sess-row,.prospect-card,.roster-row{transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease,transform .15s ease,color .15s ease;}
+  button,input,select,textarea,.group,.sess-row,.prospect-card{transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease,transform .15s ease,color .15s ease;}
   body{margin:0;font-family:'Jost','Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text);font-size:var(--fs-base);line-height:1.55;}
 
   /* ---- Header + nav: minimal, mobile-first, sticky single-row tab strip.
@@ -302,8 +302,14 @@
   .flag-btn.active{color:var(--primary);}
   .flag-btn.active:hover{background:rgba(242,138,0,.14);color:var(--primary-dark);}
 
-  .roster-row{display:flex;align-items:center;gap:14px;padding:14px 18px;background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;box-shadow:var(--shadow-sm);}
-  .roster-row .group-main{flex:1;}
+  /* Minister Overview cards need manage-action icons inline in the header,
+     outside the toggle button (a <button> can't legally contain another
+     <button>) - .group-row-wrap holds both as siblings so the icons never
+     trigger the accordion toggle. */
+  .group-row-wrap{display:flex;align-items:center;}
+  .group-row-toggle{flex:1;min-width:0;display:flex;align-items:center;gap:14px;padding:16px 8px 16px 18px;background:none;border:none;cursor:pointer;text-align:left;}
+  .group-row-toggle:hover{background:#faf8f4;}
+  .group-row-wrap .sess-actions{padding-right:14px;flex-shrink:0;}
 
   /* ---- Tablet and up ---- */
   @media (min-width:640px){
@@ -338,8 +344,7 @@
   <button data-tab="schedule" class="active" aria-current="page">Schedule</button>
   <button data-tab="planning">Planning</button>
   <button data-tab="completed">Completed Sessions</button>
-  <button data-tab="overview">Minister Overview</button>
-  <button data-tab="roster">Prayer Ministers</button>
+  <button data-tab="overview">Prayer Ministers</button>
   <button data-tab="blackouts">Blackout Dates</button>
 </nav>
 <main>
@@ -388,7 +393,11 @@
   </section>
 
   <section class="panel" id="panel-overview">
-    <p class="helptext">Grouped by minister — tap a name for their stats and upcoming sessions.</p>
+    <div class="toolbar" style="margin-bottom:10px;">
+      <button class="btn" id="btnAddMinister">+ Add Minister</button>
+      <button class="btn secondary" id="rosterSortBtn" onclick="toggleRosterSort()" style="display:inline-flex;align-items:center;gap:7px;" aria-label="Toggle sort order, currently A to Z"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h11M3 12h7M3 17h4"/><path d="M17 5v14M17 5l-4 4M17 5l4 4"/></svg> A &rarr; Z</button>
+    </div>
+    <p class="helptext">Grouped by minister — tap a name for their stats and upcoming sessions, or use the icons to manage them.</p>
     <div class="stats-collapse" id="overviewStatsCollapse">
       <button class="stats-toggle" onclick="toggleStatsCollapse(this)" aria-expanded="true">
         <span class="chevron"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>
@@ -409,22 +418,6 @@
     </nav>
     <div id="overviewGroups"></div>
     <div class="no-results" id="overviewNoResults" hidden>No ministers match your search.</div>
-  </section>
-
-  <section class="panel" id="panel-roster">
-    <div class="toolbar" style="margin-bottom:10px;">
-      <button class="btn" id="btnAddMinister">+ Add Minister</button>
-      <button class="btn secondary" id="rosterSortBtn" onclick="toggleRosterSort()" style="display:inline-flex;align-items:center;gap:7px;" aria-label="Toggle sort order, currently A to Z"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h11M3 12h7M3 17h4"/><path d="M17 5v14M17 5l-4 4M17 5l4 4"/></svg> A &rarr; Z</button>
-    </div>
-    <div class="search-row">
-      <input id="rosterSearch" placeholder="Search ministers..." aria-label="Search ministers by name">
-    </div>
-    <nav class="subtabs" aria-label="Minister status" id="rosterSubtabs">
-      <button class="active" data-status="Active">Active</button>
-      <button data-status="Inactive">Inactive</button>
-    </nav>
-    <div id="rosterList"></div>
-    <div class="no-results" id="rosterNoResults" hidden>No ministers match your search.</div>
   </section>
 
   <section class="panel" id="panel-blackouts">
@@ -560,7 +553,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-11.6";
+const APP_VERSION = "2026-09-11.7";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -730,7 +723,7 @@ let editingId=null, prevId=null, selectedMinisters=[]; // selectedMinisters: [{i
 let sessKind = 'session'; // 'session' | 'waiting' — controls which session-modal fields show
 let editingMinisterId=null;
 let blackoutEditId=null;
-let rosterSubStatus='Active', rosterSortDir='az';
+let rosterSortDir='az';
 let overviewSubStatus='Active';
 let sessionNumberMap = new Map(); // session id -> chronological "Session #N" for that recipient
 
@@ -859,7 +852,7 @@ function groupRow(key, avatarText, name, countLabel, summaryHtml, bodyHtml, wasO
   </div>`;
 }
 
-function renderAll(){ renderSchedule(); renderPlanning(); renderCompleted(); renderOverview(); renderRoster(); renderBlackouts(); }
+function renderAll(){ renderSchedule(); renderPlanning(); renderCompleted(); renderOverview(); renderBlackouts(); }
 
 async function withLoading(btn, loadingText, fn){
   if(!btn) return fn();
@@ -927,12 +920,6 @@ function wireApp(){
   $('#overviewSearch').addEventListener('input', renderOverview);
   $('#statsFrom').addEventListener('change', renderOverview);
   $('#statsTo').addEventListener('change', renderOverview);
-  $('#rosterSearch').addEventListener('input', renderRoster);
-  $('#rosterSubtabs').querySelectorAll('button[data-status]').forEach(b=>b.addEventListener('click', ()=>{
-    rosterSubStatus = b.dataset.status;
-    $('#rosterSubtabs').querySelectorAll('button[data-status]').forEach(x=>x.classList.toggle('active', x===b));
-    renderRoster();
-  }));
   $('#overviewSubtabs').querySelectorAll('button[data-substatus]').forEach(b=>b.addEventListener('click', ()=>{
     overviewSubStatus = b.dataset.substatus;
     $('#overviewSubtabs').querySelectorAll('button[data-substatus]').forEach(x=>x.classList.toggle('active', x===b));
@@ -1573,27 +1560,21 @@ function renderOverview(){
                                 .sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
       return {m, led, supported, hours, upcoming};
     })
-    .filter(x=> overviewSubStatus==='Inactive' || x.led+x.supported>0)
     .filter(x=> !q || x.m.name.toLowerCase().includes(q))
-    .sort((a,b)=>{
-      if(!!a.upcoming.length !== !!b.upcoming.length) return a.upcoming.length ? -1 : 1;
-      if(a.upcoming.length) return (a.upcoming[0].date+a.upcoming[0].time).localeCompare((b.upcoming[0]?.date||'')+(b.upcoming[0]?.time||''));
-      return a.m.name.localeCompare(b.m.name);
-    });
+    .sort((a,b)=> rosterSortDir==='za' ? b.m.name.localeCompare(a.m.name) : a.m.name.localeCompare(b.m.name));
 
   noResults.hidden = rows.length>0;
   box.innerHTML = rows.map(({m,led,supported,hours,upcoming})=>{
     const total = led+supported;
     const summary = upcoming.length
       ? `<span class="next">Next: ${fmtShort(upcoming[0].date)} · ${fmt12(upcoming[0].time)}</span>`
-      : (m.status==='Inactive' ? 'Inactive' : 'No upcoming sessions');
+      : (m.status==='Inactive' ? 'Inactive' : (escapeHtml(m.email)||'No email on file'));
     const countLabel = `${total} session${total===1?'':'s'} in range`;
     const body = `
       <div class="stat-line">
         <span>Led: <b>${led}</b></span>
         <span>Supported: <b>${supported}</b></span>
         <span>Total hours: <b>${hours.toFixed(1)}</b></span>
-        ${m.status==='Inactive' ? '<span class="tag inactive" style="margin:0;">Inactive</span>' : ''}
       </div>
       ${upcoming.length ? upcoming.map(s=>`
         <div class="sess-row"><div>
@@ -1602,7 +1583,30 @@ function renderOverview(){
         </div></div>`).join('') : '<p class="helptext" style="margin:12px 4px 4px;">No upcoming sessions.</p>'}
     `;
     const wasOpen = opened.has(String(m.id)) ? opened.get(String(m.id)) : false;
-    return groupRow(String(m.id), initials(m.name), m.name, countLabel, summary, body, wasOpen);
+    const toActive = m.status==='Inactive';
+    return `
+    <div class="group${wasOpen ? ' open' : ''}" data-key="${m.id}">
+      <div class="group-row-wrap">
+        <button class="group-row-toggle" onclick="this.closest('.group').classList.toggle('open')" aria-expanded="${wasOpen}">
+          <span class="group-avatar" aria-hidden="true">${initials(m.name)}</span>
+          <span class="group-main">
+            <span class="group-name-row">
+              <span class="group-name">${escapeHtml(m.name)}</span>
+              <span class="group-count">${countLabel}</span>
+              ${m.status==='Inactive' ? '<span class="tag inactive">Inactive</span>' : ''}
+            </span>
+            <span class="group-summary">${summary}</span>
+          </span>
+          <span class="group-chevron">${ICONS.chevron}</span>
+        </button>
+        <div class="sess-actions">
+          <button class="icon-btn${toActive?' success':''}" onclick="toggleMinisterStatus(${m.id})" title="${toActive?'Activate':'Deactivate'}" aria-label="${toActive?'Activate':'Deactivate'} ${escapeHtml(m.name)}">${ICONS.power}</button>
+          <button class="icon-btn" onclick="editMinister(${m.id})" title="Edit" aria-label="Edit ${escapeHtml(m.name)}">${ICONS.pencil}</button>
+          <button class="icon-btn danger" onclick="deleteMinister(${m.id})" title="Delete" aria-label="Delete ${escapeHtml(m.name)}">${ICONS.trash}</button>
+        </div>
+      </div>
+      <div class="group-body"><div class="group-body-inner">${body}</div></div>
+    </div>`;
   }).join('');
 
   renderOverviewStats();
@@ -1646,40 +1650,13 @@ function renderOverviewStats(){
     </div>`;
 }
 
-/* ---- PRAYER MINISTERS ---- */
-function renderRoster(){
-  const q = $('#rosterSearch').value.trim().toLowerCase();
-  const box = $('#rosterList'); const noResults = $('#rosterNoResults');
-  const rows = ministers
-    .filter(m=>m.status===rosterSubStatus)
-    .filter(m=> !q || m.name.toLowerCase().includes(q))
-    .sort((a,b)=> rosterSortDir==='za' ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name));
-  noResults.hidden = rows.length>0;
-  box.innerHTML = rows.map(m=>{
-    const toActive = m.status==='Inactive';
-    return `<div class="roster-row">
-      <span class="group-avatar" aria-hidden="true">${initials(m.name)}</span>
-      <span class="group-main">
-        <span class="group-name-row">
-          <span class="group-name">${escapeHtml(m.name)}</span>
-          ${m.status==='Inactive'?'<span class="tag inactive">Inactive</span>':''}
-        </span>
-        <span class="group-summary">${escapeHtml(m.email)||'No email on file'} · ${escapeHtml(m.phone)||'No phone on file'}</span>
-      </span>
-      <div class="sess-actions">
-        <button class="icon-btn${toActive?' success':''}" onclick="toggleMinisterStatus(${m.id})" title="${toActive?'Activate':'Deactivate'}" aria-label="${toActive?'Activate':'Deactivate'} ${escapeHtml(m.name)}">${ICONS.power}</button>
-        <button class="icon-btn" onclick="editMinister(${m.id})" title="Edit" aria-label="Edit ${escapeHtml(m.name)}">${ICONS.pencil}</button>
-        <button class="icon-btn danger" onclick="deleteMinister(${m.id})" title="Delete" aria-label="Delete ${escapeHtml(m.name)}">${ICONS.trash}</button>
-      </div>
-    </div>`;
-  }).join('');
-}
+/* ---- PRAYER MINISTERS (manage actions, now on the Minister Overview cards) ---- */
 window.toggleRosterSort = function(){
   rosterSortDir = rosterSortDir==='az' ? 'za' : 'az';
   const btn = $('#rosterSortBtn');
   btn.lastChild.textContent = rosterSortDir==='az' ? ' A → Z' : ' Z → A';
   btn.setAttribute('aria-label', `Toggle sort order, currently ${rosterSortDir==='az'?'A to Z':'Z to A'}`);
-  renderRoster();
+  renderOverview();
 };
 window.toggleMinisterStatus = async function(id){
   const m = ministers.find(x=>x.id===id);
