@@ -20,7 +20,7 @@
     --navy:#474747; --navy-dark:#333; --gold:#aa5a3c; --gold-dark:#8a4a30;
     --primary:#f28a00; --primary-dark:#ce7500; --on-primary:#1a1a1a;
     --cream:#e7e2cf; --bg:#faf8f4; --card:#fff; --border:#ddd5c4;
-    --text:#565656; --muted:#7a7a7a; --danger:#c0392b; --danger-bg:#fdecea;
+    --text:#565656; --muted:#7a7a7a; --muted-bar:#cdc4ac; --danger:#c0392b; --danger-bg:#fdecea;
     --ok:#2e7d32; --ok-bg:#e9f7ec;
     --shadow-sm:0 1px 2px rgba(35,28,20,.07),0 1px 1px rgba(35,28,20,.05);
     --shadow-md:0 6px 18px rgba(35,28,20,.10);
@@ -169,10 +169,11 @@
   /* ---- Preview-build badge: hidden until a newer preview/ build exists ---- */
   .preview-badge{display:inline-flex;align-items:center;gap:6px;background:var(--primary);color:var(--on-primary);padding:7px 13px;border-radius:20px;font-size:var(--fs-xs);font-weight:700;text-decoration:none;white-space:nowrap;box-shadow:var(--shadow-sm);}
   .preview-badge:hover{background:var(--primary-dark);color:var(--on-primary);}
-  #previewModeBanner{position:sticky;top:0;z-index:65;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;background:var(--navy);color:#fff;padding:14px 20px;font-size:var(--fs-sm);text-align:center;border-bottom:3px solid var(--gold);}
-  #previewModeBanner strong{color:var(--gold);}
-  #previewModeBanner a.btn{background:#fff;color:var(--navy);padding:7px 16px;min-height:auto;font-size:var(--fs-xs);font-weight:800;text-decoration:none;border-radius:6px;display:inline-block;}
-  #previewModeBanner a.btn:hover{background:#f1ede4;}
+  /* .preview-badge's own display:inline-flex otherwise beats the browser's
+     default [hidden]{display:none} (author styles win over UA styles
+     regardless of specificity) - so the hidden attribute was never
+     actually hiding it. This rule's higher specificity restores that. */
+  .preview-badge[hidden]{display:none;}
   #conflictToast{position:fixed;top:14px;left:50%;z-index:100;width:520px;max-width:92vw;display:flex;align-items:flex-start;gap:10px;background:var(--danger-bg);color:var(--danger);border:1px solid #f3c6c0;border-radius:8px;box-shadow:var(--shadow-lg);padding:12px 14px;font-size:var(--fs-sm);opacity:0;pointer-events:none;transform:translate(-50%,-16px);transition:opacity .2s ease,transform .2s ease;}
   #conflictToast.show{opacity:1;pointer-events:auto;transform:translate(-50%,0);}
   .conflict-toast-body{flex:1;}
@@ -207,24 +208,50 @@
   .stat-line b{font-variant-numeric:tabular-nums;}
 
   /* ---- Completed Sessions: stat tiles + monthly trend ---- */
-  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px;}
-  .stat-tile{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;box-shadow:var(--shadow-sm);}
-  .stat-label{font-size:var(--fs-2xs);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;}
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px;align-items:stretch;}
+  /* Forces exactly 2 columns (fluid fractions, not a fixed min-width) so
+     paired cards - e.g. the two "Unique Recipients" tiles - always land in
+     the same row together, at any viewport width, instead of reflowing
+     apart the way auto-fit would once 3 tiles fit a row instead of 2 or 4. */
+  .stat-grid.pairs{grid-template-columns:1fr 1fr;}
+  .stat-tile{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;}
+  /* min-height reserves room for a 2-line label (e.g. "Unique Recipients
+     (Last Year)" wraps, its neighbor doesn't) so the value below always
+     starts at the same offset across cards in the same row. */
+  .stat-label{font-size:var(--fs-2xs);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;line-height:1.3;min-height:2.6em;}
   .stat-value{font-size:28px;line-height:1.2;font-weight:700;color:var(--text);margin-top:4px;font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
   .stat-delta{font-size:var(--fs-2xs);font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap;}
   .stat-delta.up{background:var(--ok-bg);color:var(--ok);}
   .stat-delta.down{background:#f1ede4;color:var(--muted);}
-  .stat-sub{font-size:var(--fs-2xs);color:var(--muted);margin-top:3px;}
-  .split-bar{height:6px;border-radius:3px;background:#f1ede4;margin-top:9px;overflow:hidden;}
-  .split-bar span{display:block;height:100%;background:var(--primary);}
+  /* Pinned to the bottom of the tile via margin-top:auto, regardless of how
+     much content (a split-bar, a delta badge) sits above it in a given
+     card - keeps the date line flush across every card in the row. */
+  .stat-sub{font-size:var(--fs-2xs);color:var(--muted);margin-top:auto;padding-top:10px;}
+  .stat-split-label{font-size:var(--fs-2xs);color:var(--muted);margin-top:8px;}
+  .stat-split-label .dot{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:4px;vertical-align:middle;}
+  /* Two-tone stacked bar, segments in the same left-to-right order as the
+     label above (first-time, then returning) so the color mapping reads
+     unambiguously - no single orange-on-empty-track guessing which side
+     the color refers to. */
+  .split-bar{height:6px;border-radius:3px;background:#f1ede4;margin-top:6px;overflow:hidden;display:flex;}
+  .split-bar .seg{display:block;height:100%;}
+  .split-bar .seg.first{background:var(--muted-bar);}
+  .split-bar .seg.returning{background:var(--primary);}
 
   .trend-chart{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:18px;box-shadow:var(--shadow-sm);}
-  .trend-title{font-size:var(--fs-2xs);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;margin-bottom:14px;}
-  .trend-bars{display:flex;align-items:flex-end;gap:10px;height:76px;}
+  .trend-title-row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+  .trend-title{font-size:var(--fs-2xs);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;}
+  .trend-legend{display:flex;align-items:center;gap:5px;font-size:var(--fs-2xs);color:var(--muted);font-weight:600;white-space:nowrap;}
+  .trend-legend .legend-dot{width:9px;height:9px;border-radius:2px;display:inline-block;}
+  .trend-legend .legend-dot.this{background:var(--primary);}
+  .trend-legend .legend-dot.last{background:var(--muted-bar);margin-left:10px;}
+  .trend-bars{display:flex;align-items:flex-end;gap:10px;height:104px;}
   .trend-bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;}
-  .trend-bar-fill{width:100%;max-width:28px;background:var(--primary);border-radius:4px 4px 2px 2px;}
-  .trend-value{font-size:var(--fs-2xs);color:var(--text);font-weight:700;margin-bottom:4px;font-variant-numeric:tabular-nums;}
-  .trend-label{font-size:var(--fs-2xs);color:var(--muted);margin-top:6px;}
+  .trend-bar-pair{display:flex;align-items:flex-end;justify-content:center;gap:3px;height:54px;width:100%;flex-shrink:0;}
+  .trend-bar-fill{width:100%;max-width:16px;background:var(--primary);border-radius:3px 3px 2px 2px;}
+  .trend-bar-fill.last{background:var(--muted-bar);}
+  .trend-value{font-size:var(--fs-2xs);color:var(--text);font-weight:700;margin-bottom:4px;font-variant-numeric:tabular-nums;flex-shrink:0;}
+  .trend-label{font-size:var(--fs-2xs);color:var(--muted);margin-top:6px;flex-shrink:0;}
 
   /* ---- Collapsible stats (Completed, Minister Overview): pure-CSS default
      per breakpoint (open on desktop, closed on mobile) via .toggled flipping
@@ -248,9 +275,15 @@
   .overview-filters{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;}
   .overview-filters .search-wrap{flex:1 1 220px;}
   .overview-filters .search-wrap input{width:100%;}
-  .overview-filters .date-wrap{min-width:150px;}
+  .overview-filters .date-pair{display:flex;gap:10px;flex:1 1 auto;}
+  .overview-filters .date-wrap{flex:1;min-width:130px;}
+  .overview-filters .date-wrap input{width:100%;}
   .overview-filters .date-wrap label{display:block;font-size:var(--fs-sm);font-weight:700;margin-bottom:5px;}
-  @media (max-width:640px){ .overview-filters{flex-direction:column;align-items:stretch;} .overview-filters .search-wrap{flex:none;} }
+  @media (max-width:640px){
+    .overview-filters{flex-direction:column;align-items:stretch;}
+    .overview-filters .search-wrap{flex:none;}
+    .overview-filters .date-pair{flex:none;}
+  }
 
   .subtabs{display:flex;gap:20px;margin:4px 0 16px;border-bottom:1px solid var(--border);}
   .subtabs button{background:none;border:none;border-bottom:3px solid transparent;padding:8px 2px;font-weight:700;font-size:var(--fs-sm);color:var(--muted);cursor:pointer;}
@@ -364,8 +397,10 @@
     </div>
     <div class="overview-filters">
       <div class="search-wrap"><input id="overviewSearch" placeholder="Search ministers..." aria-label="Search ministers by name"></div>
-      <div class="date-wrap"><label for="statsFrom">From</label><input type="date" id="statsFrom"></div>
-      <div class="date-wrap"><label for="statsTo">To</label><input type="date" id="statsTo"></div>
+      <div class="date-pair">
+        <div class="date-wrap"><label for="statsFrom">From</label><input type="date" id="statsFrom"></div>
+        <div class="date-wrap"><label for="statsTo">To</label><input type="date" id="statsTo"></div>
+      </div>
     </div>
     <nav class="subtabs" aria-label="Minister status" id="overviewSubtabs">
       <button class="active" data-substatus="Active">Active</button>
@@ -524,7 +559,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-11.4";
+const APP_VERSION = "2026-09-11.5";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1054,12 +1089,30 @@ function completedStats(){
   const between = (start,end)=> all.filter(s=>{ const d=new Date(s.date+'T00:00'); return d>=start && d<=end; });
   const ytdThis = between(thisYearStart, now);
   const ytdLast = between(lastYearStart, lastYearSameDay);
-  const firstTime = ytdThis.filter(s=>sessionNumberOf(s)===1).length;
+  // Per-recipient, not per-session: a recipient counts as "Follow-up" if any
+  // of their completed sessions in the period has ApptType "Follow-up",
+  // otherwise they're "First-time" - so the two counts add up to the total
+  // number of unique recipients, not the total number of sessions.
+  const classifyRecipients = list => {
+    const map = new Map();
+    list.forEach(s=>{
+      const key = s.recipName.trim().toLowerCase();
+      map.set(key, (map.get(key)||false) || s.apptType==='Follow-up');
+    });
+    let firstTime=0, followUp=0;
+    map.forEach(hadFollowUp => hadFollowUp ? followUp++ : firstTime++);
+    return { firstTime, followUp, total: map.size };
+  };
+  const recip = classifyRecipients(ytdThis);
+  const recipLast = classifyRecipients(ytdLast);
   const monthCount = now.getMonth()+1;
   const monthly = Array.from({length:monthCount},(_,m)=> ytdThis.filter(s=> new Date(s.date+'T00:00').getMonth()===m).length);
+  const monthlyLast = Array.from({length:monthCount},(_,m)=> ytdLast.filter(s=> new Date(s.date+'T00:00').getMonth()===m).length);
   return { ytdThis: ytdThis.length, ytdLast: ytdLast.length,
-    uniqueRecipients: new Set(ytdThis.map(s=>s.recipName.trim().toLowerCase())).size,
-    firstTime, returning: ytdThis.length-firstTime, monthly, now };
+    uniqueRecipients: recip.total, uniqueRecipientsLast: recipLast.total,
+    firstTime: recip.firstTime, followUp: recip.followUp,
+    firstTimeLast: recipLast.firstTime, followUpLast: recipLast.followUp,
+    monthly, monthlyLast, now };
 }
 function renderCompletedStats(){
   const st = completedStats();
@@ -1068,25 +1121,51 @@ function renderCompletedStats(){
   const lastYearLabel = `${fmtShort(isoDate(new Date(now.getFullYear()-1,0,1)))} – ${fmtShort(isoDate(new Date(now.getFullYear()-1, now.getMonth(), now.getDate())))}, ${now.getFullYear()-1}`;
   const delta = st.ytdLast===0 ? null : Math.round((st.ytdThis-st.ytdLast)/st.ytdLast*100);
   const deltaHtml = delta===null ? '' : `<span class="stat-delta ${delta>=0?'up':'down'}">${delta>=0?'▲':'▼'} ${Math.abs(delta)}%</span>`;
-  const returningPct = st.ytdThis ? Math.round(st.returning/st.ytdThis*100) : 0;
+  const followUpPct = st.uniqueRecipients ? Math.round(st.followUp/st.uniqueRecipients*100) : 0;
+  const followUpPctLast = st.uniqueRecipientsLast ? Math.round(st.followUpLast/st.uniqueRecipientsLast*100) : 0;
+  const firstTimePct = 100 - followUpPct;
+  const firstTimePctLast = 100 - followUpPctLast;
   const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const maxMonthly = Math.max(1, ...st.monthly);
+  const maxMonthly = Math.max(1, ...st.monthly, ...st.monthlyLast);
   const bars = st.monthly.map((v,i)=>{
+    const vLast = st.monthlyLast[i] || 0;
     const h = Math.max(6, Math.round(v/maxMonthly*54));
-    return `<div class="trend-bar" title="${monthNames[i]}: ${v} completed">
+    const hLast = Math.max(vLast>0?4:0, Math.round(vLast/maxMonthly*54));
+    return `<div class="trend-bar" title="${monthNames[i]} ${now.getFullYear()}: ${v} completed · ${monthNames[i]} ${now.getFullYear()-1}: ${vLast} completed">
       <span class="trend-value">${v}</span>
-      <span class="trend-bar-fill" style="height:${h}px;"></span>
+      <div class="trend-bar-pair">
+        <span class="trend-bar-fill last" style="height:${hLast}px;"></span>
+        <span class="trend-bar-fill" style="height:${h}px;"></span>
+      </div>
       <span class="trend-label">${monthNames[i]}</span>
     </div>`;
   }).join('');
   $('#completedStats').innerHTML = `
-    <div class="stat-grid">
+    <div class="stat-grid pairs">
       <div class="stat-tile"><div class="stat-label">This Year (YTD)</div><div class="stat-value">${st.ytdThis}</div><div class="stat-sub">${rangeLabel}</div></div>
-      <div class="stat-tile"><div class="stat-label">Same Period Last Year</div><div class="stat-value">${st.ytdLast} ${deltaHtml}</div><div class="stat-sub">${lastYearLabel}</div></div>
-      <div class="stat-tile"><div class="stat-label">Unique Recipients (YTD)</div><div class="stat-value">${st.uniqueRecipients}</div><div class="stat-sub">${rangeLabel}</div></div>
-      <div class="stat-tile"><div class="stat-label">First-Time / Returning</div><div class="stat-value">${st.firstTime} / ${st.returning}</div><div class="split-bar"><span style="width:${returningPct}%"></span></div></div>
+      <div class="stat-tile"><div class="stat-label">Last Year (YTD)</div><div class="stat-value">${st.ytdLast} ${deltaHtml}</div><div class="stat-sub">${lastYearLabel}</div></div>
+      <div class="stat-tile">
+        <div class="stat-label">Unique Recipients (YTD)</div>
+        <div class="stat-value">${st.uniqueRecipients}</div>
+        <div class="stat-split-label"><span class="dot" style="background:var(--muted-bar)"></span>${st.firstTime} first-time &middot; <span class="dot" style="background:var(--primary)"></span>${st.followUp} follow-up</div>
+        <div class="split-bar"><span class="seg first" style="width:${firstTimePct}%"></span><span class="seg returning" style="width:${followUpPct}%"></span></div>
+        <div class="stat-sub">${rangeLabel}</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-label">Unique Recipients (Last Year)</div>
+        <div class="stat-value">${st.uniqueRecipientsLast}</div>
+        <div class="stat-split-label"><span class="dot" style="background:var(--muted-bar)"></span>${st.firstTimeLast} first-time &middot; <span class="dot" style="background:var(--primary)"></span>${st.followUpLast} follow-up</div>
+        <div class="split-bar"><span class="seg first" style="width:${firstTimePctLast}%"></span><span class="seg returning" style="width:${followUpPctLast}%"></span></div>
+        <div class="stat-sub">${lastYearLabel}</div>
+      </div>
     </div>
-    <div class="trend-chart"><div class="trend-title">Completed sessions by month — ${now.getFullYear()}</div><div class="trend-bars">${bars}</div></div>`;
+    <div class="trend-chart">
+      <div class="trend-title-row">
+        <div class="trend-title">Completed sessions by month</div>
+        <div class="trend-legend"><span class="legend-dot this"></span>${now.getFullYear()}<span class="legend-dot last"></span>${now.getFullYear()-1}</div>
+      </div>
+      <div class="trend-bars">${bars}</div>
+    </div>`;
 }
 
 /* ---- PLANNING (Waiting-status sessions) ---- */
