@@ -447,7 +447,7 @@
       <div id="followupResults"></div>
     </div>
     <div class="field-row">
-      <div class="field"><label for="recipName">Recipient Name *</label><input id="recipName"></div>
+      <div class="field"><label for="recipName">Recipient Name *</label><input id="recipName" autocomplete="off"><div id="recipNameResults"></div></div>
       <div class="field"><label for="recipContact">Recipient Contact</label><input id="recipContact"></div>
     </div>
     <p class="helptext" id="lastSeenHint" style="margin-top:-8px;"></p>
@@ -561,7 +561,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-11.7";
+const APP_VERSION = "2026-09-11.8-preview.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -912,7 +912,7 @@ function wireApp(){
   $('#sessTime').addEventListener('change', ()=>{ autoSetEndTime(); renderSlotButtons(); renderConflictCheck(); });
   $('#sessEndTime').addEventListener('change', ()=>{ updateEndPreview(); renderConflictCheck(); });
   $('#sessLocation').addEventListener('change', renderConflictCheck);
-  $('#recipName').addEventListener('input', ()=>{ updateLastSeen(); renderConflictCheck(); });
+  $('#recipName').addEventListener('input', ()=>{ updateLastSeen(); renderConflictCheck(); renderRecipNameSuggestions(); });
   $('#followupSearch').addEventListener('input', onFollowupSearch);
   $('#btnSave').addEventListener('click', ()=>withLoading($('#btnSave'), 'Saving…', onSaveSession));
   $('#btnAddLocation').addEventListener('click', ()=>{ $('#newLocationName').value=''; $('#locModalMsg').innerHTML=''; $('#locationModal').classList.add('open'); $('#newLocationName').focus(); });
@@ -1239,6 +1239,7 @@ function openModal(existing, followFrom, opts){
     : (existing ? (existing.status==='Waiting' ? 'Schedule Session' : 'Edit Session') : (followFrom ? 'Follow-up Session' : 'New Session'));
   $('#modalMsg').innerHTML='';
   $('#followupSearch').value=''; $('#followupResults').innerHTML='';
+  $('#recipNameResults').innerHTML=''; recipNameMatches=[];
   $('#recipName').value = existing ? existing.recipName : (followFrom ? followFrom.recipName : '');
   $('#recipContact').value = existing ? existing.recipContact : (followFrom ? followFrom.recipContact : '');
   $('#sessDate').value = (existing && existing.status!=='Waiting') ? existing.date : '';
@@ -1275,6 +1276,53 @@ window.fillFollowup = function(id){
   selectedMinisters = s.ministers.map(m=>({...m}));
   renderMinisterList(); updateLastSeen();
   $('#followupResults').innerHTML = `<div class="helptext">Loaded ministers from ${s.date} session.</div>`;
+};
+
+// Autocomplete for the Recipient Name field (New Session and Add to Waiting
+// List share this same field) - suggests any name already used before,
+// across every status, so re-adding someone doesn't mean retyping them.
+// Picking a suggestion also carries over their contact info and, for a
+// real (non-waiting) session, the ministers who served them last time and
+// the Follow-up appointment type - the same convenience the dedicated
+// "Follow-up to a previous recipient" search already offers, just reachable
+// straight from the name field itself.
+let recipNameMatches = [];
+function renderRecipNameSuggestions(){
+  const q = $('#recipName').value.trim().toLowerCase();
+  const box = $('#recipNameResults');
+  if(q.length<2){ box.innerHTML=''; recipNameMatches=[]; return; }
+  const byName = new Map();
+  sessions.forEach(s=>{
+    const key = s.recipName.trim().toLowerCase();
+    if(!key) return;
+    const sortKey = s.status==='Waiting' ? (s.added||s.date||'') : (s.date||'');
+    const existing = byName.get(key);
+    if(!existing || sortKey > existing.sortKey){
+      byName.set(key, { name: s.recipName.trim(), contact: s.recipContact||'', sortKey,
+        sessionId: s.id, ministers: s.ministers.map(m=>({...m})) });
+    }
+  });
+  recipNameMatches = [...byName.values()]
+    .filter(r=> r.name.toLowerCase().includes(q) && r.name.toLowerCase()!==q)
+    .sort((a,b)=> b.sortKey.localeCompare(a.sortKey))
+    .slice(0,6);
+  box.innerHTML = recipNameMatches.map((r,i)=>`<div class="followup-hit" onclick="pickRecipNameAt(${i})">${escapeHtml(r.name)}</div>`).join('');
+}
+window.pickRecipNameAt = function(i){
+  const r = recipNameMatches[i];
+  if(!r) return;
+  $('#recipName').value = r.name;
+  if(r.contact) $('#recipContact').value = r.contact;
+  if(sessKind==='session' && r.ministers.length){
+    prevId = r.sessionId;
+    selectedMinisters = r.ministers.map(m=>({...m}));
+    $('#apptType').value = 'Follow-up';
+    renderMinisterList();
+  }
+  $('#recipNameResults').innerHTML = '';
+  recipNameMatches = [];
+  updateLastSeen();
+  renderConflictCheck();
 };
 function updateLastSeen(){
   const name = $('#recipName').value.trim();
