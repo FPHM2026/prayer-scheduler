@@ -441,11 +441,6 @@
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <h2 id="modalTitle">New Session</h2>
     <div id="modalMsg"></div>
-    <div class="field sched-only" id="followupField">
-      <label for="followupSearch">Follow-up to a previous recipient? (optional)</label>
-      <input id="followupSearch" placeholder="Type a name...">
-      <div id="followupResults"></div>
-    </div>
     <div class="field-row">
       <div class="field"><label for="recipName">Recipient Name *</label><input id="recipName" autocomplete="off"><div id="recipNameResults"></div></div>
       <div class="field"><label for="recipContact">Recipient Contact</label><input id="recipContact"></div>
@@ -561,7 +556,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-11.8-preview.2";
+const APP_VERSION = "2026-09-11.8-preview.3";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -913,7 +908,6 @@ function wireApp(){
   $('#sessEndTime').addEventListener('change', ()=>{ updateEndPreview(); renderConflictCheck(); });
   $('#sessLocation').addEventListener('change', renderConflictCheck);
   $('#recipName').addEventListener('input', ()=>{ updateLastSeen(); renderConflictCheck(); renderRecipNameSuggestions(); });
-  $('#followupSearch').addEventListener('input', onFollowupSearch);
   $('#btnSave').addEventListener('click', ()=>withLoading($('#btnSave'), 'Saving…', onSaveSession));
   $('#btnAddLocation').addEventListener('click', ()=>{ $('#newLocationName').value=''; $('#locModalMsg').innerHTML=''; $('#locationModal').classList.add('open'); $('#newLocationName').focus(); });
   $('#btnLocCancel').addEventListener('click', ()=>$('#locationModal').classList.remove('open'));
@@ -1238,7 +1232,6 @@ function openModal(existing, followFrom, opts){
     ? (existing ? 'Edit Waiting Entry' : 'Add to Waiting List')
     : (existing ? (existing.status==='Waiting' ? 'Schedule Session' : 'Edit Session') : (followFrom ? 'Follow-up Session' : 'New Session'));
   $('#modalMsg').innerHTML='';
-  $('#followupSearch').value=''; $('#followupResults').innerHTML='';
   $('#recipNameResults').innerHTML=''; recipNameMatches=[];
   $('#recipName').value = existing ? existing.recipName : (followFrom ? followFrom.recipName : '');
   $('#recipContact').value = existing ? existing.recipContact : (followFrom ? followFrom.recipContact : '');
@@ -1261,22 +1254,6 @@ function openModal(existing, followFrom, opts){
   $('#sessionModal').classList.add('open');
   $('#recipName').focus();
 }
-function onFollowupSearch(e){
-  const q = e.target.value.trim().toLowerCase();
-  const box = $('#followupResults');
-  if(q.length<2){ box.innerHTML=''; return; }
-  const hits = sessions.filter(s=>s.status!=='Waiting' && s.recipName.toLowerCase().includes(q)).slice(0,5);
-  box.innerHTML = hits.map(s=>`<div class="followup-hit" onclick="fillFollowup(${s.id})">${escapeHtml(s.recipName)} — ${s.date}</div>`).join('') || '<div class="helptext">No matches</div>';
-}
-window.fillFollowup = function(id){
-  const s = sessions.find(x=>x.id===id);
-  prevId = id;
-  $('#recipName').value = s.recipName; $('#recipContact').value = s.recipContact;
-  $('#apptType').value = 'Follow-up';
-  selectedMinisters = s.ministers.map(m=>({...m}));
-  renderMinisterList(); updateLastSeen();
-  $('#followupResults').innerHTML = `<div class="helptext">Loaded ministers from ${s.date} session.</div>`;
-};
 
 // Autocomplete for the Recipient Name field (New Session and Add to Waiting
 // List share this same field) - suggests any name already used before,
