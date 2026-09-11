@@ -244,13 +244,13 @@
   .trend-legend .legend-dot{width:9px;height:9px;border-radius:2px;display:inline-block;}
   .trend-legend .legend-dot.this{background:var(--primary);}
   .trend-legend .legend-dot.last{background:var(--muted-bar);margin-left:10px;}
-  .trend-bars{display:flex;align-items:flex-end;gap:10px;height:76px;}
+  .trend-bars{display:flex;align-items:flex-end;gap:10px;height:104px;}
   .trend-bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;}
-  .trend-bar-pair{display:flex;align-items:flex-end;justify-content:center;gap:3px;height:54px;width:100%;}
+  .trend-bar-pair{display:flex;align-items:flex-end;justify-content:center;gap:3px;height:54px;width:100%;flex-shrink:0;}
   .trend-bar-fill{width:100%;max-width:16px;background:var(--primary);border-radius:3px 3px 2px 2px;}
   .trend-bar-fill.last{background:var(--muted-bar);}
-  .trend-value{font-size:var(--fs-2xs);color:var(--text);font-weight:700;margin-bottom:4px;font-variant-numeric:tabular-nums;}
-  .trend-label{font-size:var(--fs-2xs);color:var(--muted);margin-top:6px;}
+  .trend-value{font-size:var(--fs-2xs);color:var(--text);font-weight:700;margin-bottom:4px;font-variant-numeric:tabular-nums;flex-shrink:0;}
+  .trend-label{font-size:var(--fs-2xs);color:var(--muted);margin-top:6px;flex-shrink:0;}
 
   /* ---- Collapsible stats (Completed, Minister Overview): pure-CSS default
      per breakpoint (open on desktop, closed on mobile) via .toggled flipping
@@ -562,7 +562,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-11.4-preview.6";
+const APP_VERSION = "2026-09-11.4-preview.7";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
