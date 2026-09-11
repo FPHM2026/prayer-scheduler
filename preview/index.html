@@ -403,7 +403,7 @@
   <section class="panel" id="panel-overview">
     <div class="toolbar" style="margin-bottom:10px;">
       <button class="btn" id="btnAddMinister">+ Add Minister</button>
-      <button class="btn secondary" id="rosterSortBtn" onclick="toggleRosterSort()" style="display:inline-flex;align-items:center;gap:7px;" aria-label="Toggle sort order, currently A to Z"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h11M3 12h7M3 17h4"/><path d="M17 5v14M17 5l-4 4M17 5l4 4"/></svg> A &rarr; Z</button>
+      <button class="btn secondary" id="rosterSortBtn" onclick="toggleRosterSort()" style="display:inline-flex;align-items:center;gap:7px;" aria-label="Toggle sort order, currently by next appointment"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h11M3 12h7M3 17h4"/><path d="M17 5v14M17 5l-4 4M17 5l4 4"/></svg> Next Appointment</button>
     </div>
     <p class="helptext">Grouped by minister — tap a name for their stats and upcoming sessions, or use the icons to manage them.</p>
     <div class="stats-collapse" id="overviewStatsCollapse">
@@ -556,7 +556,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-11.8-preview.3";
+const APP_VERSION = "2026-09-11.8-preview.4";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -726,7 +726,7 @@ let editingId=null, prevId=null, selectedMinisters=[]; // selectedMinisters: [{i
 let sessKind = 'session'; // 'session' | 'waiting' — controls which session-modal fields show
 let editingMinisterId=null;
 let blackoutEditId=null;
-let rosterSortDir='az';
+let overviewSortMode='default'; // 'default' (next appointment) | 'az'
 let overviewSubStatus='Active';
 let sessionNumberMap = new Map(); // session id -> chronological "Session #N" for that recipient
 
@@ -1594,7 +1594,12 @@ function renderOverview(){
       return {m, led, supported, hours, upcoming};
     })
     .filter(x=> !q || x.m.name.toLowerCase().includes(q))
-    .sort((a,b)=> rosterSortDir==='za' ? b.m.name.localeCompare(a.m.name) : a.m.name.localeCompare(b.m.name));
+    .sort((a,b)=>{
+      if(overviewSortMode==='az') return a.m.name.localeCompare(b.m.name);
+      if(!!a.upcoming.length !== !!b.upcoming.length) return a.upcoming.length ? -1 : 1;
+      if(a.upcoming.length) return (a.upcoming[0].date+a.upcoming[0].time).localeCompare((b.upcoming[0]?.date||'')+(b.upcoming[0]?.time||''));
+      return a.m.name.localeCompare(b.m.name);
+    });
 
   noResults.hidden = rows.length>0;
   box.innerHTML = rows.map(({m,led,supported,hours,upcoming})=>{
@@ -1685,10 +1690,10 @@ function renderOverviewStats(){
 
 /* ---- PRAYER MINISTERS (manage actions, now on the Minister Overview cards) ---- */
 window.toggleRosterSort = function(){
-  rosterSortDir = rosterSortDir==='az' ? 'za' : 'az';
+  overviewSortMode = overviewSortMode==='az' ? 'default' : 'az';
   const btn = $('#rosterSortBtn');
-  btn.lastChild.textContent = rosterSortDir==='az' ? ' A → Z' : ' Z → A';
-  btn.setAttribute('aria-label', `Toggle sort order, currently ${rosterSortDir==='az'?'A to Z':'Z to A'}`);
+  btn.lastChild.textContent = overviewSortMode==='az' ? ' A → Z' : ' Next Appointment';
+  btn.setAttribute('aria-label', `Toggle sort order, currently ${overviewSortMode==='az'?'A to Z':'by next appointment'}`);
   renderOverview();
 };
 window.toggleMinisterStatus = async function(id){
