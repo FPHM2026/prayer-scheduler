@@ -247,8 +247,9 @@
   .trend-legend .legend-dot.last{background:var(--muted-bar);margin-left:10px;}
   .trend-bars{display:flex;align-items:flex-end;gap:10px;height:104px;}
   .trend-bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;}
-  .trend-bar-pair{display:flex;align-items:flex-end;justify-content:center;gap:3px;height:54px;width:100%;flex-shrink:0;}
-  .trend-bar-fill{width:100%;max-width:16px;background:var(--primary);border-radius:3px 3px 2px 2px;}
+  .trend-bar-pair{display:flex;align-items:flex-end;justify-content:center;gap:3px;width:100%;flex-shrink:0;}
+  .trend-bar-current{display:flex;flex-direction:column;align-items:center;flex-shrink:0;}
+  .trend-bar-fill{width:16px;background:var(--primary);border-radius:3px 3px 2px 2px;}
   .trend-bar-fill.last{background:var(--muted-bar);}
   .trend-value{font-size:var(--fs-2xs);color:var(--text);font-weight:700;margin-bottom:4px;font-variant-numeric:tabular-nums;flex-shrink:0;}
   .trend-label{font-size:var(--fs-2xs);color:var(--muted);margin-top:6px;flex-shrink:0;}
@@ -559,7 +560,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-11.5";
+const APP_VERSION = "2026-09-11.6";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1132,10 +1133,12 @@ function renderCompletedStats(){
     const h = Math.max(6, Math.round(v/maxMonthly*54));
     const hLast = Math.max(vLast>0?4:0, Math.round(vLast/maxMonthly*54));
     return `<div class="trend-bar" title="${monthNames[i]} ${now.getFullYear()}: ${v} completed · ${monthNames[i]} ${now.getFullYear()-1}: ${vLast} completed">
-      <span class="trend-value">${v}</span>
       <div class="trend-bar-pair">
         <span class="trend-bar-fill last" style="height:${hLast}px;"></span>
-        <span class="trend-bar-fill" style="height:${h}px;"></span>
+        <div class="trend-bar-current">
+          <span class="trend-value">${v}</span>
+          <span class="trend-bar-fill" style="height:${h}px;"></span>
+        </div>
       </div>
       <span class="trend-label">${monthNames[i]}</span>
     </div>`;
