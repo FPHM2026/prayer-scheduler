@@ -243,7 +243,7 @@
   .trend-legend .legend-dot.last{background:var(--muted-bar);margin-left:10px;}
   .trend-bars{display:flex;align-items:flex-end;gap:10px;height:76px;}
   .trend-bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;}
-  .trend-bar-pair{display:flex;align-items:flex-end;justify-content:center;gap:3px;height:54px;}
+  .trend-bar-pair{display:flex;align-items:flex-end;justify-content:center;gap:3px;height:54px;width:100%;}
   .trend-bar-fill{width:100%;max-width:16px;background:var(--primary);border-radius:3px 3px 2px 2px;}
   .trend-bar-fill.last{background:var(--muted-bar);}
   .trend-value{font-size:var(--fs-2xs);color:var(--text);font-weight:700;margin-bottom:4px;font-variant-numeric:tabular-nums;}
@@ -551,7 +551,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-11.4-preview.2";
+const APP_VERSION = "2026-09-11.4-preview.3";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1081,16 +1081,29 @@ function completedStats(){
   const between = (start,end)=> all.filter(s=>{ const d=new Date(s.date+'T00:00'); return d>=start && d<=end; });
   const ytdThis = between(thisYearStart, now);
   const ytdLast = between(lastYearStart, lastYearSameDay);
-  const firstTime = ytdThis.filter(s=>sessionNumberOf(s)===1).length;
-  const firstTimeLast = ytdLast.filter(s=>sessionNumberOf(s)===1).length;
+  // Per-recipient, not per-session: a recipient counts as "Follow-up" if any
+  // of their completed sessions in the period has ApptType "Follow-up",
+  // otherwise they're "First-time" - so the two counts add up to the total
+  // number of unique recipients, not the total number of sessions.
+  const classifyRecipients = list => {
+    const map = new Map();
+    list.forEach(s=>{
+      const key = s.recipName.trim().toLowerCase();
+      map.set(key, (map.get(key)||false) || s.apptType==='Follow-up');
+    });
+    let firstTime=0, followUp=0;
+    map.forEach(hadFollowUp => hadFollowUp ? followUp++ : firstTime++);
+    return { firstTime, followUp, total: map.size };
+  };
+  const recip = classifyRecipients(ytdThis);
+  const recipLast = classifyRecipients(ytdLast);
   const monthCount = now.getMonth()+1;
   const monthly = Array.from({length:monthCount},(_,m)=> ytdThis.filter(s=> new Date(s.date+'T00:00').getMonth()===m).length);
   const monthlyLast = Array.from({length:monthCount},(_,m)=> ytdLast.filter(s=> new Date(s.date+'T00:00').getMonth()===m).length);
   return { ytdThis: ytdThis.length, ytdLast: ytdLast.length,
-    uniqueRecipients: new Set(ytdThis.map(s=>s.recipName.trim().toLowerCase())).size,
-    uniqueRecipientsLast: new Set(ytdLast.map(s=>s.recipName.trim().toLowerCase())).size,
-    firstTime, returning: ytdThis.length-firstTime,
-    firstTimeLast, returningLast: ytdLast.length-firstTimeLast,
+    uniqueRecipients: recip.total, uniqueRecipientsLast: recipLast.total,
+    firstTime: recip.firstTime, followUp: recip.followUp,
+    firstTimeLast: recipLast.firstTime, followUpLast: recipLast.followUp,
     monthly, monthlyLast, now };
 }
 function renderCompletedStats(){
@@ -1100,10 +1113,10 @@ function renderCompletedStats(){
   const lastYearLabel = `${fmtShort(isoDate(new Date(now.getFullYear()-1,0,1)))} – ${fmtShort(isoDate(new Date(now.getFullYear()-1, now.getMonth(), now.getDate())))}, ${now.getFullYear()-1}`;
   const delta = st.ytdLast===0 ? null : Math.round((st.ytdThis-st.ytdLast)/st.ytdLast*100);
   const deltaHtml = delta===null ? '' : `<span class="stat-delta ${delta>=0?'up':'down'}">${delta>=0?'▲':'▼'} ${Math.abs(delta)}%</span>`;
-  const returningPct = st.ytdThis ? Math.round(st.returning/st.ytdThis*100) : 0;
-  const returningPctLast = st.ytdLast ? Math.round(st.returningLast/st.ytdLast*100) : 0;
-  const firstTimePct = 100 - returningPct;
-  const firstTimePctLast = 100 - returningPctLast;
+  const followUpPct = st.uniqueRecipients ? Math.round(st.followUp/st.uniqueRecipients*100) : 0;
+  const followUpPctLast = st.uniqueRecipientsLast ? Math.round(st.followUpLast/st.uniqueRecipientsLast*100) : 0;
+  const firstTimePct = 100 - followUpPct;
+  const firstTimePctLast = 100 - followUpPctLast;
   const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const maxMonthly = Math.max(1, ...st.monthly, ...st.monthlyLast);
   const bars = st.monthly.map((v,i)=>{
@@ -1126,15 +1139,15 @@ function renderCompletedStats(){
       <div class="stat-tile">
         <div class="stat-label">Unique Recipients (YTD)</div>
         <div class="stat-value">${st.uniqueRecipients}</div>
-        <div class="stat-split-label"><span class="dot" style="background:var(--muted-bar)"></span>${st.firstTime} first-time &middot; <span class="dot" style="background:var(--primary)"></span>${st.returning} returning</div>
-        <div class="split-bar"><span class="seg first" style="width:${firstTimePct}%"></span><span class="seg returning" style="width:${returningPct}%"></span></div>
+        <div class="stat-split-label"><span class="dot" style="background:var(--muted-bar)"></span>${st.firstTime} first-time &middot; <span class="dot" style="background:var(--primary)"></span>${st.followUp} follow-up</div>
+        <div class="split-bar"><span class="seg first" style="width:${firstTimePct}%"></span><span class="seg returning" style="width:${followUpPct}%"></span></div>
         <div class="stat-sub">${rangeLabel}</div>
       </div>
       <div class="stat-tile">
         <div class="stat-label">Unique Recipients (Last Year)</div>
         <div class="stat-value">${st.uniqueRecipientsLast}</div>
-        <div class="stat-split-label"><span class="dot" style="background:var(--muted-bar)"></span>${st.firstTimeLast} first-time &middot; <span class="dot" style="background:var(--primary)"></span>${st.returningLast} returning</div>
-        <div class="split-bar"><span class="seg first" style="width:${firstTimePctLast}%"></span><span class="seg returning" style="width:${returningPctLast}%"></span></div>
+        <div class="stat-split-label"><span class="dot" style="background:var(--muted-bar)"></span>${st.firstTimeLast} first-time &middot; <span class="dot" style="background:var(--primary)"></span>${st.followUpLast} follow-up</div>
+        <div class="split-bar"><span class="seg first" style="width:${firstTimePctLast}%"></span><span class="seg returning" style="width:${followUpPctLast}%"></span></div>
         <div class="stat-sub">${lastYearLabel}</div>
       </div>
     </div>
