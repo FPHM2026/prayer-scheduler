@@ -559,7 +559,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-11.4-preview.4";
+const APP_VERSION = "2026-09-11.4-preview.5";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1143,7 +1143,7 @@ function renderCompletedStats(){
   $('#completedStats').innerHTML = `
     <div class="stat-grid pairs">
       <div class="stat-tile"><div class="stat-label">This Year (YTD)</div><div class="stat-value">${st.ytdThis}</div><div class="stat-sub">${rangeLabel}</div></div>
-      <div class="stat-tile"><div class="stat-label">Same Period Last Year</div><div class="stat-value">${st.ytdLast} ${deltaHtml}</div><div class="stat-sub">${lastYearLabel}</div></div>
+      <div class="stat-tile"><div class="stat-label">Last Year (YTD)</div><div class="stat-value">${st.ytdLast} ${deltaHtml}</div><div class="stat-sub">${lastYearLabel}</div></div>
       <div class="stat-tile">
         <div class="stat-label">Unique Recipients (YTD)</div>
         <div class="stat-value">${st.uniqueRecipients}</div>
