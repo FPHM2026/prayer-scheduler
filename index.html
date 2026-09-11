@@ -58,21 +58,17 @@
   #btnSignOut:hover:not(:disabled){background:var(--navy-dark);border-color:var(--navy-dark);}
 
   nav[aria-label="Primary"]{position:sticky;top:0;z-index:20;max-width:1100px;margin:0 auto;display:flex;gap:4px;flex-wrap:wrap;padding:6px 10px 0;background:#fff;border-bottom:1px solid var(--border);box-shadow:var(--shadow-sm);}
-  nav[aria-label="Primary"] button{flex:1 1 auto;background:var(--gold);color:#fff;border:none;border-bottom:4px solid transparent;padding:9px 8px;border-radius:6px 6px 0 0;font-weight:700;cursor:pointer;margin-bottom:4px;font-size:var(--fs-xs);min-height:40px;white-space:nowrap;}
+  nav[aria-label="Primary"] button{flex:0 0 auto;background:var(--gold);color:#fff;border:none;border-bottom:4px solid transparent;padding:9px 13px;border-radius:6px 6px 0 0;font-weight:700;cursor:pointer;margin-bottom:4px;font-size:var(--fs-xs);min-height:40px;white-space:nowrap;}
   nav[aria-label="Primary"] button:hover{background:var(--gold-dark);}
   nav[aria-label="Primary"] button.active{background:var(--navy);color:#fff;border-bottom-color:var(--primary);}
   nav[aria-label="Primary"] button.active:hover{background:var(--navy-dark);}
-  nav[aria-label="Primary"] .tab-full{display:none;}
-  nav[aria-label="Primary"] .tab-short{display:inline;}
   @media (min-width:1024px){
     header{padding:16px 24px;}
     header h1{font-size:var(--fs-xl);letter-spacing:.03em;}
     .version-tag{display:block;margin:2px 0 0;font-size:var(--fs-2xs);}
     header .who{display:inline;}
     nav[aria-label="Primary"]{padding:8px 16px 0;}
-    nav[aria-label="Primary"] button{flex:0 0 auto;padding:12px 18px;font-size:var(--fs-sm);min-height:44px;}
-    nav[aria-label="Primary"] .tab-full{display:inline;}
-    nav[aria-label="Primary"] .tab-short{display:none;}
+    nav[aria-label="Primary"] button{padding:12px 18px;font-size:var(--fs-sm);min-height:44px;}
   }
 
   main{max-width:1100px;margin:0 auto;padding:14px 12px 50px;}
@@ -307,10 +303,10 @@
 <nav aria-label="Primary">
   <button data-tab="schedule" class="active" aria-current="page">Schedule</button>
   <button data-tab="planning">Planning</button>
-  <button data-tab="completed"><span class="tab-full">Completed Sessions</span><span class="tab-short">Completed</span></button>
-  <button data-tab="overview"><span class="tab-full">Minister Overview</span><span class="tab-short">Overview</span></button>
-  <button data-tab="roster"><span class="tab-full">Prayer Ministers</span><span class="tab-short">Ministers</span></button>
-  <button data-tab="blackouts"><span class="tab-full">Blackout Dates</span><span class="tab-short">Blackouts</span></button>
+  <button data-tab="completed">Completed Sessions</button>
+  <button data-tab="overview">Minister Overview</button>
+  <button data-tab="roster">Prayer Ministers</button>
+  <button data-tab="blackouts">Blackout Dates</button>
 </nav>
 <main>
 <div id="loadError"></div>
@@ -528,7 +524,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-11.2";
+const APP_VERSION = "2026-09-11.3";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
