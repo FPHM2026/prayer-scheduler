@@ -208,6 +208,11 @@
 
   /* ---- Completed Sessions: stat tiles + monthly trend ---- */
   .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px;align-items:stretch;}
+  /* Forces exactly 2 columns (fluid fractions, not a fixed min-width) so
+     paired cards - e.g. the two "Unique Recipients" tiles - always land in
+     the same row together, at any viewport width, instead of reflowing
+     apart the way auto-fit would once 3 tiles fit a row instead of 2 or 4. */
+  .stat-grid.pairs{grid-template-columns:1fr 1fr;}
   .stat-tile{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;}
   .stat-label{font-size:var(--fs-2xs);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;}
   .stat-value{font-size:28px;line-height:1.2;font-weight:700;color:var(--text);margin-top:4px;font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
@@ -219,8 +224,15 @@
      card - keeps the date line flush across every card in the row. */
   .stat-sub{font-size:var(--fs-2xs);color:var(--muted);margin-top:auto;padding-top:10px;}
   .stat-split-label{font-size:var(--fs-2xs);color:var(--muted);margin-top:8px;}
-  .split-bar{height:6px;border-radius:3px;background:#f1ede4;margin-top:6px;overflow:hidden;}
-  .split-bar span{display:block;height:100%;background:var(--primary);}
+  .stat-split-label .dot{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:4px;vertical-align:middle;}
+  /* Two-tone stacked bar, segments in the same left-to-right order as the
+     label above (first-time, then returning) so the color mapping reads
+     unambiguously - no single orange-on-empty-track guessing which side
+     the color refers to. */
+  .split-bar{height:6px;border-radius:3px;background:#f1ede4;margin-top:6px;overflow:hidden;display:flex;}
+  .split-bar .seg{display:block;height:100%;}
+  .split-bar .seg.first{background:var(--muted-bar);}
+  .split-bar .seg.returning{background:var(--primary);}
 
   .trend-chart{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:18px;box-shadow:var(--shadow-sm);}
   .trend-title-row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
@@ -539,7 +551,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-11.4-preview.1";
+const APP_VERSION = "2026-09-11.4-preview.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1090,6 +1102,8 @@ function renderCompletedStats(){
   const deltaHtml = delta===null ? '' : `<span class="stat-delta ${delta>=0?'up':'down'}">${delta>=0?'▲':'▼'} ${Math.abs(delta)}%</span>`;
   const returningPct = st.ytdThis ? Math.round(st.returning/st.ytdThis*100) : 0;
   const returningPctLast = st.ytdLast ? Math.round(st.returningLast/st.ytdLast*100) : 0;
+  const firstTimePct = 100 - returningPct;
+  const firstTimePctLast = 100 - returningPctLast;
   const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const maxMonthly = Math.max(1, ...st.monthly, ...st.monthlyLast);
   const bars = st.monthly.map((v,i)=>{
@@ -1106,21 +1120,21 @@ function renderCompletedStats(){
     </div>`;
   }).join('');
   $('#completedStats').innerHTML = `
-    <div class="stat-grid">
+    <div class="stat-grid pairs">
       <div class="stat-tile"><div class="stat-label">This Year (YTD)</div><div class="stat-value">${st.ytdThis}</div><div class="stat-sub">${rangeLabel}</div></div>
       <div class="stat-tile"><div class="stat-label">Same Period Last Year</div><div class="stat-value">${st.ytdLast} ${deltaHtml}</div><div class="stat-sub">${lastYearLabel}</div></div>
       <div class="stat-tile">
         <div class="stat-label">Unique Recipients (YTD)</div>
         <div class="stat-value">${st.uniqueRecipients}</div>
-        <div class="stat-split-label">${st.firstTime} first-time &middot; ${st.returning} returning</div>
-        <div class="split-bar"><span style="width:${returningPct}%"></span></div>
+        <div class="stat-split-label"><span class="dot" style="background:var(--muted-bar)"></span>${st.firstTime} first-time &middot; <span class="dot" style="background:var(--primary)"></span>${st.returning} returning</div>
+        <div class="split-bar"><span class="seg first" style="width:${firstTimePct}%"></span><span class="seg returning" style="width:${returningPct}%"></span></div>
         <div class="stat-sub">${rangeLabel}</div>
       </div>
       <div class="stat-tile">
         <div class="stat-label">Unique Recipients (Last Year)</div>
         <div class="stat-value">${st.uniqueRecipientsLast}</div>
-        <div class="stat-split-label">${st.firstTimeLast} first-time &middot; ${st.returningLast} returning</div>
-        <div class="split-bar"><span style="width:${returningPctLast}%"></span></div>
+        <div class="stat-split-label"><span class="dot" style="background:var(--muted-bar)"></span>${st.firstTimeLast} first-time &middot; <span class="dot" style="background:var(--primary)"></span>${st.returningLast} returning</div>
+        <div class="split-bar"><span class="seg first" style="width:${firstTimePctLast}%"></span><span class="seg returning" style="width:${returningPctLast}%"></span></div>
         <div class="stat-sub">${lastYearLabel}</div>
       </div>
     </div>
