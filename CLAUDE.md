@@ -113,13 +113,47 @@ fuller header and lets tabs wrap.
 - SVG icons instead of emoji for actions, keyboard-accessible minister
   selection (tabindex + Enter/Space), visible focus rings
 
+## Minister portal (`/portal/`)
+A second, deliberately small single-file app (`portal/index.html`) for prayer
+ministers themselves — "my upcoming sessions" (read-only) and "my time off"
+(add/edit/delete their own BlackoutDates entries). Supersedes the earlier
+"Forms + Power Automate, no accounts" idea below — instead, each minister
+gets their own **unlicensed** Entra ID account (a directory identity, no
+M365 seat cost) so they can sign in for real.
+
+- **Same Azure AD app registration** as the main scheduler (same Client ID) —
+  a second registration isn't needed. Delegated Graph permissions only ever
+  allow what the *signed-in user's own SharePoint permissions* allow, so a
+  minister account with restricted SharePoint access genuinely can't read or
+  write more than it's been granted, even though the app itself still
+  requests the same broad `Sites.ReadWrite.All`. The real access boundary is
+  SharePoint's own permissions on a "Ministers" group, granted directly in
+  SharePoint (not in this code, not in Entra):
+  - PrayerMinisters: Read (lets the portal resolve "which minister is this"
+    by matching sign-in email, and show co-minister names on a session)
+  - PrayerSessions: Read (SharePoint can't restrict "only sessions you're
+    assigned to" — item-level permissions key off who *created* the item,
+    and staff create every session, so ministers can technically read the
+    full upcoming schedule; the portal's own UI just filters to theirs)
+  - BlackoutDates: Contribute, with **item-level permissions** set to "Read
+    items created by the user" / "Create and edit items created by the
+    user" — this one *is* genuinely enforced, since each minister is the
+    creator of their own time-off request
+  - Locations: no access needed (LocationName is already plain text on the
+    session item)
+- Needs its own redirect URI on the same app registration:
+  `https://FPHM2026.github.io/prayer-scheduler/portal/`
+- **Identity matching**: the signed-in account's email (`account.username`)
+  must exactly match (case-insensitive) that minister's Email field in
+  PrayerMinisters, or the portal shows a "couldn't find your profile"
+  message instead of a broken page. Keep that field accurate when adding a
+  new minister account.
+- Creating the actual Entra accounts (Microsoft 365 admin center → Add a
+  user → "Create user without product license") and the SharePoint group/
+  permission setup above are manual admin steps outside this repo — Claude
+  has no tenant admin access to do them.
+
 ## Not yet built
-- **Microsoft Forms + Power Automate flow** for anonymous minister
-  blackout-date submissions. Ministers have no SharePoint accounts, so this
-  needs to stay separate from the main app: a public Microsoft Form (no login
-  required) feeding a 3-step Power Automate flow that creates items in the
-  BlackoutDates list. This is independent of everything else — doesn't touch
-  the HTML app at all.
 - **Calendar (month grid) view** — was planned but never built in this HTML
   version. The agenda/Schedule view covers the "chronological list" requirement
   on its own; the calendar grid is a nice-to-have, not yet started.
