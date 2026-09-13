@@ -501,6 +501,7 @@
     <div class="field"><label for="minName">Name *</label><input id="minName"></div>
     <div class="field"><label for="minEmail">Email</label><input id="minEmail" type="email"></div>
     <div class="field"><label for="minPhone">Phone</label><input id="minPhone" type="tel"></div>
+    <div class="field"><label for="minSignInEmail">Sign-In Email (for minister portal)</label><input id="minSignInEmail" type="email" placeholder="Their unlicensed Microsoft 365 sign-in address"><p class="helptext" style="margin:5px 0 0;">Not a real inbox — this is the account they sign into the portal with, separate from their contact Email above.</p></div>
     <div class="field"><label for="minStatus">Status</label><select id="minStatus"><option>Active</option><option>Inactive</option></select></div>
     <div class="modal-actions">
       <button class="btn secondary" id="btnMinCancel">Cancel</button>
@@ -734,7 +735,7 @@ async function loadAll(){
   const [rawMin, rawSess, rawBlack, rawLoc] = await Promise.all([
     listItems('ministers'), listItems('sessions'), listItems('blackouts'), listItems('locations')
   ]);
-  ministers = rawMin.map(m => ({ id: m.id, name: m.Title, email: m.Email||'', phone: m.Phone||'', status: m.Status||'Active' }));
+  ministers = rawMin.map(m => ({ id: m.id, name: m.Title, email: m.Email||'', phone: m.Phone||'', signInEmail: m.SignInEmail||'', status: m.Status||'Active' }));
   locations = rawLoc.map(l => ({ id: l.id, name: l.Title }));
   blackouts = rawBlack.map(b => ({ id: b.id, ministerName: b.Title, date: (b.BlackoutDate||'').split('T')[0], endDate: b.EndDate ? b.EndDate.split('T')[0] : null, notes: b.Notes||'' }));
   sessions = rawSess.map(s => {
@@ -1713,7 +1714,8 @@ function openMinisterModal(m){
   editingMinisterId = m ? m.id : null;
   $('#minModalTitle').textContent = m ? 'Edit Minister' : 'Add Minister';
   $('#minName').value = m ? m.name : ''; $('#minEmail').value = m ? m.email : '';
-  $('#minPhone').value = m ? m.phone : ''; $('#minStatus').value = m ? m.status : 'Active';
+  $('#minPhone').value = m ? m.phone : ''; $('#minSignInEmail').value = m ? (m.signInEmail||'') : '';
+  $('#minStatus').value = m ? m.status : 'Active';
   $('#minModalMsg').innerHTML = '';
   $('#ministerModal').classList.add('open');
   $('#minName').focus();
@@ -1722,7 +1724,7 @@ async function onSaveMinister(){
   const name = $('#minName').value.trim();
   $('#minModalMsg').innerHTML = '';
   if(!name){ $('#minModalMsg').innerHTML = '<div class="errbox" role="alert">Name is required.</div>'; return; }
-  const fields = { Title:name, Email:$('#minEmail').value.trim(), Phone:$('#minPhone').value.trim(), Status:$('#minStatus').value };
+  const fields = { Title:name, Email:$('#minEmail').value.trim(), Phone:$('#minPhone').value.trim(), SignInEmail:$('#minSignInEmail').value.trim(), Status:$('#minStatus').value };
   if(editingMinisterId) await updateItem('ministers', editingMinisterId, fields);
   else await createItem('ministers', fields);
   $('#ministerModal').classList.remove('open');

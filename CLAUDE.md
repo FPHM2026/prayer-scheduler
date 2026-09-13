@@ -31,7 +31,12 @@ tried and abandoned; see "History" below).
   already granted for the org).
 
 ## SharePoint Lists (the actual data store)
-- **PrayerMinisters**: Title (name), Email, Phone, Status (Choice: Active/Inactive)
+- **PrayerMinisters**: Title (name), Email (their real, checkable contact
+  address — what staff use to reach them), Phone, **SignInEmail** (their
+  unlicensed Entra ID sign-in address for the minister portal — not a real
+  inbox, deliberately a separate field from Email so giving someone portal
+  access never overwrites how you actually contact them), Status (Choice:
+  Active/Inactive)
 - **PrayerSessions**: Title, SessionDate, SessionEndDate, RecipientName,
   RecipientContact, AssignedMinisterIDs (comma-separated minister IDs, plain
   text), LeadMinisterIDs (comma-separated subset of the above who are "Lead"
@@ -144,10 +149,12 @@ M365 seat cost) so they can sign in for real.
 - Needs its own redirect URI on the same app registration:
   `https://FPHM2026.github.io/prayer-scheduler/portal/`
 - **Identity matching**: the signed-in account's email (`account.username`)
-  must exactly match (case-insensitive) that minister's Email field in
-  PrayerMinisters, or the portal shows a "couldn't find your profile"
-  message instead of a broken page. Keep that field accurate when adding a
-  new minister account.
+  must exactly match (case-insensitive) that minister's **SignInEmail**
+  field in PrayerMinisters — not the Email field, which is their real
+  contact address and is never touched by this matching — or the portal
+  shows a "couldn't find your profile" message instead of a broken page.
+  Set SignInEmail from the main app's Add/Edit Minister form when creating
+  a minister's Entra account.
 - Creating the actual Entra accounts (Microsoft 365 admin center → Add a
   user → "Create user without product license") and the SharePoint group/
   permission setup above are manual admin steps outside this repo — Claude

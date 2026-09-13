@@ -299,7 +299,7 @@ let ministers=[], sessions=[], blackouts=[], me=null;
 
 async function loadAll(){
   const [rawMin, rawSess, rawBlack] = await Promise.all([listItems('ministers'), listItems('sessions'), listItems('blackouts')]);
-  ministers = rawMin.map(m => ({ id: m.id, name: m.Title, email: m.Email||'', status: m.Status||'Active' }));
+  ministers = rawMin.map(m => ({ id: m.id, name: m.Title, signInEmail: m.SignInEmail||'', status: m.Status||'Active' }));
   sessions = rawSess.map(s => {
     const stripHtml = v => String(v||'').replace(/<[^>]*>/g, '');
     const allIds = stripHtml(s.AssignedMinisterIDs).split(',').map(x=>x.trim()).filter(Boolean);
@@ -314,7 +314,7 @@ async function loadAll(){
   blackouts = rawBlack.map(b => ({ id: b.id, ministerName: b.Title, date: (b.BlackoutDate||'').split('T')[0], endDate: b.EndDate ? b.EndDate.split('T')[0] : null, notes: b.Notes||'' }));
 
   const myEmail = (account.username||'').trim().toLowerCase();
-  me = ministers.find(m => m.email.trim().toLowerCase() === myEmail) || null;
+  me = ministers.find(m => m.signInEmail.trim().toLowerCase() === myEmail) || null;
 
   document.getElementById('notFoundMsg').style.display = me ? 'none' : 'block';
   document.getElementById('portalContent').style.display = me ? 'block' : 'none';
