@@ -179,7 +179,12 @@
      regardless of specificity) - so the hidden attribute was never
      actually hiding it. This rule's higher specificity restores that. */
   .preview-badge[hidden]{display:none;}
-  #previewModeBanner{position:sticky;top:0;z-index:65;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;background:var(--navy);color:#fff;padding:14px 20px;font-size:var(--fs-sm);text-align:center;border-bottom:3px solid var(--gold);}
+  /* Deliberately NOT position:sticky - the tab nav below is already sticky
+     at top:0, and a second sticky element at the same top:0 doesn't stack
+     under/after it, it overlaps it. On mobile, where this banner's text
+     wraps to two lines and gets tall, that overlap fully covered the tabs
+     once you scrolled. Letting the banner scroll away normally fixes it. */
+  #previewModeBanner{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;background:var(--navy);color:#fff;padding:14px 20px;font-size:var(--fs-sm);text-align:center;border-bottom:3px solid var(--gold);}
   #previewModeBanner strong{color:var(--gold);}
   #previewModeBanner a.btn{background:#fff;color:var(--navy);padding:7px 16px;min-height:auto;font-size:var(--fs-xs);font-weight:800;text-decoration:none;border-radius:6px;display:inline-block;}
   #previewModeBanner a.btn:hover{background:#f1ede4;}
@@ -567,7 +572,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-14.3";
+const APP_VERSION = "2026-09-14.4";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
