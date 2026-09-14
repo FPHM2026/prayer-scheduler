@@ -281,8 +281,11 @@
     </section>
 
     <section class="panel" id="panel-blackouts">
-      <p class="helptext">Your submitted time off, soonest first.</p>
-      <button class="btn" id="btnAddBlackout">+ Request Time Off</button>
+      <div class="toolbar">
+        <button class="btn" id="btnAddBlackout">+ Request Time Off</button>
+        <select id="blackoutRange" aria-label="Filter time off by date range"><option>Upcoming</option><option>All</option><option>Past</option></select>
+      </div>
+      <p class="helptext" id="blackoutHelptext">Your upcoming time off, soonest first.</p>
       <div id="blackoutGroups" style="margin-top:16px;"></div>
       <div class="no-results" id="blackoutNoResults" hidden>No time off on file.</div>
     </section>
@@ -784,14 +787,34 @@ function fmtBlackoutRangeShort(d){
 function renderBlackouts(){
   const box = $('#blackoutGroups'); const noResults = $('#blackoutNoResults');
   const opened = openState(box);
-  const mine = blackouts
-    .filter(b=> b.ministerName.trim().toLowerCase()===me.name.trim().toLowerCase())
-    .sort((a,b)=> a.date.localeCompare(b.date));
+  const range = $('#blackoutRange').value;
+  const today = isoDate(new Date());
+  // A range entry counts as "past" only once its whole span (end date if
+  // it has one, otherwise the single date) is behind today - a range still
+  // in progress stays in Upcoming.
+  const isPast = b => (b.endDate||b.date) < today;
+  const all = blackouts.filter(b=> b.ministerName.trim().toLowerCase()===me.name.trim().toLowerCase());
+  const mine = all
+    .filter(b=> range==='Upcoming' ? !isPast(b) : range==='Past' ? isPast(b) : true)
+    .sort((a,b)=> range==='Past' ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date));
+
+  const helptexts = { Upcoming:'Your upcoming time off, soonest first.', All:'All your time off on file.', Past:'Your past time off, most recent first.' };
+  $('#blackoutHelptext').textContent = helptexts[range] || helptexts.Upcoming;
+  const noResultsText = { Upcoming:'No upcoming time off.', All:'No time off on file.', Past:'No past time off on file.' };
+  noResults.textContent = noResultsText[range] || noResultsText.Upcoming;
 
   noResults.hidden = mine.length>0;
-  box.innerHTML = mine.length ? groupRow(me.name, initials(me.name), me.name,
+  if(!mine.length){ box.innerHTML=''; return; }
+  // The "next unavailable" summary always reflects the true next upcoming
+  // entry, regardless of which range is currently being viewed below -
+  // falls back to the most recent past entry if nothing is upcoming.
+  const upcomingSorted = all.filter(b=>!isPast(b)).sort((a,b)=>a.date.localeCompare(b.date));
+  const summary = upcomingSorted.length
+    ? `<span class="next">Next unavailable: ${fmtBlackoutRangeShort(upcomingSorted[0])}</span>`
+    : `Last: ${fmtBlackoutRangeShort(all.slice().sort((a,b)=>b.date.localeCompare(a.date))[0])}`;
+  box.innerHTML = groupRow(me.name, initials(me.name), me.name,
     `${mine.length} date${mine.length===1?'':'s'}`,
-    `<span class="next">Next unavailable: ${fmtBlackoutRangeShort(mine[0])}</span>`,
+    summary,
     mine.map(d=>`<div class="sess-row">
       <div>
         <div style="font-weight:600;">${fmtBlackoutRange(d)}</div>
@@ -801,7 +824,7 @@ function renderBlackouts(){
         <button class="icon-btn" onclick="openBlackoutModal(${d.id})" title="Edit" aria-label="Edit this time off">${ICONS.pencil}</button>
         <button class="icon-btn danger" onclick="deleteBlackout(${d.id})" title="Remove" aria-label="Remove this time off">${ICONS.trash}</button>
       </div>
-    </div>`).join(''), opened.has(me.name) ? opened.get(me.name) : true) : '';
+    </div>`).join(''), opened.has(me.name) ? opened.get(me.name) : true);
 }
 let blackoutEditId = null;
 window.setBlackoutMode = function(mode){
@@ -897,6 +920,7 @@ function wireApp(){
   $('#completedSearch').addEventListener('input', renderCompleted);
   wireSearchClear('completedSearch');
   $('#btnAddBlackout').addEventListener('click', ()=>openBlackoutModal());
+  $('#blackoutRange').addEventListener('change', renderBlackouts);
   $('#btnBlackoutCancel').addEventListener('click', ()=>$('#blackoutModal').classList.remove('open'));
   $('#btnBlackoutSave').addEventListener('click', saveBlackout);
   $('#btnConfirmCancel').addEventListener('click', ()=>closeConfirm(false));
