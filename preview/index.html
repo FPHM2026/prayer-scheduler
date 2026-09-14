@@ -567,7 +567,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-14.2";
+const APP_VERSION = "2026-09-14.3";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1322,11 +1322,10 @@ function openModal(existing, followFrom, opts){
     $('#apptType').value = opts.preset==='dropin' ? 'Drop-in' : 'Training';
     selectedMinisters = ministers.filter(m=>m.status==='Active').map(m=>({id:m.id, role:'Support'}));
     if(opts.preset==='dropin'){
-      // Sunday Drop-In always starts at 5pm - default it so date is the only
-      // thing left to pick; autoSetEndTime mirrors the usual +90min so End
-      // Time comes prefilled too instead of sitting blank.
+      // Sunday Drop-In always runs 5-7:30pm (2.5 hours, not the usual
+      // +90min default) - default it so date is the only thing left to pick.
       $('#sessTime').value = '17:00';
-      autoSetEndTime();
+      $('#sessEndTime').value = '19:30';
     }
   }
   updateGroupSessionFields();
