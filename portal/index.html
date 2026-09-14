@@ -672,6 +672,7 @@ function completedStats(){
     uniqueRecipientsLast: new Set(ytdLast.map(s=>s.recipName.trim().toLowerCase())).size,
     lifetimeSessions: all.length,
     lifetimeUnique: new Set(all.map(s=>s.recipName.trim().toLowerCase())).size,
+    firstSessionDate: all.length ? all.reduce((min,s)=> s.date<min ? s.date : min, all[0].date) : null,
     monthly, monthlyLast, now };
 }
 function renderCompletedStats(){
@@ -679,6 +680,8 @@ function renderCompletedStats(){
   const now = st.now;
   const rangeLabel = `${fmtShort(isoDate(new Date(now.getFullYear(),0,1)))} – ${fmtShort(isoDate(now))}`;
   const lastYearLabel = `${fmtShort(isoDate(new Date(now.getFullYear()-1,0,1)))} – ${fmtShort(isoDate(new Date(now.getFullYear()-1, now.getMonth(), now.getDate())))}, ${now.getFullYear()-1}`;
+  const monthNamesLong=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const lifetimeLabel = st.firstSessionDate ? `Since ${monthNamesLong[new Date(st.firstSessionDate+'T00:00').getMonth()]} ${new Date(st.firstSessionDate+'T00:00').getFullYear()}` : 'All time';
   const delta = st.ytdLast===0 ? null : Math.round((st.ytdThis-st.ytdLast)/st.ytdLast*100);
   const deltaHtml = delta===null ? '' : `<span class="stat-delta ${delta>=0?'up':'down'}">${delta>=0?'▲':'▼'} ${Math.abs(delta)}%</span>`;
   const uniqueDelta = st.uniqueRecipientsLast===0 ? null : Math.round((st.uniqueRecipients-st.uniqueRecipientsLast)/st.uniqueRecipientsLast*100);
@@ -721,7 +724,7 @@ function renderCompletedStats(){
         <span class="combo-label"></span>
         <span class="combo-range">${rangeLabel}</span>
         <span class="combo-range">${lastYearLabel}</span>
-        <span class="combo-range">All time</span>
+        <span class="combo-range">${lifetimeLabel}</span>
       </div>
     </div>
     <div class="trend-chart">
