@@ -79,6 +79,11 @@
   .toolbar > *{width:100%;}
   .search-row{margin-bottom:10px;}
   .search-row input{width:100%;}
+  .search-wrap{position:relative;}
+  .search-wrap input{width:100%;padding-right:36px;}
+  .search-clear{position:absolute;right:5px;top:50%;transform:translateY(-50%);width:26px;height:26px;display:flex;align-items:center;justify-content:center;background:none;border:none;border-radius:50%;color:var(--muted);cursor:pointer;font-size:16px;line-height:1;padding:0;min-height:0;}
+  .search-clear:hover{background:#f1ede4;color:var(--text);}
+  .search-clear[hidden]{display:none;}
   input,select,textarea{font-family:inherit;font-size:var(--fs-base);line-height:1.3;padding:10px 12px;border:1px solid var(--border);border-radius:6px;min-height:44px;background:#fff;color:var(--text);}
   input:hover,select:hover,textarea:hover{border-color:var(--gold);}
   input:focus,select:focus,textarea:focus{border-color:var(--gold);}
@@ -231,16 +236,19 @@
      much content (a split-bar, a delta badge) sits above it in a given
      card - keeps the date line flush across every card in the row. */
   .stat-sub{font-size:var(--fs-2xs);color:var(--muted);margin-top:auto;padding-top:10px;}
-  .stat-split-label{font-size:var(--fs-2xs);color:var(--muted);margin-top:8px;}
-  .stat-split-label .dot{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:4px;vertical-align:middle;}
-  /* Two-tone stacked bar, segments in the same left-to-right order as the
-     label above (first-time, then returning) so the color mapping reads
-     unambiguously - no single orange-on-empty-track guessing which side
-     the color refers to. */
-  .split-bar{height:6px;border-radius:3px;background:#f1ede4;margin-top:6px;overflow:hidden;display:flex;}
-  .split-bar .seg{display:block;height:100%;}
-  .split-bar .seg.first{background:var(--muted-bar);}
-  .split-bar .seg.returning{background:var(--primary);}
+
+  /* ---- Completed Sessions: combo card (YTD / Last Year / Lifetime) ---- */
+  .stat-combo{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px;box-shadow:var(--shadow-sm);}
+  .stat-combo-grid{display:grid;grid-template-columns:auto repeat(3,1fr);gap:0 8px;}
+  .combo-head{font-size:var(--fs-2xs);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;text-align:center;padding-bottom:8px;border-bottom:1px solid var(--border);}
+  .combo-label{font-size:var(--fs-sm);font-weight:700;color:var(--navy);display:flex;align-items:center;padding:12px 10px 4px 0;}
+  .combo-value{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:12px 4px 4px;}
+  .combo-num{font-size:24px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;line-height:1.1;}
+  .combo-label.row-divider,.combo-value.row-divider{border-top:1px solid #f1ede4;padding-top:14px;margin-top:8px;}
+  .combo-range{font-size:var(--fs-2xs);color:var(--muted);text-align:center;padding:4px 4px 0;}
+  .combo-split{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:var(--fs-2xs);color:var(--muted);padding:4px 4px 0;}
+  .combo-split .split-line{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
+  .combo-split .dot{display:inline-block;width:6px;height:6px;border-radius:2px;flex-shrink:0;}
 
   .trend-chart{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:18px;box-shadow:var(--shadow-sm);}
   .trend-title-row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
@@ -319,7 +327,7 @@
   @media (min-width:640px){
     .toolbar{flex-direction:row;flex-wrap:wrap;align-items:center;}
     .toolbar > *{width:auto;}
-    .toolbar #search,.toolbar #planningSearch{flex:1 1 220px;}
+    .toolbar .search-wrap{flex:1 1 220px;}
   }
 </style>
 </head>
@@ -361,7 +369,7 @@
   <section class="panel active" id="panel-schedule">
     <div class="toolbar">
       <button class="btn" id="btnNew">+ New Session</button>
-      <input id="search" placeholder="Search by minister or recipient..." aria-label="Search sessions by minister or recipient">
+      <div class="search-wrap"><input id="search" placeholder="Search by minister or recipient..." aria-label="Search sessions by minister or recipient"><button type="button" class="search-clear" aria-label="Clear search" hidden>&times;</button></div>
       <select id="range" aria-label="Filter sessions by date range"><option>Upcoming</option><option>All</option><option>Past</option></select>
       <button class="btn secondary" id="btnRefresh" style="display:inline-flex;align-items:center;gap:7px;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Refresh</button>
     </div>
@@ -374,7 +382,7 @@
     <p class="helptext">People who've asked for a session but aren't scheduled yet — same list as Schedule, just filtered to status "Waiting." Priority-flagged entries always stay at the top.</p>
     <div class="toolbar" style="margin-bottom:16px;">
       <button class="btn" id="btnAddWaiting">+ Add to Waiting List</button>
-      <input id="planningSearch" placeholder="Search by recipient..." aria-label="Search the waiting list by recipient">
+      <div class="search-wrap"><input id="planningSearch" placeholder="Search by recipient..." aria-label="Search the waiting list by recipient"><button type="button" class="search-clear" aria-label="Clear search" hidden>&times;</button></div>
       <select id="prospectSort" aria-label="Sort waiting list">
         <option value="waiting">Sort: Longest waiting</option>
         <option value="session">Sort: Highest session number</option>
@@ -394,7 +402,7 @@
       <div class="stats-body"><div class="stats-body-inner" id="completedStats"></div></div>
     </div>
     <div class="search-row">
-      <input id="completedSearch" placeholder="Search by minister or recipient..." aria-label="Search completed sessions by minister or recipient">
+      <div class="search-wrap"><input id="completedSearch" placeholder="Search by minister or recipient..." aria-label="Search completed sessions by minister or recipient"><button type="button" class="search-clear" aria-label="Clear search" hidden>&times;</button></div>
     </div>
     <div id="completedGroups"></div>
     <div class="no-results" id="completedNoResults" hidden>No completed sessions match your search.</div>
@@ -414,7 +422,7 @@
       <div class="stats-body"><div class="stats-body-inner" id="overviewStats"></div></div>
     </div>
     <div class="overview-filters">
-      <div class="search-wrap"><input id="overviewSearch" placeholder="Search ministers..." aria-label="Search ministers by name"></div>
+      <div class="search-wrap"><input id="overviewSearch" placeholder="Search ministers..." aria-label="Search ministers by name"><button type="button" class="search-clear" aria-label="Clear search" hidden>&times;</button></div>
       <div class="date-pair">
         <div class="date-wrap"><label for="statsFrom">From</label><input type="date" id="statsFrom"></div>
         <div class="date-wrap"><label for="statsTo">To</label><input type="date" id="statsTo"></div>
@@ -557,7 +565,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-13.1";
+const APP_VERSION = "2026-09-13.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -894,6 +902,22 @@ window.toggleStatsCollapse = function(btn){
   btn.setAttribute('aria-expanded', String(isOpen));
 };
 
+// A search input's own clear (x) button, shown only once there's text to
+// clear. Reused across every search field on every tab rather than one-off
+// wiring per field - clearing re-fires the input's existing 'input' listener
+// (whatever that tab's own render function is) instead of duplicating it.
+function wireSearchClear(inputId){
+  const input = document.getElementById(inputId);
+  const btn = input.parentElement.querySelector('.search-clear');
+  const toggle = ()=>{ btn.hidden = !input.value; };
+  input.addEventListener('input', toggle);
+  btn.addEventListener('click', ()=>{
+    input.value = '';
+    input.dispatchEvent(new Event('input'));
+    input.focus();
+  });
+  toggle();
+}
 let appWired = false;
 function wireApp(){
   if(appWired) return;
@@ -901,6 +925,7 @@ function wireApp(){
   document.querySelectorAll('nav[aria-label="Primary"] button').forEach(b=>b.addEventListener('click', ()=>switchTab(b.dataset.tab)));
   $('#btnRefresh').addEventListener('click', ()=>withLoading($('#btnRefresh'), 'Refreshing…', loadAll));
   $('#search').addEventListener('input', renderSchedule);
+  wireSearchClear('search');
   $('#range').addEventListener('change', renderSchedule);
   $('#btnNew').addEventListener('click', ()=>openModal(null, null, {forceKind:'session'}));
   $('#btnCancel').addEventListener('click', ()=>{ $('#sessionModal').classList.remove('open'); hideConflictToast(); });
@@ -918,9 +943,12 @@ function wireApp(){
   $('#btnMinSave').addEventListener('click', ()=>withLoading($('#btnMinSave'), 'Saving…', onSaveMinister));
   $('#btnAddWaiting').addEventListener('click', ()=>openModal(null, null, {forceKind:'waiting'}));
   $('#planningSearch').addEventListener('input', renderPlanning);
+  wireSearchClear('planningSearch');
   $('#prospectSort').addEventListener('change', renderPlanning);
   $('#completedSearch').addEventListener('input', renderCompleted);
+  wireSearchClear('completedSearch');
   $('#overviewSearch').addEventListener('input', renderOverview);
+  wireSearchClear('overviewSearch');
   $('#statsFrom').addEventListener('change', renderOverview);
   $('#statsTo').addEventListener('change', renderOverview);
   $('#overviewSubtabs').querySelectorAll('button[data-substatus]').forEach(b=>b.addEventListener('click', ()=>{
@@ -990,8 +1018,15 @@ function renderSchedule(){
   const groups = groupByRecipient(schedulable).map(g=>{
     const matchesSearch = !q || g.name.toLowerCase().includes(q) || g.sessions.some(s=>ministerNamesOf(s).toLowerCase().includes(q));
     let vis = g.sessions.map(s=>({...s, _start:new Date(s.date+'T'+s.time), _end:new Date(s.date+'T'+s.endTime)}));
-    if(range==='Upcoming') vis = vis.filter(s=>s._end>=now);
-    if(range==='Past') vis = vis.filter(s=>s._end<now);
+    // While actively searching, show the recipient's full matching history
+    // regardless of the range filter - otherwise a minister-name search
+    // silently comes up empty whenever their sessions with that recipient
+    // fall outside "Upcoming"/"Past" (e.g. all-Completed), which looks like
+    // minister search is broken even though it matched correctly.
+    if(!q){
+      if(range==='Upcoming') vis = vis.filter(s=>s._end>=now);
+      if(range==='Past') vis = vis.filter(s=>s._end<now);
+    }
     vis.sort((a,b)=>a._start-b._start);
     const upcoming = vis.find(s=>s._end>=now && s.status==='Scheduled');
     const mostRecent = vis[vis.length-1];
@@ -1096,6 +1131,7 @@ function completedStats(){
   };
   const recip = classifyRecipients(ytdThis);
   const recipLast = classifyRecipients(ytdLast);
+  const recipLifetime = classifyRecipients(all);
   const monthCount = now.getMonth()+1;
   const monthly = Array.from({length:monthCount},(_,m)=> ytdThis.filter(s=> new Date(s.date+'T00:00').getMonth()===m).length);
   const monthlyLast = Array.from({length:monthCount},(_,m)=> ytdLast.filter(s=> new Date(s.date+'T00:00').getMonth()===m).length);
@@ -1103,6 +1139,10 @@ function completedStats(){
     uniqueRecipients: recip.total, uniqueRecipientsLast: recipLast.total,
     firstTime: recip.firstTime, followUp: recip.followUp,
     firstTimeLast: recipLast.firstTime, followUpLast: recipLast.followUp,
+    lifetimeSessions: all.length,
+    lifetimeUnique: recipLifetime.total,
+    firstTimeLifetime: recipLifetime.firstTime, followUpLifetime: recipLifetime.followUp,
+    firstSessionDate: all.length ? all.reduce((min,s)=> s.date<min ? s.date : min, all[0].date) : null,
     monthly, monthlyLast, now };
 }
 function renderCompletedStats(){
@@ -1110,12 +1150,13 @@ function renderCompletedStats(){
   const now = st.now;
   const rangeLabel = `${fmtShort(isoDate(new Date(now.getFullYear(),0,1)))} – ${fmtShort(isoDate(now))}`;
   const lastYearLabel = `${fmtShort(isoDate(new Date(now.getFullYear()-1,0,1)))} – ${fmtShort(isoDate(new Date(now.getFullYear()-1, now.getMonth(), now.getDate())))}, ${now.getFullYear()-1}`;
+  const monthNamesLong=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const lifetimeLabel = st.firstSessionDate ? `Since ${monthNamesLong[new Date(st.firstSessionDate+'T00:00').getMonth()]} ${new Date(st.firstSessionDate+'T00:00').getFullYear()}` : 'All time';
   const delta = st.ytdLast===0 ? null : Math.round((st.ytdThis-st.ytdLast)/st.ytdLast*100);
   const deltaHtml = delta===null ? '' : `<span class="stat-delta ${delta>=0?'up':'down'}">${delta>=0?'▲':'▼'} ${Math.abs(delta)}%</span>`;
-  const followUpPct = st.uniqueRecipients ? Math.round(st.followUp/st.uniqueRecipients*100) : 0;
-  const followUpPctLast = st.uniqueRecipientsLast ? Math.round(st.followUpLast/st.uniqueRecipientsLast*100) : 0;
-  const firstTimePct = 100 - followUpPct;
-  const firstTimePctLast = 100 - followUpPctLast;
+  const uniqueDelta = st.uniqueRecipientsLast===0 ? null : Math.round((st.uniqueRecipients-st.uniqueRecipientsLast)/st.uniqueRecipientsLast*100);
+  const uniqueDeltaHtml = uniqueDelta===null ? '' : `<span class="stat-delta ${uniqueDelta>=0?'up':'down'}">${uniqueDelta>=0?'▲':'▼'} ${Math.abs(uniqueDelta)}%</span>`;
+  const splitLine = (n,label,isFollowUp)=> `<span class="split-line"><span class="dot" style="background:var(${isFollowUp?'--primary':'--muted-bar'})"></span>${n} ${label}</span>`;
   const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const maxMonthly = Math.max(1, ...st.monthly, ...st.monthlyLast);
   const bars = st.monthly.map((v,i)=>{
@@ -1134,22 +1175,32 @@ function renderCompletedStats(){
     </div>`;
   }).join('');
   $('#completedStats').innerHTML = `
-    <div class="stat-grid pairs">
-      <div class="stat-tile"><div class="stat-label">This Year (YTD)</div><div class="stat-value">${st.ytdThis}</div><div class="stat-sub">${rangeLabel}</div></div>
-      <div class="stat-tile"><div class="stat-label">Last Year (YTD)</div><div class="stat-value">${st.ytdLast} ${deltaHtml}</div><div class="stat-sub">${lastYearLabel}</div></div>
-      <div class="stat-tile">
-        <div class="stat-label">Unique Recipients (YTD)</div>
-        <div class="stat-value">${st.uniqueRecipients}</div>
-        <div class="stat-split-label"><span class="dot" style="background:var(--muted-bar)"></span>${st.firstTime} first-time &middot; <span class="dot" style="background:var(--primary)"></span>${st.followUp} follow-up</div>
-        <div class="split-bar"><span class="seg first" style="width:${firstTimePct}%"></span><span class="seg returning" style="width:${followUpPct}%"></span></div>
-        <div class="stat-sub">${rangeLabel}</div>
-      </div>
-      <div class="stat-tile">
-        <div class="stat-label">Unique Recipients (Last Year)</div>
-        <div class="stat-value">${st.uniqueRecipientsLast}</div>
-        <div class="stat-split-label"><span class="dot" style="background:var(--muted-bar)"></span>${st.firstTimeLast} first-time &middot; <span class="dot" style="background:var(--primary)"></span>${st.followUpLast} follow-up</div>
-        <div class="split-bar"><span class="seg first" style="width:${firstTimePctLast}%"></span><span class="seg returning" style="width:${followUpPctLast}%"></span></div>
-        <div class="stat-sub">${lastYearLabel}</div>
+    <div class="stat-combo">
+      <div class="stat-combo-grid">
+        <span class="combo-head"></span>
+        <span class="combo-head">YTD</span>
+        <span class="combo-head">Last Year</span>
+        <span class="combo-head">Lifetime</span>
+
+        <span class="combo-label">Sessions</span>
+        <span class="combo-value"><span class="combo-num">${st.ytdThis}</span></span>
+        <span class="combo-value"><span class="combo-num">${st.ytdLast}</span>${deltaHtml}</span>
+        <span class="combo-value"><span class="combo-num">${st.lifetimeSessions}</span></span>
+
+        <span class="combo-label row-divider">Unique Recipients</span>
+        <span class="combo-value row-divider"><span class="combo-num">${st.uniqueRecipients}</span></span>
+        <span class="combo-value row-divider"><span class="combo-num">${st.uniqueRecipientsLast}</span>${uniqueDeltaHtml}</span>
+        <span class="combo-value row-divider"><span class="combo-num">${st.lifetimeUnique}</span></span>
+
+        <span class="combo-label"></span>
+        <span class="combo-split">${splitLine(st.firstTime,'first-time')}${splitLine(st.followUp,'follow-up',true)}</span>
+        <span class="combo-split">${splitLine(st.firstTimeLast,'first-time')}${splitLine(st.followUpLast,'follow-up',true)}</span>
+        <span class="combo-split">${splitLine(st.firstTimeLifetime,'first-time')}${splitLine(st.followUpLifetime,'follow-up',true)}</span>
+
+        <span class="combo-label"></span>
+        <span class="combo-range">${rangeLabel}</span>
+        <span class="combo-range">${lastYearLabel}</span>
+        <span class="combo-range">${lifetimeLabel}</span>
       </div>
     </div>
     <div class="trend-chart">
