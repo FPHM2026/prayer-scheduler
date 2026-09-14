@@ -499,10 +499,10 @@ const ICONS = {
 };
 function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function initials(name){ return String(name||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join(''); }
-function fmtDate(d){ return d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}); }
+function fmtDate(d){ return d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'}); }
 function fmtTime(d){ return d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}); }
 function fmt12(t){ if(!t) return ''; const [h,m]=t.split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); return fmtTime(d); }
-function fmtShort(dateStr){ if(!dateStr) return ''; return new Date(dateStr+'T00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'}); }
+function fmtShort(dateStr){ if(!dateStr) return ''; return new Date(dateStr+'T00:00').toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); }
 function isoDate(d){ return d.toISOString().slice(0,10); }
 function ministerNamesOf(s){
   const sorted = [...s.ministers].sort((a,b)=> (a.role==='Lead'?0:1) - (b.role==='Lead'?0:1));
@@ -710,7 +710,7 @@ function renderCompletedStats(){
   const st = completedStats();
   const now = st.now;
   const rangeLabel = `${fmtShort(isoDate(new Date(now.getFullYear(),0,1)))} – ${fmtShort(isoDate(now))}`;
-  const lastYearLabel = `${fmtShort(isoDate(new Date(now.getFullYear()-1,0,1)))} – ${fmtShort(isoDate(new Date(now.getFullYear()-1, now.getMonth(), now.getDate())))}, ${now.getFullYear()-1}`;
+  const lastYearLabel = `${fmtShort(isoDate(new Date(now.getFullYear()-1,0,1)))} – ${fmtShort(isoDate(new Date(now.getFullYear()-1, now.getMonth(), now.getDate())))}`;
   const monthNamesLong=['January','February','March','April','May','June','July','August','September','October','November','December'];
   const lifetimeLabel = st.firstSessionDate ? `Since ${monthNamesLong[new Date(st.firstSessionDate+'T00:00').getMonth()]} ${new Date(st.firstSessionDate+'T00:00').getFullYear()}` : 'All time';
   const delta = st.ytdLast===0 ? null : Math.round((st.ytdThis-st.ytdLast)/st.ytdLast*100);

@@ -572,7 +572,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-14.5";
+const APP_VERSION = "2026-09-14.6";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -806,10 +806,10 @@ const ICONS = {
   calendarPlus: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 14v6M9 17h6"/></svg>',
   power: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>'
 };
-function fmtDate(d){ return d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}); }
+function fmtDate(d){ return d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'}); }
 function fmtTime(d){ return d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}); }
 function fmt12(t){ if(!t) return ''; const [h,m]=t.split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); return fmtTime(d); }
-function fmtShort(dateStr){ if(!dateStr) return ''; return new Date(dateStr+'T00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'}); }
+function fmtShort(dateStr){ if(!dateStr) return ''; return new Date(dateStr+'T00:00').toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); }
 function isoDate(d){ return d.toISOString().slice(0,10); }
 function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function initials(name){ return String(name||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join(''); }
@@ -1164,7 +1164,7 @@ function renderCompletedStats(){
   const st = completedStats();
   const now = st.now;
   const rangeLabel = `${fmtShort(isoDate(new Date(now.getFullYear(),0,1)))} – ${fmtShort(isoDate(now))}`;
-  const lastYearLabel = `${fmtShort(isoDate(new Date(now.getFullYear()-1,0,1)))} – ${fmtShort(isoDate(new Date(now.getFullYear()-1, now.getMonth(), now.getDate())))}, ${now.getFullYear()-1}`;
+  const lastYearLabel = `${fmtShort(isoDate(new Date(now.getFullYear()-1,0,1)))} – ${fmtShort(isoDate(new Date(now.getFullYear()-1, now.getMonth(), now.getDate())))}`;
   const monthNamesLong=['January','February','March','April','May','June','July','August','September','October','November','December'];
   const lifetimeLabel = st.firstSessionDate ? `Since ${monthNamesLong[new Date(st.firstSessionDate+'T00:00').getMonth()]} ${new Date(st.firstSessionDate+'T00:00').getFullYear()}` : 'All time';
   const delta = st.ytdLast===0 ? null : Math.round((st.ytdThis-st.ytdLast)/st.ytdLast*100);
