@@ -369,6 +369,8 @@
   <section class="panel active" id="panel-schedule">
     <div class="toolbar">
       <button class="btn" id="btnNew">+ New Session</button>
+      <button class="btn secondary" id="btnDropIn">+ Drop-in</button>
+      <button class="btn secondary" id="btnTraining">+ Training</button>
       <div class="search-wrap"><input id="search" placeholder="Search by minister or recipient..." aria-label="Search sessions by minister or recipient"><button type="button" class="search-clear" aria-label="Clear search" hidden>&times;</button></div>
       <select id="range" aria-label="Filter sessions by date range"><option>Upcoming</option><option>All</option><option>Past</option></select>
       <button class="btn secondary" id="btnRefresh" style="display:inline-flex;align-items:center;gap:7px;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Refresh</button>
@@ -456,7 +458,7 @@
     <p class="helptext" id="lastSeenHint" style="margin-top:-8px;"></p>
     <div class="field-row sched-only">
       <div class="field"><label for="apptType">Appointment Type</label>
-        <select id="apptType"><option value="First">First Appointment</option><option value="Follow-up">Follow-up</option></select>
+        <select id="apptType"><option value="First">First Appointment</option><option value="Follow-up">Follow-up</option><option value="Drop-in">Sunday Drop-In</option><option value="Training">Training</option></select>
       </div>
       <div class="field" id="statusField" style="display:none;">
         <label for="sessStatus">Status</label>
@@ -565,7 +567,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-13.2";
+const APP_VERSION = "2026-09-14.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -928,6 +930,8 @@ function wireApp(){
   wireSearchClear('search');
   $('#range').addEventListener('change', renderSchedule);
   $('#btnNew').addEventListener('click', ()=>openModal(null, null, {forceKind:'session'}));
+  $('#btnDropIn').addEventListener('click', ()=>openModal(null, null, {forceKind:'session', preset:'dropin'}));
+  $('#btnTraining').addEventListener('click', ()=>openModal(null, null, {forceKind:'session', preset:'training'}));
   $('#btnCancel').addEventListener('click', ()=>{ $('#sessionModal').classList.remove('open'); hideConflictToast(); });
   $('#sessDate').addEventListener('change', ()=>{ renderMinisterList(); updateEndPreview(); renderSameDay(); renderConflictCheck(); renderDayLabel(); renderSlotButtons(); });
   $('#sessTime').addEventListener('change', ()=>{ autoSetEndTime(); renderSlotButtons(); renderConflictCheck(); });
@@ -1107,7 +1111,12 @@ function renderCompleted(){
   renderCompletedStats();
 }
 function completedStats(){
-  const all = sessions.filter(s=>s.status==='Completed');
+  // Sunday Drop-In / Training are group sessions every minister is assigned
+  // to at once - counting them here would blow up "unique recipients" and
+  // the first-time/follow-up split with what is really one shared event, so
+  // they're excluded from every statistic even though the underlying session
+  // records still show up normally in the grouped list above.
+  const all = sessions.filter(s=>s.status==='Completed' && s.apptType!=='Drop-in' && s.apptType!=='Training');
   const now = new Date();
   const thisYearStart = new Date(now.getFullYear(),0,1);
   const lastYearStart = new Date(now.getFullYear()-1,0,1);
@@ -1282,7 +1291,7 @@ function openModal(existing, followFrom, opts){
   setSessKind(kind);
   $('#modalTitle').textContent = kind==='waiting'
     ? (existing ? 'Edit Waiting Entry' : 'Add to Waiting List')
-    : (existing ? (existing.status==='Waiting' ? 'Schedule Session' : 'Edit Session') : (followFrom ? 'Follow-up Session' : 'New Session'));
+    : (existing ? (existing.status==='Waiting' ? 'Schedule Session' : 'Edit Session') : (followFrom ? 'Follow-up Session' : (opts.preset==='dropin' ? 'New Sunday Drop-In' : opts.preset==='training' ? 'New Training Session' : 'New Session')));
   $('#modalMsg').innerHTML='';
   $('#recipNameResults').innerHTML=''; recipNameMatches=[];
   $('#recipName').value = existing ? existing.recipName : (followFrom ? followFrom.recipName : '');
@@ -1302,6 +1311,16 @@ function openModal(existing, followFrom, opts){
   $('#statusField').style.display = showStatusDropdown ? 'block' : 'none';
   $('#sessStatus').value = (existing && existing.status!=='Waiting') ? existing.status : 'Scheduled';
   selectedMinisters = (existing && existing.status!=='Waiting') ? existing.ministers.map(m=>({...m})) : (followFrom ? followFrom.ministers.map(m=>({...m})) : []);
+  // "+ Drop-in" / "+ Training" shortcuts: a group session everyone attends,
+  // so skip the usual empty-form start and prefill the recipient name,
+  // appointment type, and full active roster - only date/time are left for
+  // the admin to fill in. Only applies opening a brand-new session, never
+  // when editing an existing one or building a follow-up.
+  if(opts.preset && !existing && !followFrom){
+    $('#recipName').value = opts.preset==='dropin' ? 'Sunday Drop-In' : 'Training';
+    $('#apptType').value = opts.preset==='dropin' ? 'Drop-in' : 'Training';
+    selectedMinisters = ministers.filter(m=>m.status==='Active').map(m=>({id:m.id, role:'Support'}));
+  }
   renderMinisterList(); updateEndPreview(); renderSameDay(); updateLastSeen(); renderDayLabel(); renderSlotButtons();
   $('#sessionModal').classList.add('open');
   $('#recipName').focus();
@@ -1633,6 +1652,10 @@ function renderOverview(){
     .map(m=>{
       const inRange = sessions.filter(s=>{
         if(s.status==='Waiting') return false;
+        // Drop-in/Training assign every minister to the same shared session -
+        // excluded here too, or everyone's hours/led/supported counts would
+        // include the same group event over and over.
+        if(s.apptType==='Drop-in' || s.apptType==='Training') return false;
         if(!ministerIdsOf(s).includes(m.id)) return false;
         if(fromVal && s.date<fromVal) return false;
         if(toVal && s.date>toVal) return false;
@@ -1709,9 +1732,11 @@ function shiftYear(dateStr, delta){
 function renderOverviewStats(){
   const fromVal = $('#statsFrom').value, toVal = $('#statsTo').value;
   const activeMins = ministers.filter(m=>m.status==='Active');
-  const inRangeAll = sessions.filter(s=> s.status!=='Waiting' && (!fromVal || s.date>=fromVal) && (!toVal || s.date<=toVal));
+  // Drop-in/Training excluded here too - see the matching note in renderOverview().
+  const notGroupSession = s => s.apptType!=='Drop-in' && s.apptType!=='Training';
+  const inRangeAll = sessions.filter(s=> s.status!=='Waiting' && notGroupSession(s) && (!fromVal || s.date>=fromVal) && (!toVal || s.date<=toVal));
   const lastYearFrom = shiftYear(fromVal,-1), lastYearTo = shiftYear(toVal,-1);
-  const lastYearAll = sessions.filter(s=> s.status!=='Waiting' && (!lastYearFrom || s.date>=lastYearFrom) && (!lastYearTo || s.date<=lastYearTo));
+  const lastYearAll = sessions.filter(s=> s.status!=='Waiting' && notGroupSession(s) && (!lastYearFrom || s.date>=lastYearFrom) && (!lastYearTo || s.date<=lastYearTo));
 
   const servingIds = new Set();
   let hoursThis=0, led=0, supported=0;
