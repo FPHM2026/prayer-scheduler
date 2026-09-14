@@ -453,7 +453,7 @@
     <div id="modalMsg"></div>
     <div class="field-row">
       <div class="field"><label for="recipName">Recipient Name *</label><input id="recipName" autocomplete="off"><div id="recipNameResults"></div></div>
-      <div class="field"><label for="recipContact">Recipient Contact</label><input id="recipContact"></div>
+      <div class="field" id="recipContactField"><label for="recipContact">Recipient Contact</label><input id="recipContact"></div>
     </div>
     <p class="helptext" id="lastSeenHint" style="margin-top:-8px;"></p>
     <div class="field-row sched-only">
@@ -491,7 +491,7 @@
         <input type="checkbox" id="sessPriority" style="width:auto;min-height:auto;"> Flag as priority (bumps to top of the waiting list)
       </label>
     </div>
-    <div class="field sched-only">
+    <div class="field sched-only" id="waField">
       <label style="display:flex;align-items:center;gap:8px;font-weight:700;">
         <input type="checkbox" id="waCreated" style="width:auto;min-height:auto;"> WhatsApp group created for this session
       </label>
@@ -567,7 +567,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-14.1";
+const APP_VERSION = "2026-09-14.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -937,6 +937,7 @@ function wireApp(){
   $('#sessTime').addEventListener('change', ()=>{ autoSetEndTime(); renderSlotButtons(); renderConflictCheck(); });
   $('#sessEndTime').addEventListener('change', ()=>{ updateEndPreview(); renderConflictCheck(); });
   $('#sessLocation').addEventListener('change', renderConflictCheck);
+  $('#apptType').addEventListener('change', updateGroupSessionFields);
   $('#recipName').addEventListener('input', ()=>{ updateLastSeen(); renderConflictCheck(); renderRecipNameSuggestions(); });
   $('#btnSave').addEventListener('click', ()=>withLoading($('#btnSave'), 'Saving…', onSaveSession));
   $('#btnAddLocation').addEventListener('click', ()=>{ $('#newLocationName').value=''; $('#locModalMsg').innerHTML=''; $('#locationModal').classList.add('open'); $('#newLocationName').focus(); });
@@ -1320,10 +1321,29 @@ function openModal(existing, followFrom, opts){
     $('#recipName').value = opts.preset==='dropin' ? 'Sunday Drop-In' : 'Training';
     $('#apptType').value = opts.preset==='dropin' ? 'Drop-in' : 'Training';
     selectedMinisters = ministers.filter(m=>m.status==='Active').map(m=>({id:m.id, role:'Support'}));
+    if(opts.preset==='dropin'){
+      // Sunday Drop-In always starts at 5pm - default it so date is the only
+      // thing left to pick; autoSetEndTime mirrors the usual +90min so End
+      // Time comes prefilled too instead of sitting blank.
+      $('#sessTime').value = '17:00';
+      autoSetEndTime();
+    }
   }
+  updateGroupSessionFields();
   renderMinisterList(); updateEndPreview(); renderSameDay(); updateLastSeen(); renderDayLabel(); renderSlotButtons();
   $('#sessionModal').classList.add('open');
   $('#recipName').focus();
+}
+// Recipient Contact and the WhatsApp group checkbox don't apply to a
+// Drop-in/Training group session - hides both whenever the Appointment
+// Type is set to either, whether that came from the preset buttons, from
+// editing an existing Drop-in/Training session, or from manually changing
+// the dropdown on an otherwise-normal session.
+function updateGroupSessionFields(){
+  const isGroup = $('#apptType').value==='Drop-in' || $('#apptType').value==='Training';
+  $('#recipContactField').style.display = isGroup ? 'none' : '';
+  $('#waField').style.display = isGroup ? 'none' : '';
+  if(isGroup){ $('#recipContact').value=''; $('#waCreated').checked=false; $('#waLink').value=''; }
 }
 
 // Autocomplete for the Recipient Name field (New Session and Add to Waiting
