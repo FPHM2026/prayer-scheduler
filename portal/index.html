@@ -9,13 +9,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3/lib/msal-browser.min.js"></script>
 <style>
-  /* Same design tokens as the main scheduler app - this is a deliberately
-     smaller, single-purpose companion, not a re-skin. */
+  /* Same design tokens and components as the main scheduler app - this is
+     deliberately the SAME look, just fewer tabs and no admin actions on
+     sessions (a minister can view, not manage, their own schedule). */
   :root{
     --navy:#474747; --navy-dark:#333; --gold:#aa5a3c; --gold-dark:#8a4a30;
     --primary:#f28a00; --primary-dark:#ce7500; --on-primary:#1a1a1a;
     --cream:#e7e2cf; --bg:#faf8f4; --card:#fff; --border:#ddd5c4;
-    --text:#565656; --muted:#7a7a7a; --danger:#c0392b; --danger-bg:#fdecea;
+    --text:#565656; --muted:#7a7a7a; --muted-bar:#cdc4ac; --danger:#c0392b; --danger-bg:#fdecea;
     --ok:#2e7d32; --ok-bg:#e9f7ec;
     --shadow-sm:0 1px 2px rgba(35,28,20,.07),0 1px 1px rgba(35,28,20,.05);
     --shadow-md:0 6px 18px rgba(35,28,20,.10);
@@ -27,28 +28,52 @@
     :root{ --fs-2xs:12.5px; --fs-xs:13.5px; --fs-sm:15px; --fs-base:17px;
            --fs-md:18px; --fs-lg:20px; --fs-xl:24px; --fs-2xl:30px; }
   }
+  @media (min-width:1024px){
+    :root{ --fs-2xs:13px; --fs-xs:14px; --fs-sm:15.5px; --fs-base:18px;
+           --fs-md:19.5px; --fs-lg:22px; --fs-xl:28px; --fs-2xl:36px; }
+  }
   @media (prefers-reduced-motion: reduce){
     *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important;}
   }
   *{box-sizing:border-box;}
   a{color:var(--gold);}
+  a:hover{color:var(--navy);}
   :focus-visible{outline:3px solid var(--navy);outline-offset:2px;}
   button{font-family:inherit;}
+  button,input,select,textarea,.group,.sess-row{transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease,transform .15s ease,color .15s ease;}
   body{margin:0;font-family:'Jost','Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text);font-size:var(--fs-base);line-height:1.55;}
 
-  header{background:var(--cream);color:var(--navy);padding:14px 16px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid rgba(0,0,0,.06);}
-  header h1{margin:0;font-size:var(--fs-lg);font-family:'Playfair Display',Georgia,serif;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:var(--gold);}
+  header{max-width:1100px;margin:0 auto;background:var(--cream);color:var(--navy);padding:10px 14px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid rgba(0,0,0,.06);}
+  header h1,#signinScreen h1{margin:0;font-size:17px;font-family:'Playfair Display',Georgia,serif;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:var(--gold);}
+  #signinScreen h1{font-size:var(--fs-xl);letter-spacing:.03em;}
   header .who{font-size:var(--fs-xs);color:var(--navy);}
-  @media (min-width:640px){ header{padding:18px 24px;} header h1{font-size:var(--fs-xl);} }
+  #btnSignOut{background:var(--navy);color:#fff;border-color:var(--navy);}
+  #btnSignOut:hover:not(:disabled){background:var(--navy-dark);border-color:var(--navy-dark);}
 
-  main{max-width:720px;margin:0 auto;padding:16px 14px 60px;}
-  @media (min-width:640px){ main{padding:24px 20px 60px;} }
+  nav[aria-label="Primary"]{position:sticky;top:0;z-index:20;max-width:1100px;margin:0 auto;display:flex;gap:4px;flex-wrap:wrap;padding:6px 10px 0;background:#fff;border-bottom:1px solid var(--border);box-shadow:var(--shadow-sm);}
+  nav[aria-label="Primary"] button{flex:0 0 auto;background:var(--gold);color:#fff;border:none;border-bottom:4px solid transparent;padding:9px 13px;border-radius:6px 6px 0 0;font-weight:700;cursor:pointer;margin-bottom:4px;font-size:var(--fs-xs);min-height:40px;white-space:nowrap;}
+  nav[aria-label="Primary"] button:hover{background:var(--gold-dark);}
+  nav[aria-label="Primary"] button.active{background:var(--navy);color:#fff;border-bottom-color:var(--primary);}
+  nav[aria-label="Primary"] button.active:hover{background:var(--navy-dark);}
+  @media (min-width:1024px){
+    header{padding:16px 24px;}
+    header h1{font-size:var(--fs-xl);letter-spacing:.03em;}
+    nav[aria-label="Primary"]{padding:8px 16px 0;}
+    nav[aria-label="Primary"] button{padding:12px 18px;font-size:var(--fs-sm);min-height:44px;}
+  }
 
-  #signinScreen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:20px;background:var(--cream);}
-  #signinScreen h1{margin:0;font-size:var(--fs-xl);font-family:'Playfair Display',Georgia,serif;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--gold);}
-  #signinScreen .helptext{color:var(--navy);font-size:var(--fs-sm);max-width:360px;}
-  #appRoot{display:none;}
+  main{max-width:1100px;margin:0 auto;padding:14px 12px 50px;}
+  @media (min-width:640px){ main{padding:20px 20px 60px;} }
+  .panel{display:none;} .panel.active{display:block;}
 
+  .toolbar{display:flex;flex-direction:column;align-items:stretch;gap:10px;margin-bottom:14px;}
+  .toolbar > *{width:100%;}
+  .search-row{margin-bottom:10px;}
+  .search-row input{width:100%;}
+  input,select,textarea{font-family:inherit;font-size:var(--fs-base);line-height:1.3;padding:10px 12px;border:1px solid var(--border);border-radius:6px;min-height:44px;background:#fff;color:var(--text);}
+  input:hover,select:hover,textarea:hover{border-color:var(--gold);}
+  input:focus,select:focus,textarea:focus{border-color:var(--gold);}
+  textarea{min-height:60px;}
   button.btn{background:var(--primary);color:var(--on-primary);border:none;padding:12px 18px;border-radius:6px;font-weight:700;cursor:pointer;font-size:var(--fs-md);min-height:44px;}
   button.btn:hover:not(:disabled){background:var(--primary-dark);box-shadow:var(--shadow-sm);}
   button.btn.secondary{background:#fff;border:1px solid var(--navy);color:var(--navy);}
@@ -61,48 +86,132 @@
   button.icon-btn.danger{color:var(--danger);}
   button.icon-btn.danger:hover{background:var(--danger-bg);color:var(--danger);}
 
-  h2{font-size:var(--fs-lg);margin:0 0 4px;color:var(--navy);}
-  .section{margin-bottom:34px;}
-  .section-intro{color:var(--muted);font-size:var(--fs-sm);margin:0 0 16px;}
-
-  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;box-shadow:var(--shadow-sm);}
-  .card .row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
-  .card .title{font-weight:700;font-size:var(--fs-md);color:var(--text);}
-  .card .meta{color:var(--muted);font-size:var(--fs-sm);margin-top:3px;}
   .tag{display:inline-block;background:#f2ece1;color:var(--navy);border-radius:10px;padding:2px 9px;font-size:var(--fs-2xs);font-weight:700;margin-right:6px;}
-  .tag.lead{background:rgba(242,138,0,.16);color:#8a4a00;}
-  .no-results{padding:28px 16px;text-align:center;color:var(--muted);font-size:var(--fs-sm);}
-  .errbox{background:var(--danger-bg);color:var(--danger);border-radius:6px;padding:12px 14px;font-size:var(--fs-sm);margin-bottom:14px;}
-  .helptext{font-size:var(--fs-xs);color:var(--muted);}
+  .tag.completed{background:var(--ok-bg);color:var(--ok);}
+  .tag.first{background:rgba(242,138,0,.16);color:#8a4a00;}
+  .tag.scheduled{background:#eef4fb;color:#2c5f8a;}
 
   .field{margin-bottom:14px;}
   .field label{display:block;font-size:var(--fs-sm);font-weight:700;margin-bottom:5px;}
   .field input,.field select,.field textarea{width:100%;}
-  input,select,textarea{font-family:inherit;font-size:var(--fs-base);line-height:1.3;padding:10px 12px;border:1px solid var(--border);border-radius:6px;min-height:44px;background:#fff;color:var(--text);}
-  input:hover,select:hover,textarea:hover{border-color:var(--gold);}
-  input:focus,select:focus,textarea:focus{border-color:var(--gold);}
-  textarea{min-height:60px;}
   .field-row{display:grid;grid-template-columns:1fr;gap:10px;}
   @media (min-width:640px){ .field-row{grid-template-columns:1fr 1fr;} }
   .toggle-pair{display:flex;gap:8px;margin-bottom:14px;}
   .toggle-pair button{flex:1;background:#fff;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:10px;font-weight:700;font-size:var(--fs-sm);cursor:pointer;}
   .toggle-pair button:hover{border-color:var(--gold);}
   .toggle-pair button.active{background:#fff;border-color:var(--gold);color:var(--gold);}
+  .errbox{background:var(--danger-bg);color:var(--danger);border-radius:6px;padding:10px 12px;font-size:var(--fs-sm);margin-bottom:10px;}
+  .helptext{font-size:var(--fs-xs);color:var(--muted);}
 
-  .modal-bg{display:none;position:fixed;inset:0;background:rgba(35,30,24,.55);align-items:flex-end;justify-content:center;z-index:50;padding:0;}
+  .modal-bg{display:none;position:fixed;inset:0;background:rgba(35,30,24,.55);align-items:center;justify-content:center;z-index:50;padding:12px;}
   .modal-bg.open{display:flex;}
-  .modal{background:#fff;border-radius:16px 16px 0 0;max-width:none;width:100%;max-height:90vh;overflow:auto;padding:18px;box-shadow:var(--shadow-lg);animation:sheetSlideUp .25s ease;}
-  .modal.small{border-radius:10px;max-width:360px;max-height:96vh;align-self:center;}
-  @media (min-width:640px){ .modal{padding:24px;} }
-  @keyframes sheetSlideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+  .modal{background:#fff;border-radius:10px;max-width:560px;width:100%;max-height:96vh;overflow:auto;padding:14px;box-shadow:var(--shadow-lg);}
+  .modal.small{max-width:360px;}
   .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:4px;}
+  @media (min-width:640px){ .modal{padding:22px;max-height:92vh;} .modal.small{max-width:400px;} }
+  .modal-bg.sheet{align-items:flex-end;padding:0;}
+  .modal-bg.sheet .modal{max-width:none;width:100%;max-height:90vh;border-radius:16px 16px 0 0;animation:sheetSlideUp .25s ease;}
+  @keyframes sheetSlideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+
+  #signinScreen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:20px;background:var(--cream);}
+  #signinScreen .helptext{color:var(--navy);font-size:var(--fs-sm);max-width:360px;}
+  #appRoot{display:none;}
+
+  /* ---- Groups (Schedule, Completed, Blackout Dates) ---- */
+  .group{background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;box-shadow:var(--shadow-sm);overflow:hidden;}
+  .group-row{width:100%;display:flex;align-items:center;gap:14px;padding:16px 18px;background:none;border:none;cursor:pointer;text-align:left;}
+  .group-row:hover{background:#faf8f4;}
+  .group-avatar{flex-shrink:0;width:40px;height:40px;border-radius:50%;background:var(--cream);color:var(--gold);display:flex;align-items:center;justify-content:center;font-weight:700;font-family:'Playfair Display',Georgia,serif;font-size:16px;}
+  .group-main{flex:1;min-width:0;}
+  .group-name-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .group-name{font-weight:700;font-size:var(--fs-md);color:var(--text);}
+  .group-count{font-size:var(--fs-2xs);color:var(--muted);background:#f1ede4;border-radius:10px;padding:2px 8px;font-weight:700;white-space:nowrap;}
+  .group-summary{font-size:var(--fs-sm);color:var(--muted);margin-top:2px;}
+  .group-summary .next{color:var(--gold-dark);font-weight:600;}
+  .group-chevron{flex-shrink:0;color:var(--muted);transition:transform .2s ease;}
+  .group.open .group-chevron{transform:rotate(180deg);}
+  .group-body{max-height:0;overflow:hidden;transition:max-height .25s ease;}
+  .group.open .group-body{max-height:3000px;}
+  .group-body-inner{padding:0 16px 14px;border-top:1px solid var(--border);}
+
+  .group-row-wrap{display:flex;align-items:center;}
+  .group-row-toggle{flex:1;min-width:0;display:flex;align-items:center;gap:14px;padding:16px 8px 16px 18px;background:none;border:none;cursor:pointer;text-align:left;}
+  .group-row-toggle:hover{background:#faf8f4;}
+  .group-row-wrap .sess-actions{padding-right:14px;flex-shrink:0;}
+
+  .sess-row{padding:14px 4px;border-bottom:1px solid #f1ede4;display:flex;justify-content:space-between;align-items:center;gap:10px;}
+  .sess-row:last-child{border-bottom:none;}
+  .sess-row>*:first-child{min-width:0;}
+  .sess-meta{color:var(--muted);font-size:var(--fs-sm);margin-top:3px;}
+  .sess-actions{display:flex;gap:2px;flex-shrink:0;}
+  .wa-note{display:inline-flex;align-items:center;gap:5px;color:var(--muted);font-size:var(--fs-sm);margin-top:4px;}
+  .wa-note.on{color:var(--ok);font-weight:600;}
+
+  .stat-line{display:flex;gap:16px;flex-wrap:wrap;padding:12px 4px;font-size:var(--fs-sm);color:var(--text);border-bottom:1px solid #f1ede4;}
+  .stat-line b{font-variant-numeric:tabular-nums;}
+
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px;align-items:stretch;}
+  .stat-grid.pairs{grid-template-columns:1fr 1fr;}
+  .stat-tile{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;}
+  .stat-label{font-size:var(--fs-2xs);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;line-height:1.3;min-height:2.6em;}
+  .stat-value{font-size:28px;line-height:1.2;font-weight:700;color:var(--text);margin-top:4px;font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
+  .stat-delta{font-size:var(--fs-2xs);font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap;}
+  .stat-delta.up{background:var(--ok-bg);color:var(--ok);}
+  .stat-delta.down{background:#f1ede4;color:var(--muted);}
+  .stat-sub{font-size:var(--fs-2xs);color:var(--muted);margin-top:auto;padding-top:10px;}
+  .stat-split-label{font-size:var(--fs-2xs);color:var(--muted);margin-top:8px;}
+  .stat-split-label .dot{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:4px;vertical-align:middle;}
+  .split-bar{height:6px;border-radius:3px;background:#f1ede4;margin-top:6px;overflow:hidden;display:flex;}
+  .split-bar .seg{display:block;height:100%;}
+  .split-bar .seg.first{background:var(--muted-bar);}
+  .split-bar .seg.returning{background:var(--primary);}
+
+  .trend-chart{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:18px;box-shadow:var(--shadow-sm);}
+  .trend-title-row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+  .trend-title{font-size:var(--fs-2xs);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;}
+  .trend-legend{display:flex;align-items:center;gap:5px;font-size:var(--fs-2xs);color:var(--muted);font-weight:600;white-space:nowrap;}
+  .trend-legend .legend-dot{width:9px;height:9px;border-radius:2px;display:inline-block;}
+  .trend-legend .legend-dot.this{background:var(--primary);}
+  .trend-legend .legend-dot.last{background:var(--muted-bar);margin-left:10px;}
+  .trend-bars{display:flex;align-items:flex-end;gap:10px;height:104px;}
+  .trend-bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;}
+  .trend-bar-pair{display:flex;align-items:flex-end;justify-content:center;gap:3px;width:100%;flex-shrink:0;}
+  .trend-bar-current{display:flex;flex-direction:column;align-items:center;flex-shrink:0;}
+  .trend-bar-fill{width:16px;background:var(--primary);border-radius:3px 3px 2px 2px;}
+  .trend-bar-fill.last{background:var(--muted-bar);}
+  .trend-value{font-size:var(--fs-2xs);color:var(--text);font-weight:700;margin-bottom:4px;font-variant-numeric:tabular-nums;flex-shrink:0;}
+  .trend-label{font-size:var(--fs-2xs);color:var(--muted);margin-top:6px;flex-shrink:0;}
+
+  .stats-collapse{margin-bottom:6px;}
+  .stats-toggle{display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;cursor:pointer;padding:8px 2px;font-weight:700;font-size:var(--fs-sm);color:var(--navy);}
+  .stats-toggle .chevron{color:var(--muted);transition:transform .2s ease;flex-shrink:0;}
+  .stats-body{overflow:hidden;transition:max-height .25s ease;}
+  .stats-body-inner{padding-top:10px;}
+  .stats-toggle .chevron{transform:rotate(180deg);}
+  .stats-body{max-height:2000px;}
+  .stats-collapse.toggled .stats-toggle .chevron{transform:none;}
+  .stats-collapse.toggled .stats-body{max-height:0;}
+  @media (max-width:640px){
+    .stats-toggle .chevron{transform:none;}
+    .stats-body{max-height:0;}
+    .stats-collapse.toggled .stats-toggle .chevron{transform:rotate(180deg);}
+    .stats-collapse.toggled .stats-body{max-height:2000px;}
+  }
+
+  .no-results{padding:32px 16px;text-align:center;color:var(--muted);font-size:var(--fs-sm);}
+
+  @media (min-width:640px){
+    .toolbar{flex-direction:row;flex-wrap:wrap;align-items:center;}
+    .toolbar > *{width:auto;}
+    .toolbar #search{flex:1 1 220px;}
+  }
 </style>
 </head>
 <body>
 
 <div id="signinScreen">
   <h1>My Prayer Ministry Schedule</h1>
-  <p class="helptext" id="signinMsg">Sign in with your Microsoft 365 account to see your upcoming sessions and request time off.</p>
+  <p class="helptext" id="signinMsg">Sign in with your Microsoft 365 account to see your schedule and manage your time off.</p>
   <button class="btn" id="btnSignIn" style="margin-top:16px;">Sign in with Microsoft</button>
 </div>
 
@@ -114,32 +223,53 @@
     <button class="btn secondary" id="btnSignOut" style="padding:8px 14px;min-height:36px;">Sign Out</button>
   </div>
 </header>
+<nav aria-label="Primary">
+  <button data-tab="schedule" class="active" aria-current="page">Schedule</button>
+  <button data-tab="completed">Completed Sessions</button>
+  <button data-tab="blackouts">Blackout Dates</button>
+</nav>
 <main>
   <div id="loadError"></div>
   <div id="notFoundMsg" style="display:none;" class="errbox">
-    We couldn't find a prayer minister profile matching your sign-in email. Ask the scheduling admin to check that your email is on file correctly, then try again.
+    We couldn't find a prayer minister profile matching your sign-in email. Ask the scheduling admin to check that your Sign-In Email is on file correctly, then try again.
   </div>
 
   <div id="portalContent" style="display:none;">
-    <div class="section">
-      <h2>My Upcoming Sessions</h2>
-      <p class="section-intro">Everything you're currently scheduled for, soonest first.</p>
-      <div id="mySessions"></div>
-      <div class="no-results" id="sessionsNoResults" hidden>No upcoming sessions right now.</div>
-    </div>
+    <section class="panel active" id="panel-schedule">
+      <div class="toolbar">
+        <input id="search" placeholder="Search by recipient..." aria-label="Search your sessions by recipient">
+        <select id="range" aria-label="Filter sessions by date range"><option>Upcoming</option><option>All</option><option>Past</option></select>
+      </div>
+      <p class="helptext">Grouped by recipient — soonest first.</p>
+      <div id="scheduleGroups"></div>
+      <div class="no-results" id="scheduleNoResults" hidden>No sessions match your search.</div>
+    </section>
 
-    <div class="section">
-      <h2>My Time Off</h2>
-      <p class="section-intro">Let the scheduler know when you're unavailable.</p>
+    <section class="panel" id="panel-completed">
+      <p class="helptext">Grouped by recipient — most recently completed first.</p>
+      <div class="stats-collapse" id="completedStatsCollapse">
+        <button class="stats-toggle" onclick="toggleStatsCollapse(this)" aria-expanded="true">
+          <span class="chevron"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>
+          <span>Stats</span>
+        </button>
+        <div class="stats-body"><div class="stats-body-inner" id="completedStats"></div></div>
+      </div>
+      <div class="search-row"><input id="completedSearch" placeholder="Search by recipient..." aria-label="Search completed sessions by recipient"></div>
+      <div id="completedGroups"></div>
+      <div class="no-results" id="completedNoResults" hidden>No completed sessions match your search.</div>
+    </section>
+
+    <section class="panel" id="panel-blackouts">
+      <p class="helptext">Your submitted time off, soonest first.</p>
       <button class="btn" id="btnAddBlackout">+ Request Time Off</button>
-      <div id="myBlackouts" style="margin-top:14px;"></div>
-      <div class="no-results" id="blackoutsNoResults" hidden>No time off on file.</div>
-    </div>
+      <div id="blackoutGroups" style="margin-top:16px;"></div>
+      <div class="no-results" id="blackoutNoResults" hidden>No time off on file.</div>
+    </section>
   </div>
 </main>
 </div>
 
-<div class="modal-bg" id="blackoutModal">
+<div class="modal-bg sheet" id="blackoutModal">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="blackoutModalTitle">
     <h2 id="blackoutModalTitle">Request Time Off</h2>
     <div class="toggle-pair" role="group" aria-label="Single date or date range">
@@ -174,9 +304,7 @@
 /* =========================================================================
    CONFIG — same Azure AD app registration as the main scheduler. Delegated
    Graph permissions only ever allow what the SIGNED-IN USER's own SharePoint
-   permissions allow, so reusing this registration is safe: a minister
-   account with restricted SharePoint permissions genuinely can't read or
-   write more than it's been granted, regardless of the app's own scope.
+   permissions allow, so reusing this registration is safe.
 ========================================================================= */
 const MSAL_CONFIG = {
   auth: {
@@ -280,7 +408,7 @@ async function resolveSiteAndLists(){
 }
 async function listItems(key){
   const resp = await graphFetch(`/sites/${siteId}/lists/${listIds[key]}/items?$expand=fields&$top=999`);
-  return resp.value.map(i => ({ ...i.fields, id: parseInt(i.id, 10) }));
+  return resp.value.map(i => ({ ...i.fields, id: parseInt(i.id, 10), _created: i.createdDateTime }));
 }
 async function createItem(key, fields){
   return graphFetch(`/sites/${siteId}/lists/${listIds[key]}/items`, { method:'POST', body: JSON.stringify({ fields }) });
@@ -296,6 +424,7 @@ async function deleteItem(key, itemId){
    DATA
 ========================================================================= */
 let ministers=[], sessions=[], blackouts=[], me=null;
+let sessionNumberMap = new Map();
 
 async function loadAll(){
   const [rawMin, rawSess, rawBlack] = await Promise.all([listItems('ministers'), listItems('sessions'), listItems('blackouts')]);
@@ -308,6 +437,8 @@ async function loadAll(){
       id: s.id, recipName: s.RecipientName||'',
       date: (s.SessionDate||'').split('T')[0], time: toHM(s.SessionDate), endTime: toHM(s.SessionEndDate),
       location: s.LocationName||'', notes: s.Notes||'', status: s.Status||'Scheduled',
+      waCreated: !!s.WaCreated, waLink: s.WaLink||'',
+      added: (s._created||'').split('T')[0],
       ministers: allIds.map(id=>({ id: parseInt(id,10), role: leadIds.has(id) ? 'Lead' : 'Support' })).filter(m=>!isNaN(m.id))
     };
   });
@@ -318,7 +449,12 @@ async function loadAll(){
 
   document.getElementById('notFoundMsg').style.display = me ? 'none' : 'block';
   document.getElementById('portalContent').style.display = me ? 'block' : 'none';
-  if(me){ renderSessions(); renderBlackouts(); }
+  if(me){
+    computeSessionNumbers();
+    renderSchedule();
+    renderCompleted();
+    renderBlackouts();
+  }
 }
 function toHM(iso){
   if(!iso) return '';
@@ -327,78 +463,273 @@ function toHM(iso){
 }
 
 /* =========================================================================
-   HELPERS
+   HELPERS — same as the main app
 ========================================================================= */
 const $ = s => document.querySelector(s);
 const ICONS = {
   pencil: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
-  trash: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>'
+  trash: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>',
+  chat: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>',
+  chevron: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>'
 };
 function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function initials(name){ return String(name||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join(''); }
 function fmtDate(d){ return d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}); }
 function fmtTime(d){ return d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}); }
 function fmt12(t){ if(!t) return ''; const [h,m]=t.split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); return fmtTime(d); }
 function fmtShort(dateStr){ if(!dateStr) return ''; return new Date(dateStr+'T00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'}); }
-function otherMinisterNames(s){
-  return s.ministers.filter(m=>m.id!==me.id).map(m=>{
+function isoDate(d){ return d.toISOString().slice(0,10); }
+function ministerNamesOf(s){
+  const sorted = [...s.ministers].sort((a,b)=> (a.role==='Lead'?0:1) - (b.role==='Lead'?0:1));
+  return sorted.map(m=>{
     const min = ministers.find(x=>x.id===m.id);
-    return (min?min.name:'someone else') + (m.role==='Lead' ? ' (Lead)' : '');
+    return (min?min.name:'?') + (m.role==='Lead' ? ' (Lead)' : '');
   }).join(', ');
 }
+function sessionSortKey(s){ return (s.status==='Waiting' ? (s.added||s.date||'') : (s.date||'')) + (s.time||''); }
+function computeSessionNumbers(){
+  sessionNumberMap = new Map();
+  const groups = new Map();
+  sessions.forEach(s=>{
+    const key = s.recipName.trim().toLowerCase();
+    if(!key) return;
+    if(!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(s);
+  });
+  groups.forEach(list=>{
+    list.slice().sort((a,b)=> sessionSortKey(a).localeCompare(sessionSortKey(b)))
+      .forEach((s,i)=> sessionNumberMap.set(s.id, i+1));
+  });
+}
+function sessionNumberOf(s){ return sessionNumberMap.get(s.id) || 1; }
+function openState(container){
+  return new Map([...container.querySelectorAll('.group')].map(g => [g.dataset.key, g.classList.contains('open')]));
+}
+function groupRow(key, avatarText, name, countLabel, summaryHtml, bodyHtml, wasOpen){
+  return `
+  <div class="group${wasOpen ? ' open' : ''}" data-key="${escapeHtml(key)}">
+    <button class="group-row" onclick="this.closest('.group').classList.toggle('open')" aria-expanded="${wasOpen}">
+      <span class="group-avatar" aria-hidden="true">${escapeHtml(avatarText)}</span>
+      <span class="group-main">
+        <span class="group-name-row">
+          <span class="group-name">${escapeHtml(name)}</span>
+          <span class="group-count">${countLabel}</span>
+        </span>
+        <span class="group-summary">${summaryHtml}</span>
+      </span>
+      <span class="group-chevron">${ICONS.chevron}</span>
+    </button>
+    <div class="group-body"><div class="group-body-inner">${bodyHtml}</div></div>
+  </div>`;
+}
+window.toggleStatsCollapse = function(btn){
+  const el = btn.closest('.stats-collapse');
+  const toggled = el.classList.toggle('toggled');
+  const mobile = window.matchMedia('(max-width: 640px)').matches;
+  const isOpen = toggled ? mobile : !mobile;
+  btn.setAttribute('aria-expanded', String(isOpen));
+};
+
+/* Only sessions where I'm one of the assigned ministers */
+function mySessions(){ return sessions.filter(s=> s.ministers.some(m=>m.id===me.id)); }
 
 /* =========================================================================
-   MY SESSIONS
+   SCHEDULE — same card content as the main app's Schedule tab, read-only
+   (a minister views their own schedule, they don't manage it here)
 ========================================================================= */
-function renderSessions(){
-  const now = new Date();
-  const mine = sessions
-    .filter(s=> s.status==='Scheduled' && s.ministers.some(m=>m.id===me.id))
-    .map(s=>({...s, _start:new Date(s.date+'T'+s.time)}))
-    .filter(s=> s._start >= now)
-    .sort((a,b)=> a._start - b._start);
-
-  $('#sessionsNoResults').hidden = mine.length>0;
-  $('#mySessions').innerHTML = mine.map(s=>{
-    const myRole = s.ministers.find(m=>m.id===me.id).role;
-    const others = otherMinisterNames(s);
-    return `<div class="card">
-      <div class="row">
-        <div>
-          <div class="title">${escapeHtml(s.recipName)}</div>
-          <div class="meta">${fmtDate(s._start)} · ${fmt12(s.time)}–${fmt12(s.endTime)} · ${escapeHtml(s.location)}</div>
-          ${others ? `<div class="meta">With: ${escapeHtml(others)}</div>` : ''}
-        </div>
-        <span class="tag ${myRole==='Lead'?'lead':''}">${myRole}</span>
+function scheduleSessionRow(s){
+  return `<div class="sess-row">
+    <div>
+      <div>
+        <span class="tag ${sessionNumberOf(s)===1?'first':''}">Session #${sessionNumberOf(s)}</span>
+        <span class="tag ${s.status==='Completed'?'completed':'scheduled'}">${s.status}</span>
       </div>
-    </div>`;
+      <div class="sess-meta">${fmtDate(new Date(s.date+'T'+s.time))} · ${fmt12(s.time)}–${fmt12(s.endTime)} · ${escapeHtml(s.location)}</div>
+      <div class="sess-meta">${escapeHtml(ministerNamesOf(s))}</div>
+      ${s.notes ? `<div class="sess-meta">${escapeHtml(s.notes)}</div>` : ''}
+      <div class="wa-note ${s.waCreated?'on':''}">${ICONS.chat} ${s.waCreated?'WhatsApp group created':'No WhatsApp group yet'}</div>
+      ${s.waCreated && s.waLink ? ` · <a href="${escapeHtml(s.waLink)}" target="_blank" rel="noopener">open chat</a>` : ''}
+    </div>
+  </div>`;
+}
+function renderSchedule(){
+  const q = $('#search').value.trim().toLowerCase();
+  const range = $('#range').value;
+  const now = new Date();
+  const box = $('#scheduleGroups'); const noResults = $('#scheduleNoResults');
+  const opened = openState(box);
+
+  const schedulable = mySessions().filter(s=>s.status!=='Waiting');
+  const byRecip = new Map();
+  schedulable.forEach(s=>{
+    const key = s.recipName.trim().toLowerCase();
+    if(!key) return;
+    if(!byRecip.has(key)) byRecip.set(key, { key, name: s.recipName.trim(), sessions: [] });
+    byRecip.get(key).sessions.push(s);
+  });
+
+  const groups = [...byRecip.values()].map(g=>{
+    const matchesSearch = !q || g.name.toLowerCase().includes(q);
+    let vis = g.sessions.map(s=>({...s, _start:new Date(s.date+'T'+s.time), _end:new Date(s.date+'T'+s.endTime)}));
+    if(range==='Upcoming') vis = vis.filter(s=>s._end>=now);
+    if(range==='Past') vis = vis.filter(s=>s._end<now);
+    vis.sort((a,b)=>a._start-b._start);
+    const upcoming = vis.find(s=>s._end>=now && s.status==='Scheduled');
+    const mostRecent = vis[vis.length-1];
+    return {...g, vis, matchesSearch, upcoming, mostRecent};
+  }).filter(g=>g.matchesSearch && g.vis.length);
+
+  groups.sort((a,b)=>{
+    if(!!a.upcoming !== !!b.upcoming) return a.upcoming ? -1 : 1;
+    if(a.upcoming) return a.upcoming._start - b.upcoming._start;
+    return b.mostRecent._start - a.mostRecent._start;
+  });
+
+  noResults.hidden = groups.length>0;
+  box.innerHTML = groups.map(g=>{
+    const summary = g.upcoming
+      ? `<span class="next">Next: ${fmtShort(g.upcoming.date)} · ${fmt12(g.upcoming.time)}</span>`
+      : `Last: ${fmtShort(g.mostRecent.date)} · ${g.mostRecent.status}`;
+    const wasOpen = opened.has(g.key) ? opened.get(g.key) : false;
+    return groupRow(g.key, initials(g.name), g.name, `${g.vis.length} session${g.vis.length===1?'':'s'}`, summary,
+      g.vis.map(s=>scheduleSessionRow(s)).join(''), wasOpen);
   }).join('');
 }
 
 /* =========================================================================
-   MY TIME OFF
+   COMPLETED SESSIONS — same as the main app, filtered to my own
+========================================================================= */
+function completedSessionRow(s){
+  return `<div class="sess-row">
+    <div>
+      <div>
+        <span class="tag ${sessionNumberOf(s)===1?'first':''}">Session #${sessionNumberOf(s)}</span>
+        <span class="tag completed">Completed</span>
+      </div>
+      <div class="sess-meta">${fmtDate(new Date(s.date+'T'+s.time))} · ${fmt12(s.time)}–${fmt12(s.endTime)} · ${escapeHtml(s.location)}</div>
+      <div class="sess-meta">${escapeHtml(ministerNamesOf(s))}</div>
+      ${s.notes ? `<div class="sess-meta">${escapeHtml(s.notes)}</div>` : ''}
+    </div>
+  </div>`;
+}
+function renderCompleted(){
+  const q = $('#completedSearch').value.trim().toLowerCase();
+  const box = $('#completedGroups'); const noResults = $('#completedNoResults');
+  const opened = openState(box);
+
+  const done = mySessions().filter(s=>s.status==='Completed');
+  const byRecip = new Map();
+  done.forEach(s=>{
+    const key = s.recipName.trim().toLowerCase();
+    if(!key) return;
+    if(!byRecip.has(key)) byRecip.set(key, { key, name: s.recipName.trim(), sessions: [] });
+    byRecip.get(key).sessions.push(s);
+  });
+
+  const groups = [...byRecip.values()].map(g=>{
+    const list = g.sessions.slice().sort((a,b)=> (b.date+b.time).localeCompare(a.date+a.time));
+    const matchesSearch = !q || g.name.toLowerCase().includes(q);
+    return {...g, done: list, matchesSearch};
+  }).filter(g=>g.done.length && g.matchesSearch);
+  groups.sort((a,b)=> (b.done[0].date+b.done[0].time).localeCompare(a.done[0].date+a.done[0].time));
+
+  noResults.hidden = groups.length>0;
+  box.innerHTML = groups.map(g=>{
+    const wasOpen = opened.has(g.key) ? opened.get(g.key) : false;
+    return groupRow(g.key, initials(g.name), g.name, `${g.done.length} completed`, `Last: ${fmtShort(g.done[0].date)}`,
+      g.done.map(s=>completedSessionRow(s)).join(''), wasOpen);
+  }).join('');
+
+  renderCompletedStats();
+}
+function completedStats(){
+  const all = mySessions().filter(s=>s.status==='Completed');
+  const now = new Date();
+  const thisYearStart = new Date(now.getFullYear(),0,1);
+  const lastYearStart = new Date(now.getFullYear()-1,0,1);
+  const lastYearSameDay = new Date(now.getFullYear()-1, now.getMonth(), now.getDate());
+  const between = (start,end)=> all.filter(s=>{ const d=new Date(s.date+'T00:00'); return d>=start && d<=end; });
+  const ytdThis = between(thisYearStart, now);
+  const ytdLast = between(lastYearStart, lastYearSameDay);
+  const monthCount = now.getMonth()+1;
+  const monthly = Array.from({length:monthCount},(_,m)=> ytdThis.filter(s=> new Date(s.date+'T00:00').getMonth()===m).length);
+  const monthlyLast = Array.from({length:monthCount},(_,m)=> ytdLast.filter(s=> new Date(s.date+'T00:00').getMonth()===m).length);
+  return { ytdThis: ytdThis.length, ytdLast: ytdLast.length,
+    uniqueRecipients: new Set(ytdThis.map(s=>s.recipName.trim().toLowerCase())).size,
+    monthly, monthlyLast, now };
+}
+function renderCompletedStats(){
+  const st = completedStats();
+  const now = st.now;
+  const rangeLabel = `${fmtShort(isoDate(new Date(now.getFullYear(),0,1)))} – ${fmtShort(isoDate(now))}`;
+  const lastYearLabel = `${fmtShort(isoDate(new Date(now.getFullYear()-1,0,1)))} – ${fmtShort(isoDate(new Date(now.getFullYear()-1, now.getMonth(), now.getDate())))}, ${now.getFullYear()-1}`;
+  const delta = st.ytdLast===0 ? null : Math.round((st.ytdThis-st.ytdLast)/st.ytdLast*100);
+  const deltaHtml = delta===null ? '' : `<span class="stat-delta ${delta>=0?'up':'down'}">${delta>=0?'▲':'▼'} ${Math.abs(delta)}%</span>`;
+  const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const maxMonthly = Math.max(1, ...st.monthly, ...st.monthlyLast);
+  const bars = st.monthly.map((v,i)=>{
+    const vLast = st.monthlyLast[i] || 0;
+    const h = Math.max(6, Math.round(v/maxMonthly*54));
+    const hLast = Math.max(vLast>0?4:0, Math.round(vLast/maxMonthly*54));
+    return `<div class="trend-bar" title="${monthNames[i]} ${now.getFullYear()}: ${v} completed · ${monthNames[i]} ${now.getFullYear()-1}: ${vLast} completed">
+      <div class="trend-bar-pair">
+        <span class="trend-bar-fill last" style="height:${hLast}px;"></span>
+        <div class="trend-bar-current">
+          <span class="trend-value">${v}</span>
+          <span class="trend-bar-fill" style="height:${h}px;"></span>
+        </div>
+      </div>
+      <span class="trend-label">${monthNames[i]}</span>
+    </div>`;
+  }).join('');
+  $('#completedStats').innerHTML = `
+    <div class="stat-grid pairs">
+      <div class="stat-tile"><div class="stat-label">This Year (YTD)</div><div class="stat-value">${st.ytdThis}</div><div class="stat-sub">${rangeLabel}</div></div>
+      <div class="stat-tile"><div class="stat-label">Last Year (YTD)</div><div class="stat-value">${st.ytdLast} ${deltaHtml}</div><div class="stat-sub">${lastYearLabel}</div></div>
+      <div class="stat-tile"><div class="stat-label">Unique Recipients</div><div class="stat-value">${st.uniqueRecipients}</div><div class="stat-sub">${rangeLabel}</div></div>
+      <div class="stat-tile"><div class="stat-label">Total, All Time</div><div class="stat-value">${mySessions().filter(s=>s.status==='Completed').length}</div><div class="stat-sub">Every completed session</div></div>
+    </div>
+    <div class="trend-chart">
+      <div class="trend-title-row">
+        <div class="trend-title">Completed sessions by month</div>
+        <div class="trend-legend"><span class="legend-dot this"></span>${now.getFullYear()}<span class="legend-dot last"></span>${now.getFullYear()-1}</div>
+      </div>
+      <div class="trend-bars">${bars}</div>
+    </div>`;
+}
+
+/* =========================================================================
+   BLACKOUT DATES — same accordion pattern, filtered to my own entries
 ========================================================================= */
 function fmtBlackoutRange(d){
   if(!d.endDate || d.endDate===d.date) return fmtDate(new Date(d.date+'T00:00'));
   return `${fmtDate(new Date(d.date+'T00:00'))} – ${fmtDate(new Date(d.endDate+'T00:00'))}`;
 }
+function fmtBlackoutRangeShort(d){
+  if(!d.endDate || d.endDate===d.date) return fmtShort(d.date);
+  return `${fmtShort(d.date)} – ${fmtShort(d.endDate)}`;
+}
 function renderBlackouts(){
+  const box = $('#blackoutGroups'); const noResults = $('#blackoutNoResults');
+  const opened = openState(box);
   const mine = blackouts
     .filter(b=> b.ministerName.trim().toLowerCase()===me.name.trim().toLowerCase())
     .sort((a,b)=> a.date.localeCompare(b.date));
-  $('#blackoutsNoResults').hidden = mine.length>0;
-  $('#myBlackouts').innerHTML = mine.map(b=>`
-    <div class="card">
-      <div class="row">
-        <div>
-          <div class="title">${fmtBlackoutRange(b)}</div>
-          ${b.notes ? `<div class="meta">${escapeHtml(b.notes)}</div>` : ''}
-        </div>
-        <div style="display:flex;gap:2px;flex-shrink:0;">
-          <button class="icon-btn" onclick="openBlackoutModal(${b.id})" title="Edit" aria-label="Edit this time off">${ICONS.pencil}</button>
-          <button class="icon-btn danger" onclick="deleteBlackout(${b.id})" title="Remove" aria-label="Remove this time off">${ICONS.trash}</button>
-        </div>
+
+  noResults.hidden = mine.length>0;
+  box.innerHTML = mine.length ? groupRow(me.name, initials(me.name), me.name,
+    `${mine.length} date${mine.length===1?'':'s'}`,
+    `<span class="next">Next unavailable: ${fmtBlackoutRangeShort(mine[0])}</span>`,
+    mine.map(d=>`<div class="sess-row">
+      <div>
+        <div style="font-weight:600;">${fmtBlackoutRange(d)}</div>
+        ${d.notes?`<div class="sess-meta">${escapeHtml(d.notes)}</div>`:''}
       </div>
-    </div>`).join('');
+      <div class="sess-actions">
+        <button class="icon-btn" onclick="openBlackoutModal(${d.id})" title="Edit" aria-label="Edit this time off">${ICONS.pencil}</button>
+        <button class="icon-btn danger" onclick="deleteBlackout(${d.id})" title="Remove" aria-label="Remove this time off">${ICONS.trash}</button>
+      </div>
+    </div>`).join(''), opened.has(me.name) ? opened.get(me.name) : true) : '';
 }
 let blackoutEditId = null;
 window.setBlackoutMode = function(mode){
@@ -443,7 +774,7 @@ async function saveBlackout(){
 }
 window.deleteBlackout = async function(id){
   const b = blackouts.find(x=>x.id===id);
-  if(!(await askConfirm(`Remove this time off${b?' ('+fmtBlackoutRange(b)+')':''}?`))) return;
+  if(!(await askConfirm(`Remove this time off${b?' ('+fmtBlackoutRangeShort(b)+')':''}?`))) return;
   await deleteItem('blackouts', id);
   await loadAll();
 };
@@ -472,6 +803,10 @@ let appWired = false;
 function wireApp(){
   if(appWired) return;
   appWired = true;
+  document.querySelectorAll('nav[aria-label="Primary"] button').forEach(b=>b.addEventListener('click', ()=>switchTab(b.dataset.tab)));
+  $('#search').addEventListener('input', renderSchedule);
+  $('#range').addEventListener('change', renderSchedule);
+  $('#completedSearch').addEventListener('input', renderCompleted);
   $('#btnAddBlackout').addEventListener('click', ()=>openBlackoutModal());
   $('#btnBlackoutCancel').addEventListener('click', ()=>$('#blackoutModal').classList.remove('open'));
   $('#btnBlackoutSave').addEventListener('click', saveBlackout);
@@ -488,6 +823,14 @@ function wireApp(){
     if($('#confirmModal').classList.contains('open')) closeConfirm(false);
     document.querySelectorAll('.modal-bg.open').forEach(bg=>bg.classList.remove('open'));
   });
+}
+function switchTab(tab){
+  document.querySelectorAll('nav[aria-label="Primary"] button').forEach(b=>{
+    const active = b.dataset.tab===tab;
+    b.classList.toggle('active', active);
+    if(active) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
+  });
+  document.querySelectorAll('main .panel').forEach(p=>p.classList.toggle('active', p.id==='panel-'+tab));
 }
 
 init();
