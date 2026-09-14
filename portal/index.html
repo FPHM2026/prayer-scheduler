@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>My Prayer Ministry Schedule</title>
+<title>My FPHM Schedule</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
@@ -152,6 +152,18 @@
 
   .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px;align-items:stretch;}
   .stat-grid.pairs{grid-template-columns:1fr 1fr;}
+
+  /* ---- Combo stat card: one card, two measures (rows) x three time frames
+     (columns) - YTD / Last Year / Lifetime - instead of separate tiles per
+     measure. Lifetime is deliberately absent from the trend chart below;
+     it's a single running total, not something that plots by month. ---- */
+  .stat-combo{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px;box-shadow:var(--shadow-sm);}
+  .stat-combo-grid{display:grid;grid-template-columns:auto repeat(3,1fr);gap:0 8px;}
+  .combo-head{font-size:var(--fs-2xs);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;text-align:center;padding-bottom:8px;border-bottom:1px solid var(--border);}
+  .combo-label{font-size:var(--fs-sm);font-weight:700;color:var(--navy);display:flex;align-items:center;padding:12px 10px 4px 0;}
+  .combo-value{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:12px 4px 4px;}
+  .combo-num{font-size:24px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;line-height:1.1;}
+  .combo-label.row-divider,.combo-value.row-divider{border-top:1px solid #f1ede4;padding-top:14px;margin-top:8px;}
   .stat-tile{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;}
   .stat-label{font-size:var(--fs-2xs);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;line-height:1.3;min-height:2.6em;}
   .stat-value{font-size:28px;line-height:1.2;font-weight:700;color:var(--text);margin-top:4px;font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
@@ -210,14 +222,14 @@
 <body>
 
 <div id="signinScreen">
-  <h1>My Prayer Ministry Schedule</h1>
+  <h1>My FPHM Schedule</h1>
   <p class="helptext" id="signinMsg">Sign in with your Microsoft 365 account to see your schedule and manage your time off.</p>
   <button class="btn" id="btnSignIn" style="margin-top:16px;">Sign in with Microsoft</button>
 </div>
 
 <div id="appRoot">
 <header>
-  <h1>My Prayer Ministry Schedule</h1>
+  <h1>My FPHM Schedule</h1>
   <div style="display:flex;align-items:center;gap:12px;">
     <span class="who" id="whoami"></span>
     <button class="btn secondary" id="btnSignOut" style="padding:8px 14px;min-height:36px;">Sign Out</button>
@@ -656,6 +668,9 @@ function completedStats(){
   const monthlyLast = Array.from({length:monthCount},(_,m)=> ytdLast.filter(s=> new Date(s.date+'T00:00').getMonth()===m).length);
   return { ytdThis: ytdThis.length, ytdLast: ytdLast.length,
     uniqueRecipients: new Set(ytdThis.map(s=>s.recipName.trim().toLowerCase())).size,
+    uniqueRecipientsLast: new Set(ytdLast.map(s=>s.recipName.trim().toLowerCase())).size,
+    lifetimeSessions: all.length,
+    lifetimeUnique: new Set(all.map(s=>s.recipName.trim().toLowerCase())).size,
     monthly, monthlyLast, now };
 }
 function renderCompletedStats(){
@@ -683,11 +698,24 @@ function renderCompletedStats(){
     </div>`;
   }).join('');
   $('#completedStats').innerHTML = `
-    <div class="stat-grid pairs">
-      <div class="stat-tile"><div class="stat-label">This Year (YTD)</div><div class="stat-value">${st.ytdThis}</div><div class="stat-sub">${rangeLabel}</div></div>
-      <div class="stat-tile"><div class="stat-label">Last Year (YTD)</div><div class="stat-value">${st.ytdLast} ${deltaHtml}</div><div class="stat-sub">${lastYearLabel}</div></div>
-      <div class="stat-tile"><div class="stat-label">Unique Recipients</div><div class="stat-value">${st.uniqueRecipients}</div><div class="stat-sub">${rangeLabel}</div></div>
-      <div class="stat-tile"><div class="stat-label">Total, All Time</div><div class="stat-value">${mySessions().filter(s=>s.status==='Completed').length}</div><div class="stat-sub">Every completed session</div></div>
+    <div class="stat-combo">
+      <div class="stat-combo-grid">
+        <span class="combo-head"></span>
+        <span class="combo-head">YTD</span>
+        <span class="combo-head">Last Year</span>
+        <span class="combo-head">Lifetime</span>
+
+        <span class="combo-label">Sessions</span>
+        <span class="combo-value"><span class="combo-num">${st.ytdThis}</span></span>
+        <span class="combo-value"><span class="combo-num">${st.ytdLast}</span>${deltaHtml}</span>
+        <span class="combo-value"><span class="combo-num">${st.lifetimeSessions}</span></span>
+
+        <span class="combo-label row-divider">Unique Recipients</span>
+        <span class="combo-value row-divider"><span class="combo-num">${st.uniqueRecipients}</span></span>
+        <span class="combo-value row-divider"><span class="combo-num">${st.uniqueRecipientsLast}</span></span>
+        <span class="combo-value row-divider"><span class="combo-num">${st.lifetimeUnique}</span></span>
+      </div>
+      <p class="helptext" style="margin:12px 0 0;">YTD: ${rangeLabel} &middot; Last Year: ${lastYearLabel}</p>
     </div>
     <div class="trend-chart">
       <div class="trend-title-row">
