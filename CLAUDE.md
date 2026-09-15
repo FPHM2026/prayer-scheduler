@@ -1,24 +1,74 @@
-# Prayer Ministry Scheduler — Project Context
+# FPHM Scheduler — Project Context
 
 ## What this is
 A scheduling app for a church prayer ministry team, coordinating one-on-one prayer
 sessions between external recipients and internal prayer ministers. Built as a
 static HTML/JS single-page app, hosted on GitHub Pages, backed by SharePoint Lists
 via Microsoft Graph API (not Power Apps, not raw SharePoint hosting — both were
-tried and abandoned; see "History" below).
+tried and abandoned; see "History" below). A companion minister-facing portal
+(`portal/index.html`) lets prayer ministers see their own sessions and manage
+their own time off without needing a licensed Microsoft 365 seat — see "Minister
+portal" below.
 
 ## Architecture
-- **Frontend**: single self-contained `index.html` (vanilla JS, no build step, no
-  framework). All UI, styling, and logic live in this one file.
-- **Hosting**: GitHub Pages, org repo `FPHM2026/prayer-scheduler`, deployed from
-  the `main` branch root. Live at `https://FPHM2026.github.io/prayer-scheduler/`.
+- **Frontend**: three self-contained single-file apps (vanilla JS, no build step,
+  no framework, all UI/styling/logic per file): `index.html` (production admin
+  scheduler), `preview/index.html` (staging copy for testing unreleased changes
+  against real data), `portal/index.html` (minister-facing companion app).
+- **Hosting**: GitHub Pages, org repo `FPHM2026/prayer-scheduler` (public),
+  deployed from the `main` branch root — `/preview/` and `/portal/` are just
+  subfolders in that same deployment, not separate hosting setups:
+  - Production scheduler: `https://FPHM2026.github.io/prayer-scheduler/`
+  - Minister portal: `https://FPHM2026.github.io/prayer-scheduler/portal/`
+  - Preview build of the scheduler: `https://FPHM2026.github.io/prayer-scheduler/preview/`
+    — see "Deployment workflow" below before editing this file.
 - **Auth**: MSAL.js (`@azure/msal-browser`, loaded via jsDelivr CDN,
-  `cacheLocation: "sessionStorage"`) — admins sign in with their normal Microsoft
-  365 account via a popup.
+  `cacheLocation: "sessionStorage"`) — everyone signs in with their normal
+  Microsoft 365 account via a popup, admins and ministers alike.
 - **Data**: Microsoft Graph API (`https://graph.microsoft.com/v1.0`), talking
   directly to SharePoint Lists on the church's site. Not the older SharePoint REST
   API (`_api/web/...`) — that doesn't support CORS from an external origin; Graph
   does, via a registered Azure AD app.
+
+## Deployment workflow (preview → production)
+For anything bigger than a trivial/safe fix, build and test in
+`preview/index.html` first, never `index.html` directly:
+1. Edit `preview/index.html`. It carries one block production doesn't have —
+   a `#previewModeBanner` (HTML near the top of `<body>`, CSS a few lines
+   above it) — strip this back out if copying preview's content wholesale
+   into production.
+2. Bump `const APP_VERSION = "..."` in preview/index.html (date + counter,
+   e.g. `"2026-09-15.1"`). Two independent checks read this: each page polls
+   its own deployed copy's APP_VERSION and prompts a reload if what's loaded
+   is stale; separately, production's own page polls preview/index.html's
+   APP_VERSION and shows a small "preview build differs" badge whenever it
+   doesn't match production's — the two files should carry the *same*
+   APP_VERSION once (and only once) they're fully back in sync content-wise.
+3. Test locally: `python -m http.server <port>` in the repo root + the
+   Claude_Browser tools, injecting mock `account`/`ministers`/`sessions`/
+   `blackouts`/`locations` directly in the console to bypass real MSAL/Graph
+   calls. This validates the app's own logic; it can NOT validate Entra/
+   SharePoint permission configuration — that needs the user testing live
+   against the real tenant with a real account (see "Style/tone notes").
+4. Commit + push preview/index.html straight to `main` — GitHub Pages serves
+   both files from the same branch root, so `/preview/` is just a URL path.
+5. Have the user test against real data at the live preview URL.
+6. To promote: either copy preview/index.html over index.html wholesale and
+   strip the preview-banner block back out (when *all* of preview's changes
+   are ready), or cherry-pick specific edits into index.html directly (when
+   preview has multiple features in flight and only some are ready). Bump
+   index.html's own APP_VERSION to match. Verify locally again before
+   pushing.
+7. After every push to `main`, also fast-forward the `preview` git branch:
+   `git checkout preview && git merge main -m "Sync preview branch" && git
+   push origin preview && git checkout main`. GitHub Pages does NOT serve
+   from this branch — hosting is always from `main` regardless — keeping it
+   synced is just a clean history checkpoint of when preview and production
+   last matched.
+
+`portal/index.html` doesn't go through this dance — it's pushed directly to
+`main`, since it's a fully separate file that never touches the production
+scheduler's own code.
 
 ## Config values already in the code (in `index.html`, top of the `<script>`)
 - Azure AD Client ID: `549f5207-d7f8-4924-9bde-30532d90c1d2`
@@ -43,8 +93,11 @@ tried and abandoned; see "History" below).
   rather than "Support"), LocationName (plain text, not a true Lookup column —
   written as plain text matching a Locations list Title, chosen deliberately to
   avoid Graph's LookupId complexity), Notes (plain text — must be Plain text
-  format, not Rich text, or it stores HTML), ApptType (Choice: First/Follow-up),
-  Status (Choice: Scheduled/Completed/**Waiting**), PreviousSessionId (Number,
+  format, not Rich text, or it stores HTML), ApptType (Choice: First/Follow-up
+  in production; **Drop-in and Training are used by a preview-only feature —
+  see "In progress" below — and must be added as choices on this column
+  before that feature can be promoted**), Status (Choice: Scheduled/Completed/
+  **Waiting**), PreviousSessionId (Number,
   links a follow-up session back to the one it followed), WaCreated (Yes/No),
   WaLink (plain text), **Priority (Yes/No, default No)** — flags a Waiting entry
   to the top of the Planning tab regardless of how long they've been waiting.
@@ -66,7 +119,7 @@ tried and abandoned; see "History" below).
   Claude has no SharePoint write access outside a session you're driving.
 
 ## Features implemented
-Every list-style tab (Schedule, Completed Sessions, Minister Overview,
+Every list-style tab (Schedule, Completed Sessions, Prayer Ministers,
 Blackout Dates) is grouped into collapsible accordion cards by recipient or
 minister, collapsed by default, with a "Session #N" chip computed once per
 recipient across their full chronological history (any status, including a
@@ -75,7 +128,10 @@ width, slides up from the bottom, capped at 90vh) is used for every form
 (New Session, Minister, Blackout Date); the confirm dialog and Add Location
 stay as small centered modals. Main nav is a sticky, single-row,
 horizontally-scrolling tab strip on mobile/tablet; desktop restores the
-fuller header and lets tabs wrap.
+fuller header and lets tabs wrap. Every search field across both this app
+and the portal has an inline clear (×) button, shown only once there's text
+to clear. Every card-facing date (session rows, group summaries, stats
+ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
 
 - Schedule tab: grouped by recipient, search, Upcoming/All/Past filter,
   soonest-upcoming-first sort
@@ -96,21 +152,24 @@ fuller header and lets tabs wrap.
   a `sessKind` flag ('session' vs 'waiting') shows/hides the scheduling-only
   fields rather than being a separate form.
 - Completed Sessions tab: grouped by recipient, read-only, search, plus a
-  collapsible stats block (YTD count, same-period-last-year delta, unique
-  recipients, first-time vs. returning split, monthly trend chart for the
-  current year)
+  collapsible combo stats card — YTD / Last Year / Lifetime columns for
+  session count and unique recipients (with a first-time vs. follow-up
+  breakdown per column and a % delta badge on the Last Year column), a
+  "Since &lt;Month Year&gt;" lifetime range label computed from the earliest
+  completed session on record, and a monthly trend chart comparing this
+  year to last. Same combo card design ported to the portal's own Completed
+  Sessions tab, scoped to just that minister's sessions.
 - Planning tab: PrayerSessions items with Status="Waiting" (no separate
   Prospects list — see above), sortable by longest-waiting or highest session
   number, priority-flagged entries always pinned to the top, flag/schedule/
   edit/delete actions per entry. "Schedule Session" reopens the same session
   modal with the scheduling fields revealed, converting the same record.
-- Minister Overview tab: grouped by minister, Active/Inactive sub-tabs (Active
-  hides anyone with zero sessions in the selected range), search, date range
+- Prayer Ministers tab (merged Minister Overview + roster management into
+  one tab): grouped by minister, Active/Inactive sub-tabs, search, date range
   defaulting to year-to-date, collapsible stats block (hours this range vs.
   the same calendar range last year, active ministers serving, avg hours per
-  minister), per-minister upcoming sessions
-- Prayer Ministers tab: search, Active/Inactive sub-tabs, one-click A→Z/Z→A
-  sort toggle, activate/deactivate/edit/delete per minister
+  minister), a sort toggle cycling Next Appointment ⇄ A→Z, per-minister
+  upcoming sessions, activate/deactivate/edit/delete actions per minister
 - Blackout Dates tab: grouped by minister, soonest first, Add/Edit modal with
   a single-date/date-range toggle (writes BlackoutDate + EndDate), edit/delete
   per entry
@@ -140,13 +199,18 @@ M365 seat cost) so they can sign in for real.
     assigned to" — item-level permissions key off who *created* the item,
     and staff create every session, so ministers can technically read the
     full upcoming schedule; the portal's own UI just filters to theirs)
-  - BlackoutDates: Contribute, with **item-level permissions** set to "Read
-    items created by the user" / "Create and edit items created by the
-    user" — this one *is* genuinely enforced, since each minister is the
-    creator of their own time-off request
+  - BlackoutDates: Contribute. Item-level "Read"/"Create and edit" were
+    originally set to "items created by the user," intending SharePoint
+    itself to enforce "ministers only see/manage their own time off" — this
+    turned out **not to be reliably honored via Microsoft Graph** even for
+    Full Control users (see gotcha #11), so both were relaxed to "all
+    items." The "only your own" UX is now entirely client-side filtering in
+    both apps, not a SharePoint-enforced boundary — an accepted tradeoff,
+    not a hard security guarantee.
   - Locations: no access needed (LocationName is already plain text on the
     session item)
-- Needs its own redirect URI on the same app registration:
+- Needs its own redirect URI on the same app registration, under the
+  **Single-page application** platform specifically (see gotcha #8):
   `https://FPHM2026.github.io/prayer-scheduler/portal/`
 - **Identity matching**: the signed-in account's email (`account.username`)
   must exactly match (case-insensitive) that minister's **SignInEmail**
@@ -159,11 +223,55 @@ M365 seat cost) so they can sign in for real.
   user → "Create user without product license") and the SharePoint group/
   permission setup above are manual admin steps outside this repo — Claude
   has no tenant admin access to do them.
+- **Sign-in redirect (production, in index.html)**: a minister who signs
+  into the *main scheduler* — not the portal — gets redirected straight to
+  `/portal/` instead of landing in the admin UI. `afterSignIn()` checks the
+  signed-in account's email against every minister's SignInEmail right
+  after resolving the SharePoint site, before ever showing the admin UI; a
+  match redirects via `window.location.href` (relative `portal/` path), no
+  match proceeds into the admin app as normal. This means one URL — the
+  production scheduler link — can be handed out to everyone; SharePoint's
+  own permissions remain the real access boundary, this redirect is a UX
+  nicety on top, not a security control.
+
+### Portal UI (mirrors the main app's component style)
+Three tabs — Schedule, Completed Sessions, Blackout Dates — reusing the main
+app's accordion-card/bottom-sheet-modal CSS verbatim so the two apps feel
+like one product, not two:
+- Schedule / Completed Sessions: same grouped-by-recipient cards as the main
+  app, filtered to sessions the signed-in minister is assigned to; Schedule
+  has an Upcoming/All/Past range filter, both have search (with a clear-×
+  button, same as every search field in both apps).
+- Blackout Dates: minister manages their own time off (add/edit/delete),
+  with an Upcoming/All/Past range filter defaulting to Upcoming so old time
+  off doesn't clutter the default view — a range entry still in progress
+  (started before today, ends after) stays classified as Upcoming until its
+  whole span is behind today. The "Next unavailable" summary always reflects
+  the true next upcoming entry regardless of which range is currently being
+  browsed below it.
 
 ## Not yet built
 - **Calendar (month grid) view** — was planned but never built in this HTML
   version. The agenda/Schedule view covers the "chronological list" requirement
   on its own; the calendar grid is a nice-to-have, not yet started.
+
+## In progress (built in preview/index.html, not yet promoted to production)
+- **Sunday Drop-In / Training quick-add buttons**: "+ Drop-in" and
+  "+ Training" on the Schedule tab toolbar, prefilling the New Session form
+  for a shared group event — recipient name set to "Sunday Drop-In" /
+  "Training", every Active minister pre-selected, Recipient Contact and the
+  WhatsApp fields hidden (neither applies to a group session), Drop-In
+  further defaults Start/End Time to 5:00–7:30pm. Excluded from every
+  statistic (the Completed Sessions combo card, the Prayer Ministers tab's
+  hours/serving numbers) since assigning every minister to the same session
+  would otherwise wildly inflate those — the underlying session records
+  still show up normally in the plain lists, just not in the aggregates.
+  - **Blocker before promoting**: needs "Drop-in" and "Training" added as
+    choices on the PrayerSessions ApptType column in SharePoint, or writes
+    using those values will fail or be silently rejected depending on the
+    column's fill-in-choice setting.
+  - Needs the user's own live testing/confirmation before promoting, same
+    reasoning as every preview-first feature.
 
 ## Known gotchas (hard-won, don't reintroduce these bugs)
 1. **Graph list item IDs are strings, not numbers.** Comma-separated ID fields
@@ -201,6 +309,48 @@ M365 seat cost) so they can sign in for real.
    Administrator or similarly privileged role — a regular user can register the
    app itself but can't grant tenant-wide consent. Already granted; if you ever
    re-register the app or change scopes, you'll need that consent step redone.
+8. **AADSTS9002326 "Cross-origin token redemption" error** happens when a
+   redirect URI is registered under the **Web** platform in Entra instead of
+   **Single-page application** — Web assumes a confidential server-side
+   client and blocks the cross-origin token exchange MSAL's popup/silent
+   flows need. Every redirect URI this app uses (root, `/preview/`,
+   `/portal/`) must live under the Single-page application platform
+   section, never Web — this has regressed more than once (a URI ending up
+   duplicated under both platforms, or added under the wrong one by habit).
+   If it happens again: Entra admin center → App registrations → this app →
+   Authentication → check both the Web and Single-page application sections
+   for the exact URI that's failing.
+9. **Two `position:sticky;top:0` elements don't stack, they overlap.** If a
+   banner sits above the main sticky nav in DOM order, giving both the same
+   `top:0` makes whichever has the higher z-index render on top of the
+   other once scrolled, rather than the nav pushing below the banner — fix
+   is to only make ONE of them sticky (the preview banner deliberately
+   isn't), not to keep raising z-index.
+10. **Native `<input type="time">` renders 24-hour or 12-hour AM/PM
+    depending on the page's locale, not anything CSS can control.** A bare
+    `lang="en"` is ambiguous; `lang="en-US"` on `<html>` gets Chromium
+    browsers (Chrome/Edge) to render 12-hour AM/PM. Firefox/Safari mostly
+    follow the OS locale instead and may not be affected either way.
+11. **SharePoint item-level "Read/Create/Edit items created by the user"
+    restrictions are NOT reliably honored for Full Control users when
+    accessed via Microsoft Graph**, even though the classic SharePoint web
+    UI does honor that exemption for them. Confirmed empirically on
+    BlackoutDates: an admin with Full Control (via group membership AND a
+    direct grant) saw zero items until "Read access" was changed from "Read
+    items created by the user" to "Read all items." Pragmatic fix used
+    here: relax item-level restrictions to "all items" wherever they're
+    set, and rely entirely on each app's own client-side filtering for the
+    "you only see your own X" UX — an accepted tradeoff, not a SharePoint-
+    enforced boundary.
+12. **Filtering displayed items by a secondary control (date range) AFTER
+    determining a search match can silently hide matches instead of
+    showing them.** The Schedule tab's "search by minister or recipient"
+    matched correctly, but then filtered the matched recipient's session
+    list down to whatever the Upcoming/Past range allowed — if a matched
+    minister's sessions all fell outside that range, the whole group
+    vanished with no indication a match had even occurred. Fixed by
+    skipping the range filter entirely while a search query is active —
+    search overrides browsing filters, not the other way around.
 
 ## History (why it's built this way, not some other way)
 1. Started as a plan to host raw HTML/JS directly in a SharePoint document
@@ -210,10 +360,29 @@ M365 seat cost) so they can sign in for real.
    production hosting without Power Apps.
 3. Rebuilt as this GitHub Pages + Microsoft Graph app, which is the current,
    live version. The Power Apps build is now obsolete and can be abandoned.
+4. Added the minister portal (unlicensed Entra accounts, see "Minister
+   portal" above) once it became clear ministers needed real self-service
+   access to their own schedule and time off, without per-seat licensing
+   cost — this superseded an earlier "Microsoft Forms + Power Automate, no
+   accounts needed" idea that was considered and dropped in favor of real
+   accounts with real sign-in.
 
 ## Style/tone notes
-The person building this (via chat, not yet via Claude Code) preferred very
-granular step-by-step instructions and iterative debugging — screenshot the
-exact error, fix one thing, retest. If continuing that pattern, small verified
-steps tend to work better than large unverified changes for this project,
-given how much of the above list was discovered through exactly that process.
+Now being built via Claude Code, not just chat. The person building this
+prefers granular step-by-step instructions and iterative debugging —
+screenshot the exact error, fix one thing, retest — and for SharePoint/Entra
+configuration steps specifically (outside this repo, outside Claude's own
+access) wants clear numbered instructions. Small verified steps tend to work
+better than large unverified changes for this project, given how much of the
+gotchas list above was discovered through exactly that process.
+
+Real end-to-end testing — signing in with a real test minister account
+against live SharePoint/Entra — has repeatedly caught bugs that local
+mock-data testing structurally cannot catch, since mocking bypasses the
+real auth/permission layer entirely: the AADSTS9002326 redirect-URI-
+platform gotcha (#8), the SharePoint item-level-permission/Graph
+unreliability (#11), the sticky-banner overlap (#9). Treat mock-data
+testing (injecting `account`/`ministers`/`sessions`/etc. via the browser
+console) as validating the app's own logic; treat real-account testing as
+the only way to validate the Entra/SharePoint configuration around it — the
+two are not substitutes for each other.
