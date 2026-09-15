@@ -557,7 +557,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-14.6";
+const APP_VERSION = "2026-09-15.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -584,6 +584,9 @@ const LIST_NAMES = {
   blackouts: "BlackoutDates",
   locations: "Locations"
 };
+// Relative to this file's own location (repo root) - portal/ is a direct
+// subfolder.
+const PORTAL_URL = "portal/";
 
 const msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
 const msalReady = msalInstance.initialize();
@@ -639,6 +642,26 @@ async function getToken(){
 }
 
 async function afterSignIn(){
+  try{
+    await resolveSiteAndLists();
+    // A Prayer Minister's Entra account can complete this same sign-in -
+    // their SharePoint permissions just limit what they can see/do here,
+    // that's the real access boundary, not this check - but landing them on
+    // the admin scheduler is confusing when they only need their own
+    // portal. Redirect before ever showing the admin UI if their sign-in
+    // email matches a minister on file.
+    const rawMin = await listItems('ministers');
+    const myEmail = (account.username||'').trim().toLowerCase();
+    const isMinister = rawMin.some(m => (m.SignInEmail||'').trim().toLowerCase() === myEmail);
+    if(isMinister){
+      document.getElementById('signinMsg').textContent = "You're signed in as a Prayer Minister — redirecting to your portal…";
+      window.location.href = PORTAL_URL;
+      return;
+    }
+  }catch(e){
+    document.getElementById('loadError').innerHTML = `<div class="errbox" role="alert">Could not load data: ${e.message}. Check the SharePoint site URL in setup and that your admin has granted consent for Sites.ReadWrite.All.</div>`;
+    return;
+  }
   document.getElementById('signinScreen').style.display = 'none';
   document.getElementById('appRoot').style.display = 'block';
   document.getElementById('whoami').textContent = 'Signed in as ' + (account.name || account.username);
@@ -651,7 +674,6 @@ async function afterSignIn(){
     document.getElementById('signinMsg').textContent = 'Signed out. Sign in with your Microsoft 365 account to continue.';
   };
   try{
-    await resolveSiteAndLists();
     await loadAll();
     wireApp();
   }catch(e){
