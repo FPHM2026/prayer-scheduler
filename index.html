@@ -429,9 +429,13 @@
   </section>
 
   <section class="panel" id="panel-blackouts">
-    <p class="helptext">Grouped by minister, soonest date first.</p>
-    <button class="btn" id="btnAddBlackout">+ Add Blackout Date</button>
+    <div class="toolbar">
+      <button class="btn" id="btnAddBlackout">+ Add Blackout Date</button>
+      <select id="blackoutRange" aria-label="Filter blackout dates by date range"><option>Upcoming</option><option>All</option><option>Past</option></select>
+    </div>
+    <p class="helptext" id="blackoutHelptext">Grouped by minister, upcoming dates only, soonest first.</p>
     <div id="blackoutGroups" style="margin-top:16px;"></div>
+    <div class="no-results" id="blackoutNoResults" hidden>No upcoming blackout dates.</div>
   </section>
 
 </main>
@@ -557,7 +561,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-15.1";
+const APP_VERSION = "2026-09-15.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -971,6 +975,7 @@ function wireApp(){
     renderOverview();
   }));
   $('#btnAddBlackout').addEventListener('click', ()=>openBlackoutModal());
+  $('#blackoutRange').addEventListener('change', renderBlackouts);
   $('#btnBlackoutCancel').addEventListener('click', ()=>$('#blackoutModal').classList.remove('open'));
   $('#btnBlackoutSave').addEventListener('click', ()=>withLoading($('#btnBlackoutSave'), 'Saving…', saveBlackout));
   $('#btnConfirmCancel').addEventListener('click', ()=>closeConfirm(false));
@@ -1855,22 +1860,48 @@ window.deleteBlackoutDate = async function(id){
   await loadAll();
 };
 function renderBlackouts(){
-  const box = $('#blackoutGroups');
+  const box = $('#blackoutGroups'); const noResults = $('#blackoutNoResults');
   const opened = openState(box);
+  const range = $('#blackoutRange').value;
+  const today = isoDate(new Date());
+  // A range entry counts as "past" only once its whole span (end date if it
+  // has one, otherwise the single date) is behind today - a range still in
+  // progress stays in Upcoming.
+  const isPast = b => (b.endDate||b.date) < today;
+
   const groups = new Map();
   blackouts.forEach(b=>{
     if(!groups.has(b.ministerName)) groups.set(b.ministerName, []);
     groups.get(b.ministerName).push(b);
   });
-  const rows = [...groups.entries()].map(([name, dates])=>({
-    name, dates: dates.slice().sort((a,c)=>a.date.localeCompare(c.date))
-  })).filter(g=>g.dates.length).sort((a,b)=>a.dates[0].date.localeCompare(b.dates[0].date));
+  const rows = [...groups.entries()].map(([name, all])=>{
+    const upcoming = all.filter(b=>!isPast(b)).sort((a,c)=>a.date.localeCompare(c.date));
+    const shown = (range==='Upcoming' ? all.filter(b=>!isPast(b)) : range==='Past' ? all.filter(isPast) : all.slice())
+      .sort((a,c)=> range==='Past' ? c.date.localeCompare(a.date) : a.date.localeCompare(c.date));
+    return { name, shown, upcoming };
+  }).filter(g=>g.shown.length).sort((a,b)=>{
+    // Groups with an upcoming entry sort first, soonest first; groups with
+    // none (only past, relevant on the Past/All views) follow, most-recent
+    // first - mirrors how "Next unavailable" itself falls back below.
+    if(!!a.upcoming.length !== !!b.upcoming.length) return a.upcoming.length ? -1 : 1;
+    if(a.upcoming.length) return a.upcoming[0].date.localeCompare(b.upcoming[0].date);
+    return b.shown[0].date.localeCompare(a.shown[0].date);
+  });
+
+  const helptexts = { Upcoming:'Grouped by minister, upcoming dates only, soonest first.', All:'Grouped by minister, every date on file.', Past:'Grouped by minister, past dates only, most recent first.' };
+  $('#blackoutHelptext').textContent = helptexts[range] || helptexts.Upcoming;
+  const noResultsText = { Upcoming:'No upcoming blackout dates.', All:'No blackout dates on file.', Past:'No past blackout dates on file.' };
+  noResults.textContent = noResultsText[range] || noResultsText.Upcoming;
+  noResults.hidden = rows.length>0;
 
   box.innerHTML = rows.map(g=>{
     const wasOpen = opened.has(g.name) ? opened.get(g.name) : false;
-    return groupRow(g.name, initials(g.name), g.name, `${g.dates.length} date${g.dates.length===1?'':'s'}`,
-      `<span class="next">Next unavailable: ${fmtBlackoutRangeShort(g.dates[0])}</span>`,
-      g.dates.map(d=>`<div class="sess-row">
+    const summary = g.upcoming.length
+      ? `<span class="next">Next unavailable: ${fmtBlackoutRangeShort(g.upcoming[0])}</span>`
+      : `Last: ${fmtBlackoutRangeShort(g.shown.slice().sort((a,c)=>c.date.localeCompare(a.date))[0])}`;
+    return groupRow(g.name, initials(g.name), g.name, `${g.shown.length} date${g.shown.length===1?'':'s'}`,
+      summary,
+      g.shown.map(d=>`<div class="sess-row">
         <div>
           <div style="font-weight:600;">${fmtBlackoutRange(d)}</div>
           ${d.notes?`<div class="sess-meta">${escapeHtml(d.notes)}</div>`:''}
