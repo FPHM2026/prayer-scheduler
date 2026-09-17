@@ -714,7 +714,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-17.18";
+const APP_VERSION = "2026-09-17.19";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1814,6 +1814,18 @@ function slotDone(sl){
   const linked = sessions.find(s=>s.id===sl.linkedSessionId);
   return !!linked && linked.status==='Completed';
 }
+// A still-Open (or still-unbooked Drop-In) slot dated before today is the
+// exact same "unused" concept staleSlots()/allUnusedSlots() already clean
+// up - hidden from view here too, so it doesn't keep sitting around
+// looking actionable once its date has already passed. Both cleanup paths
+// already delete these regardless of date (allUnusedSlots has no date
+// filter at all, staleSlots's cutoff always includes everything past), so
+// hiding them here is purely a display change - nothing to update there.
+function slotPastUnused(sl){
+  const todayIso = isoDate(new Date());
+  return sl.date < todayIso && (sl.status==='Open' || (sl.status==='Drop-In' && !sl.linkedSessionId));
+}
+function isSlotVisible(sl){ return !slotDone(sl) && !slotPastUnused(sl); }
 function renderSlotWeeks(){
   const weekMap = new Map(); // weekStart -> Set of dateIso that have slots or unlinked sessions
   const addDate = dateIso => {
@@ -1822,7 +1834,7 @@ function renderSlotWeeks(){
     if(!weekMap.has(wk)) weekMap.set(wk, new Set());
     weekMap.get(wk).add(dateIso);
   };
-  const visibleSlots = slots.filter(sl=>!slotDone(sl));
+  const visibleSlots = slots.filter(isSlotVisible);
   visibleSlots.forEach(sl=>addDate(sl.date));
   sessions.forEach(s=>{ if(s.status==='Scheduled' && !slots.some(sl=>sl.linkedSessionId===s.id)) addDate(s.date); });
   if(!weekMap.size){
@@ -1857,7 +1869,7 @@ function renderSlotWeeks(){
 }
 function renderDayRow(dateIso){
   const d = new Date(dateIso+'T00:00');
-  const daySlots = slots.filter(sl=>sl.date===dateIso && !slotDone(sl)).slice().sort((a,b)=>(a.start||'').localeCompare(b.start||''));
+  const daySlots = slots.filter(sl=>sl.date===dateIso && isSlotVisible(sl)).slice().sort((a,b)=>(a.start||'').localeCompare(b.start||''));
   const extraSessions = unlinkedSessionsOn(dateIso).slice().sort((a,b)=>(a.time||'').localeCompare(b.time||''));
   return `<div class="day-row">
     <div class="day-label"><span class="dow">${d.toLocaleDateString(undefined,{weekday:'short'})}</span>${d.toLocaleDateString(undefined,{month:'short',day:'numeric'})}</div>
