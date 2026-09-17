@@ -710,7 +710,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-17.4";
+const APP_VERSION = "2026-09-17.5";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1743,6 +1743,10 @@ function weekStartOf(dateIso){ const d = new Date(dateIso+'T00:00'); d.setDate(d
 // across re-renders within the session, reset only where explicitly noted.
 let expandedSlots = new Set();
 let openHistoryFor = null;
+// The in-progress manual team pick for whichever candidate panel is
+// currently open (openHistoryFor) - reset whenever that panel opens,
+// closes, or a claim goes through, same lifecycle as openHistoryFor itself.
+let manualTeam = [];
 let customAddOpenFor = null; // dateIso of the day whose "+ Add custom slot" form is open
 window.toggleSlotOpen = function(id){
   if(expandedSlots.has(id)) expandedSlots.delete(id); else expandedSlots.add(id);
@@ -1751,8 +1755,15 @@ window.toggleSlotOpen = function(id){
 window.toggleCandHistoryReal = function(slotId, candId){
   const key = slotId+':'+candId;
   openHistoryFor = openHistoryFor===key ? null : key;
+  manualTeam = [];
   renderSlotWeeks();
 };
+window.toggleManualMinister = function(id){
+  const idx = manualTeam.findIndex(x=>x.id===id);
+  if(idx>-1) manualTeam.splice(idx,1); else manualTeam.push({id, role:'Support'});
+  renderSlotWeeks();
+};
+window.setManualRole = function(id, role){ const sel=manualTeam.find(x=>x.id===id); if(sel) sel.role=role; renderSlotWeeks(); };
 window.toggleCustomAdd = function(dateIso){
   customAddOpenFor = customAddOpenFor===dateIso ? null : dateIso;
   renderSlotWeeks();
@@ -1883,8 +1894,56 @@ function renderCandHistoryPickerReal(c, hist, sl){
         : `<span class="gender-warn">Not enough available${c.genderPref==='Same-sex' ? ' '+escapeHtml(c.recipGender||'') : ''} ministers to auto-pick a team right now.</span>`}</div>
       <button class="claim-btn" ${autoTeam?'':'disabled'} onclick="claimSlot(${sl.id},${c.id},null)">${autoTeam?'Claim with auto-pick':"Can't auto-pick"}</button>
     </div>
+    ${renderManualPicker(sl, c)}
   </div>`;
 }
+// Manual team pick - reuses the same minister-row/role-toggle markup and
+// CSS as the session modal's own renderMinisterList, just backed by
+// manualTeam instead of the modal's selectedMinisters. Needed because
+// history-reuse and auto-pick are the only other ways to build a team, and
+// neither covers "a genuinely new recipient where the admin wants to
+// choose specifically who serves them."
+function renderManualPicker(sl, c){
+  const blackedOut = blackedOutNamesOn(sl.date);
+  const busy = busyMinisterIdsAt(sl.date, sl.start, sl.end, sl.id);
+  const rows = ministers.filter(m=>m.status==='Active').map(m=>{
+    const sel = manualTeam.find(x=>x.id===m.id);
+    const checked = !!sel;
+    const out = blackedOut.has(m.name);
+    const conflict = !out && busy.has(m.id);
+    return `<div class="minister-row ${checked?'checked':''}">
+      <button type="button" class="minister-toggle" aria-pressed="${checked?'true':'false'}" onclick="toggleManualMinister(${m.id})">
+        <span class="dot" aria-hidden="true">${checked?ICONS.check:''}</span>
+        <span>${escapeHtml(m.name)}${m.gender?` <span class="helptext" style="display:inline;">(${m.gender})</span>`:''}</span>
+      </button>
+      ${out?'<span class="flag">⚠ unavailable this date</span>':(conflict?'<span class="flag">⚠ already booked this time</span>':'')}
+      ${checked?`<div class="role-toggle" role="group" aria-label="Role for ${escapeHtml(m.name)}">
+        <button type="button" class="role-btn ${sel.role==='Lead'?'active':''}" aria-pressed="${sel.role==='Lead'?'true':'false'}" onclick="setManualRole(${m.id},'Lead')">Lead</button>
+        <button type="button" class="role-btn ${sel.role!=='Lead'?'active':''}" aria-pressed="${sel.role!=='Lead'?'true':'false'}" onclick="setManualRole(${m.id},'Support')">Support</button>
+      </div>`:''}
+    </div>`;
+  }).join('');
+  const mismatch = c.genderPref==='Same-sex' && c.recipGender && manualTeam.length
+    && !manualTeam.every(sm=>{ const min=ministers.find(x=>x.id===sm.id); return min && min.gender===c.recipGender; });
+  return `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
+    <div class="helptext" style="margin:0 0 6px;">Or choose the team yourself:</div>
+    ${rows}
+    <div class="helptext" style="margin:6px 0;">${manualTeam.length} selected (choose 2 or more)</div>
+    ${mismatch ? `<div class="gender-warn-inline">⚠ doesn't match ${escapeHtml(c.recipGender||'')} same-sex preference</div>` : ''}
+    <button class="claim-btn" ${manualTeam.length<2?'disabled':''} onclick="claimSlotManual(${sl.id},${c.id})">Claim with this team</button>
+  </div>`;
+}
+window.claimSlotManual = async function(slotId, candId){
+  if(manualTeam.length<2) return;
+  const team = manualTeam.map(m=>({...m}));
+  await updateItem('slots', slotId, {
+    Status: 'Tentative', ClaimedWaitingId: candId, ClaimedDate: new Date().toISOString(),
+    ProposedMinisterIDs: team.map(m=>m.id).join(','),
+    ProposedLeadIDs: team.filter(m=>m.role==='Lead').map(m=>m.id).join(',')
+  });
+  openHistoryFor = null; manualTeam = [];
+  await loadAll();
+};
 window.claimSlot = async function(slotId, candId, historyIdx){
   const sl = slots.find(x=>x.id===slotId);
   const c = sessions.find(x=>x.id===candId);
@@ -1906,7 +1965,7 @@ window.claimSlot = async function(slotId, candId, historyIdx){
     ProposedMinisterIDs: team.map(m=>m.id).join(','),
     ProposedLeadIDs: team.filter(m=>m.role==='Lead').map(m=>m.id).join(',')
   });
-  openHistoryFor = null;
+  openHistoryFor = null; manualTeam = [];
   await loadAll();
 };
 function renderTentativeBody(sl){
