@@ -710,7 +710,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-17.7";
+const APP_VERSION = "2026-09-17.8";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -2052,6 +2052,16 @@ function qaDatesInRange(){
   return dates;
 }
 function qaBuildPlan(){ return qaDatesInRange().map(d=>planForDate(d)); }
+// Open (or unlinked Drop-In) slots dated before today that never got
+// claimed - real estate nobody's going to use at this point. Cleaned up
+// as part of every Quick Add run so the list doesn't need manual pruning.
+// Deliberately never touches Tentative (a claim is in progress - deleting
+// it would silently drop that candidate's link with no trace) or Booked
+// (a real session, kept for lookback same as the old Schedule tab).
+function staleSlots(){
+  const todayIso = isoDate(new Date());
+  return slots.filter(sl => sl.date < todayIso && (sl.status==='Open' || (sl.status==='Drop-In' && !sl.linkedSessionId)));
+}
 window.openQuickAddModal = function(){
   const today = new Date(); today.setHours(0,0,0,0);
   qaPreset = 'next4'; qaDays = new Set([0,1,2,3,4,5,6]);
@@ -2089,7 +2099,11 @@ window.qaToggleDay = function(dow){
 function renderQuickAddModal(){
   const plans = qaBuildPlan();
   const toAddTotal = plans.reduce((sum,p)=>sum+p.toAdd,0);
+  const stale = staleSlots();
   const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const btnParts = [];
+  if(toAddTotal>0) btnParts.push(`Add ${toAddTotal}`);
+  if(stale.length>0) btnParts.push(`Remove ${stale.length} Unused`);
   $('#quickAddBody').innerHTML = `
     <h2 id="quickAddTitle" style="margin:0 0 14px;color:var(--navy);">Quick Add Slots</h2>
     <div class="range-presets">
@@ -2111,9 +2125,12 @@ function renderQuickAddModal(){
           <span>${p.toAdd>0 ? `<span class="add-line">+${p.toAdd}</span>` : `<span class="clean-line">already covered</span>`} <span class="helptext">(${p.existing} of ${p.capacity})</span></span>
         </div>`).join('') : '<div class="helptext">No dates in range.</div>'}
     </div>
-    <div class="qa-preview-box"><strong>${toAddTotal}</strong> new slot${toAddTotal===1?'':'s'} will be added across ${plans.length} date${plans.length===1?'':'s'}.</div>
+    <div class="qa-preview-box">
+      <strong>${toAddTotal}</strong> new slot${toAddTotal===1?'':'s'} will be added across ${plans.length} date${plans.length===1?'':'s'}.
+      ${stale.length ? `<br><strong>${stale.length}</strong> unused past slot${stale.length===1?'':'s'} (never claimed) will be removed automatically.` : ''}
+    </div>
     <div class="toolbar" style="margin-top:14px;">
-      <button class="btn" ${toAddTotal===0?'disabled':''} onclick="confirmQuickAddSlots(this)">Add ${toAddTotal} Slot${toAddTotal===1?'':'s'}</button>
+      <button class="btn" ${btnParts.length?'':'disabled'} onclick="confirmQuickAddSlots(this)">${btnParts.length?btnParts.join(' / '):'Nothing to do'}</button>
       <button class="btn secondary" onclick="closeQuickAddModal()">Cancel</button>
     </div>`;
 }
@@ -2121,12 +2138,17 @@ window.confirmQuickAddSlots = async function(btn){
   if(qaSubmitting) return;
   const plans = qaBuildPlan().filter(p=>p.toAdd>0);
   const total = plans.reduce((sum,p)=>sum+p.toAdd,0);
-  if(!total) return;
+  const stale = staleSlots();
+  if(!total && !stale.length) return;
   qaSubmitting = true;
   try{
-    const ok = await askConfirm(`Add ${total} new slot${total===1?'':'s'} across ${plans.length} date${plans.length===1?'':'s'}?`, {confirmLabel:'Add Slots', danger:false});
+    const parts = [];
+    if(total) parts.push(`add ${total} new slot${total===1?'':'s'} across ${plans.length} date${plans.length===1?'':'s'}`);
+    if(stale.length) parts.push(`remove ${stale.length} unused past slot${stale.length===1?'':'s'} that ${stale.length===1?'was':'were'} never claimed`);
+    const msg = parts.join(' and ');
+    const ok = await askConfirm(msg.charAt(0).toUpperCase()+msg.slice(1)+'?', {confirmLabel:'Continue', danger:false});
     if(!ok) return;
-    if(btn){ btn.disabled = true; btn.textContent = 'Adding…'; }
+    if(btn){ btn.disabled = true; btn.textContent = 'Working…'; }
     for(const p of plans){
       const start = p.isDropIn ? '17:00' : '17:30', end = p.isDropIn ? '19:30' : '19:30';
       for(let i=0;i<p.toAdd;i++){
@@ -2138,6 +2160,9 @@ window.confirmQuickAddSlots = async function(btn){
           ProposedMinisterIDs: '', ProposedLeadIDs: '', LinkedSessionId: null, Notes: ''
         });
       }
+    }
+    for(const sl of stale){
+      await deleteItem('slots', sl.id);
     }
     closeQuickAddModal();
     await loadAll();
