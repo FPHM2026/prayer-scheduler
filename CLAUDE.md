@@ -101,10 +101,9 @@ scheduler's own code.
   links a follow-up session back to the one it followed), WaCreated (Yes/No),
   WaLink (plain text), **Priority (Yes/No, default No)** — flags a Waiting entry
   to the top of the Planning tab regardless of how long they've been waiting.
-  **Contacted (Yes/No, default No) — not yet added to SharePoint.** Used by
-  a preview-only feature (see "In progress" below) tracking whether the
-  admin has reached out to a Waiting entry; the column needs to be created
-  manually before that feature can be promoted.
+  **Contacted (Yes/No, default No)** — added to SharePoint 2026-09-17.
+  Used by a preview-only feature (see "In progress" below) tracking
+  whether the admin has reached out to a Waiting entry.
   A Waiting-status item has SessionDate/SessionEndDate/LocationName/
   AssignedMinisterIDs/LeadMinisterIDs blank until it's actually scheduled.
   "Days waiting" is computed client-side from the item's own SharePoint
@@ -295,12 +294,7 @@ like one product, not two:
   itself) plus a small "Contacted" badge next to Priority when true.
   Independent of Status - doesn't move an entry out of Waiting; only
   "Schedule Session" does that, same as before.
-  - **Blocker before promoting**: needs a new `Contacted` (Yes/No, default
-    No) column added to the PrayerSessions SharePoint list - same category
-    of manual step as the ApptType choices above. Reads safely as `false`
-    if the column doesn't exist yet, so the rest of the app doesn't break
-    in the meantime, but toggling it won't persist until the column is
-    added.
+  - SharePoint column added 2026-09-17 - no longer a blocker.
   - Needs the user's own live testing/confirmation before promoting.
 
 ## Known gotchas (hard-won, don't reintroduce these bugs)
