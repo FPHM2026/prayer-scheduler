@@ -410,6 +410,13 @@
 
   <section class="panel" id="panel-planning">
     <p class="helptext">People who've asked for a session but aren't scheduled yet — same list as Schedule, just filtered to status "Waiting." Priority-flagged entries always stay at the top.</p>
+    <div class="stats-collapse" id="planningStatsCollapse">
+      <button class="stats-toggle" onclick="toggleStatsCollapse(this)" aria-expanded="true">
+        <span class="chevron"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>
+        <span>Stats</span>
+      </button>
+      <div class="stats-body"><div class="stats-body-inner" id="planningStats"></div></div>
+    </div>
     <div class="toolbar" style="margin-bottom:16px;">
       <button class="btn" id="btnAddWaiting">+ Add to Waiting List</button>
       <div class="search-wrap"><input id="planningSearch" placeholder="Search by recipient..." aria-label="Search the waiting list by recipient"><button type="button" class="search-clear" aria-label="Clear search" hidden>&times;</button></div>
@@ -599,7 +606,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-17.2";
+const APP_VERSION = "2026-09-17.3";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1323,6 +1330,63 @@ function renderPlanning(){
       </div>
     </div>`;
   }).join('');
+  renderPlanningStats();
+}
+function planningStats(){
+  // Unfiltered by the search box deliberately - this is an overview of the
+  // whole waiting list, not whatever's currently typed into the search.
+  const waiting = sessions.filter(s=>s.status==='Waiting');
+  const byName = new Map();
+  waiting.forEach(s=>{
+    const key = s.recipName.trim().toLowerCase();
+    if(key && !byName.has(key)) byName.set(key, s);
+  });
+  // Per unique recipient, not per waiting entry: a recipient is a
+  // follow-up if they have ANY real (non-Waiting) session on record under
+  // this name already - i.e. they've been served before and are waiting
+  // for their next one - otherwise they're a first-timer. This is a fresh
+  // classification, not read from the entry's own ApptType field, which is
+  // always written as "First" for every Waiting entry regardless (see
+  // onSaveSession's waiting branch) and so can't distinguish the two here.
+  let firstTime=0, followUp=0;
+  byName.forEach(s=>{
+    const key = s.recipName.trim().toLowerCase();
+    const hasPriorRealSession = sessions.some(x=> x.status!=='Waiting' && x.recipName.trim().toLowerCase()===key);
+    if(hasPriorRealSession) followUp++; else firstTime++;
+  });
+  const waits = waiting.map(daysWaiting);
+  const longest = waiting.length ? waiting.slice().sort((a,b)=>daysWaiting(b)-daysWaiting(a))[0] : null;
+  const avgWait = waits.length ? Math.round(waits.reduce((a,b)=>a+b,0)/waits.length) : 0;
+  return {
+    totalEntries: waiting.length, uniqueRecipients: byName.size, firstTime, followUp,
+    longestWait: longest ? daysWaiting(longest) : 0, longestName: longest ? longest.recipName : '',
+    avgWait
+  };
+}
+function renderPlanningStats(){
+  const st = planningStats();
+  const splitLine = (n,label,isFollowUp)=> `<span class="split-line"><span class="dot" style="background:var(${isFollowUp?'--primary':'--muted-bar'})"></span>${n} ${label}</span>`;
+  $('#planningStats').innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-tile">
+        <div class="stat-label">Unique Recipients Waiting</div>
+        <div class="stat-value">${st.uniqueRecipients}</div>
+        <div style="display:flex;flex-direction:column;gap:2px;margin-top:8px;font-size:var(--fs-2xs);color:var(--muted);">
+          ${splitLine(st.firstTime,'first-time')}
+          ${splitLine(st.followUp,'follow-up',true)}
+        </div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-label">Longest Wait</div>
+        <div class="stat-value">${st.longestWait} <span style="font-size:var(--fs-sm);font-weight:600;color:var(--muted);">day${st.longestWait===1?'':'s'}</span></div>
+        <div class="stat-sub">${st.longestName?escapeHtml(st.longestName):'No one waiting'}</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-label">Average Wait</div>
+        <div class="stat-value">${st.avgWait} <span style="font-size:var(--fs-sm);font-weight:600;color:var(--muted);">day${st.avgWait===1?'':'s'}</span></div>
+        <div class="stat-sub">across ${st.totalEntries} waiting</div>
+      </div>
+    </div>`;
 }
 window.togglePriority = async function(id){
   const s = sessions.find(x=>x.id===id);
