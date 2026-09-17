@@ -710,7 +710,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-17.5";
+const APP_VERSION = "2026-09-17.6";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -2057,6 +2057,12 @@ function renderBookedBody(sl){
 
 /* ---- QUICK ADD SLOTS MODAL ---- */
 let qaPreset = 'next4', qaRangeStart = null, qaRangeEnd = null, qaDays = new Set([0,1,2,3,4,5,6]);
+// Guards confirmQuickAddSlots against running twice concurrently (a double
+// click, or clicking again while the confirm dialog is still up) - without
+// it, two overlapping runs each compute the same "toAdd" against the same
+// not-yet-refreshed slots array and each create their own full batch,
+// silently doubling every count.
+let qaSubmitting = false;
 function qaDatesInRange(){
   const dates = [];
   if(!qaRangeStart || !qaRangeEnd) return dates;
@@ -2126,30 +2132,37 @@ function renderQuickAddModal(){
     </div>
     <div class="qa-preview-box"><strong>${toAddTotal}</strong> new slot${toAddTotal===1?'':'s'} will be added across ${plans.length} date${plans.length===1?'':'s'}.</div>
     <div class="toolbar" style="margin-top:14px;">
-      <button class="btn" ${toAddTotal===0?'disabled':''} onclick="confirmQuickAddSlots()">Add ${toAddTotal} Slot${toAddTotal===1?'':'s'}</button>
+      <button class="btn" ${toAddTotal===0?'disabled':''} onclick="confirmQuickAddSlots(this)">Add ${toAddTotal} Slot${toAddTotal===1?'':'s'}</button>
       <button class="btn secondary" onclick="closeQuickAddModal()">Cancel</button>
     </div>`;
 }
-window.confirmQuickAddSlots = async function(){
+window.confirmQuickAddSlots = async function(btn){
+  if(qaSubmitting) return;
   const plans = qaBuildPlan().filter(p=>p.toAdd>0);
   const total = plans.reduce((sum,p)=>sum+p.toAdd,0);
   if(!total) return;
-  const ok = await askConfirm(`Add ${total} new slot${total===1?'':'s'} across ${plans.length} date${plans.length===1?'':'s'}?`, {confirmLabel:'Add Slots', danger:false});
-  if(!ok) return;
-  for(const p of plans){
-    const start = p.isDropIn ? '17:00' : '17:30', end = p.isDropIn ? '19:30' : '19:30';
-    for(let i=0;i<p.toAdd;i++){
-      await createItem('slots', {
-        Title: p.dateIso + (p.isDropIn?' Drop-In':' slot'),
-        SlotDate: p.dateIso+'T00:00:00', StartTime: start, EndTime: end,
-        Status: p.isDropIn ? 'Drop-In' : 'Open',
-        ClaimedWaitingId: null, ClaimedDate: null,
-        ProposedMinisterIDs: '', ProposedLeadIDs: '', LinkedSessionId: null, Notes: ''
-      });
+  qaSubmitting = true;
+  try{
+    const ok = await askConfirm(`Add ${total} new slot${total===1?'':'s'} across ${plans.length} date${plans.length===1?'':'s'}?`, {confirmLabel:'Add Slots', danger:false});
+    if(!ok) return;
+    if(btn){ btn.disabled = true; btn.textContent = 'Adding…'; }
+    for(const p of plans){
+      const start = p.isDropIn ? '17:00' : '17:30', end = p.isDropIn ? '19:30' : '19:30';
+      for(let i=0;i<p.toAdd;i++){
+        await createItem('slots', {
+          Title: p.dateIso + (p.isDropIn?' Drop-In':' slot'),
+          SlotDate: p.dateIso+'T00:00:00', StartTime: start, EndTime: end,
+          Status: p.isDropIn ? 'Drop-In' : 'Open',
+          ClaimedWaitingId: null, ClaimedDate: null,
+          ProposedMinisterIDs: '', ProposedLeadIDs: '', LinkedSessionId: null, Notes: ''
+        });
+      }
     }
+    closeQuickAddModal();
+    await loadAll();
+  } finally {
+    qaSubmitting = false;
   }
-  closeQuickAddModal();
-  await loadAll();
 };
 
 /* ---- SESSION MODAL ---- */
