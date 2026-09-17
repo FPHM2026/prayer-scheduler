@@ -86,7 +86,9 @@ scheduler's own code.
   unlicensed Entra ID sign-in address for the minister portal — not a real
   inbox, deliberately a separate field from Email so giving someone portal
   access never overwrites how you actually contact them), Status (Choice:
-  Active/Inactive)
+  Active/Inactive), **Gender (Choice: Male/Female, added 2026-09-17)** — feeds
+  the same-sex team-preference matching on the Schedule & Planning tab, see
+  "Planning Slots" under "Features implemented" below.
 - **PrayerSessions**: Title, SessionDate, SessionEndDate, RecipientName,
   RecipientContact, AssignedMinisterIDs (comma-separated minister IDs, plain
   text), LeadMinisterIDs (comma-separated subset of the above who are "Lead"
@@ -104,6 +106,10 @@ scheduler's own code.
   **Contacted (Yes/No, default No)** — added to SharePoint 2026-09-17.
   Tracks whether the admin has reached out to a Waiting entry (see the
   Planning tab bullet under "Features implemented" below).
+  **RecipientGender (Choice: Male/Female, added 2026-09-17)** and
+  **GenderPreference (Choice: Mixed/Same-sex, default Mixed, added
+  2026-09-17)** — the recipient's own gender and whether they want a
+  same-sex team; used by the Planning Slots feature (see below).
   A Waiting-status item has SessionDate/SessionEndDate/LocationName/
   AssignedMinisterIDs/LeadMinisterIDs blank until it's actually scheduled.
   "Days waiting" is computed client-side from the item's own SharePoint
@@ -112,6 +118,16 @@ scheduler's own code.
   (Date, optional)** — blank/null means a single-day blackout; set means an
   inclusive date range. Notes (Plain text)
 - **Locations**: Title (location name) — deliberately simple, just a name
+- **PlanningSlots** (added 2026-09-17): Title, SlotDate (Date), StartTime/
+  EndTime (plain text, "HH:MM" 24-hour — not a true Time column), Status
+  (Choice: Open/Tentative/Booked/**Drop-In** — note the hyphen and capital
+  I; don't confuse with PrayerSessions' own ApptType="Drop-in", lowercase i,
+  a separate field on a separate list), ClaimedWaitingId (Number, the
+  claimed PrayerSessions Waiting item's ID), ClaimedDate (Date),
+  ProposedMinisterIDs / ProposedLeadIDs (comma-separated, same plain-text-ID
+  convention as AssignedMinisterIDs/LeadMinisterIDs above), LinkedSessionId
+  (Number, the real PrayerSessions item once Booked), Notes (Plain text).
+  See "Planning Slots" under "Features implemented" for how the states flow.
 - **Prospects**: retired. The app no longer reads this list at all — replaced
   by PrayerSessions items with Status="Waiting" (see above). The list itself
   still exists in SharePoint with whatever old data was in it; run
@@ -187,7 +203,12 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
   completed session on record, and a monthly trend chart comparing this
   year to last. Same combo card design ported to the portal's own Completed
   Sessions tab, scoped to just that minister's sessions.
-- Planning tab: PrayerSessions items with Status="Waiting" (no separate
+- Planning tab: **superseded 2026-09-17 by the Schedule & Planning tab below**
+  — the old Schedule and Planning tabs' HTML/JS are both still fully intact
+  in `preview/index.html`, just deliberately unlinked from the main nav (see
+  the comment above the `<nav>` block) as an easy-to-restore fallback, not
+  deleted. What follows describes that retained-but-hidden code, unchanged:
+  PrayerSessions items with Status="Waiting" (no separate
   Prospects list — see above), sortable by longest-waiting or highest session
   number, priority-flagged entries always pinned to the top, flag/schedule/
   edit/delete actions per entry. "Schedule Session" reopens the same session
@@ -197,6 +218,61 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
   an external action, same pattern as `WaCreated`'s WhatsApp toggle; the app
   never sends anything itself. Fully independent of Status — toggling it
   doesn't move an entry out of Waiting, only "Schedule Session" does that.
+- **Schedule & Planning tab** (added 2026-09-17, `preview/index.html` only so
+  far — not yet promoted to production `index.html`): replaces the old
+  Schedule + Planning tabs with one merged view backed by the new
+  PlanningSlots list, so every slot state — Open, Tentative, Booked, or the
+  recurring Drop-In — is one collapsible accordion card grouped by week, with
+  a Booked card's expanded body showing the same facts the old Schedule tab
+  row did (recipient, contact, team, notes). Out of scope for this change,
+  per explicit decision: the minister-facing `portal/index.html`'s own
+  Schedule tab is untouched.
+  - **Capacity**: a normal date's slot count is `floor(activePMs / 2)` where
+    activePMs excludes anyone blacked out that specific date (matched by
+    minister *name*, same convention as `renderMinisterList` elsewhere — not
+    an ID join) — a session always needs exactly 2 PMs, so an odd one out
+    just sits that date out.
+  - **Quick Add Slots**: a modal with "Next 4 Weeks"/"Next Calendar Month"
+    range presets (or a manual date range), a day-of-week filter, and a live
+    per-date breakdown before confirming. The number of slots it creates per
+    date is capacity minus however many already exist there, clamped at
+    0 — idempotent by construction, so re-running it over an
+    already-provisioned or now-unavailable date adds nothing.
+  - **4th Sunday = Drop-In**: `isFourthSunday()` overrides the normal
+    capacity math entirely for that one date each month — a single
+    5:00–7:30pm Drop-In slot instead of the usual 2-PM-pair slots.
+  - **Custom slots**: a "+ Add custom slot" affordance on any date that
+    already has calculated slots lets the admin add one more at an
+    arbitrary time — same minister-double-booking rule as everywhere else
+    (blocks only on an actual time *overlap*, not merely the same day).
+  - **Claiming**: an Open slot's picker lists every unclaimed Waiting
+    candidate; expanding one shows their prior-session history (if any) to
+    reuse a past team via "Use this team," or "Claim with auto-pick" to
+    build a fresh team from who's actually free for that slot's date/time
+    (excluding anyone already committed to an overlapping Tentative/Booked/
+    Drop-In slot elsewhere that day).
+  - **Gender preference** (Male/Female on PrayerMinisters; RecipientGender +
+    GenderPreference on PrayerSessions/Waiting, see schema above): the
+    capacity/Quick-Add math stays gender-agnostic on purpose — the
+    preference only affects availability *after* someone with a same-sex
+    requirement is being matched, not before. An Open slot's header always
+    shows live "Available now: N PMs (XF, YM)." Auto-picking a team for a
+    Same-sex-preference candidate with no usable history is a **hard
+    block** if fewer than 2 of the needed gender are actually free right
+    now (mirrors the existing "at least 2 PMs" hard-block on the session
+    form). Reusing a *specific* historical team is always allowed even if
+    it doesn't match, just flagged with a non-blocking "⚠ doesn't match…"
+    warning instead (mirrors the existing Blackout Dates soft-override
+    pattern) — a deliberate, visible admin choice is never second-guessed.
+  - **Booking**: "Book This Session" on a Tentative slot opens the normal
+    session modal pre-filled from the slot (date/time/team), converting the
+    claimed Waiting record in place into a real session on save — same
+    underlying mechanism as the old `scheduleFromWaiting`. On save, the
+    slot is PATCHed to Booked + LinkedSessionId + the session's actual
+    saved times. A Drop-In slot's own "Record Drop-In Session" button
+    reuses the existing "+Drop-in" preset (recipient/appt-type/full active
+    roster prefilled) the same way, just also pinning the date and PATCHing
+    the slot on save.
 - Prayer Ministers tab (merged Minister Overview + roster management into
   one tab): grouped by minister, Active/Inactive sub-tabs, search, date range
   defaulting to year-to-date, collapsible stats block (hours this range vs.
