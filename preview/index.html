@@ -710,7 +710,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-17.10";
+const APP_VERSION = "2026-09-17.11";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -2023,6 +2023,10 @@ function renderTentativeHistoryReal(sl, hist){
     </div>`;
   }).join('');
 }
+window.reconnectSlot = async function(slotId, sessionId){
+  await updateItem('slots', slotId, { LinkedSessionId: sessionId });
+  await loadAll();
+};
 window.useTeamFromHistoryReal = async function(slotId, idx){
   const sl = slots.find(x=>x.id===slotId);
   const c = sl && sl.claimedId ? sessions.find(s=>s.id===sl.claimedId) : null;
@@ -2067,6 +2071,17 @@ function renderBookedBody(sl){
     if(sl.status==='Drop-In'){
       return `<div class="slot-detail-row">Sunday Drop-In — the 4th-Sunday group session. Team: ${teamLabel(sl.team)||'<span class="helptext">Not set</span>'}</div>
         <div class="toolbar" style="margin-top:10px;"><button class="btn" onclick="bookDropInSlot(${sl.id})">Record Drop-In Session</button></div>`;
+    }
+    // A slot that flipped to Booked but never got its LinkedSessionId to
+    // stick (the bundled-write bug, fixed for new bookings but not
+    // retroactively for slots created before the fix) still has its
+    // ClaimedWaitingId - that field's write DID succeed, so it still
+    // points at the right session. Offer a one-click repair instead of
+    // making the admin edit SharePoint by hand.
+    const cand = sl.claimedId ? sessions.find(s=>s.id===sl.claimedId) : null;
+    if(cand){
+      return `<div class="picker-empty">This slot's link to its session was lost (a data bug that's since been fixed) - it's still tracking who was claimed, though.</div>
+        <div class="toolbar" style="margin-top:10px;"><button class="btn" onclick="reconnectSlot(${sl.id},${cand.id})">Reconnect to ${escapeHtml(cand.recipName)}</button></div>`;
     }
     return `<div class="picker-empty">This slot's linked session could not be found.</div>`;
   }
