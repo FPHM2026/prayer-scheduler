@@ -93,17 +93,17 @@ scheduler's own code.
   rather than "Support"), LocationName (plain text, not a true Lookup column —
   written as plain text matching a Locations list Title, chosen deliberately to
   avoid Graph's LookupId complexity), Notes (plain text — must be Plain text
-  format, not Rich text, or it stores HTML), ApptType (Choice: First/Follow-up
-  in production; **Drop-in and Training are used by a preview-only feature —
-  see "In progress" below — and must be added as choices on this column
-  before that feature can be promoted**), Status (Choice: Scheduled/Completed/
+  format, not Rich text, or it stores HTML), ApptType (Choice: First/
+  Follow-up/Drop-in/Training — the last two are used by the Drop-in/
+  Training quick-add buttons, see "Features implemented" below), Status
+  (Choice: Scheduled/Completed/
   **Waiting**), PreviousSessionId (Number,
   links a follow-up session back to the one it followed), WaCreated (Yes/No),
   WaLink (plain text), **Priority (Yes/No, default No)** — flags a Waiting entry
   to the top of the Planning tab regardless of how long they've been waiting.
   **Contacted (Yes/No, default No)** — added to SharePoint 2026-09-17.
-  Used by a preview-only feature (see "In progress" below) tracking
-  whether the admin has reached out to a Waiting entry.
+  Tracks whether the admin has reached out to a Waiting entry (see the
+  Planning tab bullet under "Features implemented" below).
   A Waiting-status item has SessionDate/SessionEndDate/LocationName/
   AssignedMinisterIDs/LeadMinisterIDs blank until it's actually scheduled.
   "Days waiting" is computed client-side from the item's own SharePoint
@@ -137,16 +137,17 @@ to clear. Every card-facing date (session rows, group summaries, stats
 ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
 
 - Schedule tab: grouped by recipient, search, Upcoming/All/Past filter,
-  soonest-upcoming-first sort
+  soonest-upcoming-first sort, plus "+ Drop-in" and "+ Training" quick-add
+  buttons alongside "+ New Session" — see the Drop-in/Training bullet below
+  for what those prefill.
 - New/Edit/Follow-up session form: recipient info, date + day-of-week label,
   quick-select start times (Sun 4:00/5:00/5:30pm, Tue 6:00pm — curated presets,
   not auto-generated from a window), custom start/end time (hour/half-hour only,
   validated both via `step="1800"` and an explicit save-time check), location
-  dropdown with inline "add new location", appointment type (First/Follow-up,
-  smart-defaulted), status (Scheduled/Completed — hidden on new sessions, shown
-  when editing), minister multi-select (2+ required) with Lead/Support role
-  toggle per minister, live "also on this date" panel, "last session with this
-  recipient" hint (name-match based — recipients aren't persistent records),
+  dropdown with inline "add new location", appointment type (First/Follow-up/
+  Drop-in/Training, smart-defaulted), status (Scheduled/Completed — hidden on
+  new sessions, shown when editing), minister multi-select (2+ required) with
+  Lead/Support role toggle per minister, live "also on this date" panel,
   per-minister upcoming-session-count badge, blackout-date flagging,
   minister-specific double-booking prevention (two sessions CAN overlap in time
   if they share no ministers — only blocks if a specific minister would be in
@@ -154,6 +155,30 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
   link. The same modal doubles as the Waiting-list form (see Planning below) —
   a `sessKind` flag ('session' vs 'waiting') shows/hides the scheduling-only
   fields rather than being a separate form.
+  - **Recipient session history + team pre-fill**: once the typed recipient
+    name matches prior PrayerSessions records (name-match based — recipients
+    aren't persistent records), a collapsed-by-default panel expands into
+    every matching prior session, most recent first — date with weekday
+    (`fmtDate`), ministers with Lead/Support (`ministerNamesOf`), and that
+    session's notes — each row with a "Use this team" action. Replaces the
+    old one-line "last session with this recipient" hint. The most recent
+    session's team auto-applies for a genuinely new session only (not an
+    edit, not a follow-up, not a Drop-in/Training preset — each of those
+    already has its own correct minister source and must not be overridden),
+    visibly instead of silently, so a one-off substitution is something the
+    admin can catch and override rather than something that quietly becomes
+    the new default. Same recipient match as the autocomplete above; zero
+    new data — pure client-side logic against sessions already loaded.
+  - **"+ Drop-in" / "+ Training" quick-add buttons**: prefill the form for a
+    shared group event — recipient name set to "Sunday Drop-In" / "Training",
+    Appointment Type set to match, every Active minister pre-selected as
+    Support, Recipient Contact and the WhatsApp fields hidden (neither
+    applies to a group session), Drop-In further defaults Start/End Time to
+    5:00–7:30pm. Excluded from every statistic (the Completed Sessions combo
+    card, the Prayer Ministers tab's hours/serving numbers) since assigning
+    every minister to the same session would otherwise wildly inflate those —
+    the underlying session records still show up normally in the plain
+    lists, just not in the aggregates.
 - Completed Sessions tab: grouped by recipient, read-only, search, plus a
   collapsible combo stats card — YTD / Last Year / Lifetime columns for
   session count and unique recipients (with a first-time vs. follow-up
@@ -167,6 +192,11 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
   number, priority-flagged entries always pinned to the top, flag/schedule/
   edit/delete actions per entry. "Schedule Session" reopens the same session
   modal with the scheduling fields revealed, converting the same record.
+  A phone-icon "Contacted" toggle (`toggleContacted`) plus a small badge next
+  to Priority records whether the admin has reached out — a manual flag for
+  an external action, same pattern as `WaCreated`'s WhatsApp toggle; the app
+  never sends anything itself. Fully independent of Status — toggling it
+  doesn't move an entry out of Waiting, only "Schedule Session" does that.
 - Prayer Ministers tab (merged Minister Overview + roster management into
   one tab): grouped by minister, Active/Inactive sub-tabs, search, date range
   defaulting to year-to-date, collapsible stats block (hours this range vs.
@@ -257,45 +287,6 @@ like one product, not two:
 - **Calendar (month grid) view** — was planned but never built in this HTML
   version. The agenda/Schedule view covers the "chronological list" requirement
   on its own; the calendar grid is a nice-to-have, not yet started.
-
-## In progress (built in preview/index.html, not yet promoted to production)
-- **Sunday Drop-In / Training quick-add buttons**: "+ Drop-in" and
-  "+ Training" on the Schedule tab toolbar, prefilling the New Session form
-  for a shared group event — recipient name set to "Sunday Drop-In" /
-  "Training", every Active minister pre-selected, Recipient Contact and the
-  WhatsApp fields hidden (neither applies to a group session), Drop-In
-  further defaults Start/End Time to 5:00–7:30pm. Excluded from every
-  statistic (the Completed Sessions combo card, the Prayer Ministers tab's
-  hours/serving numbers) since assigning every minister to the same session
-  would otherwise wildly inflate those — the underlying session records
-  still show up normally in the plain lists, just not in the aggregates.
-  - **Blocker before promoting**: needs "Drop-in" and "Training" added as
-    choices on the PrayerSessions ApptType column in SharePoint, or writes
-    using those values will fail or be silently rejected depending on the
-    column's fill-in-choice setting.
-  - Needs the user's own live testing/confirmation before promoting, same
-    reasoning as every preview-first feature.
-- **Recipient session history + team pre-fill**, in the New/Edit Session
-  and Waiting-list forms: once a typed recipient name matches prior
-  PrayerSessions records, a collapsed-by-default panel (replacing the old
-  one-line "last session" hint) expands into every matching prior session,
-  most recent first — date, ministers (Lead/Support), notes — each with a
-  "Use this team" action. The most recent session's team auto-applies for
-  a genuinely new session (not an edit, not a follow-up, not a Drop-in/
-  Training preset), visibly instead of silently, so a one-off substitution
-  is something the admin can see and override rather than something that
-  quietly becomes the new default. No SharePoint/data model changes - pure
-  client-side logic against already-loaded sessions/ministers.
-  - No blocker - ready to promote once the user confirms it live in
-    preview.
-- **"Contacted" flag for Waiting entries** (Planning tab): a phone-icon
-  toggle button per row (same pattern as the WaCreated WhatsApp toggle -
-  a manual record of an external action, the app never sends anything
-  itself) plus a small "Contacted" badge next to Priority when true.
-  Independent of Status - doesn't move an entry out of Waiting; only
-  "Schedule Session" does that, same as before.
-  - SharePoint column added 2026-09-17 - no longer a blocker.
-  - Needs the user's own live testing/confirmation before promoting.
 
 ## Known gotchas (hard-won, don't reintroduce these bugs)
 1. **Graph list item IDs are strings, not numbers.** Comma-separated ID fields
