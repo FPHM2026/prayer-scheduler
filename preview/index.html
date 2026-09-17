@@ -710,7 +710,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-17.8";
+const APP_VERSION = "2026-09-17.9";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -2030,14 +2030,37 @@ function renderBookedBody(sl){
     <div class="slot-detail-row">${escapeHtml(locationName(linked.location))}</div>
     ${linked.notes?`<div class="notes">${escapeHtml(linked.notes)}</div>`:''}
     <div class="toolbar" style="margin-top:10px;">
-      <button class="icon-btn" onclick="editSession(${linked.id})" title="Edit" aria-label="Edit session for ${escapeHtml(linked.recipName)}">${ICONS.pencil}</button>
+      <button class="icon-btn" onclick="editBookedSession(${sl.id},${linked.id})" title="Edit" aria-label="Edit session for ${escapeHtml(linked.recipName)}">${ICONS.pencil}</button>
       ${linked.status!=='Completed' ? `<button class="icon-btn success" onclick="markComplete(${linked.id})" title="Mark Completed" aria-label="Mark session for ${escapeHtml(linked.recipName)} as completed">${ICONS.checkCircle}</button>` : ''}
-      <button class="icon-btn danger" onclick="deleteSession(${linked.id})" title="Delete" aria-label="Delete session for ${escapeHtml(linked.recipName)}">${ICONS.trash}</button>
+      <button class="icon-btn danger" onclick="deleteBookedSession(${sl.id},${linked.id})" title="Delete" aria-label="Delete session for ${escapeHtml(linked.recipName)}">${ICONS.trash}</button>
     </div>`;
 }
+// Editing a Booked slot's session reuses the plain session modal, but sets
+// pendingBookSlotId so onSaveSession's existing slot-sync PATCH (the same
+// one bookSlot/bookDropInSlot rely on) fires here too - otherwise the slot
+// card would keep showing its old date/time after the session moved.
+window.editBookedSession = function(slotId, sessionId){
+  const s = sessions.find(x=>x.id===sessionId);
+  if(!s) return;
+  openModal(s);
+  pendingBookSlotId = slotId;
+};
+// Deleting a Booked slot's session can't just delete the session and leave
+// the slot behind - Booked slots are exempt from the Quick Add stale
+// cleanup (they're supposed to be real, kept-for-lookback sessions), so an
+// orphaned one with a dead LinkedSessionId would sit there forever. Reopen
+// the slot instead, so it's available for someone else and will get swept
+// up by cleanup on its own if it ends up unused.
+window.deleteBookedSession = async function(slotId, sessionId){
+  const s = sessions.find(x=>x.id===sessionId);
+  if(!(await askConfirm(`Delete the session with ${s ? s.recipName : 'this recipient'}${s && s.date ? ' on '+s.date : ''}? This can't be undone. The slot will reopen for someone else.`))) return;
+  await deleteItem('sessions', sessionId);
+  await updateItem('slots', slotId, { Status:'Open', ClaimedWaitingId:null, ClaimedDate:null, ProposedMinisterIDs:'', ProposedLeadIDs:'', LinkedSessionId:null });
+  await loadAll();
+};
 
 /* ---- QUICK ADD SLOTS MODAL ---- */
-let qaPreset = 'next4', qaRangeStart = null, qaRangeEnd = null, qaDays = new Set([0,1,2,3,4,5,6]);
+let qaPreset = 'next4', qaRangeStart = null, qaRangeEnd = null, qaDays = new Set([0,2]); // Sun, Tue - the two days sessions actually run
 // Guards confirmQuickAddSlots against running twice concurrently (a double
 // click, or clicking again while the confirm dialog is still up) - without
 // it, two overlapping runs each compute the same "toAdd" against the same
@@ -2052,19 +2075,23 @@ function qaDatesInRange(){
   return dates;
 }
 function qaBuildPlan(){ return qaDatesInRange().map(d=>planForDate(d)); }
-// Open (or unlinked Drop-In) slots dated before today that never got
-// claimed - real estate nobody's going to use at this point. Cleaned up
-// as part of every Quick Add run so the list doesn't need manual pruning.
-// Deliberately never touches Tentative (a claim is in progress - deleting
-// it would silently drop that candidate's link with no trace) or Booked
-// (a real session, kept for lookback same as the old Schedule tab).
+// Open (or unlinked Drop-In) slots dated before the Quick Add form's own
+// range start - never claimed, and the admin moving on to a new range is
+// treated as the signal that anything earlier is done with. Deliberately
+// NOT "before today": adding October should also sweep up any leftover
+// September slots even if a few September dates haven't technically
+// passed yet - moving on to the next range is what marks the old one
+// finished, not the calendar. Never touches Tentative (a claim is in
+// progress - deleting it would silently drop that candidate's link with no
+// trace) or Booked (a real session, kept for lookback same as the old
+// Schedule tab).
 function staleSlots(){
-  const todayIso = isoDate(new Date());
-  return slots.filter(sl => sl.date < todayIso && (sl.status==='Open' || (sl.status==='Drop-In' && !sl.linkedSessionId)));
+  const cutoff = qaRangeStart || isoDate(new Date());
+  return slots.filter(sl => sl.date < cutoff && (sl.status==='Open' || (sl.status==='Drop-In' && !sl.linkedSessionId)));
 }
 window.openQuickAddModal = function(){
   const today = new Date(); today.setHours(0,0,0,0);
-  qaPreset = 'next4'; qaDays = new Set([0,1,2,3,4,5,6]);
+  qaPreset = 'next4'; qaDays = new Set([0,2]);
   qaRangeStart = isoDate(today);
   const end = new Date(today); end.setDate(end.getDate()+27);
   qaRangeEnd = isoDate(end);
