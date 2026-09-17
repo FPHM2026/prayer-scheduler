@@ -710,7 +710,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-17.6";
+const APP_VERSION = "2026-09-17.7";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1606,28 +1606,13 @@ function busyMinisterIdsAt(dateIso, start, end, excludeSlotId){
   return ids;
 }
 // Active, not-blacked-out, not-already-committed ministers for this
-// date/time, split by gender - drives both the "Available now" header text
-// and the same-sex auto-pick.
+// date/time, split by gender - drives the "Available now" header text and
+// the manual picker's own hard-exclude filters below.
 function remainingByGender(dateIso, start, end, excludeSlotId){
   const blackedOut = blackedOutNamesOn(dateIso);
   const busy = busyMinisterIdsAt(dateIso, start, end, excludeSlotId);
   const free = ministers.filter(m=>m.status==='Active' && !blackedOut.has(m.name) && !busy.has(m.id));
   return { all: free, female: free.filter(m=>m.gender==='Female'), male: free.filter(m=>m.gender==='Male') };
-}
-// Gender-agnostic auto-pick for a Mixed-preference claim with no usable
-// history team. Returns null (a hard block) when fewer than 2 are free.
-function pickFreshTeam(dateIso, start, end, excludeSlotId){
-  const free = remainingByGender(dateIso, start, end, excludeSlotId).all;
-  if(free.length<2) return null;
-  return [{ id: free[0].id, role: 'Lead' }, { id: free[1].id, role: 'Support' }];
-}
-// Same as above but restricted to one gender, for a Same-sex-preference
-// claim - the first name becomes Lead purely so the team has one, no
-// seniority implied. null is a hard block, same as the Mixed case.
-function pickFreshSameGenderTeam(gender, dateIso, start, end, excludeSlotId){
-  const pool = remainingByGender(dateIso, start, end, excludeSlotId)[gender==='Female'?'female':'male'];
-  if(pool.length<2) return null;
-  return [{ id: pool[0].id, role: 'Lead' }, { id: pool[1].id, role: 'Support' }];
 }
 // Whether an already-chosen team (e.g. a specific historical pairing) still
 // satisfies a Same-sex preference - used only for the non-blocking warning.
@@ -1874,9 +1859,6 @@ function renderSlotPicker(sl){
   }).join('');
 }
 function renderCandHistoryPickerReal(c, hist, sl){
-  const autoTeam = c.genderPref==='Same-sex'
-    ? pickFreshSameGenderTeam(c.recipGender, sl.date, sl.start, sl.end, sl.id)
-    : pickFreshTeam(sl.date, sl.start, sl.end, sl.id);
   return `<div class="cand-history">
     ${hist.length ? hist.map((h,i)=>{
       const matches = teamMatchesGenderPref(h.ministers, c.genderPref, c.recipGender);
@@ -1888,48 +1870,50 @@ function renderCandHistoryPickerReal(c, hist, sl){
         <button class="claim-btn" onclick="claimSlot(${sl.id},${c.id},${i})">Use this team</button>
       </div>`;
     }).join('') : `<div class="history-empty">No previous sessions on record.</div>`}
-    <div class="history-row">
-      <div class="history-team">${autoTeam
-        ? `Auto-pick: ${escapeHtml(teamLabel(autoTeam))}${c.genderPref==='Same-sex' ? ' <span class="gender-ok">(matches preference)</span>' : ''}`
-        : `<span class="gender-warn">Not enough available${c.genderPref==='Same-sex' ? ' '+escapeHtml(c.recipGender||'') : ''} ministers to auto-pick a team right now.</span>`}</div>
-      <button class="claim-btn" ${autoTeam?'':'disabled'} onclick="claimSlot(${sl.id},${c.id},null)">${autoTeam?'Claim with auto-pick':"Can't auto-pick"}</button>
-    </div>
     ${renderManualPicker(sl, c)}
   </div>`;
 }
 // Manual team pick - reuses the same minister-row/role-toggle markup and
 // CSS as the session modal's own renderMinisterList, just backed by
-// manualTeam instead of the modal's selectedMinisters. Needed because
-// history-reuse and auto-pick are the only other ways to build a team, and
-// neither covers "a genuinely new recipient where the admin wants to
-// choose specifically who serves them."
+// manualTeam instead of the modal's selectedMinisters. This is the only
+// "build a team from scratch" path (auto-pick was removed at the user's
+// request - team assignment always depends on factors this tool doesn't
+// track, so it's a deliberate manual call every time).
+// The list itself hard-excludes anyone blacked out that date and, when the
+// recipient wants a same-sex team, anyone not of that gender - per the
+// user's explicit request, these two are disqualifying, not just flagged.
+// A same-day time conflict with another slot is still just a soft flag,
+// same posture as everywhere else - not something the user asked to change.
 function renderManualPicker(sl, c){
   const blackedOut = blackedOutNamesOn(sl.date);
   const busy = busyMinisterIdsAt(sl.date, sl.start, sl.end, sl.id);
-  const rows = ministers.filter(m=>m.status==='Active').map(m=>{
+  const pool = ministers.filter(m=>{
+    if(m.status!=='Active') return false;
+    if(blackedOut.has(m.name)) return false;
+    if(c.genderPref==='Same-sex' && c.recipGender && m.gender!==c.recipGender) return false;
+    return true;
+  });
+  const rows = pool.map(m=>{
     const sel = manualTeam.find(x=>x.id===m.id);
     const checked = !!sel;
-    const out = blackedOut.has(m.name);
-    const conflict = !out && busy.has(m.id);
+    const conflict = busy.has(m.id);
     return `<div class="minister-row ${checked?'checked':''}">
       <button type="button" class="minister-toggle" aria-pressed="${checked?'true':'false'}" onclick="toggleManualMinister(${m.id})">
         <span class="dot" aria-hidden="true">${checked?ICONS.check:''}</span>
         <span>${escapeHtml(m.name)}${m.gender?` <span class="helptext" style="display:inline;">(${m.gender})</span>`:''}</span>
       </button>
-      ${out?'<span class="flag">⚠ unavailable this date</span>':(conflict?'<span class="flag">⚠ already booked this time</span>':'')}
+      ${conflict?'<span class="flag">⚠ already booked this time</span>':''}
       ${checked?`<div class="role-toggle" role="group" aria-label="Role for ${escapeHtml(m.name)}">
         <button type="button" class="role-btn ${sel.role==='Lead'?'active':''}" aria-pressed="${sel.role==='Lead'?'true':'false'}" onclick="setManualRole(${m.id},'Lead')">Lead</button>
         <button type="button" class="role-btn ${sel.role!=='Lead'?'active':''}" aria-pressed="${sel.role!=='Lead'?'true':'false'}" onclick="setManualRole(${m.id},'Support')">Support</button>
       </div>`:''}
     </div>`;
   }).join('');
-  const mismatch = c.genderPref==='Same-sex' && c.recipGender && manualTeam.length
-    && !manualTeam.every(sm=>{ const min=ministers.find(x=>x.id===sm.id); return min && min.gender===c.recipGender; });
+  const genderNote = c.genderPref==='Same-sex' && c.recipGender ? ` — showing ${escapeHtml(c.recipGender)} ministers only, and only those not blacked out this date` : ' — showing ministers not blacked out this date';
   return `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
-    <div class="helptext" style="margin:0 0 6px;">Or choose the team yourself:</div>
-    ${rows}
-    <div class="helptext" style="margin:6px 0;">${manualTeam.length} selected (choose 2 or more)</div>
-    ${mismatch ? `<div class="gender-warn-inline">⚠ doesn't match ${escapeHtml(c.recipGender||'')} same-sex preference</div>` : ''}
+    <div class="helptext" style="margin:0 0 6px;">Choose the team${genderNote}:</div>
+    ${pool.length ? rows : `<div class="picker-empty">No available${c.genderPref==='Same-sex'&&c.recipGender ? ' '+escapeHtml(c.recipGender) : ''} ministers for this slot's date.</div>`}
+    ${pool.length ? `<div class="helptext" style="margin:6px 0;">${manualTeam.length} selected (choose 2 or more)</div>` : ''}
     <button class="claim-btn" ${manualTeam.length<2?'disabled':''} onclick="claimSlotManual(${sl.id},${c.id})">Claim with this team</button>
   </div>`;
 }
@@ -1944,22 +1928,19 @@ window.claimSlotManual = async function(slotId, candId){
   openHistoryFor = null; manualTeam = [];
   await loadAll();
 };
+// Claims a slot by reusing a specific past team (see the manual picker's
+// own claimSlotManual for the "build a team from scratch" path - auto-pick
+// was removed at the user's request: team assignment always depends on
+// factors this tool doesn't track, so it's a manual call every time for a
+// recipient with no usable history).
 window.claimSlot = async function(slotId, candId, historyIdx){
   const sl = slots.find(x=>x.id===slotId);
   const c = sessions.find(x=>x.id===candId);
   if(!sl || !c) return;
   const hist = historyForRecipient(c.recipName, c.id);
-  const chosen = (historyIdx!=null && hist[historyIdx]) ? hist[historyIdx] : null;
-  let team = chosen ? chosen.ministers.map(m=>({...m})) : null;
-  if(!team){
-    team = c.genderPref==='Same-sex'
-      ? pickFreshSameGenderTeam(c.recipGender, sl.date, sl.start, sl.end, sl.id)
-      : pickFreshTeam(sl.date, sl.start, sl.end, sl.id);
-    if(!team){
-      showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Not enough available ministers</div><div>There aren't 2 ministers${c.genderPref==='Same-sex' ? ' of the same sex' : ''} available for this slot right now.</div>`);
-      return;
-    }
-  }
+  const chosen = hist[historyIdx];
+  if(!chosen) return;
+  const team = chosen.ministers.map(m=>({...m}));
   await updateItem('slots', slotId, {
     Status: 'Tentative', ClaimedWaitingId: c.id, ClaimedDate: new Date().toISOString(),
     ProposedMinisterIDs: team.map(m=>m.id).join(','),
