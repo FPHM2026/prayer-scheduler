@@ -710,7 +710,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-17.9";
+const APP_VERSION = "2026-09-17.10";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1770,14 +1770,26 @@ function renderOpenAvailNow(sl){
   const rb = remainingByGender(sl.date, sl.start, sl.end, sl.id);
   return `<span class="slot-header-team helptext">Available now: ${rb.all.length} PM${rb.all.length===1?'':'s'} (${rb.female.length}F, ${rb.male.length}M)</span>`;
 }
+// Scheduled sessions with no PlanningSlots record behind them - anything
+// booked via the old Schedule tab (or the +Drop-in/+Training presets)
+// before this tab existed, and so would otherwise be invisible here even
+// though it's a real, already-planned session. Deliberately excludes
+// Completed - that history already has its own dedicated tab, and mixing
+// years of it into this planning-focused view would defeat the point of
+// the redesign.
+function unlinkedSessionsOn(dateIso){
+  return sessions.filter(s => s.status==='Scheduled' && s.date===dateIso && !slots.some(sl=>sl.linkedSessionId===s.id));
+}
 function renderSlotWeeks(){
-  const weekMap = new Map(); // weekStart -> Set of dateIso that have slots
-  slots.forEach(sl=>{
-    if(!sl.date) return;
-    const wk = weekStartOf(sl.date);
+  const weekMap = new Map(); // weekStart -> Set of dateIso that have slots or unlinked sessions
+  const addDate = dateIso => {
+    if(!dateIso) return;
+    const wk = weekStartOf(dateIso);
     if(!weekMap.has(wk)) weekMap.set(wk, new Set());
-    weekMap.get(wk).add(sl.date);
-  });
+    weekMap.get(wk).add(dateIso);
+  };
+  slots.forEach(sl=>addDate(sl.date));
+  sessions.forEach(s=>{ if(s.status==='Scheduled' && !slots.some(sl=>sl.linkedSessionId===s.id)) addDate(s.date); });
   if(!weekMap.size){
     $('#slotWeeks').innerHTML = '<div class="no-results">No slots yet — use Quick Add Slots to get started.</div>';
     return;
@@ -1797,11 +1809,45 @@ function renderSlotWeeks(){
 function renderDayRow(dateIso){
   const d = new Date(dateIso+'T00:00');
   const daySlots = slots.filter(sl=>sl.date===dateIso).slice().sort((a,b)=>(a.start||'').localeCompare(b.start||''));
+  const extraSessions = unlinkedSessionsOn(dateIso).slice().sort((a,b)=>(a.time||'').localeCompare(b.time||''));
   return `<div class="day-row">
     <div class="day-label"><span class="dow">${d.toLocaleDateString(undefined,{weekday:'short'})}</span>${d.toLocaleDateString(undefined,{month:'short',day:'numeric'})}</div>
     <div class="slot-list">
       ${daySlots.map(sl=>renderSlotCard(sl)).join('')}
+      ${extraSessions.map(s=>renderUnlinkedSessionCard(s)).join('')}
       ${renderDayCustomAdd(dateIso)}
+    </div>
+  </div>`;
+}
+// A plain, always-expanded card for a Scheduled session that has no
+// PlanningSlots record - no accordion toggle, since it doesn't participate
+// in expandedSlots (that Set is keyed by real numeric slot ids) and adding
+// one just for this would need its own id scheme for no real benefit here.
+// Actions go straight to the existing editSession/markComplete/deleteSession
+// - there's no slot to keep in sync, unlike editBookedSession/
+// deleteBookedSession which exist specifically to handle that sync.
+function renderUnlinkedSessionCard(s){
+  return `<div class="slot booked expanded">
+    <div class="slot-header" style="cursor:default;">
+      <span class="slot-header-top">
+        <span class="slot-time">${s.time?`${fmt12(s.time)}–${fmt12(s.endTime)}`:''}</span>
+        <span class="slot-status booked">${escapeHtml(s.status)}</span>
+      </span>
+      <span class="slot-header-detail">
+        <span class="slot-header-name">${escapeHtml(s.recipName)}</span>
+        ${ministerNamesOf(s) ? `<span class="slot-header-team">${escapeHtml(ministerNamesOf(s))}</span>` : ''}
+      </span>
+    </div>
+    <div class="slot-body">
+      <div class="slot-detail-row"><strong>${escapeHtml(s.recipName)}</strong> ${s.recipContact?`<span class="helptext">${escapeHtml(s.recipContact)}</span>`:''}</div>
+      <div class="slot-detail-row">Team: ${escapeHtml(ministerNamesOf(s))||'<span class="helptext">None assigned</span>'}</div>
+      ${s.location?`<div class="slot-detail-row">${escapeHtml(locationName(s.location))}</div>`:''}
+      ${s.notes?`<div class="notes">${escapeHtml(s.notes)}</div>`:''}
+      <div class="toolbar" style="margin-top:10px;">
+        <button class="icon-btn" onclick="editSession(${s.id})" title="Edit" aria-label="Edit session for ${escapeHtml(s.recipName)}">${ICONS.pencil}</button>
+        <button class="icon-btn success" onclick="markComplete(${s.id})" title="Mark Completed" aria-label="Mark session for ${escapeHtml(s.recipName)} as completed">${ICONS.checkCircle}</button>
+        <button class="icon-btn danger" onclick="deleteSession(${s.id})" title="Delete" aria-label="Delete session for ${escapeHtml(s.recipName)}">${ICONS.trash}</button>
+      </div>
     </div>
   </div>`;
 }
@@ -2651,8 +2697,12 @@ async function onSaveSession(){
   };
   try{
     let sessionId = editingId;
+    // Graph's create response id is a string (see CLAUDE.md gotcha #1 -
+    // list item ids come back as strings, not numbers). LinkedSessionId
+    // below is a Number column, so this must be a real number before it's
+    // ever written there.
     if(editingId) await updateItem('sessions', editingId, fields);
-    else sessionId = (await createItem('sessions', fields)).id;
+    else sessionId = parseInt((await createItem('sessions', fields)).id, 10);
     // Belt-and-suspenders: AssignedMinisterIDs/LeadMinisterIDs have been
     // reported as unreliable when written bundled with the rest of the
     // fields in one request. Finish with a PATCH that touches only those
@@ -2663,6 +2713,11 @@ async function onSaveSession(){
         Status: 'Booked', LinkedSessionId: sessionId,
         SlotDate: start.toISOString(), StartTime: time, EndTime: endTime
       });
+      // Same belt-and-suspenders reasoning as ministerFields above -
+      // LinkedSessionId is the one field here that MUST persist for the
+      // slot to stay connected to its session, so isolate it in its own
+      // follow-up PATCH rather than trust it inside a 4-field bundle.
+      await updateItem('slots', pendingBookSlotId, { LinkedSessionId: sessionId });
       pendingBookSlotId = null;
     }
     $('#sessionModal').classList.remove('open');
