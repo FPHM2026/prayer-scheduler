@@ -101,6 +101,10 @@ scheduler's own code.
   links a follow-up session back to the one it followed), WaCreated (Yes/No),
   WaLink (plain text), **Priority (Yes/No, default No)** — flags a Waiting entry
   to the top of the Planning tab regardless of how long they've been waiting.
+  **Contacted (Yes/No, default No) — not yet added to SharePoint.** Used by
+  a preview-only feature (see "In progress" below) tracking whether the
+  admin has reached out to a Waiting entry; the column needs to be created
+  manually before that feature can be promoted.
   A Waiting-status item has SessionDate/SessionEndDate/LocationName/
   AssignedMinisterIDs/LeadMinisterIDs blank until it's actually scheduled.
   "Days waiting" is computed client-side from the item's own SharePoint
@@ -272,6 +276,32 @@ like one product, not two:
     column's fill-in-choice setting.
   - Needs the user's own live testing/confirmation before promoting, same
     reasoning as every preview-first feature.
+- **Recipient session history + team pre-fill**, in the New/Edit Session
+  and Waiting-list forms: once a typed recipient name matches prior
+  PrayerSessions records, a collapsed-by-default panel (replacing the old
+  one-line "last session" hint) expands into every matching prior session,
+  most recent first — date, ministers (Lead/Support), notes — each with a
+  "Use this team" action. The most recent session's team auto-applies for
+  a genuinely new session (not an edit, not a follow-up, not a Drop-in/
+  Training preset), visibly instead of silently, so a one-off substitution
+  is something the admin can see and override rather than something that
+  quietly becomes the new default. No SharePoint/data model changes - pure
+  client-side logic against already-loaded sessions/ministers.
+  - No blocker - ready to promote once the user confirms it live in
+    preview.
+- **"Contacted" flag for Waiting entries** (Planning tab): a phone-icon
+  toggle button per row (same pattern as the WaCreated WhatsApp toggle -
+  a manual record of an external action, the app never sends anything
+  itself) plus a small "Contacted" badge next to Priority when true.
+  Independent of Status - doesn't move an entry out of Waiting; only
+  "Schedule Session" does that, same as before.
+  - **Blocker before promoting**: needs a new `Contacted` (Yes/No, default
+    No) column added to the PrayerSessions SharePoint list - same category
+    of manual step as the ApptType choices above. Reads safely as `false`
+    if the column doesn't exist yet, so the rest of the app doesn't break
+    in the meantime, but toggling it won't persist until the column is
+    added.
+  - Needs the user's own live testing/confirmation before promoting.
 
 ## Known gotchas (hard-won, don't reintroduce these bugs)
 1. **Graph list item IDs are strings, not numbers.** Comma-separated ID fields

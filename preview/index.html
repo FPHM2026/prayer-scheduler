@@ -111,6 +111,7 @@
   .tag.active{background:var(--ok-bg);color:var(--ok);}
   .tag.inactive{background:#f1ede4;color:var(--muted);}
   .tag.priority{background:var(--primary);color:var(--on-primary);}
+  .tag.contacted{background:var(--ok-bg);color:var(--ok);}
 
   .field{margin-bottom:14px;}
   .field label{display:block;font-size:var(--fs-sm);font-weight:700;margin-bottom:5px;}
@@ -598,7 +599,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-17.1";
+const APP_VERSION = "2026-09-17.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -822,6 +823,11 @@ async function loadAll(){
       prevId: s.PreviousSessionId||null,
       waCreated: !!s.WaCreated, waLink: s.WaLink||'',
       priority: !!s.Priority,
+      // Contacted: whether the admin has reached out to this waiting entry -
+      // a manual record of an external action, same pattern as WaCreated.
+      // Reads false/undefined safely if the Contacted column doesn't exist
+      // in SharePoint yet (see gotcha in CLAUDE.md re: ApptType choices).
+      contacted: !!s.Contacted,
       // "Days waiting" for a Waiting-status entry is computed from SharePoint's
       // own createdDateTime item metadata rather than a dedicated field.
       added: (s._created||'').split('T')[0]
@@ -852,7 +858,8 @@ const ICONS = {
   chevron: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>',
   flag: (filled) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="${filled?'currentColor':'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22V4a1 1 0 0 1 1-1h13.5a.5.5 0 0 1 .4.8l-3.6 4.7 3.6 4.7a.5.5 0 0 1-.4.8H5"/></svg>`,
   calendarPlus: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 14v6M9 17h6"/></svg>',
-  power: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>'
+  power: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>',
+  phone: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>'
 };
 function fmtDate(d){ return d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'}); }
 function fmtTime(d){ return d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}); }
@@ -1301,11 +1308,13 @@ function renderPlanning(){
             <span class="name">${escapeHtml(s.recipName)}</span>
             <span class="tag ${num===1?'first':''}">Session #${num}</span>
             ${s.priority?'<span class="tag priority">Priority</span>':''}
+            ${s.contacted?'<span class="tag contacted">Contacted</span>':''}
           </div>
           <div class="helptext" style="margin:2px 0 0;">${escapeHtml(s.recipContact||'No contact info')} · Waiting ${waiting} day${waiting===1?'':'s'} · added ${fmtShort(s.added||s.date)}</div>
           ${s.notes?`<div class="notes">${escapeHtml(s.notes)}</div>`:''}
         </div>
         <div class="sess-actions">
+          <button class="icon-btn${s.contacted?' success':''}" onclick="toggleContacted(${s.id})" title="${s.contacted?'Mark as not yet contacted':'Mark as contacted'}" aria-pressed="${s.contacted}" aria-label="${s.contacted?'Mark as not yet contacted':'Mark as contacted'}: ${escapeHtml(s.recipName)}">${ICONS.phone}</button>
           <button class="icon-btn flag-btn${s.priority?' active':''}" onclick="togglePriority(${s.id})" title="${s.priority?'Remove priority':'Flag as priority'}" aria-pressed="${s.priority}" aria-label="${s.priority?'Remove priority from':'Flag as priority'} ${escapeHtml(s.recipName)}">${ICONS.flag(s.priority)}</button>
           <button class="icon-btn" onclick="scheduleFromWaiting(${s.id})" title="Schedule Session" aria-label="Schedule a session for ${escapeHtml(s.recipName)}">${ICONS.calendarPlus}</button>
           <button class="icon-btn" onclick="editSession(${s.id})" title="Edit" aria-label="Edit ${escapeHtml(s.recipName)}">${ICONS.pencil}</button>
@@ -1319,6 +1328,14 @@ window.togglePriority = async function(id){
   const s = sessions.find(x=>x.id===id);
   if(!s) return;
   await updateItem('sessions', id, { Priority: !s.priority });
+  await loadAll();
+};
+// Contacted is a manual record of an external action (the admin reached
+// out) - same pattern as WaCreated. The app never sends anything itself.
+window.toggleContacted = async function(id){
+  const s = sessions.find(x=>x.id===id);
+  if(!s) return;
+  await updateItem('sessions', id, { Contacted: !s.contacted });
   await loadAll();
 };
 window.scheduleFromWaiting = function(id){
@@ -1699,7 +1716,7 @@ async function onSaveSession(){
       Title: recipName + ' - Waiting',
       RecipientName: recipName, RecipientContact: recipContact,
       Notes: notes, Status: 'Waiting',
-      Priority: $('#sessPriority').checked,
+      Priority: $('#sessPriority').checked, Contacted: false,
       SessionDate: null, SessionEndDate: null,
       LocationName: '', AssignedMinisterIDs: '', LeadMinisterIDs: '',
       ApptType: 'First', PreviousSessionId: null, WaCreated: false, WaLink: ''
