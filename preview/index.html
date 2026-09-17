@@ -342,6 +342,74 @@
   .flag-btn.active{color:var(--primary);}
   .flag-btn.active:hover{background:rgba(242,138,0,.14);color:var(--primary-dark);}
 
+  /* ---- Schedule & Planning: slot accordions (merges the old Schedule and
+     Planning tabs - see CLAUDE.md) ---- */
+  .week-block{margin-bottom:22px;}
+  .week-header{font-size:var(--fs-2xs);font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding-bottom:6px;border-bottom:1px solid var(--border);margin-bottom:10px;}
+  .day-row{display:flex;gap:12px;margin-bottom:10px;align-items:flex-start;}
+  .day-row:last-child{margin-bottom:0;}
+  .day-label{flex:0 0 62px;font-size:var(--fs-sm);font-weight:700;color:var(--navy);line-height:1.3;padding-top:12px;}
+  .day-label .dow{display:block;color:var(--gold);font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:.04em;}
+  .slot-list{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0;}
+  .slot{background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-sm);border-left:4px solid var(--border);overflow:hidden;}
+  .slot.open{border-left-color:var(--muted-bar);}
+  .slot.tentative{border-left-color:var(--gold);}
+  .slot.booked,.slot.dropin{border-left-color:var(--ok);}
+  .slot-header{display:flex;flex-direction:column;gap:5px;padding:11px 14px;cursor:pointer;background:none;border:none;width:100%;text-align:left;font-family:inherit;}
+  .slot-header:hover{background:var(--bg);}
+  .slot-header-top{display:flex;align-items:center;gap:10px;}
+  .slot-header-top .slot-chevron{margin-left:auto;color:var(--muted);transition:transform .15s ease;}
+  .slot.expanded .slot-chevron{transform:rotate(90deg);}
+  .slot-time{font-size:var(--fs-2xs);font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;}
+  .slot-header-detail{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;}
+  .slot-header-name{font-weight:700;font-size:var(--fs-base);}
+  .slot-header-team{font-size:var(--fs-2xs);color:var(--muted);}
+  .slot-status{font-size:var(--fs-2xs);font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 8px;border-radius:9px;}
+  .slot-status.open{background:#f1ede4;color:var(--muted);}
+  .slot-status.tentative{background:rgba(170,90,60,.14);color:var(--gold-dark);}
+  .slot-status.booked,.slot-status.dropin{background:var(--ok-bg);color:var(--ok);}
+  .slot-body{padding:0 14px 13px;border-top:1px solid var(--border);padding-top:11px;margin-top:1px;}
+  .slot-meta{font-size:var(--fs-2xs);color:var(--muted);margin-bottom:8px;}
+  .slot-detail-row{font-size:var(--fs-sm);margin-bottom:6px;}
+  .slot-detail-row strong{color:var(--navy);font-weight:700;}
+  .picker-cand{border:1px solid var(--border);border-radius:8px;margin-bottom:6px;overflow:hidden;}
+  .picker-cand:last-child{margin-bottom:0;}
+  .picker-row{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--bg);padding:8px 11px;cursor:pointer;font-size:var(--fs-sm);width:100%;border:none;text-align:left;font-family:inherit;}
+  .picker-row:hover{background:var(--cream);}
+  .picker-row .pname{font-weight:600;}
+  .picker-row .ptag{font-size:var(--fs-2xs);color:var(--muted);}
+  .picker-empty{font-size:var(--fs-xs);color:var(--muted);font-style:italic;padding:4px 0;}
+  .cand-history{padding:8px 11px 10px;border-top:1px solid var(--border);}
+  .history-empty{font-size:var(--fs-xs);color:var(--muted);font-style:italic;margin:0 0 8px;}
+  .history-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
+  .history-row:last-child{border-bottom:none;padding-bottom:2px;}
+  .history-row.active{background:var(--ok-bg);margin:0 -11px;padding:8px 11px;border-radius:6px;border-bottom:none;}
+  .history-date{font-weight:700;font-size:var(--fs-sm);}
+  .history-team{font-size:var(--fs-xs);color:var(--muted);margin-top:1px;}
+  .history-notes{font-size:var(--fs-xs);color:var(--text);margin-top:3px;font-style:italic;}
+  .gender-warn-inline{font-size:var(--fs-2xs);color:var(--danger);font-weight:700;margin-top:3px;}
+  .gender-warn{font-size:var(--fs-sm);color:var(--danger);background:var(--danger-bg);border-radius:6px;padding:7px 10px;margin-bottom:9px;}
+  .gender-ok{font-size:var(--fs-sm);color:var(--ok);background:var(--ok-bg);border-radius:6px;padding:7px 10px;margin-bottom:9px;}
+  .claim-btn{flex-shrink:0;font-size:var(--fs-2xs);font-weight:700;font-family:inherit;border-radius:6px;padding:6px 10px;cursor:pointer;border:1px solid var(--border);background:var(--card);color:var(--navy);white-space:nowrap;}
+  .claim-btn:hover{border-color:var(--gold);}
+  .claim-btn.active{background:var(--ok);border-color:var(--ok);color:#fff;cursor:default;}
+  .add-custom-btn{align-self:flex-start;background:none;border:1px dashed var(--border);color:var(--muted);border-radius:8px;padding:7px 12px;font-size:var(--fs-2xs);font-weight:700;cursor:pointer;font-family:inherit;}
+  .add-custom-btn:hover{border-color:var(--gold);color:var(--gold-dark);}
+  .custom-slot-form{display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:var(--fs-xs);}
+  .custom-slot-form input[type=time]{border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-family:inherit;font-size:var(--fs-xs);background:var(--bg);color:var(--text);min-height:auto;}
+  .range-presets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+  .range-preset{border:1px solid var(--border);background:var(--card);color:var(--navy);border-radius:20px;padding:6px 12px;font-size:var(--fs-2xs);font-weight:700;cursor:pointer;font-family:inherit;}
+  .range-preset:hover{border-color:var(--gold);}
+  .day-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+  .day-chip{border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:20px;padding:7px 13px;font-size:var(--fs-sm);font-weight:700;cursor:pointer;font-family:inherit;}
+  .day-chip.active{background:var(--gold);border-color:var(--gold);color:#fff;}
+  .preset-note{font-size:var(--fs-xs);color:var(--muted);margin-bottom:16px;}
+  .qa-preview-box{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:18px;font-size:var(--fs-sm);}
+  .qa-preview-box .add-line{color:var(--ok);font-weight:700;margin-bottom:6px;}
+  .qa-preview-box .clean-line{color:var(--danger);font-weight:700;margin-top:6px;}
+  .qa-breakdown{display:flex;flex-direction:column;gap:4px;font-size:var(--fs-xs);color:var(--muted);border-top:1px solid var(--border);padding-top:8px;margin-top:2px;}
+  .qa-breakdown .zero{color:var(--danger);}
+
   /* Minister Overview cards need manage-action icons inline in the header,
      outside the toggle button (a <button> can't legally contain another
      <button>) - .group-row-wrap holds both as siblings so the icons never
@@ -385,8 +453,12 @@
   </div>
 </header>
 <nav aria-label="Primary">
-  <button data-tab="schedule" class="active" aria-current="page">Schedule</button>
-  <button data-tab="planning">Planning</button>
+  <!-- The old Schedule and Planning tabs (panel-schedule / panel-planning
+       below) are kept fully intact but deliberately not linked here - the
+       merged Schedule & Planning tab (panel-schedplan) replaces both, per
+       the "no duplicated functionality" decision. Re-add these two buttons
+       plus data-tab="schedule"/"planning" here to fall back if needed. -->
+  <button data-tab="schedplan" class="active" aria-current="page">Schedule &amp; Planning</button>
   <button data-tab="completed">Completed Sessions</button>
   <button data-tab="overview">Prayer Ministers</button>
   <button data-tab="blackouts">Blackout Dates</button>
@@ -394,7 +466,27 @@
 <main>
 <div id="loadError"></div>
 
-  <section class="panel active" id="panel-schedule">
+  <section class="panel active" id="panel-schedplan">
+    <p class="helptext">Every state lives here — open slots to fill, tentative claims to review, and booked sessions to look back on.</p>
+    <div class="stats-collapse" id="schedPlanStatsCollapse">
+      <button class="stats-toggle" onclick="toggleStatsCollapse(this)" aria-expanded="true">
+        <span class="chevron"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>
+        <span>Stats</span>
+      </button>
+      <div class="stats-body"><div class="stats-body-inner" id="schedPlanStats"></div></div>
+    </div>
+    <div class="toolbar">
+      <button class="btn" id="btnQuickAddSlots">+ Quick Add Slots</button>
+      <button class="btn secondary" id="btnAddWaiting2">+ Add to Waiting List</button>
+    </div>
+    <div class="section-title" style="display:flex;align-items:baseline;gap:8px;margin:0 0 12px;"><h2 style="font-size:var(--fs-lg);margin:0;color:var(--navy);">Slots</h2></div>
+    <div id="slotWeeks"></div>
+    <div class="section-title" style="display:flex;align-items:baseline;gap:8px;margin:26px 0 12px;"><h2 style="font-size:var(--fs-lg);margin:0;color:var(--navy);">Unplaced Candidates</h2><span class="helptext" id="unplacedCount" style="margin:0;"></span></div>
+    <div id="unplacedList"></div>
+    <div class="no-results" id="unplacedNoResults" hidden>Everyone on the waiting list has been claimed onto a slot.</div>
+  </section>
+
+  <section class="panel" id="panel-schedule">
     <div class="toolbar">
       <button class="btn" id="btnNew">+ New Session</button>
       <button class="btn secondary" id="btnDropIn">+ Drop-in</button>
@@ -494,6 +586,10 @@
       <div class="field"><label for="recipName">Recipient Name *</label><input id="recipName" autocomplete="off"><div id="recipNameResults"></div></div>
       <div class="field" id="recipContactField"><label for="recipContact">Recipient Contact</label><input id="recipContact"></div>
     </div>
+    <div class="field-row">
+      <div class="field"><label for="recipGender">Recipient Gender</label><select id="recipGender"><option value="">— Not set —</option><option>Female</option><option>Male</option></select></div>
+      <div class="field"><label for="genderPref">Team Preference</label><select id="genderPref"><option value="Mixed">Mixed (no preference)</option><option value="Same-sex">Same-sex team only</option></select></div>
+    </div>
     <div id="historyPanel" style="margin-top:-8px;margin-bottom:14px;"></div>
     <div class="field-row sched-only">
       <div class="field"><label for="apptType">Appointment Type</label>
@@ -523,6 +619,7 @@
       <div class="minister-list" id="ministerList"></div>
       <p class="helptext" id="selCount">0 selected</p>
       <p class="helptext">Tap a name to select; use the Lead/Support pills to mark who's leading.</p>
+      <p class="helptext" id="genderWarn" style="display:none;color:var(--danger);"></p>
     </fieldset>
     <div class="field"><label for="notes">Notes</label><textarea id="notes" rows="2"></textarea></div>
     <div class="field waiting-only" id="priorityField" style="display:none;">
@@ -551,6 +648,7 @@
     <div class="field"><label for="minEmail">Email</label><input id="minEmail" type="email"></div>
     <div class="field"><label for="minPhone">Phone</label><input id="minPhone" type="tel"></div>
     <div class="field"><label for="minSignInEmail">Sign-In Email (for minister portal)</label><input id="minSignInEmail" type="email" placeholder="Their unlicensed Microsoft 365 sign-in address"><p class="helptext" style="margin:5px 0 0;">Not a real inbox — this is the account they sign into the portal with, separate from their contact Email above.</p></div>
+    <div class="field"><label for="minGender">Gender</label><select id="minGender"><option value="">— Not set —</option><option>Female</option><option>Male</option></select><p class="helptext" style="margin:5px 0 0;">Used by the same-sex preference match on the Schedule &amp; Planning tab.</p></div>
     <div class="field"><label for="minStatus">Status</label><select id="minStatus"><option>Active</option><option>Inactive</option></select></div>
     <div class="modal-actions">
       <button class="btn secondary" id="btnMinCancel">Cancel</button>
@@ -592,6 +690,12 @@
   </div>
 </div>
 
+<div class="modal-bg sheet" id="quickAddModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="quickAddTitle">
+    <div id="quickAddBody"></div>
+  </div>
+</div>
+
 <div class="modal-bg" id="confirmModal">
   <div class="modal small" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
     <h2 id="confirmTitle">Please confirm</h2>
@@ -606,7 +710,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-17.3";
+const APP_VERSION = "2026-09-17.4";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -631,7 +735,8 @@ const LIST_NAMES = {
   ministers: "PrayerMinisters",
   sessions: "PrayerSessions",
   blackouts: "BlackoutDates",
-  locations: "Locations"
+  locations: "Locations",
+  slots: "PlanningSlots"
 };
 // Relative to this file's own location (preview/) - portal/ is a sibling of
 // the repo root, one level up from here.
@@ -793,8 +898,13 @@ async function deleteItem(key, itemId){
 /* =========================================================================
    DATA CACHE (refreshed from Graph after loads/writes)
 ========================================================================= */
-let ministers=[], sessions=[], blackouts=[], locations=[];
+let ministers=[], sessions=[], blackouts=[], locations=[], slots=[];
 let editingId=null, prevId=null, selectedMinisters=[]; // selectedMinisters: [{id, role}]
+// Set by bookSlot() right after it opens the session modal on a Tentative
+// slot's claimed candidate - tells onSaveSession() which PlanningSlots item
+// to PATCH to Booked once the real session save succeeds. Cleared on every
+// other modal open/cancel so it never leaks into an unrelated save.
+let pendingBookSlotId = null;
 let sessKind = 'session'; // 'session' | 'waiting' — controls which session-modal fields show
 let editingMinisterId=null;
 let blackoutEditId=null;
@@ -803,12 +913,28 @@ let overviewSubStatus='Active';
 let sessionNumberMap = new Map(); // session id -> chronological "Session #N" for that recipient
 
 async function loadAll(){
-  const [rawMin, rawSess, rawBlack, rawLoc] = await Promise.all([
-    listItems('ministers'), listItems('sessions'), listItems('blackouts'), listItems('locations')
+  const [rawMin, rawSess, rawBlack, rawLoc, rawSlots] = await Promise.all([
+    listItems('ministers'), listItems('sessions'), listItems('blackouts'), listItems('locations'), listItems('slots')
   ]);
-  ministers = rawMin.map(m => ({ id: m.id, name: m.Title, email: m.Email||'', phone: m.Phone||'', signInEmail: m.SignInEmail||'', status: m.Status||'Active' }));
+  ministers = rawMin.map(m => ({ id: m.id, name: m.Title, email: m.Email||'', phone: m.Phone||'', signInEmail: m.SignInEmail||'', status: m.Status||'Active', gender: m.Gender||'' }));
   locations = rawLoc.map(l => ({ id: l.id, name: l.Title }));
   blackouts = rawBlack.map(b => ({ id: b.id, ministerName: b.Title, date: (b.BlackoutDate||'').split('T')[0], endDate: b.EndDate ? b.EndDate.split('T')[0] : null, notes: b.Notes||'' }));
+  slots = rawSlots.map(sl => {
+    const stripHtml = v => String(v||'').replace(/<[^>]*>/g, '');
+    const proposedIds = stripHtml(sl.ProposedMinisterIDs).split(',').map(x=>x.trim()).filter(Boolean);
+    const proposedLeadIds = new Set(stripHtml(sl.ProposedLeadIDs).split(',').map(x=>x.trim()).filter(Boolean));
+    return {
+      id: sl.id,
+      date: (sl.SlotDate||'').split('T')[0],
+      start: sl.StartTime||'', end: sl.EndTime||'',
+      status: sl.Status||'Open',
+      claimedId: sl.ClaimedWaitingId||null,
+      claimedDate: sl.ClaimedDate ? sl.ClaimedDate.split('T')[0] : null,
+      team: proposedIds.map(id=>({ id: parseInt(id,10), role: proposedLeadIds.has(id) ? 'Lead' : 'Support' })).filter(m=>!isNaN(m.id)),
+      linkedSessionId: sl.LinkedSessionId||null,
+      notes: sl.Notes||''
+    };
+  });
   sessions = rawSess.map(s => {
     // Defensive against the "Multiple lines of text" defaulting to Rich Text
     // gotcha (see CLAUDE.md #5): if LeadMinisterIDs/AssignedMinisterIDs ever
@@ -835,6 +961,10 @@ async function loadAll(){
       // Reads false/undefined safely if the Contacted column doesn't exist
       // in SharePoint yet (see gotcha in CLAUDE.md re: ApptType choices).
       contacted: !!s.Contacted,
+      // Recipient gender + preference - Mixed is the default so existing
+      // records without these columns populated yet don't accidentally read
+      // as requiring a same-sex team.
+      recipGender: s.RecipientGender||'', genderPref: s.GenderPreference||'Mixed',
       // "Days waiting" for a Waiting-status entry is computed from SharePoint's
       // own createdDateTime item metadata rather than a dedicated field.
       added: (s._created||'').split('T')[0]
@@ -933,7 +1063,7 @@ function groupRow(key, avatarText, name, countLabel, summaryHtml, bodyHtml, wasO
   </div>`;
 }
 
-function renderAll(){ renderSchedule(); renderPlanning(); renderCompleted(); renderOverview(); renderBlackouts(); }
+function renderAll(){ renderSchedule(); renderPlanning(); renderCompleted(); renderOverview(); renderBlackouts(); renderSchedPlan(); }
 
 async function withLoading(btn, loadingText, fn){
   if(!btn) return fn();
@@ -999,12 +1129,14 @@ function wireApp(){
   $('#btnNew').addEventListener('click', ()=>openModal(null, null, {forceKind:'session'}));
   $('#btnDropIn').addEventListener('click', ()=>openModal(null, null, {forceKind:'session', preset:'dropin'}));
   $('#btnTraining').addEventListener('click', ()=>openModal(null, null, {forceKind:'session', preset:'training'}));
-  $('#btnCancel').addEventListener('click', ()=>{ $('#sessionModal').classList.remove('open'); hideConflictToast(); });
+  $('#btnCancel').addEventListener('click', ()=>{ $('#sessionModal').classList.remove('open'); hideConflictToast(); pendingBookSlotId = null; });
   $('#sessDate').addEventListener('change', ()=>{ renderMinisterList(); updateEndPreview(); renderSameDay(); renderConflictCheck(); renderDayLabel(); renderSlotButtons(); });
   $('#sessTime').addEventListener('change', ()=>{ autoSetEndTime(); renderSlotButtons(); renderConflictCheck(); });
   $('#sessEndTime').addEventListener('change', ()=>{ updateEndPreview(); renderConflictCheck(); });
   $('#sessLocation').addEventListener('change', renderConflictCheck);
   $('#apptType').addEventListener('change', updateGroupSessionFields);
+  $('#recipGender').addEventListener('change', renderMinisterList);
+  $('#genderPref').addEventListener('change', renderMinisterList);
   $('#recipName').addEventListener('input', ()=>{ renderRecipientHistory(); renderConflictCheck(); renderRecipNameSuggestions(); });
   $('#btnSave').addEventListener('click', ()=>withLoading($('#btnSave'), 'Saving…', onSaveSession));
   $('#btnAddLocation').addEventListener('click', ()=>{ $('#newLocationName').value=''; $('#locModalMsg').innerHTML=''; $('#locationModal').classList.add('open'); $('#newLocationName').focus(); });
@@ -1014,6 +1146,8 @@ function wireApp(){
   $('#btnMinCancel').addEventListener('click', ()=>$('#ministerModal').classList.remove('open'));
   $('#btnMinSave').addEventListener('click', ()=>withLoading($('#btnMinSave'), 'Saving…', onSaveMinister));
   $('#btnAddWaiting').addEventListener('click', ()=>openModal(null, null, {forceKind:'waiting'}));
+  $('#btnAddWaiting2').addEventListener('click', ()=>openModal(null, null, {forceKind:'waiting'}));
+  $('#btnQuickAddSlots').addEventListener('click', ()=>openQuickAddModal());
   $('#planningSearch').addEventListener('input', renderPlanning);
   wireSearchClear('planningSearch');
   $('#prospectSort').addEventListener('change', renderPlanning);
@@ -1047,6 +1181,7 @@ document.addEventListener('keydown', (e)=>{
   if($('#confirmModal').classList.contains('open')) closeConfirm(false);
   document.querySelectorAll('.modal-bg.open').forEach(bg=>bg.classList.remove('open'));
   hideConflictToast();
+  pendingBookSlotId = null;
 });
 
 function switchTab(tab){
@@ -1406,6 +1541,558 @@ window.scheduleFromWaiting = function(id){
   openModal(sessions.find(s=>s.id===id), null, {forceKind:'session'});
 };
 
+/* ---- SCHEDULE & PLANNING (merged tab: PlanningSlots) ---- */
+
+// slots use .team where real sessions use .ministers for the same shape
+// ({id,role}[]) - ministerNamesOf() only reads the latter, so this covers
+// the gap without touching that existing function.
+function teamLabel(team){
+  if(!team || !team.length) return '';
+  const sorted = [...team].sort((a,b)=> (a.role==='Lead'?0:1) - (b.role==='Lead'?0:1));
+  return sorted.map(m=>{
+    const min = ministers.find(x=>x.id===m.id);
+    return (min?min.name:'?') + (m.role==='Lead' ? ' (Lead)' : '');
+  }).join(', ');
+}
+// The 4th Sunday of the month is the recurring Sunday Drop-In date - it
+// gets one 5-7:30pm group slot instead of the normal 2-PM-pair capacity math.
+function isFourthSunday(d){ return d.getDay()===0 && Math.ceil(d.getDate()/7)===4; }
+// Blackouts match by minister NAME everywhere else in this app (see
+// renderMinisterList) - follows that same convention, not an id join.
+// endDate supports a blackout that spans a range, not just a single day.
+function blackedOutNamesOn(dateIso){
+  const names = new Set();
+  blackouts.forEach(b=>{
+    const end = b.endDate || b.date;
+    if(dateIso>=b.date && dateIso<=end) names.add(b.ministerName);
+  });
+  return names;
+}
+// How many 2-PM sessions a date can support: every Active minister not
+// blacked out that day, paired off - an odd one out sits the date out.
+function capacityForDate(dateIso){
+  const blackedOut = blackedOutNamesOn(dateIso);
+  const available = ministers.filter(m=>m.status==='Active' && !blackedOut.has(m.name));
+  return Math.floor(available.length/2);
+}
+function existingSlotCountForDate(dateIso){ return slots.filter(sl=>sl.date===dateIso).length; }
+// Idempotent Quick Add math for one date - never negative, and zero once a
+// date is already fully provisioned (or its availability has since dropped
+// below what's already there), so re-running Quick Add adds nothing extra.
+function planForDate(d){
+  const dateIso = isoDate(d);
+  if(isFourthSunday(d)){
+    const already = slots.some(sl=>sl.date===dateIso && sl.status==='Drop-In');
+    return { dateIso, isDropIn: true, capacity: 1, existing: already?1:0, toAdd: already?0:1 };
+  }
+  const capacity = capacityForDate(dateIso);
+  const existing = existingSlotCountForDate(dateIso);
+  return { dateIso, isDropIn: false, capacity, existing, toAdd: Math.max(0, capacity-existing) };
+}
+// Minister ids already committed to a Tentative/Booked/Drop-In slot on this
+// date whose time range OVERLAPS [start,end) - same day at a different time
+// is not a conflict, only used to see who's genuinely still free.
+function busyMinisterIdsAt(dateIso, start, end, excludeSlotId){
+  const ids = new Set();
+  if(!start || !end) return ids;
+  const s = new Date(dateIso+'T'+start), e = new Date(dateIso+'T'+end);
+  slots.forEach(sl=>{
+    if(sl.id===excludeSlotId || sl.date!==dateIso) return;
+    if(!['Tentative','Booked','Drop-In'].includes(sl.status)) return;
+    if(!sl.start || !sl.end) return;
+    const slS = new Date(dateIso+'T'+sl.start), slE = new Date(dateIso+'T'+sl.end);
+    if(s<slE && e>slS) sl.team.forEach(m=>ids.add(m.id));
+  });
+  return ids;
+}
+// Active, not-blacked-out, not-already-committed ministers for this
+// date/time, split by gender - drives both the "Available now" header text
+// and the same-sex auto-pick.
+function remainingByGender(dateIso, start, end, excludeSlotId){
+  const blackedOut = blackedOutNamesOn(dateIso);
+  const busy = busyMinisterIdsAt(dateIso, start, end, excludeSlotId);
+  const free = ministers.filter(m=>m.status==='Active' && !blackedOut.has(m.name) && !busy.has(m.id));
+  return { all: free, female: free.filter(m=>m.gender==='Female'), male: free.filter(m=>m.gender==='Male') };
+}
+// Gender-agnostic auto-pick for a Mixed-preference claim with no usable
+// history team. Returns null (a hard block) when fewer than 2 are free.
+function pickFreshTeam(dateIso, start, end, excludeSlotId){
+  const free = remainingByGender(dateIso, start, end, excludeSlotId).all;
+  if(free.length<2) return null;
+  return [{ id: free[0].id, role: 'Lead' }, { id: free[1].id, role: 'Support' }];
+}
+// Same as above but restricted to one gender, for a Same-sex-preference
+// claim - the first name becomes Lead purely so the team has one, no
+// seniority implied. null is a hard block, same as the Mixed case.
+function pickFreshSameGenderTeam(gender, dateIso, start, end, excludeSlotId){
+  const pool = remainingByGender(dateIso, start, end, excludeSlotId)[gender==='Female'?'female':'male'];
+  if(pool.length<2) return null;
+  return [{ id: pool[0].id, role: 'Lead' }, { id: pool[1].id, role: 'Support' }];
+}
+// Whether an already-chosen team (e.g. a specific historical pairing) still
+// satisfies a Same-sex preference - used only for the non-blocking warning.
+// A deliberate, visible admin choice to reuse a specific past team is
+// always allowed (mirrors the Blackout Dates soft-override elsewhere).
+function teamMatchesGenderPref(team, genderPref, recipGender){
+  if(genderPref!=='Same-sex' || !recipGender || !team.length) return true;
+  return team.every(m=>{ const min = ministers.find(x=>x.id===m.id); return min && min.gender===recipGender; });
+}
+// Waiting-status sessions not currently claimed by any Tentative/Booked/
+// Drop-In slot - the "Unplaced Candidates" list.
+function unplacedCandidates(){
+  const claimedIds = new Set(slots.filter(sl=>sl.claimedId).map(sl=>sl.claimedId));
+  return sessions.filter(s=>s.status==='Waiting' && !claimedIds.has(s.id));
+}
+// Every past real session for this recipient name, most recent first - the
+// "previous sessions" a slot's candidate picker draws from.
+function historyForRecipient(name, excludeId){
+  const key = name.trim().toLowerCase();
+  return sessions.filter(s=> s.status!=='Waiting' && s.recipName.trim().toLowerCase()===key && s.id!==excludeId)
+    .slice().sort((a,b)=> sessionSortKey(b).localeCompare(sessionSortKey(a)));
+}
+
+function schedPlanStats(){
+  const waiting = unplacedCandidates();
+  const byName = new Map();
+  waiting.forEach(s=>{ const key=s.recipName.trim().toLowerCase(); if(key && !byName.has(key)) byName.set(key,s); });
+  let firstTime=0, followUp=0;
+  byName.forEach(s=>{
+    const key = s.recipName.trim().toLowerCase();
+    const hasPriorRealSession = sessions.some(x=> x.status!=='Waiting' && x.recipName.trim().toLowerCase()===key);
+    if(hasPriorRealSession) followUp++; else firstTime++;
+  });
+  const waits = waiting.map(daysWaiting);
+  const longest = waiting.length ? waiting.slice().sort((a,b)=>daysWaiting(b)-daysWaiting(a))[0] : null;
+  const avgWait = waits.length ? Math.round(waits.reduce((a,b)=>a+b,0)/waits.length) : 0;
+  return {
+    totalEntries: waiting.length, uniqueRecipients: byName.size, firstTime, followUp,
+    longestWait: longest ? daysWaiting(longest) : 0, longestName: longest ? longest.recipName : '',
+    avgWait
+  };
+}
+function renderSchedPlanStats(){
+  const st = schedPlanStats();
+  const splitLine = (n,label,isFollowUp)=> `<span class="split-line"><span class="dot" style="background:var(${isFollowUp?'--primary':'--muted-bar'})"></span>${n} ${label}</span>`;
+  $('#schedPlanStats').innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-tile">
+        <div class="stat-label">Unplaced</div>
+        <div class="stat-value">${st.totalEntries}</div>
+        <div class="stat-sub">${st.uniqueRecipients} unique recipient${st.uniqueRecipients===1?'':'s'}</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-label">First-Time vs Follow-up</div>
+        <div class="stat-value">${st.uniqueRecipients}</div>
+        <div style="display:flex;flex-direction:column;gap:2px;margin-top:8px;font-size:var(--fs-2xs);color:var(--muted);">
+          ${splitLine(st.firstTime,'first-time')}
+          ${splitLine(st.followUp,'follow-up',true)}
+        </div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-label">Longest Wait</div>
+        <div class="stat-value">${st.longestWait} <span style="font-size:var(--fs-sm);font-weight:600;color:var(--muted);">day${st.longestWait===1?'':'s'}</span></div>
+        <div class="stat-sub">${st.longestName?escapeHtml(st.longestName):'No one unplaced'}</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-label">Average Wait</div>
+        <div class="stat-value">${st.avgWait} <span style="font-size:var(--fs-sm);font-weight:600;color:var(--muted);">day${st.avgWait===1?'':'s'}</span></div>
+        <div class="stat-sub">across ${st.totalEntries} unplaced</div>
+      </div>
+    </div>`;
+}
+
+function renderSchedPlan(){ renderSlotWeeks(); renderUnplacedCandidates(); renderSchedPlanStats(); }
+
+function renderUnplacedCandidates(){
+  const rows = unplacedCandidates().slice().sort((a,b)=>{
+    if(a.priority!==b.priority) return a.priority ? -1 : 1;
+    return daysWaiting(b)-daysWaiting(a);
+  });
+  $('#unplacedNoResults').hidden = rows.length>0;
+  $('#unplacedCount').textContent = rows.length ? `${rows.length} waiting` : '';
+  $('#unplacedList').innerHTML = rows.map(s=>{
+    const waiting = daysWaiting(s);
+    const num = sessionNumberOf(s);
+    return `<div class="prospect-card${s.priority?' priority':''}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+        <div style="min-width:0;">
+          <div class="name-row">
+            <span class="name">${escapeHtml(s.recipName)}</span>
+            <span class="tag ${num===1?'first':''}">Session #${num}</span>
+            ${s.genderPref==='Same-sex' ? `<span class="tag">${escapeHtml(s.recipGender||'Same-sex')} only</span>` : ''}
+            ${s.priority?'<span class="tag priority">Priority</span>':''}
+            ${s.contacted?'<span class="tag contacted">Contacted</span>':''}
+          </div>
+          <div class="helptext" style="margin:2px 0 0;">${escapeHtml(s.recipContact||'No contact info')} · Waiting ${waiting} day${waiting===1?'':'s'} · added ${fmtShort(s.added||s.date)}</div>
+          ${s.notes?`<div class="notes">${escapeHtml(s.notes)}</div>`:''}
+        </div>
+        <div class="sess-actions">
+          <button class="icon-btn${s.contacted?' success':''}" onclick="toggleContacted(${s.id})" title="${s.contacted?'Mark as not yet contacted':'Mark as contacted'}" aria-pressed="${s.contacted}" aria-label="${s.contacted?'Mark as not yet contacted':'Mark as contacted'}: ${escapeHtml(s.recipName)}">${ICONS.phone}</button>
+          <button class="icon-btn flag-btn${s.priority?' active':''}" onclick="togglePriority(${s.id})" title="${s.priority?'Remove priority':'Flag as priority'}" aria-pressed="${s.priority}" aria-label="${s.priority?'Remove priority from':'Flag as priority'} ${escapeHtml(s.recipName)}">${ICONS.flag(s.priority)}</button>
+          <button class="icon-btn" onclick="editSession(${s.id})" title="Edit" aria-label="Edit ${escapeHtml(s.recipName)}">${ICONS.pencil}</button>
+          <button class="icon-btn danger" onclick="deleteSession(${s.id})" title="Delete" aria-label="Remove ${escapeHtml(s.recipName)} from the waiting list">${ICONS.trash}</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function weekStartOf(dateIso){ const d = new Date(dateIso+'T00:00'); d.setDate(d.getDate()-d.getDay()); return isoDate(d); }
+// Which slot (by id) has its body expanded, and which candidate (by id) has
+// their history panel open inside an Open slot's picker - both persist
+// across re-renders within the session, reset only where explicitly noted.
+let expandedSlots = new Set();
+let openHistoryFor = null;
+let customAddOpenFor = null; // dateIso of the day whose "+ Add custom slot" form is open
+window.toggleSlotOpen = function(id){
+  if(expandedSlots.has(id)) expandedSlots.delete(id); else expandedSlots.add(id);
+  renderSlotWeeks();
+};
+window.toggleCandHistoryReal = function(slotId, candId){
+  const key = slotId+':'+candId;
+  openHistoryFor = openHistoryFor===key ? null : key;
+  renderSlotWeeks();
+};
+window.toggleCustomAdd = function(dateIso){
+  customAddOpenFor = customAddOpenFor===dateIso ? null : dateIso;
+  renderSlotWeeks();
+};
+window.addCustomSlot = async function(dateIso){
+  const start = $('#customStart-'+dateIso).value, end = $('#customEnd-'+dateIso).value;
+  if(!start || !end || end<=start) return;
+  await createItem('slots', {
+    Title: dateIso+' custom slot', SlotDate: dateIso+'T00:00:00', StartTime: start, EndTime: end,
+    Status: 'Open', ClaimedWaitingId: null, ClaimedDate: null,
+    ProposedMinisterIDs: '', ProposedLeadIDs: '', LinkedSessionId: null, Notes: ''
+  });
+  customAddOpenFor = null;
+  await loadAll();
+};
+
+function statusClass(status){ return String(status||'').toLowerCase().replace('-',''); }
+function renderOpenAvailNow(sl){
+  const rb = remainingByGender(sl.date, sl.start, sl.end, sl.id);
+  return `<span class="slot-header-team helptext">Available now: ${rb.all.length} PM${rb.all.length===1?'':'s'} (${rb.female.length}F, ${rb.male.length}M)</span>`;
+}
+function renderSlotWeeks(){
+  const weekMap = new Map(); // weekStart -> Set of dateIso that have slots
+  slots.forEach(sl=>{
+    if(!sl.date) return;
+    const wk = weekStartOf(sl.date);
+    if(!weekMap.has(wk)) weekMap.set(wk, new Set());
+    weekMap.get(wk).add(sl.date);
+  });
+  if(!weekMap.size){
+    $('#slotWeeks').innerHTML = '<div class="no-results">No slots yet — use Quick Add Slots to get started.</div>';
+    return;
+  }
+  const currentWeek = weekStartOf(isoDate(new Date()));
+  const weekKeys = [...weekMap.keys()];
+  const ordered = [...weekKeys.filter(w=>w>=currentWeek).sort(), ...weekKeys.filter(w=>w<currentWeek).sort().reverse()];
+  $('#slotWeeks').innerHTML = ordered.map(wk=>{
+    const dates = [...weekMap.get(wk)].sort();
+    const wkEnd = new Date(wk+'T00:00'); wkEnd.setDate(wkEnd.getDate()+6);
+    return `<div class="week-block">
+      <div class="week-header">${escapeHtml(fmtShort(wk))} – ${escapeHtml(fmtShort(isoDate(wkEnd)))}</div>
+      ${dates.map(dateIso=>renderDayRow(dateIso)).join('')}
+    </div>`;
+  }).join('');
+}
+function renderDayRow(dateIso){
+  const d = new Date(dateIso+'T00:00');
+  const daySlots = slots.filter(sl=>sl.date===dateIso).slice().sort((a,b)=>(a.start||'').localeCompare(b.start||''));
+  return `<div class="day-row">
+    <div class="day-label"><span class="dow">${d.toLocaleDateString(undefined,{weekday:'short'})}</span>${d.toLocaleDateString(undefined,{month:'short',day:'numeric'})}</div>
+    <div class="slot-list">
+      ${daySlots.map(sl=>renderSlotCard(sl)).join('')}
+      ${renderDayCustomAdd(dateIso)}
+    </div>
+  </div>`;
+}
+function renderDayCustomAdd(dateIso){
+  if(customAddOpenFor!==dateIso) return `<button type="button" class="add-custom-btn" onclick="toggleCustomAdd('${dateIso}')">+ Add custom slot</button>`;
+  return `<div class="custom-slot-form">
+    <label>Start <input type="time" id="customStart-${dateIso}" value="13:00"></label>
+    <label>End <input type="time" id="customEnd-${dateIso}" value="15:00"></label>
+    <button class="btn" onclick="addCustomSlot('${dateIso}')">Add</button>
+    <button class="btn secondary" onclick="toggleCustomAdd(null)">Cancel</button>
+  </div>`;
+}
+function renderSlotCard(sl){
+  const cls = statusClass(sl.status);
+  const isOpen = expandedSlots.has(sl.id);
+  const cand = sl.claimedId ? sessions.find(s=>s.id===sl.claimedId) : null;
+  const linked = sl.linkedSessionId ? sessions.find(s=>s.id===sl.linkedSessionId) : null;
+  const nameForHeader = linked ? linked.recipName : (cand ? cand.recipName : (sl.status==='Drop-In' ? 'Sunday Drop-In' : ''));
+  const teamForHeader = teamLabel(sl.team);
+  return `<div class="slot ${cls}${isOpen?' expanded':''}">
+    <button type="button" class="slot-header" onclick="toggleSlotOpen(${sl.id})" aria-expanded="${isOpen}">
+      <span class="slot-header-top">
+        <span class="slot-time">${fmt12(sl.start)}–${fmt12(sl.end)}</span>
+        <span class="slot-status ${cls}">${escapeHtml(sl.status)}</span>
+      </span>
+      <span class="slot-header-detail">
+        ${nameForHeader ? `<span class="slot-header-name">${escapeHtml(nameForHeader)}</span>` : ''}
+        ${teamForHeader ? `<span class="slot-header-team">${escapeHtml(teamForHeader)}</span>` : (sl.status==='Open' ? renderOpenAvailNow(sl) : '')}
+      </span>
+      <span class="slot-chevron">${ICONS.chevron}</span>
+    </button>
+    ${isOpen ? `<div class="slot-body">${renderSlotBody(sl)}</div>` : ''}
+  </div>`;
+}
+function renderSlotBody(sl){
+  if(sl.status==='Open') return renderSlotPicker(sl);
+  if(sl.status==='Tentative') return renderTentativeBody(sl);
+  return renderBookedBody(sl);
+}
+function renderSlotPicker(sl){
+  const cands = unplacedCandidates();
+  const rb = remainingByGender(sl.date, sl.start, sl.end, sl.id);
+  const avail = `<div class="slot-meta">Available now: ${rb.all.length} PM${rb.all.length===1?'':'s'} (${rb.female.length}F, ${rb.male.length}M)</div>`;
+  if(!cands.length) return avail + `<div class="picker-empty">No one on the waiting list to claim yet.</div>`;
+  return avail + cands.map(c=>{
+    const num = sessionNumberOf(c);
+    const isExpanded = openHistoryFor===(sl.id+':'+c.id);
+    return `<div class="picker-cand">
+      <button type="button" class="picker-row" onclick="toggleCandHistoryReal(${sl.id},${c.id})">
+        <span class="pname">${escapeHtml(c.recipName)}</span>
+        <span class="ptag">Session #${num}${c.genderPref==='Same-sex' ? ` · ${escapeHtml(c.recipGender||'Same-sex')} only` : ''}${c.priority ? ' · Priority' : ''}</span>
+      </button>
+      ${isExpanded ? renderCandHistoryPickerReal(c, historyForRecipient(c.recipName, c.id), sl) : ''}
+    </div>`;
+  }).join('');
+}
+function renderCandHistoryPickerReal(c, hist, sl){
+  const autoTeam = c.genderPref==='Same-sex'
+    ? pickFreshSameGenderTeam(c.recipGender, sl.date, sl.start, sl.end, sl.id)
+    : pickFreshTeam(sl.date, sl.start, sl.end, sl.id);
+  return `<div class="cand-history">
+    ${hist.length ? hist.map((h,i)=>{
+      const matches = teamMatchesGenderPref(h.ministers, c.genderPref, c.recipGender);
+      return `<div class="history-row">
+        <div class="history-date">${fmtShort(h.date)} <span class="helptext">Session #${sessionNumberOf(h)}</span></div>
+        <div class="history-team">${escapeHtml(ministerNamesOf(h))}</div>
+        ${h.notes ? `<div class="history-notes">${escapeHtml(h.notes)}</div>` : ''}
+        ${!matches ? `<div class="gender-warn-inline">⚠ doesn't match ${escapeHtml(c.recipGender||'')} same-sex preference</div>` : ''}
+        <button class="claim-btn" onclick="claimSlot(${sl.id},${c.id},${i})">Use this team</button>
+      </div>`;
+    }).join('') : `<div class="history-empty">No previous sessions on record.</div>`}
+    <div class="history-row">
+      <div class="history-team">${autoTeam
+        ? `Auto-pick: ${escapeHtml(teamLabel(autoTeam))}${c.genderPref==='Same-sex' ? ' <span class="gender-ok">(matches preference)</span>' : ''}`
+        : `<span class="gender-warn">Not enough available${c.genderPref==='Same-sex' ? ' '+escapeHtml(c.recipGender||'') : ''} ministers to auto-pick a team right now.</span>`}</div>
+      <button class="claim-btn" ${autoTeam?'':'disabled'} onclick="claimSlot(${sl.id},${c.id},null)">${autoTeam?'Claim with auto-pick':"Can't auto-pick"}</button>
+    </div>
+  </div>`;
+}
+window.claimSlot = async function(slotId, candId, historyIdx){
+  const sl = slots.find(x=>x.id===slotId);
+  const c = sessions.find(x=>x.id===candId);
+  if(!sl || !c) return;
+  const hist = historyForRecipient(c.recipName, c.id);
+  const chosen = (historyIdx!=null && hist[historyIdx]) ? hist[historyIdx] : null;
+  let team = chosen ? chosen.ministers.map(m=>({...m})) : null;
+  if(!team){
+    team = c.genderPref==='Same-sex'
+      ? pickFreshSameGenderTeam(c.recipGender, sl.date, sl.start, sl.end, sl.id)
+      : pickFreshTeam(sl.date, sl.start, sl.end, sl.id);
+    if(!team){
+      showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Not enough available ministers</div><div>There aren't 2 ministers${c.genderPref==='Same-sex' ? ' of the same sex' : ''} available for this slot right now.</div>`);
+      return;
+    }
+  }
+  await updateItem('slots', slotId, {
+    Status: 'Tentative', ClaimedWaitingId: c.id, ClaimedDate: new Date().toISOString(),
+    ProposedMinisterIDs: team.map(m=>m.id).join(','),
+    ProposedLeadIDs: team.filter(m=>m.role==='Lead').map(m=>m.id).join(',')
+  });
+  openHistoryFor = null;
+  await loadAll();
+};
+function renderTentativeBody(sl){
+  const c = sl.claimedId ? sessions.find(s=>s.id===sl.claimedId) : null;
+  if(!c) return `<div class="picker-empty">This slot's claimed candidate is no longer on the waiting list.</div>`;
+  const matches = teamMatchesGenderPref(sl.team, c.genderPref, c.recipGender);
+  return `
+    <div class="slot-detail-row"><strong>${escapeHtml(c.recipName)}</strong> <span class="helptext">Session #${sessionNumberOf(c)}</span></div>
+    <div class="slot-detail-row">Team: ${teamLabel(sl.team)||'<span class="helptext">None proposed</span>'}
+      ${!matches ? `<div class="gender-warn-inline">⚠ doesn't match ${escapeHtml(c.recipGender||'')} same-sex preference</div>` : ''}
+    </div>
+    ${c.notes ? `<div class="notes">${escapeHtml(c.notes)}</div>` : ''}
+    <div class="cand-history">${renderTentativeHistoryReal(sl, historyForRecipient(c.recipName, c.id))}</div>
+    <div class="toolbar" style="margin-top:10px;">
+      <button class="btn" onclick="bookSlot(${sl.id})">Book This Session</button>
+      <button class="btn secondary" onclick="releaseSlot(${sl.id})">Release Back to Open</button>
+    </div>`;
+}
+function renderTentativeHistoryReal(sl, hist){
+  if(!hist.length) return `<div class="history-empty">No previous sessions on record.</div>`;
+  const currentIds = new Set(sl.team.map(m=>m.id));
+  return hist.map((h,i)=>{
+    const isActive = h.ministers.length===sl.team.length && h.ministers.every(m=>currentIds.has(m.id));
+    return `<div class="history-row${isActive?' active':''}">
+      <div class="history-date">${fmtShort(h.date)} <span class="helptext">Session #${sessionNumberOf(h)}</span></div>
+      <div class="history-team">${escapeHtml(ministerNamesOf(h))}</div>
+      ${isActive ? `<span class="helptext">Currently proposed</span>` : `<button class="claim-btn" onclick="useTeamFromHistoryReal(${sl.id},${i})">Use this team</button>`}
+    </div>`;
+  }).join('');
+}
+window.useTeamFromHistoryReal = async function(slotId, idx){
+  const sl = slots.find(x=>x.id===slotId);
+  const c = sl && sl.claimedId ? sessions.find(s=>s.id===sl.claimedId) : null;
+  if(!sl || !c) return;
+  const h = historyForRecipient(c.recipName, c.id)[idx];
+  if(!h) return;
+  const team = h.ministers.map(m=>({...m}));
+  await updateItem('slots', slotId, {
+    ProposedMinisterIDs: team.map(m=>m.id).join(','),
+    ProposedLeadIDs: team.filter(m=>m.role==='Lead').map(m=>m.id).join(',')
+  });
+  await loadAll();
+};
+window.releaseSlot = async function(slotId){
+  const ok = await askConfirm('Release this slot back to Open? The candidate returns to the unplaced list.', {confirmLabel:'Release', danger:false});
+  if(!ok) return;
+  await updateItem('slots', slotId, { Status:'Open', ClaimedWaitingId:null, ClaimedDate:null, ProposedMinisterIDs:'', ProposedLeadIDs:'' });
+  await loadAll();
+};
+window.bookSlot = function(slotId){
+  const sl = slots.find(x=>x.id===slotId);
+  if(!sl || !sl.claimedId) return;
+  const cand = sessions.find(x=>x.id===sl.claimedId);
+  if(!cand) return;
+  openModal(cand, null, {forceKind:'session'});
+  $('#sessDate').value = sl.date; $('#sessTime').value = sl.start; $('#sessEndTime').value = sl.end;
+  selectedMinisters = sl.team.map(m=>({...m})).filter(m=>ministers.some(x=>x.id===m.id));
+  pendingBookSlotId = slotId;
+  renderMinisterList(); updateEndPreview(); renderSameDay(); renderDayLabel(); renderSlotButtons(); renderConflictCheck();
+};
+window.bookDropInSlot = function(slotId){
+  const sl = slots.find(x=>x.id===slotId);
+  if(!sl) return;
+  openModal(null, null, {forceKind:'session', preset:'dropin'});
+  $('#sessDate').value = sl.date;
+  pendingBookSlotId = slotId;
+  renderMinisterList(); updateEndPreview(); renderSameDay(); renderDayLabel(); renderSlotButtons(); renderConflictCheck();
+};
+function renderBookedBody(sl){
+  const linked = sl.linkedSessionId ? sessions.find(s=>s.id===sl.linkedSessionId) : null;
+  if(!linked){
+    if(sl.status==='Drop-In'){
+      return `<div class="slot-detail-row">Sunday Drop-In — the 4th-Sunday group session. Team: ${teamLabel(sl.team)||'<span class="helptext">Not set</span>'}</div>
+        <div class="toolbar" style="margin-top:10px;"><button class="btn" onclick="bookDropInSlot(${sl.id})">Record Drop-In Session</button></div>`;
+    }
+    return `<div class="picker-empty">This slot's linked session could not be found.</div>`;
+  }
+  return `
+    <div class="slot-detail-row"><strong>${escapeHtml(linked.recipName)}</strong> ${linked.recipContact?`<span class="helptext">${escapeHtml(linked.recipContact)}</span>`:''}</div>
+    <div class="slot-detail-row">Team: ${escapeHtml(ministerNamesOf(linked))}</div>
+    <div class="slot-detail-row">${escapeHtml(locationName(linked.location))}</div>
+    ${linked.notes?`<div class="notes">${escapeHtml(linked.notes)}</div>`:''}
+    <div class="toolbar" style="margin-top:10px;">
+      <button class="icon-btn" onclick="editSession(${linked.id})" title="Edit" aria-label="Edit session for ${escapeHtml(linked.recipName)}">${ICONS.pencil}</button>
+      ${linked.status!=='Completed' ? `<button class="icon-btn success" onclick="markComplete(${linked.id})" title="Mark Completed" aria-label="Mark session for ${escapeHtml(linked.recipName)} as completed">${ICONS.checkCircle}</button>` : ''}
+      <button class="icon-btn danger" onclick="deleteSession(${linked.id})" title="Delete" aria-label="Delete session for ${escapeHtml(linked.recipName)}">${ICONS.trash}</button>
+    </div>`;
+}
+
+/* ---- QUICK ADD SLOTS MODAL ---- */
+let qaPreset = 'next4', qaRangeStart = null, qaRangeEnd = null, qaDays = new Set([0,1,2,3,4,5,6]);
+function qaDatesInRange(){
+  const dates = [];
+  if(!qaRangeStart || !qaRangeEnd) return dates;
+  let d = new Date(qaRangeStart+'T00:00'); const end = new Date(qaRangeEnd+'T00:00');
+  while(d<=end){ if(qaDays.has(d.getDay())) dates.push(new Date(d)); d.setDate(d.getDate()+1); }
+  return dates;
+}
+function qaBuildPlan(){ return qaDatesInRange().map(d=>planForDate(d)); }
+window.openQuickAddModal = function(){
+  const today = new Date(); today.setHours(0,0,0,0);
+  qaPreset = 'next4'; qaDays = new Set([0,1,2,3,4,5,6]);
+  qaRangeStart = isoDate(today);
+  const end = new Date(today); end.setDate(end.getDate()+27);
+  qaRangeEnd = isoDate(end);
+  renderQuickAddModal();
+  $('#quickAddModal').classList.add('open');
+};
+window.closeQuickAddModal = function(){ $('#quickAddModal').classList.remove('open'); };
+window.qaSetPreset = function(preset){
+  qaPreset = preset;
+  const today = new Date(); today.setHours(0,0,0,0);
+  if(preset==='next4'){
+    qaRangeStart = isoDate(today);
+    const end = new Date(today); end.setDate(end.getDate()+27);
+    qaRangeEnd = isoDate(end);
+  } else {
+    const start = new Date(today.getFullYear(), today.getMonth()+1, 1);
+    const end = new Date(today.getFullYear(), today.getMonth()+2, 0);
+    qaRangeStart = isoDate(start); qaRangeEnd = isoDate(end);
+  }
+  renderQuickAddModal();
+};
+window.qaSetCustomRange = function(){
+  qaPreset = null;
+  qaRangeStart = $('#qaRangeStart').value || qaRangeStart;
+  qaRangeEnd = $('#qaRangeEnd').value || qaRangeEnd;
+  renderQuickAddModal();
+};
+window.qaToggleDay = function(dow){
+  if(qaDays.has(dow)) qaDays.delete(dow); else qaDays.add(dow);
+  renderQuickAddModal();
+};
+function renderQuickAddModal(){
+  const plans = qaBuildPlan();
+  const toAddTotal = plans.reduce((sum,p)=>sum+p.toAdd,0);
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  $('#quickAddBody').innerHTML = `
+    <h2 id="quickAddTitle" style="margin:0 0 14px;color:var(--navy);">Quick Add Slots</h2>
+    <div class="range-presets">
+      <button type="button" class="range-preset${qaPreset==='next4'?' active':''}" onclick="qaSetPreset('next4')">Next 4 Weeks</button>
+      <button type="button" class="range-preset${qaPreset==='nextMonth'?' active':''}" onclick="qaSetPreset('nextMonth')">Next Calendar Month</button>
+    </div>
+    <div class="field-row">
+      <div class="field"><label for="qaRangeStart">From</label><input type="date" id="qaRangeStart" value="${qaRangeStart||''}" onchange="qaSetCustomRange()"></div>
+      <div class="field"><label for="qaRangeEnd">To</label><input type="date" id="qaRangeEnd" value="${qaRangeEnd||''}" onchange="qaSetCustomRange()"></div>
+    </div>
+    <div class="field"><label>Days of the week</label>
+      <div class="day-chips">${dayNames.map((n,i)=>`<button type="button" class="day-chip${qaDays.has(i)?' active':''}" onclick="qaToggleDay(${i})">${n}</button>`).join('')}</div>
+    </div>
+    <p class="preset-note">Slot counts come from active Prayer Ministers minus anyone blacked out that day — dates already fully covered, or with no availability, add nothing.</p>
+    <div class="qa-breakdown">
+      ${plans.length ? plans.map(p=>`
+        <div class="qa-breakdown-row${p.toAdd===0?' zero':''}">
+          <span>${escapeHtml(fmtShort(p.dateIso))}${p.isDropIn?' · Sunday Drop-In':''}</span>
+          <span>${p.toAdd>0 ? `<span class="add-line">+${p.toAdd}</span>` : `<span class="clean-line">already covered</span>`} <span class="helptext">(${p.existing} of ${p.capacity})</span></span>
+        </div>`).join('') : '<div class="helptext">No dates in range.</div>'}
+    </div>
+    <div class="qa-preview-box"><strong>${toAddTotal}</strong> new slot${toAddTotal===1?'':'s'} will be added across ${plans.length} date${plans.length===1?'':'s'}.</div>
+    <div class="toolbar" style="margin-top:14px;">
+      <button class="btn" ${toAddTotal===0?'disabled':''} onclick="confirmQuickAddSlots()">Add ${toAddTotal} Slot${toAddTotal===1?'':'s'}</button>
+      <button class="btn secondary" onclick="closeQuickAddModal()">Cancel</button>
+    </div>`;
+}
+window.confirmQuickAddSlots = async function(){
+  const plans = qaBuildPlan().filter(p=>p.toAdd>0);
+  const total = plans.reduce((sum,p)=>sum+p.toAdd,0);
+  if(!total) return;
+  const ok = await askConfirm(`Add ${total} new slot${total===1?'':'s'} across ${plans.length} date${plans.length===1?'':'s'}?`, {confirmLabel:'Add Slots', danger:false});
+  if(!ok) return;
+  for(const p of plans){
+    const start = p.isDropIn ? '17:00' : '17:30', end = p.isDropIn ? '19:30' : '19:30';
+    for(let i=0;i<p.toAdd;i++){
+      await createItem('slots', {
+        Title: p.dateIso + (p.isDropIn?' Drop-In':' slot'),
+        SlotDate: p.dateIso+'T00:00:00', StartTime: start, EndTime: end,
+        Status: p.isDropIn ? 'Drop-In' : 'Open',
+        ClaimedWaitingId: null, ClaimedDate: null,
+        ProposedMinisterIDs: '', ProposedLeadIDs: '', LinkedSessionId: null, Notes: ''
+      });
+    }
+  }
+  closeQuickAddModal();
+  await loadAll();
+};
+
 /* ---- SESSION MODAL ---- */
 function setSessKind(kind){
   sessKind = kind;
@@ -1423,6 +2110,7 @@ function openModal(existing, followFrom, opts){
   opts = opts || {};
   editingId = existing ? existing.id : null;
   prevId = followFrom ? followFrom.id : null;
+  pendingBookSlotId = null;
   const kind = opts.forceKind || (existing && existing.status==='Waiting' ? 'waiting' : 'session');
   setSessKind(kind);
   $('#modalTitle').textContent = kind==='waiting'
@@ -1432,6 +2120,8 @@ function openModal(existing, followFrom, opts){
   $('#recipNameResults').innerHTML=''; recipNameMatches=[];
   $('#recipName').value = existing ? existing.recipName : (followFrom ? followFrom.recipName : '');
   $('#recipContact').value = existing ? existing.recipContact : (followFrom ? followFrom.recipContact : '');
+  $('#recipGender').value = existing ? (existing.recipGender||'') : (followFrom ? (followFrom.recipGender||'') : '');
+  $('#genderPref').value = existing ? (existing.genderPref||'Mixed') : (followFrom ? (followFrom.genderPref||'Mixed') : 'Mixed');
   $('#sessDate').value = (existing && existing.status!=='Waiting') ? existing.date : '';
   $('#sessTime').value = (existing && existing.status!=='Waiting') ? existing.time : '';
   $('#sessEndTime').value = (existing && existing.status!=='Waiting') ? existing.endTime : '';
@@ -1633,7 +2323,7 @@ function renderMinisterList(){
     return `<div class="minister-row ${checked?'checked':''}">
       <button type="button" class="minister-toggle" aria-pressed="${checked?'true':'false'}" onclick="toggleMinister(${m.id})">
         <span class="dot" aria-hidden="true">${checked?ICONS.check:''}</span>
-        <span>${escapeHtml(m.name)}</span>
+        <span>${escapeHtml(m.name)}${m.gender?` <span class="helptext" style="display:inline;">(${m.gender})</span>`:''}</span>
       </button>
       ${out?'<span class="flag">⚠ unavailable this date</span>':(checked?'':`<span class="workload-badge">${load} upcoming</span>`)}
       ${checked?`<div class="role-toggle" role="group" aria-label="Role for ${escapeHtml(m.name)}">
@@ -1644,6 +2334,17 @@ function renderMinisterList(){
   }).join('');
   $('#selCount').textContent = `${selectedMinisters.length} selected (choose 2 or more)`;
   $('#selCount').style.color = (selectedMinisters.length<2) ? 'var(--danger)' : 'var(--muted)';
+  // Non-blocking, informational only - the admin can see exactly who's
+  // selected and choose to override, same posture as an explicit history
+  // pick in the Schedule & Planning claim flow (Level 2 spec: a deliberate
+  // choice gets a warning, not a hard block; only the slot-claim's own
+  // auto-pick, with no admin eyes on it, blocks outright).
+  const gw = $('#genderWarn');
+  const recipGender = $('#recipGender').value, genderPref = $('#genderPref').value;
+  const mismatch = genderPref==='Same-sex' && recipGender && selectedMinisters.length
+    && !selectedMinisters.every(sm=>{ const min=ministers.find(x=>x.id===sm.id); return min && min.gender===recipGender; });
+  gw.style.display = mismatch ? 'block' : 'none';
+  gw.textContent = mismatch ? `⚠ This team doesn't match the recipient's same-sex (${recipGender}) preference.` : '';
   renderConflictCheck();
 }
 window.toggleMinister = function(id){
@@ -1779,6 +2480,7 @@ async function onSaveSession(){
     const fields = {
       Title: recipName + ' - Waiting',
       RecipientName: recipName, RecipientContact: recipContact,
+      RecipientGender: $('#recipGender').value, GenderPreference: $('#genderPref').value,
       Notes: notes, Status: 'Waiting',
       Priority: $('#sessPriority').checked, Contacted: false,
       SessionDate: null, SessionEndDate: null,
@@ -1833,6 +2535,7 @@ async function onSaveSession(){
   const fields = {
     Title: recipName + ' - ' + date,
     RecipientName: recipName, RecipientContact: recipContact,
+    RecipientGender: $('#recipGender').value, GenderPreference: $('#genderPref').value,
     SessionDate: start.toISOString(), SessionEndDate: end.toISOString(),
     LocationName: locationName(locationId),
     Notes: notes, ApptType: apptType, Status: status,
@@ -1850,6 +2553,13 @@ async function onSaveSession(){
     // fields in one request. Finish with a PATCH that touches only those
     // two, so the very last write to the item is minimal and isolated.
     await updateItem('sessions', sessionId, ministerFields);
+    if(pendingBookSlotId){
+      await updateItem('slots', pendingBookSlotId, {
+        Status: 'Booked', LinkedSessionId: sessionId,
+        SlotDate: start.toISOString(), StartTime: time, EndTime: endTime
+      });
+      pendingBookSlotId = null;
+    }
     $('#sessionModal').classList.remove('open');
     hideConflictToast();
     await loadAll();
@@ -2010,6 +2720,7 @@ function openMinisterModal(m){
   $('#minModalTitle').textContent = m ? 'Edit Minister' : 'Add Minister';
   $('#minName').value = m ? m.name : ''; $('#minEmail').value = m ? m.email : '';
   $('#minPhone').value = m ? m.phone : ''; $('#minSignInEmail').value = m ? (m.signInEmail||'') : '';
+  $('#minGender').value = m ? (m.gender||'') : '';
   $('#minStatus').value = m ? m.status : 'Active';
   $('#minModalMsg').innerHTML = '';
   $('#ministerModal').classList.add('open');
@@ -2019,7 +2730,7 @@ async function onSaveMinister(){
   const name = $('#minName').value.trim();
   $('#minModalMsg').innerHTML = '';
   if(!name){ $('#minModalMsg').innerHTML = '<div class="errbox" role="alert">Name is required.</div>'; return; }
-  const fields = { Title:name, Email:$('#minEmail').value.trim(), Phone:$('#minPhone').value.trim(), SignInEmail:$('#minSignInEmail').value.trim(), Status:$('#minStatus').value };
+  const fields = { Title:name, Email:$('#minEmail').value.trim(), Phone:$('#minPhone').value.trim(), SignInEmail:$('#minSignInEmail').value.trim(), Gender:$('#minGender').value, Status:$('#minStatus').value };
   if(editingMinisterId) await updateItem('ministers', editingMinisterId, fields);
   else await createItem('ministers', fields);
   $('#ministerModal').classList.remove('open');
