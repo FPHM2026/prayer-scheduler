@@ -218,8 +218,8 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
   an external action, same pattern as `WaCreated`'s WhatsApp toggle; the app
   never sends anything itself. Fully independent of Status — toggling it
   doesn't move an entry out of Waiting, only "Schedule Session" does that.
-- **Schedule & Planning tab** (added 2026-09-17, `preview/index.html` only so
-  far — not yet promoted to production `index.html`): replaces the old
+- **Schedule & Planning tab** (added 2026-09-17, promoted to production the
+  same day): replaces the old
   Schedule + Planning tabs with one merged view backed by the new
   PlanningSlots list, so every slot state — Open, Tentative, Booked, or the
   recurring Drop-In — is one collapsible accordion card grouped by week, with
@@ -442,6 +442,16 @@ like one product, not two:
     vanished with no indication a match had even occurred. Fixed by
     skipping the range filter entirely while a search query is active —
     search overrides browsing filters, not the other way around.
+13. **A wholesale preview → production copy carries `preview/index.html`'s
+    own relative-path assumptions with it.** `PORTAL_URL` is `"../portal/"`
+    in preview (one folder deeper than the repo root) but must be
+    `"portal/"` in production — copying the file verbatim silently points
+    production's minister sign-in redirect one level too high. Also strip
+    the `#previewModeBanner` CSS/markup block AND the comment that explains
+    it (the comment sits just above the CSS rule it describes, easy to
+    leave orphaned if only the rule itself gets removed) — production never
+    had either. Check both by hand after every promotion; nothing catches
+    this automatically.
 
 ## History (why it's built this way, not some other way)
 1. Started as a plan to host raw HTML/JS directly in a SharePoint document
