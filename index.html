@@ -111,6 +111,7 @@
   .tag.active{background:var(--ok-bg);color:var(--ok);}
   .tag.inactive{background:#f1ede4;color:var(--muted);}
   .tag.priority{background:var(--primary);color:var(--on-primary);}
+  .tag.contacted{background:var(--ok-bg);color:var(--ok);}
 
   .field{margin-bottom:14px;}
   .field label{display:block;font-size:var(--fs-sm);font-weight:700;margin-bottom:5px;}
@@ -274,6 +275,28 @@
   .stats-body{max-height:2000px;}
   .stats-collapse.toggled .stats-toggle .chevron{transform:none;}
   .stats-collapse.toggled .stats-body{max-height:0;}
+
+  /* ---- Recipient history panel (New/Edit Session + Waiting-list forms) ----
+     Deliberately its own simpler collapse, not a reuse of .stats-collapse -
+     that one defaults open on desktop/closed on mobile via a viewport check,
+     but this panel should default closed on every screen size so a long
+     history doesn't push the rest of the form down by default. */
+  .history-collapse{margin-bottom:14px;}
+  .history-toggle{display:flex;align-items:flex-start;gap:8px;width:100%;background:none;border:none;cursor:pointer;padding:4px 2px;text-align:left;font-family:inherit;font-size:var(--fs-sm);color:var(--muted);}
+  .history-toggle .chevron{color:var(--muted);transition:transform .2s ease;flex-shrink:0;margin-top:2px;}
+  .history-collapse.open .history-toggle .chevron{transform:rotate(180deg);}
+  .history-body{overflow:hidden;max-height:0;transition:max-height .25s ease;}
+  .history-collapse.open .history-body{max-height:2000px;}
+  .history-body-inner{margin-top:8px;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+  .history-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);background:var(--card);}
+  .history-row:last-child{border-bottom:none;}
+  .history-row.active{background:var(--ok-bg);}
+  .history-date{font-weight:700;font-size:var(--fs-sm);color:var(--navy);}
+  .history-ministers{font-size:var(--fs-xs);color:var(--muted);margin-top:2px;}
+  .history-notes{font-size:var(--fs-xs);color:var(--text);margin-top:4px;font-style:italic;}
+  .history-use-btn{flex-shrink:0;background:#fff;border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:var(--fs-2xs);font-weight:700;color:var(--navy);cursor:pointer;white-space:nowrap;min-height:auto;}
+  .history-use-btn:hover{border-color:var(--gold);}
+  .history-use-btn.active{background:var(--ok);border-color:var(--ok);color:#fff;cursor:default;}
   @media (max-width:640px){
     .stats-toggle .chevron{transform:none;}
     .stats-body{max-height:0;}
@@ -361,6 +384,8 @@
   <section class="panel active" id="panel-schedule">
     <div class="toolbar">
       <button class="btn" id="btnNew">+ New Session</button>
+      <button class="btn secondary" id="btnDropIn">+ Drop-in</button>
+      <button class="btn secondary" id="btnTraining">+ Training</button>
       <div class="search-wrap"><input id="search" placeholder="Search by minister or recipient..." aria-label="Search sessions by minister or recipient"><button type="button" class="search-clear" aria-label="Clear search" hidden>&times;</button></div>
       <select id="range" aria-label="Filter sessions by date range"><option>Upcoming</option><option>All</option><option>Past</option></select>
       <button class="btn secondary" id="btnRefresh" style="display:inline-flex;align-items:center;gap:7px;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Refresh</button>
@@ -447,12 +472,12 @@
     <div id="modalMsg"></div>
     <div class="field-row">
       <div class="field"><label for="recipName">Recipient Name *</label><input id="recipName" autocomplete="off"><div id="recipNameResults"></div></div>
-      <div class="field"><label for="recipContact">Recipient Contact</label><input id="recipContact"></div>
+      <div class="field" id="recipContactField"><label for="recipContact">Recipient Contact</label><input id="recipContact"></div>
     </div>
-    <p class="helptext" id="lastSeenHint" style="margin-top:-8px;"></p>
+    <div id="historyPanel" style="margin-top:-8px;margin-bottom:14px;"></div>
     <div class="field-row sched-only">
       <div class="field"><label for="apptType">Appointment Type</label>
-        <select id="apptType"><option value="First">First Appointment</option><option value="Follow-up">Follow-up</option></select>
+        <select id="apptType"><option value="First">First Appointment</option><option value="Follow-up">Follow-up</option><option value="Drop-in">Sunday Drop-In</option><option value="Training">Training</option></select>
       </div>
       <div class="field" id="statusField" style="display:none;">
         <label for="sessStatus">Status</label>
@@ -485,7 +510,7 @@
         <input type="checkbox" id="sessPriority" style="width:auto;min-height:auto;"> Flag as priority (bumps to top of the waiting list)
       </label>
     </div>
-    <div class="field sched-only">
+    <div class="field sched-only" id="waField">
       <label style="display:flex;align-items:center;gap:8px;font-weight:700;">
         <input type="checkbox" id="waCreated" style="width:auto;min-height:auto;"> WhatsApp group created for this session
       </label>
@@ -561,7 +586,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-15.2";
+const APP_VERSION = "2026-09-17.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -785,6 +810,11 @@ async function loadAll(){
       prevId: s.PreviousSessionId||null,
       waCreated: !!s.WaCreated, waLink: s.WaLink||'',
       priority: !!s.Priority,
+      // Contacted: whether the admin has reached out to this waiting entry -
+      // a manual record of an external action, same pattern as WaCreated.
+      // Reads false/undefined safely if the Contacted column doesn't exist
+      // in SharePoint yet (see gotcha in CLAUDE.md re: ApptType choices).
+      contacted: !!s.Contacted,
       // "Days waiting" for a Waiting-status entry is computed from SharePoint's
       // own createdDateTime item metadata rather than a dedicated field.
       added: (s._created||'').split('T')[0]
@@ -815,7 +845,8 @@ const ICONS = {
   chevron: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>',
   flag: (filled) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="${filled?'currentColor':'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22V4a1 1 0 0 1 1-1h13.5a.5.5 0 0 1 .4.8l-3.6 4.7 3.6 4.7a.5.5 0 0 1-.4.8H5"/></svg>`,
   calendarPlus: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 14v6M9 17h6"/></svg>',
-  power: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>'
+  power: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>',
+  phone: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>'
 };
 function fmtDate(d){ return d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'}); }
 function fmtTime(d){ return d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}); }
@@ -946,12 +977,15 @@ function wireApp(){
   wireSearchClear('search');
   $('#range').addEventListener('change', renderSchedule);
   $('#btnNew').addEventListener('click', ()=>openModal(null, null, {forceKind:'session'}));
+  $('#btnDropIn').addEventListener('click', ()=>openModal(null, null, {forceKind:'session', preset:'dropin'}));
+  $('#btnTraining').addEventListener('click', ()=>openModal(null, null, {forceKind:'session', preset:'training'}));
   $('#btnCancel').addEventListener('click', ()=>{ $('#sessionModal').classList.remove('open'); hideConflictToast(); });
   $('#sessDate').addEventListener('change', ()=>{ renderMinisterList(); updateEndPreview(); renderSameDay(); renderConflictCheck(); renderDayLabel(); renderSlotButtons(); });
   $('#sessTime').addEventListener('change', ()=>{ autoSetEndTime(); renderSlotButtons(); renderConflictCheck(); });
   $('#sessEndTime').addEventListener('change', ()=>{ updateEndPreview(); renderConflictCheck(); });
   $('#sessLocation').addEventListener('change', renderConflictCheck);
-  $('#recipName').addEventListener('input', ()=>{ updateLastSeen(); renderConflictCheck(); renderRecipNameSuggestions(); });
+  $('#apptType').addEventListener('change', updateGroupSessionFields);
+  $('#recipName').addEventListener('input', ()=>{ renderRecipientHistory(); renderConflictCheck(); renderRecipNameSuggestions(); });
   $('#btnSave').addEventListener('click', ()=>withLoading($('#btnSave'), 'Saving…', onSaveSession));
   $('#btnAddLocation').addEventListener('click', ()=>{ $('#newLocationName').value=''; $('#locModalMsg').innerHTML=''; $('#locationModal').classList.add('open'); $('#newLocationName').focus(); });
   $('#btnLocCancel').addEventListener('click', ()=>$('#locationModal').classList.remove('open'));
@@ -1126,7 +1160,12 @@ function renderCompleted(){
   renderCompletedStats();
 }
 function completedStats(){
-  const all = sessions.filter(s=>s.status==='Completed');
+  // Sunday Drop-In / Training are group sessions every minister is assigned
+  // to at once - counting them here would blow up "unique recipients" and
+  // the first-time/follow-up split with what is really one shared event, so
+  // they're excluded from every statistic even though the underlying session
+  // records still show up normally in the grouped list above.
+  const all = sessions.filter(s=>s.status==='Completed' && s.apptType!=='Drop-in' && s.apptType!=='Training');
   const now = new Date();
   const thisYearStart = new Date(now.getFullYear(),0,1);
   const lastYearStart = new Date(now.getFullYear()-1,0,1);
@@ -1256,11 +1295,13 @@ function renderPlanning(){
             <span class="name">${escapeHtml(s.recipName)}</span>
             <span class="tag ${num===1?'first':''}">Session #${num}</span>
             ${s.priority?'<span class="tag priority">Priority</span>':''}
+            ${s.contacted?'<span class="tag contacted">Contacted</span>':''}
           </div>
           <div class="helptext" style="margin:2px 0 0;">${escapeHtml(s.recipContact||'No contact info')} · Waiting ${waiting} day${waiting===1?'':'s'} · added ${fmtShort(s.added||s.date)}</div>
           ${s.notes?`<div class="notes">${escapeHtml(s.notes)}</div>`:''}
         </div>
         <div class="sess-actions">
+          <button class="icon-btn${s.contacted?' success':''}" onclick="toggleContacted(${s.id})" title="${s.contacted?'Mark as not yet contacted':'Mark as contacted'}" aria-pressed="${s.contacted}" aria-label="${s.contacted?'Mark as not yet contacted':'Mark as contacted'}: ${escapeHtml(s.recipName)}">${ICONS.phone}</button>
           <button class="icon-btn flag-btn${s.priority?' active':''}" onclick="togglePriority(${s.id})" title="${s.priority?'Remove priority':'Flag as priority'}" aria-pressed="${s.priority}" aria-label="${s.priority?'Remove priority from':'Flag as priority'} ${escapeHtml(s.recipName)}">${ICONS.flag(s.priority)}</button>
           <button class="icon-btn" onclick="scheduleFromWaiting(${s.id})" title="Schedule Session" aria-label="Schedule a session for ${escapeHtml(s.recipName)}">${ICONS.calendarPlus}</button>
           <button class="icon-btn" onclick="editSession(${s.id})" title="Edit" aria-label="Edit ${escapeHtml(s.recipName)}">${ICONS.pencil}</button>
@@ -1274,6 +1315,14 @@ window.togglePriority = async function(id){
   const s = sessions.find(x=>x.id===id);
   if(!s) return;
   await updateItem('sessions', id, { Priority: !s.priority });
+  await loadAll();
+};
+// Contacted is a manual record of an external action (the admin reached
+// out) - same pattern as WaCreated. The app never sends anything itself.
+window.toggleContacted = async function(id){
+  const s = sessions.find(x=>x.id===id);
+  if(!s) return;
+  await updateItem('sessions', id, { Contacted: !s.contacted });
   await loadAll();
 };
 window.scheduleFromWaiting = function(id){
@@ -1301,7 +1350,7 @@ function openModal(existing, followFrom, opts){
   setSessKind(kind);
   $('#modalTitle').textContent = kind==='waiting'
     ? (existing ? 'Edit Waiting Entry' : 'Add to Waiting List')
-    : (existing ? (existing.status==='Waiting' ? 'Schedule Session' : 'Edit Session') : (followFrom ? 'Follow-up Session' : 'New Session'));
+    : (existing ? (existing.status==='Waiting' ? 'Schedule Session' : 'Edit Session') : (followFrom ? 'Follow-up Session' : (opts.preset==='dropin' ? 'New Sunday Drop-In' : opts.preset==='training' ? 'New Training Session' : 'New Session')));
   $('#modalMsg').innerHTML='';
   $('#recipNameResults').innerHTML=''; recipNameMatches=[];
   $('#recipName').value = existing ? existing.recipName : (followFrom ? followFrom.recipName : '');
@@ -1321,9 +1370,40 @@ function openModal(existing, followFrom, opts){
   $('#statusField').style.display = showStatusDropdown ? 'block' : 'none';
   $('#sessStatus').value = (existing && existing.status!=='Waiting') ? existing.status : 'Scheduled';
   selectedMinisters = (existing && existing.status!=='Waiting') ? existing.ministers.map(m=>({...m})) : (followFrom ? followFrom.ministers.map(m=>({...m})) : []);
-  renderMinisterList(); updateEndPreview(); renderSameDay(); updateLastSeen(); renderDayLabel(); renderSlotButtons();
+  historyExpanded = false;
+  historyAutoName = null;
+  historyAutoApplyOk = kind==='session' && !existing && !followFrom && !opts.preset;
+  // "+ Drop-in" / "+ Training" shortcuts: a group session everyone attends,
+  // so skip the usual empty-form start and prefill the recipient name,
+  // appointment type, and full active roster - only date/time are left for
+  // the admin to fill in. Only applies opening a brand-new session, never
+  // when editing an existing one or building a follow-up.
+  if(opts.preset && !existing && !followFrom){
+    $('#recipName').value = opts.preset==='dropin' ? 'Sunday Drop-In' : 'Training';
+    $('#apptType').value = opts.preset==='dropin' ? 'Drop-in' : 'Training';
+    selectedMinisters = ministers.filter(m=>m.status==='Active').map(m=>({id:m.id, role:'Support'}));
+    if(opts.preset==='dropin'){
+      // Sunday Drop-In always runs 5-7:30pm (2.5 hours, not the usual
+      // +90min default) - default it so date is the only thing left to pick.
+      $('#sessTime').value = '17:00';
+      $('#sessEndTime').value = '19:30';
+    }
+  }
+  updateGroupSessionFields();
+  renderMinisterList(); updateEndPreview(); renderSameDay(); renderRecipientHistory(); renderDayLabel(); renderSlotButtons();
   $('#sessionModal').classList.add('open');
   $('#recipName').focus();
+}
+// Recipient Contact and the WhatsApp group checkbox don't apply to a
+// Drop-in/Training group session - hides both whenever the Appointment
+// Type is set to either, whether that came from the preset buttons, from
+// editing an existing Drop-in/Training session, or from manually changing
+// the dropdown on an otherwise-normal session.
+function updateGroupSessionFields(){
+  const isGroup = $('#apptType').value==='Drop-in' || $('#apptType').value==='Training';
+  $('#recipContactField').style.display = isGroup ? 'none' : '';
+  $('#waField').style.display = isGroup ? 'none' : '';
+  if(isGroup){ $('#recipContact').value=''; $('#waCreated').checked=false; $('#waLink').value=''; }
 }
 
 // Autocomplete for the Recipient Name field (New Session and Add to Waiting
@@ -1335,6 +1415,15 @@ function openModal(existing, followFrom, opts){
 // "Follow-up to a previous recipient" search already offers, just reachable
 // straight from the name field itself.
 let recipNameMatches = [];
+// Recipient history panel state (see renderRecipientHistory below).
+// historyAutoApplyOk gates the ONE-TIME automatic pre-fill of the most
+// recent session's team to a genuinely brand-new session (not an edit, not
+// a follow-up, not a Drop-in/Training preset - each of those already sets
+// selectedMinisters from its own correct source and must not be overridden
+// just because the recipient name happens to match past records).
+let historyExpanded = false;
+let historyAutoName = null;
+let historyAutoApplyOk = false;
 function renderRecipNameSuggestions(){
   const q = $('#recipName').value.trim().toLowerCase();
   const box = $('#recipNameResults');
@@ -1361,27 +1450,80 @@ window.pickRecipNameAt = function(i){
   if(!r) return;
   $('#recipName').value = r.name;
   if(r.contact) $('#recipContact').value = r.contact;
-  if(sessKind==='session' && r.ministers.length){
-    prevId = r.sessionId;
-    selectedMinisters = r.ministers.map(m=>({...m}));
+  // Team pre-fill now lives entirely in renderRecipientHistory (below) -
+  // it applies the most recent real session's team the same way this used
+  // to do inline, but as part of the visible history panel rather than a
+  // silent side effect here, so picking a suggestion doesn't duplicate it.
+  $('#recipNameResults').innerHTML = '';
+  recipNameMatches = [];
+  renderRecipientHistory();
+  renderConflictCheck();
+};
+// Replaces the old one-line "last session with this recipient" hint with
+// an expandable history of every matching prior session (most recent
+// first) - date, the ministers who served them (Lead/Support), and their
+// notes - each with a "Use this team" action. Collapsed by default so a
+// long history doesn't push the rest of the form down. See Change 2/3 of
+// the Planning Autofill spec (2026-09-16) for the full rationale.
+function renderRecipientHistory(){
+  const name = $('#recipName').value.trim();
+  const box = $('#historyPanel');
+  if(!name){ box.innerHTML=''; historyAutoName=null; return; }
+  const matches = sessions.filter(s=> s.status!=='Waiting' && s.recipName.toLowerCase()===name.toLowerCase() && s.id!==editingId)
+    .sort((a,b)=> b.date.localeCompare(a.date));
+  if(!matches.length){
+    box.innerHTML = '<p class="helptext">No prior sessions found for this name — this would be their 1st.</p>';
+    historyAutoName = null;
+    return;
+  }
+  const showActions = sessKind==='session';
+  // One-time auto-apply of the most recent session's team, only for a
+  // genuinely brand-new session (historyAutoApplyOk) and only once per
+  // distinct name typed (historyAutoName) - typing more characters that
+  // still match the same name must not keep re-overwriting an explicit
+  // "Use this team" choice made on a different row in the meantime.
+  if(showActions && historyAutoApplyOk && historyAutoName!==name.toLowerCase()){
+    prevId = matches[0].id;
+    selectedMinisters = matches[0].ministers.map(m=>({...m}));
     $('#apptType').value = 'Follow-up';
     renderMinisterList();
   }
-  $('#recipNameResults').innerHTML = '';
-  recipNameMatches = [];
-  updateLastSeen();
-  renderConflictCheck();
-};
-function updateLastSeen(){
-  const name = $('#recipName').value.trim();
-  const hint = $('#lastSeenHint');
-  if(!name){ hint.textContent=''; return; }
-  const matches = sessions.filter(s=> s.status!=='Waiting' && s.recipName.toLowerCase()===name.toLowerCase() && s.id!==editingId);
-  const count = matches.length;
-  if(!count){ hint.textContent = 'No prior sessions found for this name — this would be their 1st.'; return; }
-  const last = matches.sort((a,b)=> b.date.localeCompare(a.date))[0];
-  hint.textContent = `${count} prior session${count===1?'':'s'} with ${last.recipName} — last on ${last.date}. This would be session #${count+1}.`;
+  if(showActions) historyAutoName = name.toLowerCase();
+  const activeId = showActions ? prevId : null;
+
+  const summary = `${matches.length} prior session${matches.length===1?'':'s'} with ${escapeHtml(matches[0].recipName)} — last on ${fmtShort(matches[0].date)}. This would be session #${matches.length+1}.`;
+  const rows = matches.map(s=>{
+    const isActive = showActions && s.id===activeId;
+    return `<div class="history-row${isActive?' active':''}">
+      <div>
+        <div class="history-date">${fmtDate(new Date(s.date+'T00:00'))}</div>
+        <div class="history-ministers">${escapeHtml(ministerNamesOf(s))}</div>
+        ${s.notes?`<div class="history-notes">${escapeHtml(s.notes)}</div>`:''}
+      </div>
+      ${showActions ? `<button type="button" class="history-use-btn${isActive?' active':''}" onclick="useTeamFrom(${s.id})">${isActive?'✓ Using this team':'Use this team'}</button>` : ''}
+    </div>`;
+  }).join('');
+  box.innerHTML = `<div class="history-collapse${historyExpanded?' open':''}">
+    <button type="button" class="history-toggle" onclick="toggleHistoryPanel(this)" aria-expanded="${historyExpanded}">
+      <span class="chevron">${ICONS.chevron}</span>
+      <span>${summary}</span>
+    </button>
+    <div class="history-body"><div class="history-body-inner">${rows}</div></div>
+  </div>`;
 }
+window.toggleHistoryPanel = function(btn){
+  historyExpanded = btn.closest('.history-collapse').classList.toggle('open');
+  btn.setAttribute('aria-expanded', String(historyExpanded));
+};
+window.useTeamFrom = function(sessionId){
+  const s = sessions.find(x=>x.id===sessionId);
+  if(!s) return;
+  prevId = s.id;
+  selectedMinisters = s.ministers.map(m=>({...m}));
+  $('#apptType').value = 'Follow-up';
+  renderMinisterList();
+  renderRecipientHistory();
+};
 async function onSaveLocation(){
   const name = $('#newLocationName').value.trim();
   $('#locModalMsg').innerHTML = '';
@@ -1561,7 +1703,7 @@ async function onSaveSession(){
       Title: recipName + ' - Waiting',
       RecipientName: recipName, RecipientContact: recipContact,
       Notes: notes, Status: 'Waiting',
-      Priority: $('#sessPriority').checked,
+      Priority: $('#sessPriority').checked, Contacted: false,
       SessionDate: null, SessionEndDate: null,
       LocationName: '', AssignedMinisterIDs: '', LeadMinisterIDs: '',
       ApptType: 'First', PreviousSessionId: null, WaCreated: false, WaLink: ''
@@ -1652,6 +1794,10 @@ function renderOverview(){
     .map(m=>{
       const inRange = sessions.filter(s=>{
         if(s.status==='Waiting') return false;
+        // Drop-in/Training assign every minister to the same shared session -
+        // excluded here too, or everyone's hours/led/supported counts would
+        // include the same group event over and over.
+        if(s.apptType==='Drop-in' || s.apptType==='Training') return false;
         if(!ministerIdsOf(s).includes(m.id)) return false;
         if(fromVal && s.date<fromVal) return false;
         if(toVal && s.date>toVal) return false;
@@ -1728,9 +1874,11 @@ function shiftYear(dateStr, delta){
 function renderOverviewStats(){
   const fromVal = $('#statsFrom').value, toVal = $('#statsTo').value;
   const activeMins = ministers.filter(m=>m.status==='Active');
-  const inRangeAll = sessions.filter(s=> s.status!=='Waiting' && (!fromVal || s.date>=fromVal) && (!toVal || s.date<=toVal));
+  // Drop-in/Training excluded here too - see the matching note in renderOverview().
+  const notGroupSession = s => s.apptType!=='Drop-in' && s.apptType!=='Training';
+  const inRangeAll = sessions.filter(s=> s.status!=='Waiting' && notGroupSession(s) && (!fromVal || s.date>=fromVal) && (!toVal || s.date<=toVal));
   const lastYearFrom = shiftYear(fromVal,-1), lastYearTo = shiftYear(toVal,-1);
-  const lastYearAll = sessions.filter(s=> s.status!=='Waiting' && (!lastYearFrom || s.date>=lastYearFrom) && (!lastYearTo || s.date<=lastYearTo));
+  const lastYearAll = sessions.filter(s=> s.status!=='Waiting' && notGroupSession(s) && (!lastYearFrom || s.date>=lastYearFrom) && (!lastYearTo || s.date<=lastYearTo));
 
   const servingIds = new Set();
   let hoursThis=0, led=0, supported=0;
