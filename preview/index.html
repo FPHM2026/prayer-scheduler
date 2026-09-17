@@ -710,7 +710,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-17.11";
+const APP_VERSION = "2026-09-17.12";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -928,10 +928,18 @@ async function loadAll(){
       date: (sl.SlotDate||'').split('T')[0],
       start: sl.StartTime||'', end: sl.EndTime||'',
       status: sl.Status||'Open',
-      claimedId: sl.ClaimedWaitingId||null,
+      // parseInt defensively on both - ClaimedWaitingId/LinkedSessionId are
+      // meant to be Number columns, but LinkedSessionId turned out to be a
+      // Single line of text column in the real list. A raw string id
+      // ("42") never strict-equals a numeric session id (42) in every
+      // sessions.find(s=>s.id===sl.linkedSessionId) lookup this app does,
+      // so the write silently "worked" while every lookup against it kept
+      // failing. parseInt makes the comparison correct regardless of
+      // which column type either field actually ends up as.
+      claimedId: sl.ClaimedWaitingId ? parseInt(sl.ClaimedWaitingId, 10) : null,
       claimedDate: sl.ClaimedDate ? sl.ClaimedDate.split('T')[0] : null,
       team: proposedIds.map(id=>({ id: parseInt(id,10), role: proposedLeadIds.has(id) ? 'Lead' : 'Support' })).filter(m=>!isNaN(m.id)),
-      linkedSessionId: sl.LinkedSessionId||null,
+      linkedSessionId: sl.LinkedSessionId ? parseInt(sl.LinkedSessionId, 10) : null,
       notes: sl.Notes||''
     };
   });
