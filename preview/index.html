@@ -345,7 +345,9 @@
   /* ---- Schedule & Planning: slot accordions (merges the old Schedule and
      Planning tabs - see CLAUDE.md) ---- */
   .week-block{margin-bottom:22px;}
-  .week-header{font-size:var(--fs-2xs);font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding-bottom:6px;border-bottom:1px solid var(--border);margin-bottom:10px;}
+  .week-header{font:inherit;font-size:var(--fs-2xs);font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:0 0 6px;border:none;border-bottom:1px solid var(--border);margin-bottom:10px;background:none;width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;}
+  .week-chevron{color:var(--muted);transition:transform .15s ease;flex-shrink:0;}
+  .week-block.open .week-chevron{transform:rotate(90deg);}
   .day-row{display:flex;gap:12px;margin-bottom:10px;align-items:flex-start;}
   .day-row:last-child{margin-bottom:0;}
   .day-label{flex:0 0 62px;font-size:var(--fs-sm);font-weight:700;color:var(--navy);line-height:1.3;padding-top:12px;}
@@ -710,7 +712,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-17.15";
+const APP_VERSION = "2026-09-17.16";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1788,6 +1790,17 @@ function renderOpenAvailNow(sl){
 function unlinkedSessionsOn(dateIso){
   return sessions.filter(s => s.status==='Scheduled' && s.date===dateIso && !slots.some(sl=>sl.linkedSessionId===s.id));
 }
+// Explicit open/closed overrides a user has clicked, keyed by week start -
+// takes priority over the computed default (current/future weeks open,
+// past weeks collapsed) so a manually-expanded old week stays expanded
+// across re-renders within the session.
+let weekOverrides = new Map();
+window.toggleWeekBlock = function(wk){
+  const defaultOpen = wk>=weekStartOf(isoDate(new Date()));
+  const isOpen = weekOverrides.has(wk) ? weekOverrides.get(wk) : defaultOpen;
+  weekOverrides.set(wk, !isOpen);
+  renderSlotWeeks();
+};
 function renderSlotWeeks(){
   const weekMap = new Map(); // weekStart -> Set of dateIso that have slots or unlinked sessions
   const addDate = dateIso => {
@@ -1802,15 +1815,23 @@ function renderSlotWeeks(){
     $('#slotWeeks').innerHTML = '<div class="no-results">No slots yet — use Quick Add Slots to get started.</div>';
     return;
   }
+  // Plain chronological order, oldest to newest - Sunday already starts
+  // each week (weekStartOf), and this is a straightforward top-to-bottom
+  // calendar list with no jump-around between "upcoming" and "past"
+  // sections to second-guess.
   const currentWeek = weekStartOf(isoDate(new Date()));
-  const weekKeys = [...weekMap.keys()];
-  const ordered = [...weekKeys.filter(w=>w>=currentWeek).sort(), ...weekKeys.filter(w=>w<currentWeek).sort().reverse()];
+  const ordered = [...weekMap.keys()].sort();
   $('#slotWeeks').innerHTML = ordered.map(wk=>{
     const dates = [...weekMap.get(wk)].sort();
     const wkEnd = new Date(wk+'T00:00'); wkEnd.setDate(wkEnd.getDate()+6);
-    return `<div class="week-block">
-      <div class="week-header">${escapeHtml(fmtShort(wk))} – ${escapeHtml(fmtShort(isoDate(wkEnd)))}</div>
-      ${dates.map(dateIso=>renderDayRow(dateIso)).join('')}
+    const defaultOpen = wk>=currentWeek;
+    const isOpen = weekOverrides.has(wk) ? weekOverrides.get(wk) : defaultOpen;
+    return `<div class="week-block${isOpen?' open':''}">
+      <button type="button" class="week-header" onclick="toggleWeekBlock('${wk}')" aria-expanded="${isOpen}">
+        <span>${escapeHtml(fmtShort(wk))} – ${escapeHtml(fmtShort(isoDate(wkEnd)))}</span>
+        <span class="week-chevron">${ICONS.chevron}</span>
+      </button>
+      ${isOpen ? dates.map(dateIso=>renderDayRow(dateIso)).join('') : ''}
     </div>`;
   }).join('');
 }
