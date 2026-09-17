@@ -710,7 +710,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-17.14";
+const APP_VERSION = "2026-09-17.15";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1871,23 +1871,23 @@ window.assignSlotToSession = async function(sessionId, btn){
   if(!s) return;
   if(btn){ btn.disabled = true; btn.textContent = 'Assigning…'; }
   try{
+    // Create as a bare Open slot first - the exact same minimal shape
+    // Quick Add already creates successfully every time - then apply the
+    // real values through separate PATCHes below. Sending a populated
+    // team, Status="Booked", and a real LinkedSessionId all in the initial
+    // POST (the previous version) is a combination no other code path in
+    // this app has ever used, and SharePoint 500'd on it.
     const created = await createItem('slots', {
       Title: (s.date||'') + ' slot',
       SlotDate: s.date ? s.date+'T00:00:00' : null,
       StartTime: s.time||'', EndTime: s.endTime||'',
-      Status: 'Booked',
+      Status: 'Open',
       ClaimedWaitingId: null, ClaimedDate: null,
-      ProposedMinisterIDs: s.ministers.map(m=>m.id).join(','),
-      ProposedLeadIDs: s.ministers.filter(m=>m.role==='Lead').map(m=>m.id).join(','),
-      LinkedSessionId: s.id, Notes: ''
+      ProposedMinisterIDs: '', ProposedLeadIDs: '', LinkedSessionId: null, Notes: ''
     });
     const slotId = parseInt(created.id, 10);
-    // createItem's own bundled follow-up PATCH covers the basics, but this
-    // write bundled 10 fields together in one request - too many to trust,
-    // per the same write-reliability gotcha already hit twice on this list.
     // Isolate every field that actually matters to how the slot displays,
-    // one at a time, so a partial failure can't leave it stuck on the
-    // schema default (Status="Open") the way it did before this fix.
+    // one at a time, so a partial failure can't leave it stuck part-way.
     await updateItem('slots', slotId, {
       ProposedMinisterIDs: s.ministers.map(m=>m.id).join(','),
       ProposedLeadIDs: s.ministers.filter(m=>m.role==='Lead').map(m=>m.id).join(',')
