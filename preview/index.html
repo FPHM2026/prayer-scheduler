@@ -714,7 +714,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-18.1";
+const APP_VERSION = "2026-09-18.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -2454,8 +2454,16 @@ function openModal(existing, followFrom, opts){
   const tbdLocation = locations.find(l=>l.name.trim().toLowerCase()==='to be determined');
   const defaultLocationId = tbdLocation ? tbdLocation.id : (locations[0]?locations[0].id:'');
   $('#sessLocation').value = (existing && existing.location) ? existing.location : (followFrom ? followFrom.location : defaultLocationId);
+  // A Waiting record's own apptType is hardcoded to 'First' at creation
+  // time (see onSaveSession's waiting branch) and never revisited, so
+  // trusting existing.apptType here for one is exactly how "Schedule
+  // Session"/bookSlot converting a Waiting entry into a real session kept
+  // defaulting to First regardless of actual prior history - only a
+  // genuinely already-real (non-Waiting) session's own saved apptType is
+  // trustworthy; anything else (brand new, or a Waiting entry about to
+  // become real) recomputes from what's actually on record.
   const priorCount = recipSessionCount($('#recipName').value, editingId);
-  $('#apptType').value = existing ? existing.apptType : (priorCount>0 ? 'Follow-up' : 'First');
+  $('#apptType').value = (existing && existing.status!=='Waiting') ? existing.apptType : (priorCount>0 ? 'Follow-up' : 'First');
   const showStatusDropdown = kind==='session' && !!existing && existing.status!=='Waiting';
   $('#statusField').style.display = showStatusDropdown ? 'block' : 'none';
   $('#sessStatus').value = (existing && existing.status!=='Waiting') ? existing.status : 'Scheduled';
