@@ -714,7 +714,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-17.19";
+const APP_VERSION = "2026-09-18.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1990,10 +1990,20 @@ function renderSlotBody(sl){
   if(sl.status==='Tentative') return renderTentativeBody(sl);
   return renderBookedBody(sl);
 }
+// Active ministers blacked out on this slot's date, by name - shown on
+// the Open slot's own card (before anyone's assigned) so the admin can
+// see at a glance who's ruled out for reasons the "Available now" count
+// alone doesn't explain.
+function blackedOutNamesListOn(dateIso){
+  const names = blackedOutNamesOn(dateIso);
+  return ministers.filter(m=>m.status==='Active' && names.has(m.name)).map(m=>m.name);
+}
 function renderSlotPicker(sl){
   const cands = unplacedCandidates();
   const rb = remainingByGender(sl.date, sl.start, sl.end, sl.id);
-  const avail = `<div class="slot-meta">Available now: ${rb.all.length} PM${rb.all.length===1?'':'s'} (${rb.female.length}F, ${rb.male.length}M)</div>`;
+  const blackedOut = blackedOutNamesListOn(sl.date);
+  const avail = `<div class="slot-meta">Available now: ${rb.all.length} PM${rb.all.length===1?'':'s'} (${rb.female.length}F, ${rb.male.length}M)</div>`
+    + (blackedOut.length ? `<div class="slot-meta">Unavailable (blackout): ${escapeHtml(blackedOut.join(', '))}</div>` : '');
   if(!cands.length) return avail + `<div class="picker-empty">No one on the waiting list to claim yet.</div>`;
   return avail + cands.map(c=>{
     const num = sessionNumberOf(c);
@@ -2373,7 +2383,13 @@ window.confirmQuickAddSlots = async function(btn){
     if(!ok) return;
     if(btn){ btn.disabled = true; btn.textContent = 'Working…'; }
     for(const p of plans){
-      const start = p.isDropIn ? '17:00' : '17:30', end = p.isDropIn ? '19:30' : '19:30';
+      // Derives from the same DAY_WINDOWS "usual time slot" the session
+      // form's own quick-pick uses, so both stay in sync from one place -
+      // falls back to the old flat default for any day without its own
+      // defined window. Drop-In keeps its own fixed 5-7:30pm regardless.
+      const win = DAY_WINDOWS[new Date(p.dateIso+'T00:00').getDay()];
+      const start = p.isDropIn ? '17:00' : (win ? win.start : '17:30');
+      const end = p.isDropIn ? '19:30' : (win ? win.end : '19:30');
       for(let i=0;i<p.toAdd;i++){
         await createItem('slots', {
           Title: p.dateIso + (p.isDropIn?' Drop-In':' slot'),
@@ -2431,7 +2447,13 @@ function openModal(existing, followFrom, opts){
   $('#waCreated').checked = existing ? !!existing.waCreated : false;
   $('#waLink').value = existing ? (existing.waLink||'') : '';
   populateLocationSelect();
-  $('#sessLocation').value = (existing && existing.location) ? existing.location : (followFrom ? followFrom.location : (locations[0]?locations[0].id:''));
+  // A brand-new session (no existing record, no follow-up source) defaults
+  // to the "To Be Determined" location rather than just whichever location
+  // happens to load first - the admin usually doesn't know the room yet
+  // when first scheduling.
+  const tbdLocation = locations.find(l=>l.name.trim().toLowerCase()==='to be determined');
+  const defaultLocationId = tbdLocation ? tbdLocation.id : (locations[0]?locations[0].id:'');
+  $('#sessLocation').value = (existing && existing.location) ? existing.location : (followFrom ? followFrom.location : defaultLocationId);
   const priorCount = recipSessionCount($('#recipName').value, editingId);
   $('#apptType').value = existing ? existing.apptType : (priorCount>0 ? 'Follow-up' : 'First');
   const showStatusDropdown = kind==='session' && !!existing && existing.status!=='Waiting';
@@ -2656,8 +2678,8 @@ window.toggleMinister = function(id){
 window.setRole = function(id, role){ const sel=selectedMinisters.find(x=>x.id===id); if(sel) sel.role=role; renderMinisterList(); };
 
 const DAY_WINDOWS = {
-  0: { label:'Sunday', start:'16:00', end:'19:00', presets:['16:00','17:00','17:30','18:00'] },
-  2: { label:'Tuesday', start:'18:00', end:'19:30', presets:['18:00'] },
+  0: { label:'Sunday', start:'17:30', end:'20:00', presets:['17:30'] },
+  2: { label:'Tuesday', start:'18:00', end:'20:30', presets:['18:00'] },
 };
 function slotStartsFor(dateStr){
   if(!dateStr) return [];
