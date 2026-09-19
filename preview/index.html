@@ -745,7 +745,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-19.3";
+const APP_VERSION = "2026-09-19.4";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1948,7 +1948,11 @@ function downloadSessionIcs(s, locationText){
   if(!s.date || !s.time || !s.endTime) return;
   const start = new Date(s.date+'T'+s.time), end = new Date(s.date+'T'+s.endTime);
   const title = calendarEventTitle(s);
-  const ics = [
+  // ministerNamesOf already formats "Name (Lead), Name" - reused as-is so
+  // the invite's team list matches how the team is shown everywhere else
+  // in the app, no separate formatting to keep in sync.
+  const team = ministerNamesOf(s);
+  const lines = [
     'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//FPHM Scheduler//EN','CALSCALE:GREGORIAN',
     'BEGIN:VEVENT',
     'UID:fphm-'+s.id+'-'+start.getTime()+'@fphm-scheduler',
@@ -1956,9 +1960,11 @@ function downloadSessionIcs(s, locationText){
     'DTSTART:'+icsDateStamp(start),
     'DTEND:'+icsDateStamp(end),
     'SUMMARY:'+icsEscape(title),
-    'LOCATION:'+icsEscape(locationText||''),
-    'END:VEVENT','END:VCALENDAR'
-  ].join('\r\n');
+    'LOCATION:'+icsEscape(locationText||'')
+  ];
+  if(team) lines.push('DESCRIPTION:'+icsEscape('Prayer Ministers: '+team));
+  lines.push('END:VEVENT','END:VCALENDAR');
+  const ics = lines.join('\r\n');
   const blob = new Blob([ics], {type:'text/calendar;charset=utf-8'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
