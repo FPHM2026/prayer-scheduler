@@ -52,7 +52,7 @@
   header{max-width:1100px;margin:0 auto;background:var(--cream);color:var(--navy);padding:10px 14px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid rgba(0,0,0,.06);}
   header h1,#signinScreen h1{margin:0;font-size:17px;font-family:'Playfair Display',Georgia,serif;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:var(--gold);}
   #signinScreen h1{font-size:var(--fs-xl);letter-spacing:.03em;}
-  .version-tag{display:none;font-family:'Jost','Segoe UI',Arial,sans-serif;font-weight:400;text-transform:none;color:var(--muted);}
+  .version-tag{display:block;margin:2px 0 0;font-size:var(--fs-2xs);font-family:'Jost','Segoe UI',Arial,sans-serif;font-weight:400;text-transform:none;color:var(--muted);}
   header .who{display:none;font-size:var(--fs-xs);color:var(--navy);}
   #btnSignOut{background:var(--navy);color:#fff;border-color:var(--navy);}
   #btnSignOut:hover:not(:disabled){background:var(--navy-dark);border-color:var(--navy-dark);}
@@ -65,7 +65,6 @@
   @media (min-width:1024px){
     header{padding:16px 24px;}
     header h1{font-size:var(--fs-xl);letter-spacing:.03em;}
-    .version-tag{display:block;margin:2px 0 0;font-size:var(--fs-2xs);}
     header .who{display:inline;}
     nav[aria-label="Primary"]{padding:8px 16px 0;}
     nav[aria-label="Primary"] button{padding:12px 18px;font-size:var(--fs-sm);min-height:44px;}
@@ -745,7 +744,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-19.4";
+const APP_VERSION = "2026-09-19.5";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
