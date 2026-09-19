@@ -735,7 +735,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-19.1";
+const APP_VERSION = "2026-09-19.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3311,6 +3311,10 @@ function generateReport(){
   const now = new Date();
   $('#statsFrom').value = isoDate(new Date(now.getFullYear(),0,1));
   $('#statsTo').value = isoDate(now);
+  // Reports tab defaults to the same year-to-date range - re-picking it
+  // every time would otherwise be the first thing anyone does anyway.
+  $('#reportFrom').value = isoDate(new Date(now.getFullYear(),0,1));
+  $('#reportTo').value = isoDate(now);
 })();
 
 /* =========================================================================
