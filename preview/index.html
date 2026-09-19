@@ -458,7 +458,7 @@
     <h1>FPHM Scheduler</h1>
     <span class="version-tag" id="versionTagHeader"></span>
   </div>
-  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end;">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end;margin-left:auto;">
     <a href="./preview/" class="preview-badge" id="previewBadge" hidden>🧪 Preview build available</a>
     <span class="who" id="whoami"></span>
     <button class="btn secondary" id="btnSignOut" style="padding:8px 14px;min-height:36px;">Sign Out</button>
@@ -744,7 +744,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-19.5";
+const APP_VERSION = "2026-09-19.6";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
