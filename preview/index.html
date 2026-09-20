@@ -643,8 +643,8 @@
       <div class="section-title" style="margin:26px 0 12px;"><h2 style="font-size:var(--fs-lg);margin:0;color:var(--navy);">Sunday Drop-In</h2></div>
       <p class="helptext">Default time and location used when creating Drop-In slots and sessions.</p>
       <div class="field-row">
-        <div class="field"><label for="settingsDropInStart">Start Time</label><input type="time" id="settingsDropInStart"></div>
-        <div class="field"><label for="settingsDropInEnd">End Time</label><input type="time" id="settingsDropInEnd"></div>
+        <div class="field"><label for="settingsDropInStart">Start Time</label><select id="settingsDropInStart" class="time-select"></select></div>
+        <div class="field"><label for="settingsDropInEnd">End Time</label><select id="settingsDropInEnd" class="time-select"></select></div>
         <div class="field"><label for="settingsDropInLocation">Location</label><select id="settingsDropInLocation"></select></div>
       </div>
       <div class="toolbar" style="margin-top:8px;">
@@ -708,8 +708,8 @@
       </div>
     </div>
     <div class="field-row sched-only">
-      <div class="field"><label for="sessTime">Start Time *</label><input type="time" id="sessTime"></div>
-      <div class="field"><label for="sessEndTime">End Time *</label><input type="time" id="sessEndTime"></div>
+      <div class="field"><label for="sessTime">Start Time *</label><select id="sessTime" class="time-select"></select></div>
+      <div class="field"><label for="sessEndTime">End Time *</label><select id="sessEndTime" class="time-select"></select></div>
     </div>
     <div id="slotButtons" class="sched-only"></div>
     <div id="sameDayPanel" class="sched-only"></div>
@@ -796,8 +796,8 @@
     <div id="twModalMsg"></div>
     <div class="field"><label for="twDay">Day of the Week *</label><select id="twDay"></select></div>
     <div class="field-row">
-      <div class="field"><label for="twStart">Start Time *</label><input type="time" id="twStart"></div>
-      <div class="field"><label for="twEnd">End Time *</label><input type="time" id="twEnd"></div>
+      <div class="field"><label for="twStart">Start Time *</label><select id="twStart" class="time-select"></select></div>
+      <div class="field"><label for="twEnd">End Time *</label><select id="twEnd" class="time-select"></select></div>
     </div>
     <div class="modal-actions">
       <button class="btn secondary" id="btnTwCancel">Cancel</button>
@@ -826,7 +826,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-20.4";
+const APP_VERSION = "2026-09-20.5";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1139,6 +1139,28 @@ const ICONS = {
 function fmtDate(d){ return d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'}); }
 function fmtTime(d){ return d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit',hour12:true}); }
 function fmt12(t){ if(!t) return ''; const [h,m]=t.split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); return fmtTime(d); }
+// Every time field in the app (session Start/End, Time Window Start/End,
+// Sunday Drop-In Start/End) is a single <select class="time-select"> of
+// 15-minute slots instead of a native <input type="time"> - the native
+// control's hour cycle follows the OS/browser locale (24h on plenty of
+// machines) with no reliable way to force AM/PM, so this is the only way
+// every time field reads consistently as "6:30 PM" for every admin
+// regardless of their device settings. Populated once here, before
+// sign-in - every later `$('#id').value = 'HH:MM'` assignment (openModal,
+// openTimeWindowModal, renderTimeWindowsSettings, etc.) keeps working
+// exactly as it did against a native input, since a <select>'s value
+// still just selects the matching option.
+function populateTimeSelects(){
+  let optsHtml = '';
+  for(let h=0; h<24; h++){
+    for(let m=0; m<60; m+=15){
+      const hm = String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+      optsHtml += `<option value="${hm}">${fmt12(hm)}</option>`;
+    }
+  }
+  document.querySelectorAll('select.time-select').forEach(sel => { sel.innerHTML = optsHtml; });
+}
+populateTimeSelects();
 function fmtShort(dateStr){ if(!dateStr) return ''; return new Date(dateStr+'T00:00').toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); }
 function isoDate(d){ return d.toISOString().slice(0,10); }
 function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -1907,7 +1929,7 @@ window.toggleCustomAdd = function(dateIso){
   renderSlotWeeks();
 };
 window.addCustomSlot = async function(dateIso){
-  const start = readTimePicker('customStart-'+dateIso), end = readTimePicker('customEnd-'+dateIso);
+  const start = $('#customStart-'+dateIso).value, end = $('#customEnd-'+dateIso).value;
   if(!start || !end || end<=start) return;
   await createItem('slots', {
     Title: dateIso+' custom slot', SlotDate: dateIso+'T00:00:00', StartTime: start, EndTime: end,
@@ -1933,7 +1955,7 @@ window.submitCustomAdd = async function(dateIso){
     openModal(null, null, {forceKind:'session', preset:'training', dateIso});
     return;
   }
-  const start = readTimePicker('customStart-'+dateIso), end = readTimePicker('customEnd-'+dateIso);
+  const start = $('#customStart-'+dateIso).value, end = $('#customEnd-'+dateIso).value;
   if(!start || !end || end<=start) return;
   if(type==='dropin'){
     await createItem('slots', {
@@ -2210,29 +2232,28 @@ window.assignSlotToSession = async function(sessionId, btn){
 // A native <input type="time"> renders in whatever hour cycle the
 // browser/OS locale picks (24h on plenty of machines) with no reliable
 // HTML/CSS way to force 12h display - unlike our own text output, which
-// fmt12()/fmtTime() already force to AM/PM. This form always displays
-// AM/PM by building the picker itself (hour 1-12 + 15-minute increments +
-// AM/PM) instead of relying on the browser's own control.
-function timePickerHtml(idPrefix, defaultHM){
-  const [h24, m] = (defaultHM||'13:00').split(':').map(Number);
-  const h12 = (h24 % 12) || 12;
-  const ap = h24 < 12 ? 'AM' : 'PM';
-  const roundedM = Math.round(m/15)*15 % 60;
-  const hourOpts = Array.from({length:12}, (_,i)=>i+1)
-    .map(h=>`<option value="${h}" ${h===h12?'selected':''}>${h}</option>`).join('');
-  const minuteOpts = [0,15,30,45]
-    .map(mm=>`<option value="${mm}" ${mm===roundedM?'selected':''}>${String(mm).padStart(2,'0')}</option>`).join('');
-  const apOpts = ['AM','PM']
-    .map(a=>`<option value="${a}" ${a===ap?'selected':''}>${a}</option>`).join('');
-  return `<select id="${idPrefix}H" aria-label="Hour">${hourOpts}</select>:<select id="${idPrefix}M" aria-label="Minute">${minuteOpts}</select><select id="${idPrefix}AP" aria-label="AM or PM">${apOpts}</select>`;
+// fmt12()/fmtTime() already force to AM/PM. Every time field in the app
+// uses this single <select> instead: one dropdown, options pre-formatted
+// through fmt12() so the label always reads "6:30 PM", and a value that's
+// still the plain 24h "HH:MM" string everything else already expects -
+// so every existing `$('#id').value` read/write keeps working unchanged.
+function roundToQuarterHour(hm){
+  if(!hm) return '00:00';
+  let [h,m] = hm.split(':').map(Number);
+  m = Math.round(m/15)*15;
+  if(m===60){ m=0; h=(h+1)%24; }
+  return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
 }
-function readTimePicker(idPrefix){
-  const hEl = $('#'+idPrefix+'H'), mEl = $('#'+idPrefix+'M'), apEl = $('#'+idPrefix+'AP');
-  if(!hEl || !mEl || !apEl) return '';
-  const h12 = parseInt(hEl.value, 10), m = parseInt(mEl.value, 10), ap = apEl.value;
-  let h24 = h12 % 12;
-  if(ap==='PM') h24 += 12;
-  return String(h24).padStart(2,'0')+':'+String(m).padStart(2,'0');
+function timeSelectHtml(id, defaultHM){
+  const selected = roundToQuarterHour(defaultHM);
+  const opts = [];
+  for(let h=0; h<24; h++){
+    for(let m=0; m<60; m+=15){
+      const hm = String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+      opts.push(`<option value="${hm}"${hm===selected?' selected':''}>${fmt12(hm)}</option>`);
+    }
+  }
+  return `<select id="${id}">${opts.join('')}</select>`;
 }
 function renderDayCustomAdd(dateIso){
   if(customAddOpenFor!==dateIso) return `<button type="button" class="add-custom-btn" onclick="toggleCustomAdd('${dateIso}')">+ Add custom slot</button>`;
@@ -2242,8 +2263,8 @@ function renderDayCustomAdd(dateIso){
       <option value="dropin">Sunday Drop-In</option>
       <option value="training">Training</option>
     </select></label>
-    <label>Start ${timePickerHtml('customStart-'+dateIso, '13:00')}</label>
-    <label>End ${timePickerHtml('customEnd-'+dateIso, '15:00')}</label>
+    <label>Start ${timeSelectHtml('customStart-'+dateIso, '13:00')}</label>
+    <label>End ${timeSelectHtml('customEnd-'+dateIso, '15:00')}</label>
     <button class="btn" onclick="submitCustomAdd('${dateIso}')">Add</button>
     <button class="btn secondary" onclick="toggleCustomAdd(null)">Cancel</button>
   </div>`;
@@ -3734,6 +3755,9 @@ function generateReport(){
 ========================================================================= */
 const CHANGE_LOG = [
   { date: 'Sep 20, 2026', version: APP_VERSION, items: [
+    'Changed: every Start/End time field (session times, Quick Slots, Sunday Drop-In, "+ Add custom slot") is now one dropdown of times like "6:30 PM" - always AM/PM, same style everywhere, instead of the browser\'s own time picker.'
+  ]},
+  { date: 'Sep 20, 2026', version: '2026-09-20.4', items: [
     'Changed: "Default Location for New Sessions" moved out of Quick Slots into its own tab in Settings.'
   ]},
   { date: 'Sep 20, 2026', version: '2026-09-20.3', items: [
