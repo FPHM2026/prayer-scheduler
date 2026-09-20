@@ -19,8 +19,8 @@
   :root{
     --navy:#474747; --navy-dark:#333; --gold:#aa5a3c; --gold-dark:#8a4a30;
     --primary:#f28a00; --primary-dark:#ce7500; --on-primary:#1a1a1a;
-    --cream:#e7e2cf; --bg:#faf8f4; --card:#fff; --border:#ddd5c4;
-    --text:#565656; --muted:#7a7a7a; --muted-bar:#cdc4ac; --danger:#c0392b; --danger-bg:#fdecea;
+    --cream:#e7e2cf; --bg:#faf8f4; --card:#fff; --border:#9d8b67;
+    --text:#565656; --muted:#636363; --muted-bar:#cdc4ac; --danger:#c0392b; --danger-bg:#fdecea;
     --ok:#2e7d32; --ok-bg:#e9f7ec;
     --shadow-sm:0 1px 2px rgba(35,28,20,.07),0 1px 1px rgba(35,28,20,.05);
     --shadow-md:0 6px 18px rgba(35,28,20,.10);
@@ -50,7 +50,7 @@
   /* ---- Header + nav: minimal, mobile-first, sticky single-row tab strip.
      Desktop (1024px+) restores the fuller header/nav treatment. ---- */
   header{max-width:1100px;margin:0 auto;background:var(--cream);color:var(--navy);padding:10px 14px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid rgba(0,0,0,.06);}
-  header h1,#signinScreen h1{margin:0;font-size:17px;font-family:'Playfair Display',Georgia,serif;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:var(--gold);}
+  header h1,#signinScreen h1{margin:0;font-size:17px;font-family:'Playfair Display',Georgia,serif;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:var(--gold-dark);}
   #signinScreen h1{font-size:var(--fs-xl);letter-spacing:.03em;}
   .version-tag{display:block;margin:2px 0 0;font-size:var(--fs-2xs);font-family:'Jost','Segoe UI',Arial,sans-serif;font-weight:400;text-transform:none;color:var(--muted);}
   header .who{display:none;font-size:var(--fs-xs);color:var(--navy);}
@@ -73,6 +73,7 @@
   main{max-width:1100px;margin:0 auto;padding:14px 12px 50px;}
   @media (min-width:640px){ main{padding:20px 20px 60px;} }
   .panel{display:none;} .panel.active{display:block;}
+  .settings-subview{display:none;} .settings-subview.active{display:block;}
 
   .toolbar{display:flex;flex-direction:column;align-items:stretch;gap:10px;margin-bottom:14px;}
   .toolbar > *{width:100%;}
@@ -189,11 +190,6 @@
      regardless of specificity) - so the hidden attribute was never
      actually hiding it. This rule's higher specificity restores that. */
   .preview-badge[hidden]{display:none;}
-  /* Deliberately NOT position:sticky - the tab nav below is already sticky
-     at top:0, and a second sticky element at the same top:0 doesn't stack
-     under/after it, it overlaps it. On mobile, where this banner's text
-     wraps to two lines and gets tall, that overlap fully covered the tabs
-     once you scrolled. Letting the banner scroll away normally fixes it. */
   #conflictToast{position:fixed;top:14px;left:50%;z-index:100;width:520px;max-width:92vw;display:flex;align-items:flex-start;gap:10px;background:var(--danger-bg);color:var(--danger);border:1px solid #f3c6c0;border-radius:8px;box-shadow:var(--shadow-lg);padding:12px 14px;font-size:var(--fs-sm);opacity:0;pointer-events:none;transform:translate(-50%,-16px);transition:opacity .2s ease,transform .2s ease;}
   #conflictToast.show{opacity:1;pointer-events:auto;transform:translate(-50%,0);}
   .conflict-toast-body{flex:1;}
@@ -247,6 +243,12 @@
      much content (a split-bar, a delta badge) sits above it in a given
      card - keeps the date line flush across every card in the row. */
   .stat-sub{font-size:var(--fs-2xs);color:var(--muted);margin-top:auto;padding-top:10px;}
+
+  /* ---- Settings: one card per distinct setting group ---- */
+  .settings-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:16px;box-shadow:var(--shadow-sm);}
+  .settings-card h2{font-size:var(--fs-lg);margin:0 0 4px;color:var(--navy);}
+  .settings-card .helptext{margin-bottom:14px;}
+  .settings-card:last-child{margin-bottom:0;}
 
   /* ---- Completed Sessions: combo card (YTD / Last Year / Lifetime) ---- */
   .stat-combo{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px;box-shadow:var(--shadow-sm);}
@@ -405,6 +407,7 @@
   .add-custom-btn:hover{border-color:var(--gold);color:var(--gold-dark);}
   .custom-slot-form{display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:var(--fs-xs);}
   .custom-slot-form input[type=time]{border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-family:inherit;font-size:var(--fs-xs);background:var(--bg);color:var(--text);min-height:auto;}
+  .custom-slot-form select{border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-family:inherit;font-size:var(--fs-xs);background:var(--bg);color:var(--text);min-height:auto;}
   .range-presets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
   .range-preset{border:1px solid var(--border);background:var(--card);color:var(--navy);border-radius:20px;padding:6px 12px;font-size:var(--fs-2xs);font-weight:700;cursor:pointer;font-family:inherit;}
   .range-preset:hover{border-color:var(--gold);}
@@ -467,6 +470,7 @@
   <button data-tab="overview">Prayer Ministers</button>
   <button data-tab="blackouts">Blackout Dates</button>
   <button data-tab="reports">Reports</button>
+  <button data-tab="settings">Settings</button>
 </nav>
 <main>
 <div id="loadError"></div>
@@ -601,6 +605,63 @@
     <p class="errbox" role="alert" id="reportMsg" hidden></p>
   </section>
 
+  <section class="panel" id="panel-settings">
+    <p class="helptext">Configure defaults used across scheduling — no code changes needed.</p>
+    <nav class="subtabs" aria-label="Settings section" id="settingsSubtabs">
+      <button class="active" data-settingsview="timewindows">Quick Slots</button>
+      <button data-settingsview="locations">Locations</button>
+      <button data-settingsview="defaultlocation">Sessions</button>
+    </nav>
+
+    <div class="settings-subview active" id="settingsTimeWindowsView">
+      <p class="helptext">These two cards together are what the "+ Quick Add Slots" button offers — the default days for Freedom Sessions, and the separate Sunday Drop-In defaults.</p>
+
+      <div class="settings-card">
+        <h2>Default Days</h2>
+        <p class="helptext">Which days have a default and what time each runs. Add, edit, or remove a day.</p>
+        <div class="toolbar" style="margin-bottom:10px;">
+          <button class="btn" id="btnAddTimeWindow">+ Add a Day</button>
+        </div>
+        <div id="settingsTimeWindowsList"></div>
+      </div>
+
+      <div class="settings-card">
+        <h2>Sunday Drop-In</h2>
+        <p class="helptext">Default time and location used when creating Drop-In slots and sessions.</p>
+        <div class="field-row">
+          <div class="field"><label for="settingsDropInStart">Start Time</label><input type="time" id="settingsDropInStart"></div>
+          <div class="field"><label for="settingsDropInEnd">End Time</label><input type="time" id="settingsDropInEnd"></div>
+          <div class="field"><label for="settingsDropInLocation">Location</label><select id="settingsDropInLocation"></select></div>
+        </div>
+        <div class="toolbar" style="margin-top:8px;">
+          <button class="btn" id="btnSaveDropInSettings">Save Drop-In Defaults</button>
+        </div>
+        <p class="helptext" id="settingsDropInMsg"></p>
+      </div>
+    </div>
+
+    <div class="settings-subview" id="settingsLocationsView">
+      <div class="toolbar" style="margin:16px 0 10px;">
+        <button class="btn" id="btnSettingsAddLocation">+ Add Location</button>
+      </div>
+      <p class="helptext">Deleting a location removes it from the dropdown for new sessions — sessions that already used it keep showing its original name.</p>
+      <div id="settingsLocationsList"></div>
+    </div>
+
+    <div class="settings-subview" id="settingsDefaultLocationView">
+      <div class="section-title" style="margin:16px 0 12px;"><h2 style="font-size:var(--fs-lg);margin:0;color:var(--navy);">Default Location for New Sessions</h2></div>
+      <p class="helptext">Used when creating a brand-new session before a room has been decided.</p>
+      <div class="field">
+        <label for="settingsDefaultLocation">Location</label>
+        <select id="settingsDefaultLocation"></select>
+      </div>
+      <div class="toolbar" style="margin-top:8px;">
+        <button class="btn" id="btnSaveDefaultLocationSetting">Save Default Location</button>
+      </div>
+      <p class="helptext" id="settingsDefaultLocationMsg"></p>
+    </div>
+  </section>
+
 </main>
 </div>
 
@@ -716,6 +777,22 @@
   </div>
 </div>
 
+<div class="modal-bg" id="timeWindowModal">
+  <div class="modal small" role="dialog" aria-modal="true" aria-labelledby="twModalTitle">
+    <h2 id="twModalTitle">Add a Day</h2>
+    <div id="twModalMsg"></div>
+    <div class="field"><label for="twDay">Day of the Week *</label><select id="twDay"></select></div>
+    <div class="field-row">
+      <div class="field"><label for="twStart">Start Time *</label><input type="time" id="twStart"></div>
+      <div class="field"><label for="twEnd">End Time *</label><input type="time" id="twEnd"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="btnTwCancel">Cancel</button>
+      <button class="btn" id="btnTwSave">Save</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg sheet" id="quickAddModal">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="quickAddTitle">
     <div id="quickAddBody"></div>
@@ -736,7 +813,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-19.11";
+const APP_VERSION = "2026-09-20.11";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -762,10 +839,11 @@ const LIST_NAMES = {
   sessions: "PrayerSessions",
   blackouts: "BlackoutDates",
   locations: "Locations",
-  slots: "PlanningSlots"
+  slots: "PlanningSlots",
+  timeWindows: "TimeWindows"
 };
-// Relative to this file's own location (repo root) - portal/ is a direct
-// subfolder.
+// Relative to this file's own location (preview/) - portal/ is a sibling of
+// the repo root, one level up from here.
 const PORTAL_URL = "portal/";
 
 const msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
@@ -924,7 +1002,7 @@ async function deleteItem(key, itemId){
 /* =========================================================================
    DATA CACHE (refreshed from Graph after loads/writes)
 ========================================================================= */
-let ministers=[], sessions=[], blackouts=[], locations=[], slots=[];
+let ministers=[], sessions=[], blackouts=[], locations=[], slots=[], timeWindows=[];
 let editingId=null, prevId=null, selectedMinisters=[]; // selectedMinisters: [{id, role}]
 // Set by bookSlot() right after it opens the session modal on a Tentative
 // slot's claimed candidate - tells onSaveSession() which PlanningSlots item
@@ -939,11 +1017,16 @@ let overviewSubStatus='Active';
 let sessionNumberMap = new Map(); // session id -> chronological "Session #N" for that recipient
 
 async function loadAll(){
-  const [rawMin, rawSess, rawBlack, rawLoc, rawSlots] = await Promise.all([
-    listItems('ministers'), listItems('sessions'), listItems('blackouts'), listItems('locations'), listItems('slots')
+  const [rawMin, rawSess, rawBlack, rawLoc, rawSlots, rawTW] = await Promise.all([
+    listItems('ministers'), listItems('sessions'), listItems('blackouts'), listItems('locations'), listItems('slots'), listItems('timeWindows')
   ]);
   ministers = rawMin.map(m => ({ id: m.id, name: m.Title, email: m.Email||'', phone: m.Phone||'', signInEmail: m.SignInEmail||'', status: m.Status||'Active', gender: m.Gender||'' }));
   locations = rawLoc.map(l => ({ id: l.id, name: l.Title }));
+  timeWindows = rawTW.map(t => ({
+    id: t.id, title: t.Title||'', kind: t.Kind||'',
+    dayOfWeek: (t.DayOfWeek!=null && t.DayOfWeek!=='') ? parseInt(t.DayOfWeek,10) : null,
+    start: t.StartTime||'', end: t.EndTime||'', locationName: t.LocationName||''
+  }));
   blackouts = rawBlack.map(b => ({ id: b.id, ministerName: b.Title, date: (b.BlackoutDate||'').split('T')[0], endDate: b.EndDate ? b.EndDate.split('T')[0] : null, notes: b.Notes||'' }));
   slots = rawSlots.map(sl => {
     const stripHtml = v => String(v||'').replace(/<[^>]*>/g, '');
@@ -983,6 +1066,14 @@ async function loadAll(){
       date: (s.SessionDate||'').split('T')[0], time: toHM(s.SessionDate),
       endTime: toHM(s.SessionEndDate),
       location: (locations.find(l=>l.name===s.LocationName)||{}).id || null,
+      // The Locations list is now freely deletable from Settings - if the
+      // matching entry is gone, `location` above resolves to null and
+      // locationName(id) would return '' even though this session's own
+      // SharePoint item still literally has the name in LocationName.
+      // Carried through separately so sessionLocationDisplay() can fall
+      // back to it - deleting a location must never erase what an
+      // existing session already shows.
+      locationRawName: s.LocationName||'',
       notes: s.Notes||'',
       ministers: allIds.map(id=>({ id: parseInt(id,10), role: leadIds.has(id) ? 'Lead' : 'Support' }))
         .filter(m=>!isNaN(m.id) && ministers.some(x=>x.id===m.id)),
@@ -1033,7 +1124,7 @@ const ICONS = {
   phone: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>'
 };
 function fmtDate(d){ return d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'}); }
-function fmtTime(d){ return d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}); }
+function fmtTime(d){ return d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit',hour12:true}); }
 function fmt12(t){ if(!t) return ''; const [h,m]=t.split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); return fmtTime(d); }
 function fmtShort(dateStr){ if(!dateStr) return ''; return new Date(dateStr+'T00:00').toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); }
 function isoDate(d){ return d.toISOString().slice(0,10); }
@@ -1048,6 +1139,11 @@ function ministerNamesOf(s){
   }).join(', ');
 }
 function locationName(id){ const l = locations.find(x=>x.id===id); return l?l.name:''; }
+// Use this instead of locationName(s.location) anywhere a SESSION's own
+// location is being displayed - falls back to the raw name SharePoint
+// still has on that session item if the Locations entry was since
+// deleted, so an old session never silently loses its location text.
+function sessionLocationDisplay(s){ return locationName(s.location) || s.locationRawName || ''; }
 function durationHours(s){ if(!s.date||!s.time||!s.endTime) return 0; const start=new Date(s.date+'T'+s.time), end=new Date(s.date+'T'+s.endTime); return Math.max(0,(end-start)/3600000); }
 
 function sessionSortKey(s){ return (s.status==='Waiting' ? (s.added||s.date||'') : (s.date||'')) + (s.time||''); }
@@ -1097,7 +1193,7 @@ function groupRow(key, avatarText, name, countLabel, summaryHtml, bodyHtml, wasO
   </div>`;
 }
 
-function renderAll(){ renderSchedule(); renderPlanning(); renderCompleted(); renderOverview(); renderBlackouts(); renderSchedPlan(); }
+function renderAll(){ renderSchedule(); renderPlanning(); renderCompleted(); renderOverview(); renderBlackouts(); renderSchedPlan(); renderTimeWindowsSettings(); renderLocationsSettings(); }
 
 async function withLoading(btn, loadingText, fn){
   if(!btn) return fn();
@@ -1176,6 +1272,13 @@ function wireApp(){
   $('#btnAddLocation').addEventListener('click', ()=>{ $('#newLocationName').value=''; $('#locModalMsg').innerHTML=''; $('#locationModal').classList.add('open'); $('#newLocationName').focus(); });
   $('#btnLocCancel').addEventListener('click', ()=>$('#locationModal').classList.remove('open'));
   $('#btnLocSave').addEventListener('click', ()=>withLoading($('#btnLocSave'), 'Saving…', onSaveLocation));
+  $('#btnSettingsAddLocation').addEventListener('click', ()=>{ $('#newLocationName').value=''; $('#locModalMsg').innerHTML=''; $('#locationModal').classList.add('open'); $('#newLocationName').focus(); });
+  $('#btnAddTimeWindow').addEventListener('click', ()=>openTimeWindowModal(null));
+  $('#btnTwCancel').addEventListener('click', ()=>$('#timeWindowModal').classList.remove('open'));
+  $('#btnTwSave').addEventListener('click', ()=>withLoading($('#btnTwSave'), 'Saving…', onSaveTimeWindow));
+  $('#btnSaveDropInSettings').addEventListener('click', ()=>withLoading($('#btnSaveDropInSettings'), 'Saving…', saveDropInSettings));
+  $('#btnSaveDefaultLocationSetting').addEventListener('click', ()=>withLoading($('#btnSaveDefaultLocationSetting'), 'Saving…', saveDefaultLocationSetting));
+  $('#settingsSubtabs').querySelectorAll('button[data-settingsview]').forEach(b=>b.addEventListener('click', ()=>switchSettingsSub(b.dataset.settingsview)));
   $('#btnAddMinister').addEventListener('click', ()=>openMinisterModal());
   $('#btnMinCancel').addEventListener('click', ()=>$('#ministerModal').classList.remove('open'));
   $('#btnMinSave').addEventListener('click', ()=>withLoading($('#btnMinSave'), 'Saving…', onSaveMinister));
@@ -1237,7 +1340,7 @@ function scheduleSessionRow(s){
         <span class="tag ${sessionNumberOf(s)===1?'first':''}">Session #${sessionNumberOf(s)}</span>
         <span class="tag ${s.status==='Completed'?'completed':'scheduled'}">${s.status}</span>
       </div>
-      <div class="sess-meta">${fmtDate(new Date(s.date+'T'+s.time))} · ${fmt12(s.time)}–${fmt12(s.endTime)} · ${escapeHtml(locationName(s.location))}</div>
+      <div class="sess-meta">${fmtDate(new Date(s.date+'T'+s.time))} · ${fmt12(s.time)}–${fmt12(s.endTime)} · ${escapeHtml(sessionLocationDisplay(s))}</div>
       <div class="sess-meta">${escapeHtml(ministerNamesOf(s))}</div>
       ${s.notes ? `<div class="sess-meta">${escapeHtml(s.notes)}</div>` : ''}
       <button type="button" class="wa-note ${s.waCreated?'on':''}" aria-pressed="${s.waCreated?'true':'false'}" onclick="toggleWa(${s.id})" style="cursor:pointer;background:none;border:none;padding:4px 0;font-family:inherit;">${ICONS.chat} ${s.waCreated?'WhatsApp group created':'No WhatsApp group yet — tap to mark created'}</button>
@@ -1326,7 +1429,7 @@ function completedSessionRow(s){
         <span class="tag ${sessionNumberOf(s)===1?'first':''}">Session #${sessionNumberOf(s)}</span>
         <span class="tag completed">Completed</span>
       </div>
-      <div class="sess-meta">${fmtDate(new Date(s.date+'T'+s.time))} · ${fmt12(s.time)}–${fmt12(s.endTime)} · ${escapeHtml(locationName(s.location))}</div>
+      <div class="sess-meta">${fmtDate(new Date(s.date+'T'+s.time))} · ${fmt12(s.time)}–${fmt12(s.endTime)} · ${escapeHtml(sessionLocationDisplay(s))}</div>
       <div class="sess-meta">${escapeHtml(ministerNamesOf(s))}</div>
       ${s.notes ? `<div class="sess-meta">${escapeHtml(s.notes)}</div>` : ''}
     </div>
@@ -1735,24 +1838,20 @@ function renderUnplacedCandidates(){
     const waiting = daysWaiting(s);
     const num = sessionNumberOf(s);
     return `<div class="prospect-card${s.priority?' priority':''}">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
-        <div style="min-width:0;">
-          <div class="name-row">
-            <span class="name">${escapeHtml(s.recipName)}</span>
-            <span class="tag ${num===1?'first':''}">Session #${num}</span>
-            ${s.genderPref==='Same-sex' ? `<span class="tag">${escapeHtml(s.recipGender||'Same-sex')} only</span>` : ''}
-            ${s.priority?'<span class="tag priority">Priority</span>':''}
-            ${s.contacted?'<span class="tag contacted">Contacted</span>':''}
-          </div>
-          <div class="helptext" style="margin:2px 0 0;">${escapeHtml(s.recipContact||'No contact info')} · Waiting ${waiting} day${waiting===1?'':'s'} · added ${fmtShort(s.added||s.date)}</div>
-          ${s.notes?`<div class="notes">${escapeHtml(s.notes)}</div>`:''}
-        </div>
-        <div class="sess-actions">
-          <button class="icon-btn${s.contacted?' success':''}" onclick="toggleContacted(${s.id})" title="${s.contacted?'Mark as not yet contacted':'Mark as contacted'}" aria-pressed="${s.contacted}" aria-label="${s.contacted?'Mark as not yet contacted':'Mark as contacted'}: ${escapeHtml(s.recipName)}">${ICONS.phone}</button>
-          <button class="icon-btn flag-btn${s.priority?' active':''}" onclick="togglePriority(${s.id})" title="${s.priority?'Remove priority':'Flag as priority'}" aria-pressed="${s.priority}" aria-label="${s.priority?'Remove priority from':'Flag as priority'} ${escapeHtml(s.recipName)}">${ICONS.flag(s.priority)}</button>
-          <button class="icon-btn" onclick="editSession(${s.id})" title="Edit" aria-label="Edit ${escapeHtml(s.recipName)}">${ICONS.pencil}</button>
-          <button class="icon-btn danger" onclick="deleteSession(${s.id})" title="Delete" aria-label="Remove ${escapeHtml(s.recipName)} from the waiting list">${ICONS.trash}</button>
-        </div>
+      <div class="name-row">
+        <span class="name">${escapeHtml(s.recipName)}</span>
+        <span class="tag ${num===1?'first':''}">Session #${num}</span>
+        ${s.genderPref==='Same-sex' ? `<span class="tag">${escapeHtml(s.recipGender||'Same-sex')} only</span>` : ''}
+        ${s.priority?'<span class="tag priority">Priority</span>':''}
+        ${s.contacted?'<span class="tag contacted">Contacted</span>':''}
+      </div>
+      <div class="helptext" style="margin:2px 0 0;">${escapeHtml(s.recipContact||'No contact info')} · Waiting ${waiting} day${waiting===1?'':'s'} · added ${fmtShort(s.added||s.date)}</div>
+      ${s.notes?`<div class="notes">${escapeHtml(s.notes)}</div>`:''}
+      <div class="toolbar" style="margin-top:10px;">
+        <button class="icon-btn${s.contacted?' success':''}" onclick="toggleContacted(${s.id})" title="${s.contacted?'Mark as not yet contacted':'Mark as contacted'}" aria-pressed="${s.contacted}" aria-label="${s.contacted?'Mark as not yet contacted':'Mark as contacted'}: ${escapeHtml(s.recipName)}">${ICONS.phone}<span class="btn-label">${s.contacted?'Not Contacted':'Contacted'}</span></button>
+        <button class="icon-btn flag-btn${s.priority?' active':''}" onclick="togglePriority(${s.id})" title="${s.priority?'Remove priority':'Flag as priority'}" aria-pressed="${s.priority}" aria-label="${s.priority?'Remove priority from':'Flag as priority'} ${escapeHtml(s.recipName)}">${ICONS.flag(s.priority)}<span class="btn-label">${s.priority?'Remove Priority':'Flag Priority'}</span></button>
+        <button class="icon-btn" onclick="editSession(${s.id})" title="Edit" aria-label="Edit ${escapeHtml(s.recipName)}">${ICONS.pencil}<span class="btn-label">Edit</span></button>
+        <button class="icon-btn danger" onclick="deleteSession(${s.id})" title="Delete" aria-label="Remove ${escapeHtml(s.recipName)} from the waiting list">${ICONS.trash}<span class="btn-label">Delete</span></button>
       </div>
     </div>`;
   }).join('');
@@ -1799,6 +1898,36 @@ window.addCustomSlot = async function(dateIso){
   });
   customAddOpenFor = null;
   await loadAll();
+};
+// Custom-slot form's "Type" picker dispatches to the right creation path:
+// Regular stays a claimable PlanningSlot (addCustomSlot, unchanged). Drop-In
+// is also slot-based (mirrors Quick Add's own Drop-In slot creation) so it
+// shows up in the planning view the same way. Training has no slot concept
+// anywhere else in the app - it's always a directly-created session - so
+// this opens the same session modal the top "+ Training" button uses,
+// pre-filled with this date, and lets the existing save path (with its
+// conflict checks) take it from there rather than duplicating that logic.
+window.submitCustomAdd = async function(dateIso){
+  const type = $('#customType-'+dateIso).value;
+  if(type==='training'){
+    customAddOpenFor = null;
+    renderSlotWeeks();
+    openModal(null, null, {forceKind:'session', preset:'training', dateIso});
+    return;
+  }
+  const start = $('#customStart-'+dateIso).value, end = $('#customEnd-'+dateIso).value;
+  if(!start || !end || end<=start) return;
+  if(type==='dropin'){
+    await createItem('slots', {
+      Title: dateIso+' Drop-In', SlotDate: dateIso+'T00:00:00', StartTime: start, EndTime: end,
+      Status: 'Drop-In', ClaimedWaitingId: null, ClaimedDate: null,
+      ProposedMinisterIDs: '', ProposedLeadIDs: '', LinkedSessionId: null, Notes: ''
+    });
+    customAddOpenFor = null;
+    await loadAll();
+    return;
+  }
+  await addCustomSlot(dateIso);
 };
 
 function statusClass(status){ return String(status||'').toLowerCase().replace('-',''); }
@@ -1974,7 +2103,7 @@ function downloadSessionIcs(s, locationText){
 window.addToCalendar = function(sessionId){
   const s = sessions.find(x=>x.id===sessionId);
   if(!s) return;
-  downloadSessionIcs(s, locationName(s.location));
+  downloadSessionIcs(s, sessionLocationDisplay(s));
 };
 function renderUnlinkedSessionCard(s){
   return `<div class="slot booked expanded">
@@ -1991,7 +2120,7 @@ function renderUnlinkedSessionCard(s){
     <div class="slot-body">
       <div class="slot-detail-row"><strong>${escapeHtml(s.recipName)}</strong> ${s.recipContact?`<span class="helptext">${escapeHtml(s.recipContact)}</span>`:''}</div>
       <div class="slot-detail-row">Team: ${escapeHtml(ministerNamesOf(s))||'<span class="helptext">None assigned</span>'}</div>
-      ${s.location?`<div class="slot-detail-row">${escapeHtml(locationName(s.location))}</div>`:''}
+      ${s.location?`<div class="slot-detail-row">${escapeHtml(sessionLocationDisplay(s))}</div>`:''}
       ${s.notes?`<div class="notes">${escapeHtml(s.notes)}</div>`:''}
       <div class="toolbar" style="margin-top:10px;">
         <button class="btn secondary" onclick="assignSlotToSession(${s.id},this)">Assign to a Slot</button>
@@ -2063,9 +2192,14 @@ window.assignSlotToSession = async function(sessionId, btn){
 function renderDayCustomAdd(dateIso){
   if(customAddOpenFor!==dateIso) return `<button type="button" class="add-custom-btn" onclick="toggleCustomAdd('${dateIso}')">+ Add custom slot</button>`;
   return `<div class="custom-slot-form">
+    <label>Type <select id="customType-${dateIso}">
+      <option value="regular">Regular slot</option>
+      <option value="dropin">Sunday Drop-In</option>
+      <option value="training">Training</option>
+    </select></label>
     <label>Start <input type="time" id="customStart-${dateIso}" value="13:00"></label>
     <label>End <input type="time" id="customEnd-${dateIso}" value="15:00"></label>
-    <button class="btn" onclick="addCustomSlot('${dateIso}')">Add</button>
+    <button class="btn" onclick="submitCustomAdd('${dateIso}')">Add</button>
     <button class="btn secondary" onclick="toggleCustomAdd(null)">Cancel</button>
   </div>`;
 }
@@ -2311,7 +2445,7 @@ function renderBookedBody(sl){
   return `
     <div class="slot-detail-row"><strong>${escapeHtml(linked.recipName)}</strong> ${linked.recipContact?`<span class="helptext">${escapeHtml(linked.recipContact)}</span>`:''}</div>
     <div class="slot-detail-row">Team: ${escapeHtml(ministerNamesOf(linked))}</div>
-    <div class="slot-detail-row">${escapeHtml(locationName(linked.location))}</div>
+    <div class="slot-detail-row">${escapeHtml(sessionLocationDisplay(linked))}</div>
     ${linked.notes?`<div class="notes">${escapeHtml(linked.notes)}</div>`:''}
     <div class="toolbar" style="margin-top:10px;">
       <button class="icon-btn" onclick="addToCalendar(${linked.id})" title="Add to Calendar" aria-label="Add session for ${escapeHtml(linked.recipName)} to your calendar">${ICONS.calendarPlus}<span class="btn-label">Add to Calendar</span></button>
@@ -2425,7 +2559,8 @@ window.removeAllUnusedSlots = async function(btn){
 };
 window.openQuickAddModal = function(){
   const today = new Date(); today.setHours(0,0,0,0);
-  qaPreset = 'next4'; qaDays = new Set([0,2]);
+  const configured = configuredWeekdays();
+  qaPreset = 'next4'; qaDays = new Set(configured.length ? configured : [0,2]);
   qaRangeStart = isoDate(today);
   const end = new Date(today); end.setDate(end.getDate()+27);
   qaRangeEnd = isoDate(end);
@@ -2511,13 +2646,14 @@ window.confirmQuickAddSlots = async function(btn){
     if(!ok) return;
     if(btn){ btn.disabled = true; btn.textContent = 'Working…'; }
     for(const p of plans){
-      // Derives from the same DAY_WINDOWS "usual time slot" the session
-      // form's own quick-pick uses, so both stay in sync from one place -
-      // falls back to the old flat default for any day without its own
-      // defined window. Drop-In keeps its own fixed 5:00-8:15pm regardless.
-      const win = DAY_WINDOWS[new Date(p.dateIso+'T00:00').getDay()];
-      const start = p.isDropIn ? '17:00' : (win ? win.start : '17:30');
-      const end = p.isDropIn ? '20:15' : (win ? win.end : '19:30');
+      // Derives from the same TimeWindows Settings data the session form's
+      // own quick-pick uses, so both stay in sync from one source - falls
+      // back to a flat default for any day without its own configured
+      // window, or if the DropIn row hasn't been set up yet.
+      const win = windowForDay(new Date(p.dateIso+'T00:00').getDay());
+      const dropIn = dropInWindow();
+      const start = p.isDropIn ? (dropIn ? dropIn.start : '17:00') : (win ? win.start : '17:30');
+      const end = p.isDropIn ? (dropIn ? dropIn.end : '20:15') : (win ? win.end : '19:30');
       for(let i=0;i<p.toAdd;i++){
         await createItem('slots', {
           Title: p.dateIso + (p.isDropIn?' Drop-In':' slot'),
@@ -2567,7 +2703,7 @@ function openModal(existing, followFrom, opts){
   $('#recipContact').value = existing ? existing.recipContact : (followFrom ? followFrom.recipContact : '');
   $('#recipGender').value = existing ? (existing.recipGender||'') : (followFrom ? (followFrom.recipGender||'') : '');
   $('#genderPref').value = existing ? (existing.genderPref||'Mixed') : (followFrom ? (followFrom.genderPref||'Mixed') : 'Mixed');
-  $('#sessDate').value = (existing && existing.status!=='Waiting') ? existing.date : '';
+  $('#sessDate').value = (existing && existing.status!=='Waiting') ? existing.date : (opts.dateIso || '');
   $('#sessTime').value = (existing && existing.status!=='Waiting') ? existing.time : '';
   $('#sessEndTime').value = (existing && existing.status!=='Waiting') ? existing.endTime : '';
   $('#notes').value = existing ? existing.notes : '';
@@ -2576,11 +2712,15 @@ function openModal(existing, followFrom, opts){
   $('#waLink').value = existing ? (existing.waLink||'') : '';
   populateLocationSelect();
   // A brand-new session (no existing record, no follow-up source) defaults
-  // to the "To Be Determined" location rather than just whichever location
-  // happens to load first - the admin usually doesn't know the room yet
-  // when first scheduling.
+  // to whatever location is configured in Settings as the default, rather
+  // than just whichever location happens to load first - the admin
+  // usually doesn't know the room yet when first scheduling. Falls back
+  // to "To Be Determined" by name, then to the first location, if the
+  // DefaultLocation row hasn't been configured yet.
+  const defaultSetting = defaultLocationSetting();
+  const defaultByName = defaultSetting ? locations.find(l=>l.name.trim().toLowerCase()===defaultSetting.locationName.trim().toLowerCase()) : null;
   const tbdLocation = locations.find(l=>l.name.trim().toLowerCase()==='to be determined');
-  const defaultLocationId = tbdLocation ? tbdLocation.id : (locations[0]?locations[0].id:'');
+  const defaultLocationId = defaultByName ? defaultByName.id : (tbdLocation ? tbdLocation.id : (locations[0]?locations[0].id:''));
   $('#sessLocation').value = (existing && existing.location) ? existing.location : (followFrom ? followFrom.location : defaultLocationId);
   // A Waiting record's own apptType is hardcoded to 'First' at creation
   // time (see onSaveSession's waiting branch) and never revisited, so
@@ -2609,12 +2749,15 @@ function openModal(existing, followFrom, opts){
     $('#apptType').value = opts.preset==='dropin' ? 'Drop-in' : 'Training';
     selectedMinisters = ministers.filter(m=>m.status==='Active').map(m=>({id:m.id, role:'Support'}));
     if(opts.preset==='dropin'){
-      // Sunday Drop-In always runs 5:00-8:15pm in the Kids' Wing - default
-      // all three so date is the only thing left to pick.
-      $('#sessTime').value = '17:00';
-      $('#sessEndTime').value = '20:15';
-      const kidsWing = locations.find(l=>l.name.trim().toLowerCase()==="kids' wing");
-      if(kidsWing) $('#sessLocation').value = kidsWing.id;
+      // Sunday Drop-In's time/location come from the DropIn-kind row in
+      // Settings now, not hardcoded - default all three so date is the
+      // only thing left to pick. Falls back to the old fixed values if
+      // that row hasn't been configured yet.
+      const dropIn = dropInWindow();
+      $('#sessTime').value = dropIn ? dropIn.start : '17:00';
+      $('#sessEndTime').value = dropIn ? dropIn.end : '20:15';
+      const dropInLoc = dropIn ? locations.find(l=>l.name.trim().toLowerCase()===dropIn.locationName.trim().toLowerCase()) : null;
+      if(dropInLoc) $('#sessLocation').value = dropInLoc.id;
     }
   }
   updateGroupSessionFields();
@@ -2772,6 +2915,130 @@ async function onSaveLocation(){
   populateLocationSelect();
   $('#sessLocation').value = created.id;
   $('#locationModal').classList.remove('open');
+  renderLocationsSettings();
+}
+
+/* ---- SETTINGS: TIME WINDOWS & LOCATIONS ---- */
+let twEditingId = null;
+function openTimeWindowModal(existing){
+  twEditingId = existing ? existing.id : null;
+  $('#twModalTitle').textContent = existing ? 'Edit Day' : 'Add a Day';
+  $('#twModalMsg').innerHTML = '';
+  const taken = new Set(configuredWeekdays().filter(d => !existing || d!==existing.dayOfWeek));
+  $('#twDay').innerHTML = DAY_NAMES.map((name,i)=>`<option value="${i}" ${taken.has(i)?'disabled':''}>${name}${taken.has(i)?' (already set)':''}</option>`).join('');
+  const firstFree = DAY_NAMES.findIndex((_,i)=>!taken.has(i));
+  $('#twDay').value = existing ? existing.dayOfWeek : (firstFree>-1 ? firstFree : 0);
+  $('#twStart').value = existing ? existing.start : '18:00';
+  $('#twEnd').value = existing ? existing.end : '20:00';
+  $('#timeWindowModal').classList.add('open');
+}
+async function onSaveTimeWindow(){
+  const msg = $('#twModalMsg'); msg.innerHTML = '';
+  const dow = parseInt($('#twDay').value, 10);
+  const start = $('#twStart').value, end = $('#twEnd').value;
+  if(!start || !end || end<=start){ msg.innerHTML = '<div class="errbox" role="alert">End time must be after the start time.</div>'; return; }
+  const dupe = timeWindows.find(t=>t.kind==='Weekday' && t.dayOfWeek===dow && t.id!==twEditingId);
+  if(dupe){ msg.innerHTML = `<div class="errbox" role="alert">${DAY_NAMES[dow]} is already configured — edit or remove that one first.</div>`; return; }
+  const fields = { Title: DAY_NAMES[dow], Kind: 'Weekday', DayOfWeek: dow, StartTime: start, EndTime: end, LocationName: '' };
+  if(twEditingId) await updateItem('timeWindows', twEditingId, fields);
+  else await createItem('timeWindows', fields);
+  $('#timeWindowModal').classList.remove('open');
+  await loadAll();
+}
+window.deleteTimeWindow = async function(id){
+  const ok = await askConfirm('Remove this day from the default schedule? It can be added back later.', {confirmLabel:'Remove', danger:true});
+  if(!ok) return;
+  await deleteItem('timeWindows', id);
+  await loadAll();
+};
+function renderTimeWindowsSettings(){
+  const listEl = $('#settingsTimeWindowsList');
+  if(listEl){
+    const rows = timeWindows.filter(t=>t.kind==='Weekday').slice().sort((a,b)=>a.dayOfWeek-b.dayOfWeek);
+    listEl.innerHTML = rows.length ? rows.map(t=>`
+      <div class="sess-row">
+        <div>
+          <div><strong>${DAY_NAMES[t.dayOfWeek]}</strong></div>
+          <div class="sess-meta">${fmt12(t.start)}–${fmt12(t.end)}</div>
+        </div>
+        <div class="sess-actions">
+          <button class="icon-btn" onclick="editTimeWindow(${t.id})" title="Edit" aria-label="Edit ${DAY_NAMES[t.dayOfWeek]} window">${ICONS.pencil}</button>
+          <button class="icon-btn danger" onclick="deleteTimeWindow(${t.id})" title="Remove" aria-label="Remove ${DAY_NAMES[t.dayOfWeek]} window">${ICONS.trash}</button>
+        </div>
+      </div>
+    `).join('') : '<div class="no-results">No default days configured yet.</div>';
+  }
+  const dropInSelect = $('#settingsDropInLocation');
+  if(dropInSelect){
+    const dropIn = dropInWindow();
+    $('#settingsDropInStart').value = dropIn ? dropIn.start : '17:00';
+    $('#settingsDropInEnd').value = dropIn ? dropIn.end : '20:15';
+    dropInSelect.innerHTML = locations.map(l=>`<option value="${escapeHtml(l.name)}">${escapeHtml(l.name)}</option>`).join('');
+    const curName = dropIn ? dropIn.locationName : "Kids' Wing";
+    const match = locations.find(l=>l.name.trim().toLowerCase()===String(curName||'').trim().toLowerCase());
+    if(match) dropInSelect.value = match.name;
+  }
+  const defLocSelect = $('#settingsDefaultLocation');
+  if(defLocSelect){
+    const defLoc = defaultLocationSetting();
+    defLocSelect.innerHTML = locations.map(l=>`<option value="${escapeHtml(l.name)}">${escapeHtml(l.name)}</option>`).join('');
+    const curName = defLoc ? defLoc.locationName : 'To Be Determined';
+    const match = locations.find(l=>l.name.trim().toLowerCase()===String(curName||'').trim().toLowerCase());
+    if(match) defLocSelect.value = match.name;
+  }
+}
+window.editTimeWindow = function(id){ openTimeWindowModal(timeWindows.find(t=>t.id===id)); };
+async function saveDropInSettings(){
+  const msg = $('#settingsDropInMsg'); msg.innerHTML = '';
+  const start = $('#settingsDropInStart').value, end = $('#settingsDropInEnd').value;
+  const locName = $('#settingsDropInLocation').value;
+  if(!start || !end || end<=start){ msg.innerHTML = '<div class="errbox" role="alert">End time must be after the start time.</div>'; return; }
+  const existing = dropInWindow();
+  const fields = { Title: 'Drop-In', Kind: 'DropIn', DayOfWeek: null, StartTime: start, EndTime: end, LocationName: locName };
+  if(existing) await updateItem('timeWindows', existing.id, fields);
+  else await createItem('timeWindows', fields);
+  await loadAll();
+  msg.textContent = 'Saved.';
+}
+async function saveDefaultLocationSetting(){
+  const msg = $('#settingsDefaultLocationMsg'); msg.innerHTML = '';
+  const locName = $('#settingsDefaultLocation').value;
+  const existing = defaultLocationSetting();
+  const fields = { Title: 'Default Location', Kind: 'DefaultLocation', DayOfWeek: null, StartTime: '', EndTime: '', LocationName: locName };
+  if(existing) await updateItem('timeWindows', existing.id, fields);
+  else await createItem('timeWindows', fields);
+  await loadAll();
+  msg.textContent = 'Saved.';
+}
+function renderLocationsSettings(){
+  const el = $('#settingsLocationsList');
+  if(!el) return;
+  el.innerHTML = locations.length ? locations.map(l=>`
+    <div class="sess-row">
+      <span>${escapeHtml(l.name)}</span>
+      <button class="icon-btn danger" onclick="deleteLocationSetting(${l.id})" title="Delete" aria-label="Delete location ${escapeHtml(l.name)}">${ICONS.trash}</button>
+    </div>
+  `).join('') : '<div class="no-results">No locations yet.</div>';
+}
+window.deleteLocationSetting = async function(id){
+  const loc = locations.find(l=>l.id===id);
+  if(!loc) return;
+  const inUse = sessions.some(s=>s.location===id);
+  const msg = inUse
+    ? `"${loc.name}" is used by existing sessions. Those will keep showing "${loc.name}" as their location, but it will no longer be selectable for new sessions. Delete anyway?`
+    : `Delete "${loc.name}"?`;
+  const ok = await askConfirm(msg, {confirmLabel:'Delete', danger:true});
+  if(!ok) return;
+  await deleteItem('locations', id);
+  await loadAll();
+};
+let settingsSubView = 'timewindows';
+function switchSettingsSub(view){
+  settingsSubView = view;
+  $('#settingsSubtabs').querySelectorAll('button[data-settingsview]').forEach(b=>b.classList.toggle('active', b.dataset.settingsview===view));
+  $('#settingsTimeWindowsView').classList.toggle('active', view==='timewindows');
+  $('#settingsLocationsView').classList.toggle('active', view==='locations');
+  $('#settingsDefaultLocationView').classList.toggle('active', view==='defaultlocation');
 }
 function upcomingCountFor(ministerId){
   const now = new Date();
@@ -2826,14 +3093,30 @@ window.toggleMinister = function(id){
 };
 window.setRole = function(id, role){ const sel=selectedMinisters.find(x=>x.id===id); if(sel) sel.role=role; renderMinisterList(); };
 
-const DAY_WINDOWS = {
-  0: { label:'Sunday', start:'17:30', end:'20:00', presets:['17:30'] },
-  2: { label:'Tuesday', start:'18:00', end:'20:30', presets:['18:00'] },
-};
+const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+// Replaces the old hardcoded DAY_WINDOWS const - now driven by the
+// Weekday-kind rows in the TimeWindows SharePoint list, editable from
+// Settings without a code change. Returns null for any day with no
+// configured row (no usual window for that day).
+function windowForDay(dow){
+  const w = timeWindows.find(t=>t.kind==='Weekday' && t.dayOfWeek===dow);
+  return w ? { label: DAY_NAMES[dow], start: w.start, end: w.end, presets: [w.start] } : null;
+}
+// Which weekdays have a configured window at all - drives Quick Add's own
+// default day-chip selection, so adding a Thursday window in Settings
+// means Thursday is pre-checked in Quick Add without a separate flag.
+function configuredWeekdays(){
+  return timeWindows.filter(t=>t.kind==='Weekday' && t.dayOfWeek!=null).map(t=>t.dayOfWeek);
+}
+// The singleton DropIn/DefaultLocation rows - null if not yet configured
+// (e.g. before the admin has visited Settings), with fallbacks used at
+// every call site so nothing breaks on a brand-new TimeWindows list.
+function dropInWindow(){ return timeWindows.find(t=>t.kind==='DropIn') || null; }
+function defaultLocationSetting(){ return timeWindows.find(t=>t.kind==='DefaultLocation') || null; }
 function slotStartsFor(dateStr){
   if(!dateStr) return [];
   const dow = new Date(dateStr+'T00:00').getDay();
-  const win = DAY_WINDOWS[dow];
+  const win = windowForDay(dow);
   return win ? win.presets : [];
 }
 function renderDayLabel(){
@@ -2841,7 +3124,7 @@ function renderDayLabel(){
   if(!d){ lbl.textContent=''; return; }
   const dow = new Date(d+'T00:00').getDay();
   const dayName = new Date(d+'T00:00').toLocaleDateString(undefined,{weekday:'long'});
-  const win = DAY_WINDOWS[dow];
+  const win = windowForDay(dow);
   lbl.textContent = dayName + (win ? ` — usual window ${fmt12(win.start)}–${fmt12(win.end)}` : '');
 }
 function renderSlotButtons(){
@@ -2871,7 +3154,7 @@ function renderSameDay(){
   if(!same.length){ box.innerHTML = `<div class="sameday-box"><div class="title">Also on this date</div>Nothing else scheduled.</div>`; return; }
   box.innerHTML = `<div class="sameday-box"><div class="title">Also on this date (${same.length})</div>` +
     same.sort((a,b)=>a.time.localeCompare(b.time)).map(s=>
-      `<div>${fmt12(s.time)}–${fmt12(s.endTime)} — ${escapeHtml(s.recipName)} <span class="helptext">(${escapeHtml(ministerNamesOf(s))}, ${escapeHtml(locationName(s.location))})</span></div>`
+      `<div>${fmt12(s.time)}–${fmt12(s.endTime)} — ${escapeHtml(s.recipName)} <span class="helptext">(${escapeHtml(ministerNamesOf(s))}, ${escapeHtml(sessionLocationDisplay(s))})</span></div>`
     ).join('') + `</div>`;
 }
 function showConflictToast(html){
@@ -2921,10 +3204,14 @@ function renderConflictCheck(){
   }
 
   const locationId = parseInt($('#sessLocation').value,10);
-  // "To Be Determined" isn't a real physical room - it means no room has
-  // been decided yet, so two sessions both sitting at TBD aren't actually
-  // competing for the same space and shouldn't flag as a room conflict.
-  const isTbdLocation = locationId && (locations.find(l=>l.id===locationId)||{}).name?.trim().toLowerCase()==='to be determined';
+  // The configured default location (or "To Be Determined" by name, if
+  // that setting hasn't been configured yet) isn't a real physical room -
+  // it means no room has been decided yet, so two sessions both sitting
+  // there aren't actually competing for the same space and shouldn't flag
+  // as a room conflict.
+  const currentLocName = locationId ? (locations.find(l=>l.id===locationId)||{}).name?.trim().toLowerCase() : '';
+  const defaultSettingName = (defaultLocationSetting()||{}).locationName?.trim().toLowerCase();
+  const isTbdLocation = locationId && (currentLocName==='to be determined' || (defaultSettingName && currentLocName===defaultSettingName));
   if(locationId && !isTbdLocation){
     const roomHit = overlapping.find(s=>s.location===locationId);
     if(roomHit){

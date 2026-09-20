@@ -3715,7 +3715,12 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
-  { date: 'Sep 20, 2026', version: APP_VERSION, items: [
+];
+// Entries already live in production, newest first - moved here from
+// CHANGE_LOG at promotion time rather than deleted. See the block comment
+// above for the maintenance rule.
+const CHANGE_LOG_ARCHIVE = [
+  { date: 'Sep 20, 2026', version: '2026-09-20.11', items: [
     'Changed: on phones, the Unplaced Candidates buttons (Contacted, Flag Priority, Edit, Delete) now show text next to the icon, same as the booked-session buttons already did.'
   ]},
   { date: 'Sep 20, 2026', version: '2026-09-20.10', items: [
@@ -3753,12 +3758,7 @@ const CHANGE_LOG = [
     'New: also in Settings - the Sunday Drop-In defaults and the default location for new sessions are now editable, no code changes needed anymore.',
     'New: Locations can now be added or deleted from Settings - a deleted location still shows correctly on any session that already used it.',
     'New: "+ Add custom slot" on the Schedule & Planning tab can now create a Drop-In slot or a Training session, not just a regular one.'
-  ]}
-];
-// Entries already live in production, newest first - moved here from
-// CHANGE_LOG at promotion time rather than deleted. See the block comment
-// above for the maintenance rule.
-const CHANGE_LOG_ARCHIVE = [
+  ]},
   { date: 'Sep 19, 2026', version: '2026-09-19.11', items: [
     'New: tap the calendar icon on a booked session to add it to your phone’s calendar app - includes the room and the prayer team.',
     'New: a Reports tab (placeholder for now - date range and report picker work, the real reports come later).',
