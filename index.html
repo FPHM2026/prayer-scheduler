@@ -52,7 +52,7 @@
   header{max-width:1100px;margin:0 auto;background:var(--cream);color:var(--navy);padding:10px 14px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid rgba(0,0,0,.06);}
   header h1,#signinScreen h1{margin:0;font-size:17px;font-family:'Playfair Display',Georgia,serif;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:var(--gold);}
   #signinScreen h1{font-size:var(--fs-xl);letter-spacing:.03em;}
-  .version-tag{display:none;font-family:'Jost','Segoe UI',Arial,sans-serif;font-weight:400;text-transform:none;color:var(--muted);}
+  .version-tag{display:block;margin:2px 0 0;font-size:var(--fs-2xs);font-family:'Jost','Segoe UI',Arial,sans-serif;font-weight:400;text-transform:none;color:var(--muted);}
   header .who{display:none;font-size:var(--fs-xs);color:var(--navy);}
   #btnSignOut{background:var(--navy);color:#fff;border-color:var(--navy);}
   #btnSignOut:hover:not(:disabled){background:var(--navy-dark);border-color:var(--navy-dark);}
@@ -65,7 +65,6 @@
   @media (min-width:1024px){
     header{padding:16px 24px;}
     header h1{font-size:var(--fs-xl);letter-spacing:.03em;}
-    .version-tag{display:block;margin:2px 0 0;font-size:var(--fs-2xs);}
     header .who{display:inline;}
     nav[aria-label="Primary"]{padding:8px 16px 0;}
     nav[aria-label="Primary"] button{padding:12px 18px;font-size:var(--fs-sm);min-height:44px;}
@@ -103,6 +102,16 @@
   button.icon-btn.danger:hover{background:var(--danger-bg);color:var(--danger);}
   button.icon-btn.success{color:var(--ok);}
   button.icon-btn.success:hover{background:var(--ok-bg);color:var(--ok);}
+  /* Icon-only is fine with a mouse and a title tooltip, but on a touch
+     screen there's no hover to reveal what an icon means - on the session
+     cards specifically (Add to Calendar/Edit/Mark Completed/Delete), show
+     the label text too below 640px rather than making someone guess or
+     long-press for a tooltip that may not even appear on touch. */
+  .toolbar .icon-btn .btn-label{display:none;}
+  @media (max-width:640px){
+    .toolbar .icon-btn{width:100%;justify-content:flex-start;gap:8px;padding:10px 14px;}
+    .toolbar .icon-btn .btn-label{display:inline;font-size:var(--fs-sm);font-weight:600;}
+  }
 
   .tag{display:inline-block;background:#f2ece1;color:var(--navy);border-radius:10px;padding:2px 9px;font-size:var(--fs-2xs);font-weight:700;margin-right:6px;}
   .tag.completed{background:var(--ok-bg);color:var(--ok);}
@@ -441,7 +450,7 @@
     <h1>FPHM Scheduler</h1>
     <span class="version-tag" id="versionTagHeader"></span>
   </div>
-  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end;">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end;margin-left:auto;">
     <a href="./preview/" class="preview-badge" id="previewBadge" hidden>🧪 Preview build available</a>
     <span class="who" id="whoami"></span>
     <button class="btn secondary" id="btnSignOut" style="padding:8px 14px;min-height:36px;">Sign Out</button>
@@ -457,6 +466,7 @@
   <button data-tab="completed">Completed Sessions</button>
   <button data-tab="overview">Prayer Ministers</button>
   <button data-tab="blackouts">Blackout Dates</button>
+  <button data-tab="reports">Reports</button>
 </nav>
 <main>
 <div id="loadError"></div>
@@ -569,6 +579,26 @@
     <p class="helptext" id="blackoutHelptext">Grouped by minister, upcoming dates only, soonest first.</p>
     <div id="blackoutGroups" style="margin-top:16px;"></div>
     <div class="no-results" id="blackoutNoResults" hidden>No upcoming blackout dates.</div>
+  </section>
+
+  <section class="panel" id="panel-reports">
+    <p class="helptext">Pick a date range and a report, then Generate opens it in a new tab. These are placeholders for now — the real report designs come later.</p>
+    <div class="field-row">
+      <div class="field"><label for="reportFrom">From</label><input type="date" id="reportFrom"></div>
+      <div class="field"><label for="reportTo">To</label><input type="date" id="reportTo"></div>
+    </div>
+    <div class="field">
+      <label for="reportType">Report</label>
+      <select id="reportType">
+        <option value="sessions">Session Statistics (Freedom Sessions)</option>
+        <option value="training">Training Statistics</option>
+        <option value="dropin">Drop-in Statistics</option>
+      </select>
+    </div>
+    <div class="toolbar">
+      <button class="btn" id="btnGenerateReport">Generate Report</button>
+    </div>
+    <p class="errbox" role="alert" id="reportMsg" hidden></p>
   </section>
 
 </main>
@@ -706,7 +736,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-18.2";
+const APP_VERSION = "2026-09-19.6";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1171,6 +1201,7 @@ function wireApp(){
   $('#blackoutRange').addEventListener('change', renderBlackouts);
   $('#btnBlackoutCancel').addEventListener('click', ()=>$('#blackoutModal').classList.remove('open'));
   $('#btnBlackoutSave').addEventListener('click', ()=>withLoading($('#btnBlackoutSave'), 'Saving…', saveBlackout));
+  $('#btnGenerateReport').addEventListener('click', generateReport);
   $('#btnConfirmCancel').addEventListener('click', ()=>closeConfirm(false));
   $('#btnConfirmOk').addEventListener('click', ()=>closeConfirm(true));
 }
@@ -1879,6 +1910,64 @@ function renderDayRow(dateIso){
 // Actions go straight to the existing editSession/markComplete/deleteSession
 // - there's no slot to keep in sync, unlike editBookedSession/
 // deleteBookedSession which exist specifically to handle that sync.
+/* ---- ADD TO CALENDAR (.ics download, hands off to the device's native
+   calendar app - Apple Calendar on iOS, whatever's registered for .ics on
+   Android, typically the Google Calendar app itself). UTC (Z-suffix)
+   DTSTART/DTEND rather than a floating local time or a VTIMEZONE block -
+   SessionDate/SessionEndDate are already stored as UTC ISO datetimes via
+   toISOString(), so parsing s.date+s.time as local and re-serializing to
+   UTC here is the same conversion the rest of the app already relies on,
+   and sidesteps DST-transition bugs entirely. ---- */
+function icsDateStamp(d){ return d.toISOString().replace(/[-:]/g,'').split('.')[0]+'Z'; }
+function icsEscape(s){ return String(s||'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n'); }
+// Deliberately not the recipient's full name - once this lands in a
+// minister's personal calendar, this app has no control over who else
+// sees it (a shared family calendar, a synced work calendar). First name
+// + last initial is enough for the minister to recognize the session
+// without exporting a recipient's full identity onto infrastructure this
+// app doesn't own.
+function calendarEventTitle(s){
+  if(s.apptType==='Drop-in') return 'Drop-in Prayer';
+  if(s.apptType==='Training') return 'FPHM Training';
+  const parts = (s.recipName||'').trim().split(/\s+/).filter(Boolean);
+  if(!parts.length) return 'Freedom Session';
+  const first = parts[0];
+  const lastInitial = parts.length>1 ? parts[parts.length-1][0].toUpperCase() : '';
+  return (lastInitial ? `${first} ${lastInitial}` : first) + ' - Freedom Session';
+}
+function downloadSessionIcs(s, locationText){
+  if(!s.date || !s.time || !s.endTime) return;
+  const start = new Date(s.date+'T'+s.time), end = new Date(s.date+'T'+s.endTime);
+  const title = calendarEventTitle(s);
+  // ministerNamesOf already formats "Name (Lead), Name" - reused as-is so
+  // the invite's team list matches how the team is shown everywhere else
+  // in the app, no separate formatting to keep in sync.
+  const team = ministerNamesOf(s);
+  const lines = [
+    'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//FPHM Scheduler//EN','CALSCALE:GREGORIAN',
+    'BEGIN:VEVENT',
+    'UID:fphm-'+s.id+'-'+start.getTime()+'@fphm-scheduler',
+    'DTSTAMP:'+icsDateStamp(new Date()),
+    'DTSTART:'+icsDateStamp(start),
+    'DTEND:'+icsDateStamp(end),
+    'SUMMARY:'+icsEscape(title),
+    'LOCATION:'+icsEscape(locationText||'')
+  ];
+  if(team) lines.push('DESCRIPTION:'+icsEscape('Prayer Ministers: '+team));
+  lines.push('END:VEVENT','END:VCALENDAR');
+  const ics = lines.join('\r\n');
+  const blob = new Blob([ics], {type:'text/calendar;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = title.replace(/[^a-z0-9]+/gi,'-').toLowerCase()+'.ics';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 1500);
+}
+window.addToCalendar = function(sessionId){
+  const s = sessions.find(x=>x.id===sessionId);
+  if(!s) return;
+  downloadSessionIcs(s, locationName(s.location));
+};
 function renderUnlinkedSessionCard(s){
   return `<div class="slot booked expanded">
     <div class="slot-header" style="cursor:default;">
@@ -1898,9 +1987,10 @@ function renderUnlinkedSessionCard(s){
       ${s.notes?`<div class="notes">${escapeHtml(s.notes)}</div>`:''}
       <div class="toolbar" style="margin-top:10px;">
         <button class="btn secondary" onclick="assignSlotToSession(${s.id},this)">Assign to a Slot</button>
-        <button class="icon-btn" onclick="editSession(${s.id})" title="Edit" aria-label="Edit session for ${escapeHtml(s.recipName)}">${ICONS.pencil}</button>
-        <button class="icon-btn success" onclick="markComplete(${s.id})" title="Mark Completed" aria-label="Mark session for ${escapeHtml(s.recipName)} as completed">${ICONS.checkCircle}</button>
-        <button class="icon-btn danger" onclick="deleteSession(${s.id})" title="Delete" aria-label="Delete session for ${escapeHtml(s.recipName)}">${ICONS.trash}</button>
+        <button class="icon-btn" onclick="addToCalendar(${s.id})" title="Add to Calendar" aria-label="Add session for ${escapeHtml(s.recipName)} to your calendar">${ICONS.calendarPlus}<span class="btn-label">Add to Calendar</span></button>
+        <button class="icon-btn" onclick="editSession(${s.id})" title="Edit" aria-label="Edit session for ${escapeHtml(s.recipName)}">${ICONS.pencil}<span class="btn-label">Edit</span></button>
+        <button class="icon-btn success" onclick="markComplete(${s.id})" title="Mark Completed" aria-label="Mark session for ${escapeHtml(s.recipName)} as completed">${ICONS.checkCircle}<span class="btn-label">Mark Completed</span></button>
+        <button class="icon-btn danger" onclick="deleteSession(${s.id})" title="Delete" aria-label="Delete session for ${escapeHtml(s.recipName)}">${ICONS.trash}<span class="btn-label">Delete</span></button>
       </div>
     </div>
   </div>`;
@@ -2200,9 +2290,10 @@ function renderBookedBody(sl){
     <div class="slot-detail-row">${escapeHtml(locationName(linked.location))}</div>
     ${linked.notes?`<div class="notes">${escapeHtml(linked.notes)}</div>`:''}
     <div class="toolbar" style="margin-top:10px;">
-      <button class="icon-btn" onclick="editBookedSession(${sl.id},${linked.id})" title="Edit" aria-label="Edit session for ${escapeHtml(linked.recipName)}">${ICONS.pencil}</button>
-      ${linked.status!=='Completed' ? `<button class="icon-btn success" onclick="markComplete(${linked.id})" title="Mark Completed" aria-label="Mark session for ${escapeHtml(linked.recipName)} as completed">${ICONS.checkCircle}</button>` : ''}
-      <button class="icon-btn danger" onclick="deleteBookedSession(${sl.id},${linked.id})" title="Delete" aria-label="Delete session for ${escapeHtml(linked.recipName)}">${ICONS.trash}</button>
+      <button class="icon-btn" onclick="addToCalendar(${linked.id})" title="Add to Calendar" aria-label="Add session for ${escapeHtml(linked.recipName)} to your calendar">${ICONS.calendarPlus}<span class="btn-label">Add to Calendar</span></button>
+      <button class="icon-btn" onclick="editBookedSession(${sl.id},${linked.id})" title="Edit" aria-label="Edit session for ${escapeHtml(linked.recipName)}">${ICONS.pencil}<span class="btn-label">Edit</span></button>
+      ${linked.status!=='Completed' ? `<button class="icon-btn success" onclick="markComplete(${linked.id})" title="Mark Completed" aria-label="Mark session for ${escapeHtml(linked.recipName)} as completed">${ICONS.checkCircle}<span class="btn-label">Mark Completed</span></button>` : ''}
+      <button class="icon-btn danger" onclick="deleteBookedSession(${sl.id},${linked.id})" title="Delete" aria-label="Delete session for ${escapeHtml(linked.recipName)}">${ICONS.trash}<span class="btn-label">Delete</span></button>
     </div>`;
 }
 // Editing a Booked slot's session reuses the plain session modal, but sets
@@ -3182,12 +3273,55 @@ function renderBlackouts(){
   }).join('');
 }
 
+/* =========================================================================
+   REPORTS — placeholder tab. Generate opens a strawdog report in a new
+   tab (Blob + window.open, not a data: URI - more reliable across
+   browsers for a full HTML document) so the real report designs can be
+   filled in later without changing this scaffolding.
+========================================================================= */
+const REPORT_LABELS = {
+  sessions: 'Session Statistics (Freedom Sessions)',
+  training: 'Training Statistics',
+  dropin: 'Drop-in Statistics'
+};
+function generateReport(){
+  const msg = $('#reportMsg');
+  msg.hidden = true;
+  const from = $('#reportFrom').value, to = $('#reportTo').value, type = $('#reportType').value;
+  if(!from || !to){ msg.hidden = false; msg.textContent = 'Please pick both a from and a to date.'; return; }
+  if(to < from){ msg.hidden = false; msg.textContent = 'The to date must be on or after the from date.'; return; }
+  const label = REPORT_LABELS[type] || type;
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(label)}</title>
+<style>
+  body{font-family:Georgia,'Times New Roman',serif;background:#faf8f4;color:#2a2a2a;margin:0;padding:40px;}
+  .wrap{max-width:800px;margin:0 auto;background:#fff;border:1px solid #ddd5c4;border-radius:10px;padding:36px 42px;}
+  h1{color:#aa5a3c;font-size:24px;margin:0 0 6px;}
+  .range{color:#6b6b6b;font-size:14px;margin:0 0 28px;}
+  .placeholder{background:#e7e2cf;border-radius:8px;padding:20px 24px;color:#474747;font-size:14px;line-height:1.6;}
+  @media print{ body{background:#fff;padding:0;} .wrap{border:none;} }
+</style></head><body>
+  <div class="wrap">
+    <h1>${escapeHtml(label)}</h1>
+    <p class="range">${escapeHtml(fmtShort(from))} – ${escapeHtml(fmtShort(to))}</p>
+    <div class="placeholder">This report's design hasn't been built yet — this is a placeholder to confirm the date range and report selection work end to end. The real ${escapeHtml(label.toLowerCase())} report will replace this page.</div>
+  </div>
+</body></html>`;
+  const blob = new Blob([html], {type: 'text/html'});
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+  setTimeout(()=>URL.revokeObjectURL(url), 60000);
+}
+
 /* Minister Overview date range defaults to year-to-date, set once at load
    (before the first render) so the very first paint already reflects it. */
 (function setDefaultStatsRange(){
   const now = new Date();
   $('#statsFrom').value = isoDate(new Date(now.getFullYear(),0,1));
   $('#statsTo').value = isoDate(now);
+  // Reports tab defaults to the same year-to-date range - re-picking it
+  // every time would otherwise be the first thing anyone does anyway.
+  $('#reportFrom').value = isoDate(new Date(now.getFullYear(),0,1));
+  $('#reportTo').value = isoDate(now);
 })();
 
 /* =========================================================================
