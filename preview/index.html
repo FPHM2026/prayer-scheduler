@@ -823,7 +823,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-20.2";
+const APP_VERSION = "2026-09-20.3";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1904,7 +1904,7 @@ window.toggleCustomAdd = function(dateIso){
   renderSlotWeeks();
 };
 window.addCustomSlot = async function(dateIso){
-  const start = $('#customStart-'+dateIso).value, end = $('#customEnd-'+dateIso).value;
+  const start = readTimePicker('customStart-'+dateIso), end = readTimePicker('customEnd-'+dateIso);
   if(!start || !end || end<=start) return;
   await createItem('slots', {
     Title: dateIso+' custom slot', SlotDate: dateIso+'T00:00:00', StartTime: start, EndTime: end,
@@ -1930,7 +1930,7 @@ window.submitCustomAdd = async function(dateIso){
     openModal(null, null, {forceKind:'session', preset:'training', dateIso});
     return;
   }
-  const start = $('#customStart-'+dateIso).value, end = $('#customEnd-'+dateIso).value;
+  const start = readTimePicker('customStart-'+dateIso), end = readTimePicker('customEnd-'+dateIso);
   if(!start || !end || end<=start) return;
   if(type==='dropin'){
     await createItem('slots', {
@@ -2204,6 +2204,33 @@ window.assignSlotToSession = async function(sessionId, btn){
     if(btn){ btn.disabled = false; btn.textContent = 'Assign to a Slot'; }
   }
 };
+// A native <input type="time"> renders in whatever hour cycle the
+// browser/OS locale picks (24h on plenty of machines) with no reliable
+// HTML/CSS way to force 12h display - unlike our own text output, which
+// fmt12()/fmtTime() already force to AM/PM. This form always displays
+// AM/PM by building the picker itself (hour 1-12 + 15-minute increments +
+// AM/PM) instead of relying on the browser's own control.
+function timePickerHtml(idPrefix, defaultHM){
+  const [h24, m] = (defaultHM||'13:00').split(':').map(Number);
+  const h12 = (h24 % 12) || 12;
+  const ap = h24 < 12 ? 'AM' : 'PM';
+  const roundedM = Math.round(m/15)*15 % 60;
+  const hourOpts = Array.from({length:12}, (_,i)=>i+1)
+    .map(h=>`<option value="${h}" ${h===h12?'selected':''}>${h}</option>`).join('');
+  const minuteOpts = [0,15,30,45]
+    .map(mm=>`<option value="${mm}" ${mm===roundedM?'selected':''}>${String(mm).padStart(2,'0')}</option>`).join('');
+  const apOpts = ['AM','PM']
+    .map(a=>`<option value="${a}" ${a===ap?'selected':''}>${a}</option>`).join('');
+  return `<select id="${idPrefix}H" aria-label="Hour">${hourOpts}</select>:<select id="${idPrefix}M" aria-label="Minute">${minuteOpts}</select><select id="${idPrefix}AP" aria-label="AM or PM">${apOpts}</select>`;
+}
+function readTimePicker(idPrefix){
+  const hEl = $('#'+idPrefix+'H'), mEl = $('#'+idPrefix+'M'), apEl = $('#'+idPrefix+'AP');
+  if(!hEl || !mEl || !apEl) return '';
+  const h12 = parseInt(hEl.value, 10), m = parseInt(mEl.value, 10), ap = apEl.value;
+  let h24 = h12 % 12;
+  if(ap==='PM') h24 += 12;
+  return String(h24).padStart(2,'0')+':'+String(m).padStart(2,'0');
+}
 function renderDayCustomAdd(dateIso){
   if(customAddOpenFor!==dateIso) return `<button type="button" class="add-custom-btn" onclick="toggleCustomAdd('${dateIso}')">+ Add custom slot</button>`;
   return `<div class="custom-slot-form">
@@ -2212,8 +2239,8 @@ function renderDayCustomAdd(dateIso){
       <option value="dropin">Sunday Drop-In</option>
       <option value="training">Training</option>
     </select></label>
-    <label>Start <input type="time" id="customStart-${dateIso}" value="13:00"></label>
-    <label>End <input type="time" id="customEnd-${dateIso}" value="15:00"></label>
+    <label>Start ${timePickerHtml('customStart-'+dateIso, '13:00')}</label>
+    <label>End ${timePickerHtml('customEnd-'+dateIso, '15:00')}</label>
     <button class="btn" onclick="submitCustomAdd('${dateIso}')">Add</button>
     <button class="btn secondary" onclick="toggleCustomAdd(null)">Cancel</button>
   </div>`;
@@ -3703,6 +3730,9 @@ function generateReport(){
 ========================================================================= */
 const CHANGE_LOG = [
   { date: 'Sep 20, 2026', version: APP_VERSION, items: [
+    'Fixed: the Start/End time pickers on the "+ Add custom slot" form now always show AM/PM (e.g. "6:30 PM") instead of sometimes showing 24-hour time.'
+  ]},
+  { date: 'Sep 20, 2026', version: '2026-09-20.2', items: [
     'New: the Changes tab now has a Recent/Archive switch, so past entries that already made it to production have somewhere to go instead of just being deleted.'
   ]},
   { date: 'Sep 20, 2026', version: '2026-09-20.1', items: [
