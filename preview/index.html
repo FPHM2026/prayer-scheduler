@@ -753,7 +753,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-19.8";
+const APP_VERSION = "2026-09-19.9";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1955,13 +1955,13 @@ function icsEscape(s){ return String(s||'').replace(/\\/g,'\\\\').replace(/;/g,'
 // without exporting a recipient's full identity onto infrastructure this
 // app doesn't own.
 function calendarEventTitle(s){
-  if(s.apptType==='Drop-in') return 'Drop-in Prayer';
+  if(s.apptType==='Drop-in') return 'FPHM Drop-in';
   if(s.apptType==='Training') return 'FPHM Training';
   const parts = (s.recipName||'').trim().split(/\s+/).filter(Boolean);
-  if(!parts.length) return 'Freedom Session';
+  if(!parts.length) return 'FS';
   const first = parts[0];
   const lastInitial = parts.length>1 ? parts[parts.length-1][0].toUpperCase() : '';
-  return (lastInitial ? `${first} ${lastInitial}` : first) + ' - Freedom Session';
+  return 'FS: ' + (lastInitial ? `${first} ${lastInitial}` : first);
 }
 function downloadSessionIcs(s, locationText){
   if(!s.date || !s.time || !s.endTime) return;
@@ -3408,7 +3408,8 @@ const CHANGE_LOG = [
     'Fixed: the WhatsApp group checkbox and invite link now actually save on the waiting-list form.',
     'Fixed: two sessions both set to "To Be Determined" no longer show a false room-conflict warning.',
     'Changed: you can now see who’s blacked out right on the slot card, without opening it.',
-    'Changed: on phones, buttons on session cards now show text next to the icon, not just the icon by itself.'
+    'Changed: on phones, buttons on session cards now show text next to the icon, not just the icon by itself.',
+    'Changed: calendar invite titles now read "FS: First L" for regular sessions, "FPHM Drop-in" for Drop-ins, "FPHM Training" for Trainings.'
   ]}
 ];
 function renderChangeLog(){
