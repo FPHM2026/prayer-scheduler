@@ -629,7 +629,7 @@
       <div class="field"><label for="recipName">Recipient Name *</label><input id="recipName" autocomplete="off"><div id="recipNameResults"></div></div>
       <div class="field" id="recipContactField"><label for="recipContact">Recipient Contact</label><input id="recipContact"></div>
     </div>
-    <div class="field-row">
+    <div class="field-row" id="genderFieldRow">
       <div class="field"><label for="recipGender">Recipient Gender</label><select id="recipGender"><option value="">— Not set —</option><option>Female</option><option>Male</option></select></div>
       <div class="field"><label for="genderPref">Team Preference</label><select id="genderPref"><option value="Mixed">Mixed (no preference)</option><option value="Same-sex">Same-sex team only</option></select></div>
     </div>
@@ -753,7 +753,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-19.10";
+const APP_VERSION = "2026-09-19.11";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1608,7 +1608,7 @@ function teamLabel(team){
   }).join(', ');
 }
 // The 4th Sunday of the month is the recurring Sunday Drop-In date - it
-// gets one 5-7:30pm group slot instead of the normal 2-PM-pair capacity math.
+// gets one 5:00-8:15pm group slot instead of the normal 2-PM-pair capacity math.
 function isFourthSunday(d){ return d.getDay()===0 && Math.ceil(d.getDate()/7)===4; }
 // Blackouts match by minister NAME everywhere else in this app (see
 // renderMinisterList) - follows that same convention, not an id join.
@@ -2531,10 +2531,10 @@ window.confirmQuickAddSlots = async function(btn){
       // Derives from the same DAY_WINDOWS "usual time slot" the session
       // form's own quick-pick uses, so both stay in sync from one place -
       // falls back to the old flat default for any day without its own
-      // defined window. Drop-In keeps its own fixed 5-7:30pm regardless.
+      // defined window. Drop-In keeps its own fixed 5:00-8:15pm regardless.
       const win = DAY_WINDOWS[new Date(p.dateIso+'T00:00').getDay()];
       const start = p.isDropIn ? '17:00' : (win ? win.start : '17:30');
-      const end = p.isDropIn ? '19:30' : (win ? win.end : '19:30');
+      const end = p.isDropIn ? '20:15' : (win ? win.end : '19:30');
       for(let i=0;i<p.toAdd;i++){
         await createItem('slots', {
           Title: p.dateIso + (p.isDropIn?' Drop-In':' slot'),
@@ -2626,10 +2626,12 @@ function openModal(existing, followFrom, opts){
     $('#apptType').value = opts.preset==='dropin' ? 'Drop-in' : 'Training';
     selectedMinisters = ministers.filter(m=>m.status==='Active').map(m=>({id:m.id, role:'Support'}));
     if(opts.preset==='dropin'){
-      // Sunday Drop-In always runs 5-7:30pm (2.5 hours, not the usual
-      // +90min default) - default it so date is the only thing left to pick.
+      // Sunday Drop-In always runs 5:00-8:15pm in the Kids' Wing - default
+      // all three so date is the only thing left to pick.
       $('#sessTime').value = '17:00';
-      $('#sessEndTime').value = '19:30';
+      $('#sessEndTime').value = '20:15';
+      const kidsWing = locations.find(l=>l.name.trim().toLowerCase()==="kids' wing");
+      if(kidsWing) $('#sessLocation').value = kidsWing.id;
     }
   }
   updateGroupSessionFields();
@@ -2646,7 +2648,18 @@ function updateGroupSessionFields(){
   const isGroup = $('#apptType').value==='Drop-in' || $('#apptType').value==='Training';
   $('#recipContactField').style.display = isGroup ? 'none' : '';
   $('#waField').style.display = isGroup ? 'none' : '';
-  if(isGroup){ $('#recipContact').value=''; $('#waCreated').checked=false; $('#waLink').value=''; }
+  // Gender/team-preference make no sense for a group event - "Sunday
+  // Drop-In" and "Training" aren't individuals with a gender or a
+  // same-sex-team need, same reasoning as hiding contact/WhatsApp above.
+  $('#genderFieldRow').style.display = isGroup ? 'none' : '';
+  if(isGroup){
+    $('#recipContact').value=''; $('#waCreated').checked=false; $('#waLink').value='';
+    $('#recipGender').value=''; $('#genderPref').value='Mixed';
+  }
+  // Re-render since the gender fields may have just changed under it -
+  // keeps the same-sex mismatch warning from going stale if this fired
+  // from switching Appointment Type mid-edit rather than on initial open.
+  renderMinisterList();
 }
 
 // Autocomplete for the Recipient Name field (New Session and Add to Waiting
@@ -3406,7 +3419,9 @@ const CHANGE_LOG = [
     'Fixed: two sessions both set to "To Be Determined" no longer show a false room-conflict warning.',
     'Changed: you can now see who’s blacked out right on the slot card, without opening it.',
     'Changed: on phones, buttons on session cards now show text next to the icon, not just the icon by itself.',
-    'Changed: calendar invite titles now read "FS: Full Name" for regular sessions, "FPHM Drop-in" for Drop-ins, "FPHM Training" for Trainings.'
+    'Changed: calendar invite titles now read "FS: Full Name" for regular sessions, "FPHM Drop-in" for Drop-ins, "FPHM Training" for Trainings.',
+    'Changed: Recipient Gender and Team Preference no longer show on the form for Drop-In or Training sessions - they don’t apply to a group event.',
+    'Changed: Sunday Drop-In now defaults to 5:00-8:15pm in the Kids’ Wing.'
   ]}
 ];
 function renderChangeLog(){
