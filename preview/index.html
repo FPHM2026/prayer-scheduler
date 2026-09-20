@@ -478,6 +478,7 @@
   <button data-tab="changes" class="active" aria-current="page">Changes</button>
   <button data-tab="schedplan">Schedule &amp; Planning</button>
   <button data-tab="completed">Completed Sessions</button>
+  <button data-tab="overview">Prayer Ministers</button>
   <button data-tab="blackouts">Blackout Dates</button>
   <button data-tab="reports">Reports</button>
   <button data-tab="settings">Settings</button>
@@ -562,6 +563,34 @@
     <div class="no-results" id="completedNoResults" hidden>No completed sessions match your search.</div>
   </section>
 
+  <section class="panel" id="panel-overview">
+    <div class="toolbar" style="margin-bottom:10px;">
+      <button class="btn" id="btnAddMinister">+ Add Minister</button>
+      <button class="btn secondary" id="rosterSortBtn" onclick="toggleRosterSort()" style="display:inline-flex;align-items:center;gap:7px;" aria-label="Toggle sort order, currently by next appointment"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h11M3 12h7M3 17h4"/><path d="M17 5v14M17 5l-4 4M17 5l4 4"/></svg> Next Appointment</button>
+    </div>
+    <p class="helptext">Grouped by minister — tap a name for their stats and upcoming sessions, or use the icons to manage them.</p>
+    <div class="stats-collapse" id="overviewStatsCollapse">
+      <button class="stats-toggle" onclick="toggleStatsCollapse(this)" aria-expanded="true">
+        <span class="chevron"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>
+        <span>Stats</span>
+      </button>
+      <div class="stats-body"><div class="stats-body-inner" id="overviewStats"></div></div>
+    </div>
+    <div class="overview-filters">
+      <div class="search-wrap"><input id="overviewSearch" placeholder="Search ministers..." aria-label="Search ministers by name"><button type="button" class="search-clear" aria-label="Clear search" hidden>&times;</button></div>
+      <div class="date-pair">
+        <div class="date-wrap"><label for="statsFrom">From</label><input type="date" id="statsFrom"></div>
+        <div class="date-wrap"><label for="statsTo">To</label><input type="date" id="statsTo"></div>
+      </div>
+    </div>
+    <nav class="subtabs" aria-label="Minister status" id="overviewSubtabs">
+      <button class="active" data-substatus="Active">Active</button>
+      <button data-substatus="Inactive">Inactive</button>
+    </nav>
+    <div id="overviewGroups"></div>
+    <div class="no-results" id="overviewNoResults" hidden>No ministers match your search.</div>
+  </section>
+
   <section class="panel" id="panel-blackouts">
     <div class="toolbar">
       <button class="btn" id="btnAddBlackout">+ Add Blackout Date</button>
@@ -595,16 +624,15 @@
   <section class="panel" id="panel-settings">
     <p class="helptext">Configure defaults used across scheduling — no code changes needed.</p>
     <nav class="subtabs" aria-label="Settings section" id="settingsSubtabs">
-      <button class="active" data-settingsview="timewindows">Time Windows</button>
+      <button class="active" data-settingsview="timewindows">Quick Slots</button>
       <button data-settingsview="locations">Locations</button>
-      <button data-settingsview="ministers">Prayer Ministers</button>
     </nav>
 
     <div class="settings-subview active" id="settingsTimeWindowsView">
       <div class="toolbar" style="margin:16px 0 10px;">
         <button class="btn" id="btnAddTimeWindow">+ Add a Day</button>
       </div>
-      <p class="helptext">Default time windows offered when quick-adding slots for a Freedom Session. Add, edit, or remove which days have a default and what time each runs.</p>
+      <p class="helptext">The days and times the "+ Quick Add Slots" button offers for a Freedom Session. Add, edit, or remove which days have a default and what time each runs.</p>
       <div id="settingsTimeWindowsList"></div>
 
       <div class="section-title" style="margin:26px 0 12px;"><h2 style="font-size:var(--fs-lg);margin:0;color:var(--navy);">Sunday Drop-In</h2></div>
@@ -637,34 +665,6 @@
       </div>
       <p class="helptext">Deleting a location removes it from the dropdown for new sessions — sessions that already used it keep showing its original name.</p>
       <div id="settingsLocationsList"></div>
-    </div>
-
-    <div class="settings-subview" id="panel-overview">
-      <div class="toolbar" style="margin:16px 0 10px;">
-        <button class="btn" id="btnAddMinister">+ Add Minister</button>
-        <button class="btn secondary" id="rosterSortBtn" onclick="toggleRosterSort()" style="display:inline-flex;align-items:center;gap:7px;" aria-label="Toggle sort order, currently by next appointment"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h11M3 12h7M3 17h4"/><path d="M17 5v14M17 5l-4 4M17 5l4 4"/></svg> Next Appointment</button>
-      </div>
-      <p class="helptext">Grouped by minister — tap a name for their stats and upcoming sessions, or use the icons to manage them.</p>
-      <div class="stats-collapse" id="overviewStatsCollapse">
-        <button class="stats-toggle" onclick="toggleStatsCollapse(this)" aria-expanded="true">
-          <span class="chevron"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>
-          <span>Stats</span>
-        </button>
-        <div class="stats-body"><div class="stats-body-inner" id="overviewStats"></div></div>
-      </div>
-      <div class="overview-filters">
-        <div class="search-wrap"><input id="overviewSearch" placeholder="Search ministers..." aria-label="Search ministers by name"><button type="button" class="search-clear" aria-label="Clear search" hidden>&times;</button></div>
-        <div class="date-pair">
-          <div class="date-wrap"><label for="statsFrom">From</label><input type="date" id="statsFrom"></div>
-          <div class="date-wrap"><label for="statsTo">To</label><input type="date" id="statsTo"></div>
-        </div>
-      </div>
-      <nav class="subtabs" aria-label="Minister status" id="overviewSubtabs">
-        <button class="active" data-substatus="Active">Active</button>
-        <button data-substatus="Inactive">Inactive</button>
-      </nav>
-      <div id="overviewGroups"></div>
-      <div class="no-results" id="overviewNoResults" hidden>No ministers match your search.</div>
     </div>
   </section>
 
@@ -819,7 +819,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-19.12";
+const APP_VERSION = "2026-09-19.13";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3048,7 +3048,6 @@ function switchSettingsSub(view){
   $('#settingsSubtabs').querySelectorAll('button[data-settingsview]').forEach(b=>b.classList.toggle('active', b.dataset.settingsview===view));
   $('#settingsTimeWindowsView').classList.toggle('active', view==='timewindows');
   $('#settingsLocationsView').classList.toggle('active', view==='locations');
-  $('#panel-overview').classList.toggle('active', view==='ministers');
 }
 function upcomingCountFor(ministerId){
   const now = new Date();
@@ -3691,13 +3690,13 @@ function generateReport(){
    letting this grow into a full history.
 ========================================================================= */
 const CHANGE_LOG = [
-  { date: 'Sep 19, 2026', items: [
-    'New: a Settings tab (admin-only) to configure default Freedom Session time windows by day, the Sunday Drop-In defaults, and the default location for new sessions - no code changes needed anymore.',
-    'Changed: Prayer Ministers administration moved into the new Settings tab.',
+  { date: 'Sep 19, 2026', version: APP_VERSION, items: [
+    'New: a Settings tab (admin-only) with a "Quick Slots" section - the days and times the "+ Quick Add Slots" button offers for a Freedom Session are now editable there instead of fixed to Tuesday/Sunday.',
+    'New: also in Settings - the Sunday Drop-In defaults and the default location for new sessions are now editable, no code changes needed anymore.',
     'New: Locations can now be added or deleted from Settings - a deleted location still shows correctly on any session that already used it.',
     'New: "+ Add custom slot" on the Schedule & Planning tab can now create a Drop-In slot or a Training session, not just a regular one.'
   ]},
-  { date: 'Sep 19, 2026', items: [
+  { date: 'Sep 19, 2026', version: '2026-09-19.11', items: [
     'New: tap the calendar icon on a booked session to add it to your phone’s calendar app - includes the room and the prayer team.',
     'New: a Reports tab (placeholder for now - date range and report picker work, the real reports come later).',
     'Fixed: deleting a booked session now puts the person back on the waiting list instead of removing them completely.',
@@ -3715,7 +3714,7 @@ function renderChangeLog(){
   if(!box) return;
   box.innerHTML = CHANGE_LOG.map(entry => `
     <div style="margin-bottom:22px;">
-      <div style="font-weight:700;color:var(--gold);font-size:var(--fs-sm);margin-bottom:8px;">${escapeHtml(entry.date)}</div>
+      <div style="font-weight:700;color:var(--gold);font-size:var(--fs-sm);margin-bottom:8px;">${escapeHtml(entry.date)}${entry.version ? ' · v'+escapeHtml(entry.version) : ''}</div>
       <ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;">
         ${entry.items.map(i=>`<li>${i}</li>`).join('')}
       </ul>
