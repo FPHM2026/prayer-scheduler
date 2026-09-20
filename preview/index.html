@@ -819,7 +819,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-19.13";
+const APP_VERSION = "2026-09-20.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1130,7 +1130,7 @@ const ICONS = {
   phone: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>'
 };
 function fmtDate(d){ return d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'}); }
-function fmtTime(d){ return d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}); }
+function fmtTime(d){ return d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit',hour12:true}); }
 function fmt12(t){ if(!t) return ''; const [h,m]=t.split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); return fmtTime(d); }
 function fmtShort(dateStr){ if(!dateStr) return ''; return new Date(dateStr+'T00:00').toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); }
 function isoDate(d){ return d.toISOString().slice(0,10); }
@@ -3690,7 +3690,10 @@ function generateReport(){
    letting this grow into a full history.
 ========================================================================= */
 const CHANGE_LOG = [
-  { date: 'Sep 19, 2026', version: APP_VERSION, items: [
+  { date: 'Sep 20, 2026', version: APP_VERSION, items: [
+    'Fixed: times now always show as "6:00 PM" style (AM/PM), even on a phone or computer set to 24-hour time. Applies everywhere in both the admin app and the minister portal.'
+  ]},
+  { date: 'Sep 19, 2026', version: '2026-09-19.13', items: [
     'New: a Settings tab (admin-only) with a "Quick Slots" section - the days and times the "+ Quick Add Slots" button offers for a Freedom Session are now editable there instead of fixed to Tuesday/Sunday.',
     'New: also in Settings - the Sunday Drop-In defaults and the default location for new sessions are now editable, no code changes needed anymore.',
     'New: Locations can now be added or deleted from Settings - a deleted location still shows correctly on any session that already used it.',
@@ -3699,14 +3702,7 @@ const CHANGE_LOG = [
   { date: 'Sep 19, 2026', version: '2026-09-19.11', items: [
     'New: tap the calendar icon on a booked session to add it to your phone’s calendar app - includes the room and the prayer team.',
     'New: a Reports tab (placeholder for now - date range and report picker work, the real reports come later).',
-    'Fixed: deleting a booked session now puts the person back on the waiting list instead of removing them completely.',
-    'Fixed: the WhatsApp group checkbox and invite link now actually save on the waiting-list form.',
-    'Fixed: two sessions both set to "To Be Determined" no longer show a false room-conflict warning.',
-    'Changed: you can now see who’s blacked out right on the slot card, without opening it.',
-    'Changed: on phones, buttons on session cards now show text next to the icon, not just the icon by itself.',
-    'Changed: calendar invite titles now read "FS: Full Name" for regular sessions, "FPHM Drop-in" for Drop-ins, "FPHM Training" for Trainings.',
-    'Changed: Recipient Gender and Team Preference no longer show on the form for Drop-In or Training sessions - they don’t apply to a group event.',
-    'Changed: Sunday Drop-In now defaults to 5:00-8:15pm in the Kids’ Wing.'
+    'Fixed: deleting a booked session now puts the person back on the waiting list instead of removing them completely.'
   ]}
 ];
 function renderChangeLog(){
