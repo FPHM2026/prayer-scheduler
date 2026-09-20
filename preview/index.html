@@ -3724,14 +3724,14 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
-  { date: 'Sep 20, 2026', version: APP_VERSION, items: [
-    'New: session cards on Schedule & Planning now show the "Session #N" chip (first-time vs follow-up) next to the recipient\'s name, same as Completed Sessions already had.'
-  ]}
 ];
 // Entries already live in production, newest first - moved here from
 // CHANGE_LOG at promotion time rather than deleted. See the block comment
 // above for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Sep 20, 2026', version: '2026-09-20.12', items: [
+    'New: session cards on Schedule & Planning now show the "Session #N" chip (first-time vs follow-up) next to the recipient\'s name, same as Completed Sessions already had.'
+  ]},
   { date: 'Sep 20, 2026', version: '2026-09-20.11', items: [
     'Changed: on phones, the Unplaced Candidates buttons (Contacted, Flag Priority, Edit, Delete) now show text next to the icon, same as the booked-session buttons already did.'
   ]},

@@ -813,7 +813,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-20.11";
+const APP_VERSION = "2026-09-20.12";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -2114,6 +2114,7 @@ function renderUnlinkedSessionCard(s){
       </span>
       <span class="slot-header-detail">
         <span class="slot-header-name">${escapeHtml(s.recipName)}</span>
+        ${s.apptType!=='Drop-in' && s.apptType!=='Training' ? `<span class="tag ${sessionNumberOf(s)===1?'first':''}">Session #${sessionNumberOf(s)}</span>` : ''}
         ${ministerNamesOf(s) ? `<span class="slot-header-team">${escapeHtml(ministerNamesOf(s))}</span>` : ''}
       </span>
     </div>
@@ -2208,7 +2209,14 @@ function renderSlotCard(sl){
   const isOpen = expandedSlots.has(sl.id);
   const cand = sl.claimedId ? sessions.find(s=>s.id===sl.claimedId) : null;
   const linked = sl.linkedSessionId ? sessions.find(s=>s.id===sl.linkedSessionId) : null;
+  const sessionForHeader = linked || cand;
   const nameForHeader = linked ? linked.recipName : (cand ? cand.recipName : (sl.status==='Drop-In' ? 'Sunday Drop-In' : ''));
+  // Session #N only means something for an individual recipient's own
+  // history - Drop-in/Training share one recipName across every occurrence
+  // (see computeSessionNumbers), so the number there is just a running
+  // count of group events, not a first-time/follow-up signal. Same
+  // exclusion Completed Sessions already applies.
+  const showSessionNum = sessionForHeader && sessionForHeader.apptType!=='Drop-in' && sessionForHeader.apptType!=='Training';
   const teamForHeader = teamLabel(sl.team);
   return `<div class="slot ${cls}${isOpen?' expanded':''}">
     <button type="button" class="slot-header" onclick="toggleSlotOpen(${sl.id})" aria-expanded="${isOpen}">
@@ -2218,6 +2226,7 @@ function renderSlotCard(sl){
       </span>
       <span class="slot-header-detail">
         ${nameForHeader ? `<span class="slot-header-name">${escapeHtml(nameForHeader)}</span>` : ''}
+        ${showSessionNum ? `<span class="tag ${sessionNumberOf(sessionForHeader)===1?'first':''}">Session #${sessionNumberOf(sessionForHeader)}</span>` : ''}
         ${teamForHeader ? `<span class="slot-header-team">${escapeHtml(teamForHeader)}</span>` : (sl.status==='Open' ? renderOpenAvailNow(sl) : '')}
       </span>
       <span class="slot-chevron">${ICONS.chevron}</span>
