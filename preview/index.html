@@ -630,6 +630,7 @@
     <nav class="subtabs" aria-label="Settings section" id="settingsSubtabs">
       <button class="active" data-settingsview="timewindows">Quick Slots</button>
       <button data-settingsview="locations">Locations</button>
+      <button data-settingsview="defaultlocation">Default Location</button>
     </nav>
 
     <div class="settings-subview active" id="settingsTimeWindowsView">
@@ -650,8 +651,18 @@
         <button class="btn" id="btnSaveDropInSettings">Save Drop-In Defaults</button>
       </div>
       <p class="helptext" id="settingsDropInMsg"></p>
+    </div>
 
-      <div class="section-title" style="margin:26px 0 12px;"><h2 style="font-size:var(--fs-lg);margin:0;color:var(--navy);">Default Location for New Sessions</h2></div>
+    <div class="settings-subview" id="settingsLocationsView">
+      <div class="toolbar" style="margin:16px 0 10px;">
+        <button class="btn" id="btnSettingsAddLocation">+ Add Location</button>
+      </div>
+      <p class="helptext">Deleting a location removes it from the dropdown for new sessions — sessions that already used it keep showing its original name.</p>
+      <div id="settingsLocationsList"></div>
+    </div>
+
+    <div class="settings-subview" id="settingsDefaultLocationView">
+      <div class="section-title" style="margin:16px 0 12px;"><h2 style="font-size:var(--fs-lg);margin:0;color:var(--navy);">Default Location for New Sessions</h2></div>
       <p class="helptext">Used when creating a brand-new session before a room has been decided.</p>
       <div class="field">
         <label for="settingsDefaultLocation">Location</label>
@@ -661,14 +672,6 @@
         <button class="btn" id="btnSaveDefaultLocationSetting">Save Default Location</button>
       </div>
       <p class="helptext" id="settingsDefaultLocationMsg"></p>
-    </div>
-
-    <div class="settings-subview" id="settingsLocationsView">
-      <div class="toolbar" style="margin:16px 0 10px;">
-        <button class="btn" id="btnSettingsAddLocation">+ Add Location</button>
-      </div>
-      <p class="helptext">Deleting a location removes it from the dropdown for new sessions — sessions that already used it keep showing its original name.</p>
-      <div id="settingsLocationsList"></div>
     </div>
   </section>
 
@@ -823,7 +826,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-20.3";
+const APP_VERSION = "2026-09-20.4";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3080,6 +3083,7 @@ function switchSettingsSub(view){
   $('#settingsSubtabs').querySelectorAll('button[data-settingsview]').forEach(b=>b.classList.toggle('active', b.dataset.settingsview===view));
   $('#settingsTimeWindowsView').classList.toggle('active', view==='timewindows');
   $('#settingsLocationsView').classList.toggle('active', view==='locations');
+  $('#settingsDefaultLocationView').classList.toggle('active', view==='defaultlocation');
 }
 function upcomingCountFor(ministerId){
   const now = new Date();
@@ -3730,6 +3734,9 @@ function generateReport(){
 ========================================================================= */
 const CHANGE_LOG = [
   { date: 'Sep 20, 2026', version: APP_VERSION, items: [
+    'Changed: "Default Location for New Sessions" moved out of Quick Slots into its own tab in Settings.'
+  ]},
+  { date: 'Sep 20, 2026', version: '2026-09-20.3', items: [
     'Fixed: the Start/End time pickers on the "+ Add custom slot" form now always show AM/PM (e.g. "6:30 PM") instead of sometimes showing 24-hour time.'
   ]},
   { date: 'Sep 20, 2026', version: '2026-09-20.2', items: [
