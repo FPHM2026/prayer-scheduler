@@ -15,8 +15,8 @@
   :root{
     --navy:#474747; --navy-dark:#333; --gold:#aa5a3c; --gold-dark:#8a4a30;
     --primary:#f28a00; --primary-dark:#ce7500; --on-primary:#1a1a1a;
-    --cream:#e7e2cf; --bg:#faf8f4; --card:#fff; --border:#ddd5c4;
-    --text:#565656; --muted:#7a7a7a; --muted-bar:#cdc4ac; --danger:#c0392b; --danger-bg:#fdecea;
+    --cream:#e7e2cf; --bg:#faf8f4; --card:#fff; --border:#9d8b67;
+    --text:#565656; --muted:#636363; --muted-bar:#cdc4ac; --danger:#c0392b; --danger-bg:#fdecea;
     --ok:#2e7d32; --ok-bg:#e9f7ec;
     --shadow-sm:0 1px 2px rgba(35,28,20,.07),0 1px 1px rgba(35,28,20,.05);
     --shadow-md:0 6px 18px rgba(35,28,20,.10);
@@ -44,7 +44,7 @@
   body{margin:0;font-family:'Jost','Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text);font-size:var(--fs-base);line-height:1.55;}
 
   header{max-width:1100px;margin:0 auto;background:var(--cream);color:var(--navy);padding:10px 14px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid rgba(0,0,0,.06);}
-  header h1,#signinScreen h1{margin:0;font-size:17px;font-family:'Playfair Display',Georgia,serif;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:var(--gold);}
+  header h1,#signinScreen h1{margin:0;font-size:17px;font-family:'Playfair Display',Georgia,serif;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:var(--gold-dark);}
   #signinScreen h1{font-size:var(--fs-xl);letter-spacing:.03em;}
   header .who{font-size:var(--fs-xs);color:var(--navy);}
   #btnSignOut{background:var(--navy);color:#fff;border-color:var(--navy);}
@@ -501,7 +501,7 @@ const ICONS = {
 function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function initials(name){ return String(name||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join(''); }
 function fmtDate(d){ return d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'}); }
-function fmtTime(d){ return d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}); }
+function fmtTime(d){ return d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit',hour12:true}); }
 function fmt12(t){ if(!t) return ''; const [h,m]=t.split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); return fmtTime(d); }
 function fmtShort(dateStr){ if(!dateStr) return ''; return new Date(dateStr+'T00:00').toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); }
 function isoDate(d){ return d.toISOString().slice(0,10); }
@@ -566,13 +566,10 @@ function mySessions(){ return sessions.filter(s=> s.ministers.some(m=>m.id===me.
 function icsDateStamp(d){ return d.toISOString().replace(/[-:]/g,'').split('.')[0]+'Z'; }
 function icsEscape(s){ return String(s||'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n'); }
 function calendarEventTitle(s){
-  if(s.apptType==='Drop-in') return 'Drop-in Prayer';
+  if(s.apptType==='Drop-in') return 'FPHM Drop-in';
   if(s.apptType==='Training') return 'FPHM Training';
-  const parts = (s.recipName||'').trim().split(/\s+/).filter(Boolean);
-  if(!parts.length) return 'Freedom Session';
-  const first = parts[0];
-  const lastInitial = parts.length>1 ? parts[parts.length-1][0].toUpperCase() : '';
-  return (lastInitial ? `${first} ${lastInitial}` : first) + ' - Freedom Session';
+  const name = (s.recipName||'').trim();
+  return name ? `FS: ${name}` : 'FS';
 }
 window.addToCalendar = function(sessionId){
   const s = sessions.find(x=>x.id===sessionId);
