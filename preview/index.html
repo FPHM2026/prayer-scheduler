@@ -470,7 +470,11 @@
        merged Schedule & Planning tab (panel-schedplan) replaces both, per
        the "no duplicated functionality" decision. Re-add these two buttons
        plus data-tab="schedule"/"planning" here to fall back if needed. -->
-  <button data-tab="schedplan" class="active" aria-current="page">Schedule &amp; Planning</button>
+  <!-- Preview-only tab - never promote this one to production. Kept first
+       so a reviewer's very first click lands on "what changed", not
+       buried after everything else. -->
+  <button data-tab="changes" class="active" aria-current="page">Changes</button>
+  <button data-tab="schedplan">Schedule &amp; Planning</button>
   <button data-tab="completed">Completed Sessions</button>
   <button data-tab="overview">Prayer Ministers</button>
   <button data-tab="blackouts">Blackout Dates</button>
@@ -479,7 +483,12 @@
 <main>
 <div id="loadError"></div>
 
-  <section class="panel active" id="panel-schedplan">
+  <section class="panel active" id="panel-changes">
+    <p class="helptext">What's new in this preview build — check these specifically before anything else. Newest first.</p>
+    <div id="changeLog"></div>
+  </section>
+
+  <section class="panel" id="panel-schedplan">
     <p class="helptext">Every state lives here — open slots to fill, tentative claims to review, and booked sessions to look back on.</p>
     <div class="stats-collapse" id="schedPlanStatsCollapse">
       <button class="stats-toggle" onclick="toggleStatsCollapse(this)" aria-expanded="true">
@@ -744,7 +753,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-19.7";
+const APP_VERSION = "2026-09-19.8";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3382,6 +3391,39 @@ function generateReport(){
 
 /* Minister Overview date range defaults to year-to-date, set once at load
    (before the first render) so the very first paint already reflects it. */
+/* =========================================================================
+   CHANGES TAB — preview-only, never promoted to production (strip this
+   whole section, the panel-changes HTML block, and its nav button when
+   copying this file over to index.html). Maintained by hand: add one new
+   dated entry at the top on each preview publish, in plain language a
+   non-technical reviewer can act on - what to actually go check, not a
+   commit log. Keep it short - trim old entries off the bottom rather than
+   letting this grow into a full history.
+========================================================================= */
+const CHANGE_LOG = [
+  { date: 'Sep 19, 2026', items: [
+    'New: tap the calendar icon on a booked session to add it to your phone’s calendar app - includes the room and the prayer team.',
+    'New: a Reports tab (placeholder for now - date range and report picker work, the real reports come later).',
+    'Fixed: deleting a booked session now puts the person back on the waiting list instead of removing them completely.',
+    'Fixed: the WhatsApp group checkbox and invite link now actually save on the waiting-list form.',
+    'Fixed: two sessions both set to "To Be Determined" no longer show a false room-conflict warning.',
+    'Changed: you can now see who’s blacked out right on the slot card, without opening it.',
+    'Changed: on phones, buttons on session cards now show text next to the icon, not just the icon by itself.'
+  ]}
+];
+function renderChangeLog(){
+  const box = $('#changeLog');
+  if(!box) return;
+  box.innerHTML = CHANGE_LOG.map(entry => `
+    <div style="margin-bottom:22px;">
+      <div style="font-weight:700;color:var(--gold);font-size:var(--fs-sm);margin-bottom:8px;">${escapeHtml(entry.date)}</div>
+      <ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;">
+        ${entry.items.map(i=>`<li>${i}</li>`).join('')}
+      </ul>
+    </div>`).join('');
+}
+renderChangeLog();
+
 (function setDefaultStatsRange(){
   const now = new Date();
   $('#statsFrom').value = isoDate(new Date(now.getFullYear(),0,1));

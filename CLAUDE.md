@@ -33,10 +33,17 @@ portal" below.
 ## Deployment workflow (preview → production)
 For anything bigger than a trivial/safe fix, build and test in
 `preview/index.html` first, never `index.html` directly:
-1. Edit `preview/index.html`. It carries one block production doesn't have —
+1. Edit `preview/index.html`. It carries blocks production doesn't have —
    a `#previewModeBanner` (HTML near the top of `<body>`, CSS a few lines
-   above it) — strip this back out if copying preview's content wholesale
-   into production.
+   above it), and a **Changes tab** (`panel-changes`, its nav button, the
+   `CHANGE_LOG` array + `renderChangeLog()`) — strip all of this back out if
+   copying preview's content wholesale into production. The Changes tab is
+   the first tab and the default-active one specifically so a non-technical
+   reviewer's first click lands on "what changed," not buried after
+   everything else — add one new dated entry to `CHANGE_LOG` (newest at the
+   top) on every preview publish, written in plain language describing what
+   to actually go check, not a commit log; trim old entries off the bottom
+   rather than letting it grow into a full history.
 2. Bump `const APP_VERSION = "..."` in preview/index.html (date + counter,
    e.g. `"2026-09-15.1"`). Two independent checks read this: each page polls
    its own deployed copy's APP_VERSION and prompts a reload if what's loaded
@@ -449,9 +456,10 @@ like one product, not two:
     production's minister sign-in redirect one level too high. Also strip
     the `#previewModeBanner` CSS/markup block AND the comment that explains
     it (the comment sits just above the CSS rule it describes, easy to
-    leave orphaned if only the rule itself gets removed) — production never
-    had either. Check both by hand after every promotion; nothing catches
-    this automatically.
+    leave orphaned if only the rule itself gets removed), and the entire
+    **Changes tab** (`panel-changes` section, its nav button, `CHANGE_LOG`/
+    `renderChangeLog()`) — production never had any of these. Check all of
+    it by hand after every promotion; nothing catches this automatically.
 
 ## History (why it's built this way, not some other way)
 1. Started as a plan to host raw HTML/JS directly in a SharePoint document
