@@ -636,7 +636,7 @@
     <nav class="subtabs" aria-label="Settings section" id="settingsSubtabs">
       <button class="active" data-settingsview="timewindows">Quick Slots</button>
       <button data-settingsview="locations">Locations</button>
-      <button data-settingsview="defaultlocation">Default Location</button>
+      <button data-settingsview="defaultlocation">Sessions</button>
     </nav>
 
     <div class="settings-subview active" id="settingsTimeWindowsView">
@@ -839,7 +839,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-20.9";
+const APP_VERSION = "2026-09-20.10";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3720,6 +3720,9 @@ function generateReport(){
 ========================================================================= */
 const CHANGE_LOG = [
   { date: 'Sep 20, 2026', version: APP_VERSION, items: [
+    'Changed: renamed the "Default Location" tab in Settings to "Sessions".'
+  ]},
+  { date: 'Sep 20, 2026', version: '2026-09-20.9', items: [
     'Changed: in Settings, Quick Slots now shows Default Days and Sunday Drop-In as two separate cards, so it\'s clear they\'re related but independent settings.'
   ]},
   { date: 'Sep 20, 2026', version: '2026-09-20.8', items: [
