@@ -253,6 +253,12 @@
      card - keeps the date line flush across every card in the row. */
   .stat-sub{font-size:var(--fs-2xs);color:var(--muted);margin-top:auto;padding-top:10px;}
 
+  /* ---- Settings: one card per distinct setting group ---- */
+  .settings-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:16px;box-shadow:var(--shadow-sm);}
+  .settings-card h2{font-size:var(--fs-lg);margin:0 0 4px;color:var(--navy);}
+  .settings-card .helptext{margin-bottom:14px;}
+  .settings-card:last-child{margin-bottom:0;}
+
   /* ---- Completed Sessions: combo card (YTD / Last Year / Lifetime) ---- */
   .stat-combo{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px;box-shadow:var(--shadow-sm);}
   .stat-combo-grid{display:grid;grid-template-columns:auto repeat(3,1fr);gap:0 8px;}
@@ -634,23 +640,30 @@
     </nav>
 
     <div class="settings-subview active" id="settingsTimeWindowsView">
-      <div class="toolbar" style="margin:16px 0 10px;">
-        <button class="btn" id="btnAddTimeWindow">+ Add a Day</button>
-      </div>
-      <p class="helptext">The days and times the "+ Quick Add Slots" button offers for a Freedom Session. Add, edit, or remove which days have a default and what time each runs.</p>
-      <div id="settingsTimeWindowsList"></div>
+      <p class="helptext">These two cards together are what the "+ Quick Add Slots" button offers — the default days for Freedom Sessions, and the separate Sunday Drop-In defaults.</p>
 
-      <div class="section-title" style="margin:26px 0 12px;"><h2 style="font-size:var(--fs-lg);margin:0;color:var(--navy);">Sunday Drop-In</h2></div>
-      <p class="helptext">Default time and location used when creating Drop-In slots and sessions.</p>
-      <div class="field-row">
-        <div class="field"><label for="settingsDropInStart">Start Time</label><input type="time" id="settingsDropInStart"></div>
-        <div class="field"><label for="settingsDropInEnd">End Time</label><input type="time" id="settingsDropInEnd"></div>
-        <div class="field"><label for="settingsDropInLocation">Location</label><select id="settingsDropInLocation"></select></div>
+      <div class="settings-card">
+        <h2>Default Days</h2>
+        <p class="helptext">Which days have a default and what time each runs. Add, edit, or remove a day.</p>
+        <div class="toolbar" style="margin-bottom:10px;">
+          <button class="btn" id="btnAddTimeWindow">+ Add a Day</button>
+        </div>
+        <div id="settingsTimeWindowsList"></div>
       </div>
-      <div class="toolbar" style="margin-top:8px;">
-        <button class="btn" id="btnSaveDropInSettings">Save Drop-In Defaults</button>
+
+      <div class="settings-card">
+        <h2>Sunday Drop-In</h2>
+        <p class="helptext">Default time and location used when creating Drop-In slots and sessions.</p>
+        <div class="field-row">
+          <div class="field"><label for="settingsDropInStart">Start Time</label><input type="time" id="settingsDropInStart"></div>
+          <div class="field"><label for="settingsDropInEnd">End Time</label><input type="time" id="settingsDropInEnd"></div>
+          <div class="field"><label for="settingsDropInLocation">Location</label><select id="settingsDropInLocation"></select></div>
+        </div>
+        <div class="toolbar" style="margin-top:8px;">
+          <button class="btn" id="btnSaveDropInSettings">Save Drop-In Defaults</button>
+        </div>
+        <p class="helptext" id="settingsDropInMsg"></p>
       </div>
-      <p class="helptext" id="settingsDropInMsg"></p>
     </div>
 
     <div class="settings-subview" id="settingsLocationsView">
@@ -826,7 +839,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-20.8";
+const APP_VERSION = "2026-09-20.9";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3707,6 +3720,9 @@ function generateReport(){
 ========================================================================= */
 const CHANGE_LOG = [
   { date: 'Sep 20, 2026', version: APP_VERSION, items: [
+    'Changed: in Settings, Quick Slots now shows Default Days and Sunday Drop-In as two separate cards, so it\'s clear they\'re related but independent settings.'
+  ]},
+  { date: 'Sep 20, 2026', version: '2026-09-20.8', items: [
     'Fixed: card, row, and field borders were nearly invisible against their backgrounds - darkened to a warm tan that actually shows up while still fitting the palette. Same fix applied to the minister portal.'
   ]},
   { date: 'Sep 20, 2026', version: '2026-09-20.7', items: [
