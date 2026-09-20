@@ -487,7 +487,11 @@
 <div id="loadError"></div>
 
   <section class="panel active" id="panel-changes">
-    <p class="helptext">What's new in this preview build — check these specifically before anything else. Newest first.</p>
+    <p class="helptext" id="changesHelptext">What's new in this preview build — check these specifically before anything else. Newest first.</p>
+    <nav class="subtabs" aria-label="Changes view" id="changesSubtabs">
+      <button class="active" data-changesview="recent">Recent</button>
+      <button data-changesview="archive">Archive</button>
+    </nav>
     <div id="changeLog"></div>
   </section>
 
@@ -819,7 +823,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-20.1";
+const APP_VERSION = "2026-09-20.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1285,6 +1289,7 @@ function wireApp(){
   $('#btnSaveDropInSettings').addEventListener('click', ()=>withLoading($('#btnSaveDropInSettings'), 'Saving…', saveDropInSettings));
   $('#btnSaveDefaultLocationSetting').addEventListener('click', ()=>withLoading($('#btnSaveDefaultLocationSetting'), 'Saving…', saveDefaultLocationSetting));
   $('#settingsSubtabs').querySelectorAll('button[data-settingsview]').forEach(b=>b.addEventListener('click', ()=>switchSettingsSub(b.dataset.settingsview)));
+  $('#changesSubtabs').querySelectorAll('button[data-changesview]').forEach(b=>b.addEventListener('click', ()=>switchChangesSub(b.dataset.changesview)));
   $('#btnAddMinister').addEventListener('click', ()=>openMinisterModal());
   $('#btnMinCancel').addEventListener('click', ()=>$('#ministerModal').classList.remove('open'));
   $('#btnMinSave').addEventListener('click', ()=>withLoading($('#btnMinSave'), 'Saving…', onSaveMinister));
@@ -3684,13 +3689,23 @@ function generateReport(){
    CHANGES TAB — preview-only, never promoted to production (strip this
    whole section, the panel-changes HTML block, and its nav button when
    copying this file over to index.html). Maintained by hand: add one new
-   dated entry at the top on each preview publish, in plain language a
-   non-technical reviewer can act on - what to actually go check, not a
-   commit log. Keep it short - trim old entries off the bottom rather than
-   letting this grow into a full history.
+   dated entry at the top of CHANGE_LOG on each preview publish, in plain
+   language a non-technical reviewer can act on - what to actually go
+   check, not a commit log.
+
+   CHANGE_LOG holds only what's live in preview but NOT YET in production.
+   As part of every promotion (preview -> production, gotcha #13), move
+   whichever entries just went live out of CHANGE_LOG and onto the TOP of
+   CHANGE_LOG_ARCHIVE instead of deleting them - that's the "Archive" tab's
+   history of what's already shipped. CHANGE_LOG itself should end up
+   empty right after a full promotion, since preview and production are
+   back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
   { date: 'Sep 20, 2026', version: APP_VERSION, items: [
+    'New: the Changes tab now has a Recent/Archive switch, so past entries that already made it to production have somewhere to go instead of just being deleted.'
+  ]},
+  { date: 'Sep 20, 2026', version: '2026-09-20.1', items: [
     'Fixed: times now always show as "6:00 PM" style (AM/PM), even on a phone or computer set to 24-hour time. Applies everywhere in both the admin app and the minister portal.'
   ]},
   { date: 'Sep 19, 2026', version: '2026-09-19.13', items: [
@@ -3698,17 +3713,36 @@ const CHANGE_LOG = [
     'New: also in Settings - the Sunday Drop-In defaults and the default location for new sessions are now editable, no code changes needed anymore.',
     'New: Locations can now be added or deleted from Settings - a deleted location still shows correctly on any session that already used it.',
     'New: "+ Add custom slot" on the Schedule & Planning tab can now create a Drop-In slot or a Training session, not just a regular one.'
-  ]},
+  ]}
+];
+// Entries already live in production, newest first - moved here from
+// CHANGE_LOG at promotion time rather than deleted. See the block comment
+// above for the maintenance rule.
+const CHANGE_LOG_ARCHIVE = [
   { date: 'Sep 19, 2026', version: '2026-09-19.11', items: [
     'New: tap the calendar icon on a booked session to add it to your phone’s calendar app - includes the room and the prayer team.',
     'New: a Reports tab (placeholder for now - date range and report picker work, the real reports come later).',
     'Fixed: deleting a booked session now puts the person back on the waiting list instead of removing them completely.'
   ]}
 ];
+let changesSubView = 'recent';
+function switchChangesSub(view){
+  changesSubView = view;
+  $('#changesSubtabs').querySelectorAll('button[data-changesview]').forEach(b=>b.classList.toggle('active', b.dataset.changesview===view));
+  $('#changesHelptext').textContent = view==='archive'
+    ? 'Already live in production — kept here for reference. Newest first.'
+    : "What's new in this preview build — check these specifically before anything else. Newest first.";
+  renderChangeLog();
+}
 function renderChangeLog(){
   const box = $('#changeLog');
   if(!box) return;
-  box.innerHTML = CHANGE_LOG.map(entry => `
+  const list = changesSubView==='archive' ? CHANGE_LOG_ARCHIVE : CHANGE_LOG;
+  if(!list.length){
+    box.innerHTML = `<div class="no-results">${changesSubView==='archive' ? 'Nothing archived yet.' : 'Nothing new since the last production push.'}</div>`;
+    return;
+  }
+  box.innerHTML = list.map(entry => `
     <div style="margin-bottom:22px;">
       <div style="font-weight:700;color:var(--gold);font-size:var(--fs-sm);margin-bottom:8px;">${escapeHtml(entry.date)}${entry.version ? ' · v'+escapeHtml(entry.version) : ''}</div>
       <ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;">

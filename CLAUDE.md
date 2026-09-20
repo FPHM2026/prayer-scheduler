@@ -36,14 +36,20 @@ For anything bigger than a trivial/safe fix, build and test in
 1. Edit `preview/index.html`. It carries blocks production doesn't have —
    a `#previewModeBanner` (HTML near the top of `<body>`, CSS a few lines
    above it), and a **Changes tab** (`panel-changes`, its nav button, the
-   `CHANGE_LOG` array + `renderChangeLog()`) — strip all of this back out if
-   copying preview's content wholesale into production. The Changes tab is
-   the first tab and the default-active one specifically so a non-technical
-   reviewer's first click lands on "what changed," not buried after
-   everything else — add one new dated entry to `CHANGE_LOG` (newest at the
-   top) on every preview publish, written in plain language describing what
-   to actually go check, not a commit log; trim old entries off the bottom
-   rather than letting it grow into a full history.
+   `CHANGE_LOG`/`CHANGE_LOG_ARCHIVE` arrays + `renderChangeLog()`) — strip
+   all of this back out if copying preview's content wholesale into
+   production. The Changes tab is the first tab and the default-active one
+   specifically so a non-technical reviewer's first click lands on "what
+   changed," not buried after everything else — add one new dated entry to
+   `CHANGE_LOG` (newest at the top) on every preview publish, written in
+   plain language describing what to actually go check, not a commit log.
+   The tab has a Recent/Archive switch: `CHANGE_LOG` is "Recent" (only what's
+   live in preview but not yet in production); `CHANGE_LOG_ARCHIVE` is
+   "Archive" (already shipped, kept for reference). As step 6 below
+   promotes entries to production, move those same `CHANGE_LOG` entries
+   onto the *top* of `CHANGE_LOG_ARCHIVE` instead of deleting them —
+   `CHANGE_LOG` should end up empty right after a full promotion, since
+   preview and production are back in sync at that point.
 2. Bump `const APP_VERSION = "..."` in preview/index.html (date + counter,
    e.g. `"2026-09-15.1"`). Two independent checks read this: each page polls
    its own deployed copy's APP_VERSION and prompts a reload if what's loaded
@@ -65,7 +71,8 @@ For anything bigger than a trivial/safe fix, build and test in
    are ready), or cherry-pick specific edits into index.html directly (when
    preview has multiple features in flight and only some are ready). Bump
    index.html's own APP_VERSION to match. Verify locally again before
-   pushing.
+   pushing. In the same pass, move whichever `CHANGE_LOG` entries just went
+   live onto the top of `CHANGE_LOG_ARCHIVE` in preview/index.html (see step 1).
 7. After every push to `main`, also fast-forward the `preview` git branch:
    `git checkout preview && git merge main -m "Sync preview branch" && git
    push origin preview && git checkout main`. GitHub Pages does NOT serve
