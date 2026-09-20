@@ -19,7 +19,7 @@
   :root{
     --navy:#474747; --navy-dark:#333; --gold:#aa5a3c; --gold-dark:#8a4a30;
     --primary:#f28a00; --primary-dark:#ce7500; --on-primary:#1a1a1a;
-    --cream:#e7e2cf; --bg:#faf8f4; --card:#fff; --border:#ddd5c4;
+    --cream:#e7e2cf; --bg:#faf8f4; --card:#fff; --border:#9d8b67;
     --text:#565656; --muted:#636363; --muted-bar:#cdc4ac; --danger:#c0392b; --danger-bg:#fdecea;
     --ok:#2e7d32; --ok-bg:#e9f7ec;
     --shadow-sm:0 1px 2px rgba(35,28,20,.07),0 1px 1px rgba(35,28,20,.05);
@@ -826,7 +826,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-20.7";
+const APP_VERSION = "2026-09-20.8";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3707,6 +3707,9 @@ function generateReport(){
 ========================================================================= */
 const CHANGE_LOG = [
   { date: 'Sep 20, 2026', version: APP_VERSION, items: [
+    'Fixed: card, row, and field borders were nearly invisible against their backgrounds - darkened to a warm tan that actually shows up while still fitting the palette. Same fix applied to the minister portal.'
+  ]},
+  { date: 'Sep 20, 2026', version: '2026-09-20.7', items: [
     'Fixed: a few low-contrast text colors (the header title, the version number under it, and muted helper text throughout) were hard to read against their backgrounds - darkened them to pass accessibility contrast guidelines. Same fix applied to the minister portal.'
   ]},
   { date: 'Sep 20, 2026', version: '2026-09-20.6', items: [
