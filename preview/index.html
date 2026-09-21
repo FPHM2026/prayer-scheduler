@@ -612,25 +612,16 @@
   </section>
 
   <section class="panel" id="panel-reports">
-    <p class="helptext">Pick a date range and a report, then Generate opens it in a new tab, ready to review or print.</p>
+    <p class="helptext">Pick a date range, then Generate opens a statistics report in a new tab — Freedom Sessions, Drop-In, and Training as three separate sections, ready to review or print.</p>
     <div class="range-presets">
-      <button type="button" class="range-preset" onclick="setReportRange('ytd')">Year to Date</button>
+      <button type="button" class="range-preset" onclick="setReportRange('thisyear')">This Year</button>
       <button type="button" class="range-preset" onclick="setReportRange('lastyear')">Last Year</button>
-      <button type="button" class="range-preset" onclick="setReportRange('thismonth')">This Month</button>
-      <button type="button" class="range-preset" onclick="setReportRange('lastmonth')">Last Month</button>
-      <button type="button" class="range-preset" onclick="setReportRange('last90')">Last 90 Days</button>
+      <button type="button" class="range-preset" onclick="setReportRange('last3years')">Last 3 Years</button>
+      <button type="button" class="range-preset" onclick="setReportRange('alltime')">All Time</button>
     </div>
     <div class="field-row">
       <div class="field"><label for="reportFrom">From</label><input type="date" id="reportFrom"></div>
       <div class="field"><label for="reportTo">To</label><input type="date" id="reportTo"></div>
-    </div>
-    <div class="field">
-      <label for="reportType">Report</label>
-      <select id="reportType">
-        <option value="sessions">Session Statistics (Freedom Sessions)</option>
-        <option value="training">Training Statistics</option>
-        <option value="dropin">Drop-in Statistics</option>
-      </select>
     </div>
     <div class="toolbar">
       <button class="btn" id="btnGenerateReport">Generate Report</button>
@@ -846,7 +837,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-21.2";
+const APP_VERSION = "2026-09-21.3";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3674,32 +3665,39 @@ function renderBlackouts(){
 }
 
 /* =========================================================================
-   REPORTS — Session/Training/Drop-in Statistics for an arbitrary date
-   range, computed here against the live sessions/ministers already loaded
-   and rendered into a standalone printable page (Blob + window.open, not a
-   data: URI - more reliable across browsers for a full HTML document). The
-   new tab has no access back to this app's data, so every number is
-   pre-computed into plain HTML before it's opened - nothing in the report
-   page re-fetches or recomputes anything itself.
+   REPORTS — Freedom Sessions / Drop-In / Training statistics for an
+   arbitrary date range, computed here against the live sessions/ministers
+   already loaded and rendered into a standalone printable page (Blob +
+   window.open, not a data: URI - more reliable across browsers for a full
+   HTML document). The new tab has no access back to this app's data, so
+   every number is pre-computed into plain HTML before it's opened -
+   nothing in the report page re-fetches or recomputes anything itself.
+   Per the punch-list spec (item 10): one Generate produces all three as
+   distinct sections (not merged, not picked one-at-a-time), each a
+   year-by-year table with a shaded running-total column, plus a
+   collapsed-by-default minister breakdown that tags inactive ministers.
 ========================================================================= */
-const REPORT_LABELS = {
-  sessions: 'Session Statistics (Freedom Sessions)',
-  training: 'Training Statistics',
-  dropin: 'Drop-in Statistics'
-};
-const REPORT_NOUN = { sessions: 'Freedom Session', training: 'Training', dropin: 'Drop-in' };
-const REPORT_EMPTY_NOUN = { sessions: 'Freedom Sessions', training: 'Training sessions', dropin: 'Drop-in sessions' };
-// Common backward-looking ranges for the report picker, so the usual cases
-// don't require typing two dates by hand every time - same .range-preset
-// pattern Quick Add Slots already uses for its own (forward-looking) ranges.
+const REPORT_TYPES = [
+  { key: 'sessions', label: 'Freedom Sessions', noun: 'Freedom Session' },
+  { key: 'dropin', label: 'Sunday Drop-In', noun: 'Drop-In' },
+  { key: 'training', label: 'Training', noun: 'Training' }
+];
+// This Year/Last Year/Last 3 Years/All Time, per the punch-list spec -
+// same .range-preset pattern Quick Add Slots already uses for its own
+// (forward-looking) ranges. "Last 3 Years" is the last 3 FULL calendar
+// years (excluding the current, still-partial one) so it's a clean,
+// non-overlapping complement to "Last Year" rather than double-counting.
 window.setReportRange = function(preset){
   const now = new Date();
   let from, to;
-  if(preset==='ytd'){ from = new Date(now.getFullYear(),0,1); to = now; }
+  if(preset==='thisyear'){ from = new Date(now.getFullYear(),0,1); to = now; }
   else if(preset==='lastyear'){ from = new Date(now.getFullYear()-1,0,1); to = new Date(now.getFullYear()-1,11,31); }
-  else if(preset==='thismonth'){ from = new Date(now.getFullYear(),now.getMonth(),1); to = now; }
-  else if(preset==='lastmonth'){ from = new Date(now.getFullYear(),now.getMonth()-1,1); to = new Date(now.getFullYear(),now.getMonth(),0); }
-  else if(preset==='last90'){ from = new Date(now); from.setDate(from.getDate()-90); to = now; }
+  else if(preset==='last3years'){ from = new Date(now.getFullYear()-3,0,1); to = new Date(now.getFullYear()-1,11,31); }
+  else if(preset==='alltime'){
+    const allCompleted = sessions.filter(s=>s.status==='Completed');
+    const earliest = allCompleted.length ? allCompleted.reduce((min,s)=> s.date<min ? s.date : min, allCompleted[0].date) : isoDate(now);
+    from = new Date(earliest+'T00:00'); to = now;
+  }
   else return;
   $('#reportFrom').value = isoDate(from);
   $('#reportTo').value = isoDate(to);
@@ -3735,12 +3733,14 @@ function reportRecipientSplit(list){
   map.forEach(hadFollowUp => hadFollowUp ? followUp++ : firstTime++);
   return { firstTime, followUp, total: map.size };
 }
+// Tags anyone no longer Active - the breakdown includes everyone with a
+// session in range regardless of current roster status, per the spec.
 function reportMinisterBreakdown(list){
   const map = new Map();
   list.forEach(s=>{
     s.ministers.forEach(m=>{
       const min = ministers.find(x=>x.id===m.id);
-      if(!map.has(m.id)) map.set(m.id, { name: min ? min.name : 'Unknown', count:0, leadCount:0 });
+      if(!map.has(m.id)) map.set(m.id, { name: min ? min.name : 'Unknown', inactive: min ? min.status!=='Active' : false, count:0, leadCount:0 });
       const rec = map.get(m.id);
       rec.count++;
       if(m.role==='Lead') rec.leadCount++;
@@ -3748,65 +3748,72 @@ function reportMinisterBreakdown(list){
   });
   return [...map.values()].sort((a,b)=> b.count-a.count || a.name.localeCompare(b.name));
 }
-// Month-by-month bucket count across the report's actual range, however
-// many calendar years it spans (not fixed to "this year" like the
-// Completed Sessions trend chart) - falls back to yearly buckets past 24
-// months so a genuinely long range still renders a readable chart instead
-// of dozens of skinny bars.
-function reportMonthlyTrend(list, from, to){
-  const fromD = new Date(from+'T00:00'), toD = new Date(to+'T00:00');
-  const months = [];
-  let d = new Date(fromD.getFullYear(), fromD.getMonth(), 1);
-  const endD = new Date(toD.getFullYear(), toD.getMonth(), 1);
-  while(d<=endD){ months.push({y:d.getFullYear(), m:d.getMonth()}); d.setMonth(d.getMonth()+1); }
-  if(months.length>24){
-    const years = [...new Set(months.map(x=>x.y))];
-    return years.map(y=>({ label:String(y), count: list.filter(s=>new Date(s.date+'T00:00').getFullYear()===y).length }));
+// One row per calendar year touched by [from,to], each year's own count
+// clamped to the actual selected range (a partial first/last year only
+// counts what's actually in range), plus a cumulative running total -
+// local to this report, starting from 0 before the first row shown, not a
+// lifetime total - so "This Year" and "Last 3 Years" each start fresh.
+function reportYearRows(type, from, to){
+  const fromY = new Date(from+'T00:00').getFullYear();
+  const toY = new Date(to+'T00:00').getFullYear();
+  const isIndividual = type==='sessions';
+  let running = 0;
+  const rows = [];
+  for(let y=fromY; y<=toY; y++){
+    const yFrom = y===fromY ? from : `${y}-01-01`;
+    const yTo = y===toY ? to : `${y}-12-31`;
+    const list = reportSessionsFor(type, yFrom, yTo);
+    running += list.length;
+    const row = { year: y, count: list.length, running };
+    if(isIndividual){
+      const split = reportRecipientSplit(list);
+      row.unique = split.total; row.firstTime = split.firstTime; row.followUp = split.followUp;
+    }
+    rows.push(row);
   }
-  const MONTH_ABBR=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return months.map(({y,m})=>({
-    label: `${MONTH_ABBR[m]} '${String(y).slice(2)}`,
-    count: list.filter(s=>{ const sd=new Date(s.date+'T00:00'); return sd.getFullYear()===y && sd.getMonth()===m; }).length
-  }));
+  return rows;
+}
+function buildReportSection(typeInfo, from, to){
+  const { key: type, label, noun } = typeInfo;
+  const isIndividual = type==='sessions';
+  const rows = reportYearRows(type, from, to);
+  const fullList = reportSessionsFor(type, from, to);
+  const ministerRows = reportMinisterBreakdown(fullList);
+
+  const theadCols = isIndividual
+    ? '<th>Year</th><th>Sessions</th><th class="running">Running Total</th><th>Unique Recipients</th><th>First-time</th><th>Follow-up</th>'
+    : '<th>Year</th><th>Sessions</th><th class="running">Running Total</th>';
+  const bodyRows = rows.length ? rows.map(r => isIndividual
+    ? `<tr><td>${r.year}</td><td>${r.count}</td><td class="running">${r.running}</td><td>${r.unique}</td><td>${r.firstTime}</td><td>${r.followUp}</td></tr>`
+    : `<tr><td>${r.year}</td><td>${r.count}</td><td class="running">${r.running}</td></tr>`
+  ).join('') : `<tr><td colspan="${isIndividual?6:3}" class="empty">No completed ${escapeHtml(noun.toLowerCase())} sessions in this range.</td></tr>`;
+
+  const ministerHtml = ministerRows.length ? ministerRows.map(r=>`
+    <tr><td>${escapeHtml(r.name)}${r.inactive ? ' <span class="inactive-tag">Inactive</span>' : ''}</td><td>${r.count}</td><td>${r.leadCount}</td></tr>`).join('')
+    : `<tr><td colspan="3" class="empty">No ministers recorded in this range.</td></tr>`;
+
+  return `
+    <section class="report-section">
+      <h2>${escapeHtml(label)}</h2>
+      <table class="year-table">
+        <thead><tr>${theadCols}</tr></thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+      <details class="minister-details">
+        <summary>Show minister breakdown (${ministerRows.length})</summary>
+        <table class="minister-table"><thead><tr><th>Minister</th><th>Sessions</th><th>As Lead</th></tr></thead><tbody>${ministerHtml}</tbody></table>
+      </details>
+    </section>`;
 }
 function generateReport(){
   const msg = $('#reportMsg');
   msg.hidden = true;
-  const from = $('#reportFrom').value, to = $('#reportTo').value, type = $('#reportType').value;
+  const from = $('#reportFrom').value, to = $('#reportTo').value;
   if(!from || !to){ msg.hidden = false; msg.textContent = 'Please pick both a from and a to date.'; return; }
   if(to < from){ msg.hidden = false; msg.textContent = 'The to date must be on or after the from date.'; return; }
-  const label = REPORT_LABELS[type] || type;
-  const isIndividual = type==='sessions';
-  const list = reportSessionsFor(type, from, to);
-  const split = isIndividual ? reportRecipientSplit(list) : null;
-  const ministerRows = reportMinisterBreakdown(list);
-  const trend = reportMonthlyTrend(list, from, to);
-  const maxTrend = Math.max(1, ...trend.map(t=>t.count));
+  const sectionsHtml = REPORT_TYPES.map(t => buildReportSection(t, from, to)).join('');
 
-  const summaryHtml = isIndividual ? `
-    <div class="summary-grid">
-      <div class="summary-tile"><div class="summary-num">${list.length}</div><div class="summary-label">Sessions</div></div>
-      <div class="summary-tile"><div class="summary-num">${split.total}</div><div class="summary-label">Unique Recipients</div></div>
-      <div class="summary-tile summary-split">
-        <div class="split-row"><span class="dot first"></span>${split.firstTime} first-time</div>
-        <div class="split-row"><span class="dot follow"></span>${split.followUp} follow-up</div>
-      </div>
-    </div>` : `
-    <div class="summary-grid">
-      <div class="summary-tile"><div class="summary-num">${list.length}</div><div class="summary-label">${escapeHtml(REPORT_NOUN[type])} Sessions</div></div>
-    </div>`;
-
-  const ministerHtml = ministerRows.length ? ministerRows.map(r=>`
-    <tr><td>${escapeHtml(r.name)}</td><td>${r.count}</td><td>${r.leadCount}</td></tr>`).join('')
-    : `<tr><td colspan="3" class="empty">No ministers recorded in this range.</td></tr>`;
-
-  const trendHtml = `<div class="trend-bars">${trend.map(t=>`
-    <div class="tbar">
-      <div class="tbar-fill" style="height:${Math.max(4, Math.round(t.count/maxTrend*90))}px;"><span class="tbar-val">${t.count}</span></div>
-      <div class="tbar-label">${escapeHtml(t.label)}</div>
-    </div>`).join('')}</div>`;
-
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(label)}</title>
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ministry Statistics</title>
 <style>
   body{font-family:Georgia,'Times New Roman',serif;background:#faf8f4;color:#2a2a2a;margin:0;padding:40px;}
   .wrap{max-width:800px;margin:0 auto;background:#fff;border:1px solid #ddd5c4;border-radius:10px;padding:36px 42px;}
@@ -3814,52 +3821,38 @@ function generateReport(){
   .toolbar button{background:#f28a00;color:#1a1a1a;border:none;padding:9px 18px;border-radius:6px;font-weight:700;font-size:14px;cursor:pointer;font-family:Georgia,'Times New Roman',serif;}
   .toolbar button:hover{background:#ce7500;}
   h1{color:#8a4a30;font-size:24px;margin:0 0 6px;}
-  .range{color:#6b6b6b;font-size:14px;margin:0 0 26px;}
-  .empty-state{background:#e7e2cf;border-radius:8px;padding:20px 24px;color:#474747;font-size:14px;line-height:1.6;margin-bottom:8px;}
-  .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:0 0 30px;}
-  .summary-tile{background:#faf8f4;border:1px solid #ddd5c4;border-radius:8px;padding:16px 18px;}
-  .summary-num{font-size:30px;font-weight:700;color:#474747;line-height:1;}
-  .summary-label{font-size:11.5px;color:#6b6b6b;text-transform:uppercase;letter-spacing:.04em;margin-top:6px;}
-  .summary-split{display:flex;flex-direction:column;justify-content:center;gap:5px;}
-  .split-row{font-size:13.5px;color:#474747;display:flex;align-items:center;gap:7px;}
-  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:0 0 auto;}
-  .dot.first{background:#cdc4ac;} .dot.follow{background:#f28a00;}
-  h2{font-size:13.5px;color:#474747;text-transform:uppercase;letter-spacing:.04em;margin:0 0 14px;border-bottom:1px solid #ddd5c4;padding-bottom:8px;font-weight:700;}
-  .trend-bars{display:flex;align-items:flex-end;gap:6px;height:128px;margin:0 0 30px;padding:0 2px;border-bottom:1px solid #ddd5c4;overflow-x:auto;}
-  .tbar{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;flex:1 0 30px;height:100%;}
-  .tbar-fill{width:100%;max-width:26px;background:#f28a00;border-radius:3px 3px 0 0;display:flex;align-items:flex-start;justify-content:center;position:relative;min-height:4px;}
-  .tbar-val{position:absolute;top:-18px;font-size:10.5px;color:#474747;font-weight:700;white-space:nowrap;}
-  .tbar-label{font-size:10px;color:#6b6b6b;margin-top:6px;white-space:nowrap;}
-  details{margin-top:6px;border:1px solid #ddd5c4;border-radius:8px;overflow:hidden;}
-  summary{cursor:pointer;font-weight:700;color:#474747;padding:13px 16px;font-size:14px;list-style:none;}
+  .range{color:#6b6b6b;font-size:14px;margin:0 0 30px;}
+  .report-section{margin-bottom:34px;}
+  .report-section:last-child{margin-bottom:0;}
+  .report-section h2{font-size:16.5px;color:#474747;margin:0 0 14px;border-bottom:1px solid #ddd5c4;padding-bottom:9px;font-weight:700;}
+  table.year-table{width:100%;border-collapse:collapse;margin:0 0 10px;font-size:13.5px;}
+  table.year-table th,table.year-table td{text-align:left;padding:9px 11px;border-bottom:1px solid #f1ede4;}
+  table.year-table th{font-size:11px;text-transform:uppercase;color:#6b6b6b;letter-spacing:.03em;font-weight:700;}
+  table.year-table td.running,table.year-table th.running{background:#f3ead9;font-weight:700;color:#474747;}
+  td.empty{color:#6b6b6b;font-style:italic;}
+  .inactive-tag{display:inline-block;background:#e7e2cf;color:#7a7a7a;font-size:10px;text-transform:uppercase;letter-spacing:.03em;font-weight:700;border-radius:8px;padding:2px 7px;margin-left:6px;}
+  details.minister-details{margin-top:6px;border:1px solid #ddd5c4;border-radius:8px;overflow:hidden;}
+  summary{cursor:pointer;font-weight:700;color:#474747;padding:12px 16px;font-size:13.5px;list-style:none;}
   summary::-webkit-details-marker{display:none;}
   summary::before{content:'▸  ';color:#aa5a3c;}
   details[open] summary::before{content:'▾  ';}
-  table{width:calc(100% - 32px);border-collapse:collapse;margin:0 16px 14px;font-size:13px;}
-  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid #f1ede4;}
-  th{font-size:11px;text-transform:uppercase;color:#6b6b6b;letter-spacing:.03em;font-weight:700;}
-  td.empty{color:#6b6b6b;font-style:italic;}
+  table.minister-table{width:calc(100% - 32px);border-collapse:collapse;margin:0 16px 14px;font-size:13px;}
+  table.minister-table th,table.minister-table td{text-align:left;padding:8px 10px;border-bottom:1px solid #f1ede4;}
+  table.minister-table th{font-size:11px;text-transform:uppercase;color:#6b6b6b;letter-spacing:.03em;font-weight:700;}
   @media print{
     body{background:#fff;padding:0;}
     .wrap{border:none;padding:0;max-width:100%;}
     .no-print{display:none!important;}
-    .trend-bars{overflow-x:visible;}
+    .report-section{break-inside:avoid;}
   }
 </style></head><body>
   <div class="wrap">
     <div class="toolbar no-print">
       <button type="button" onclick="document.querySelectorAll('details').forEach(function(d){d.open=true;});window.print();">Print</button>
     </div>
-    <h1>${escapeHtml(label)}</h1>
+    <h1>Ministry Statistics</h1>
     <p class="range">${escapeHtml(fmtShort(from))} – ${escapeHtml(fmtShort(to))}</p>
-    ${!list.length ? `<div class="empty-state">No completed ${escapeHtml(REPORT_EMPTY_NOUN[type] || label)} in this date range.</div>` : `
-    ${summaryHtml}
-    <h2>By Month</h2>
-    ${trendHtml}
-    <details id="ministerBreakdown">
-      <summary>Minister Breakdown (${ministerRows.length})</summary>
-      <table><thead><tr><th>Minister</th><th>Sessions</th><th>As Lead</th></tr></thead><tbody>${ministerHtml}</tbody></table>
-    </details>`}
+    ${sectionsHtml}
   </div>
 </body></html>`;
   const blob = new Blob([html], {type: 'text/html'});
@@ -3888,6 +3881,9 @@ function generateReport(){
 ========================================================================= */
 const CHANGE_LOG = [
   { date: 'Sep 21, 2026', version: APP_VERSION, items: [
+    'Changed: Reports now matches the actual spec - one Generate shows Freedom Sessions, Sunday Drop-In, and Training as three separate sections (not picked one at a time), each a year-by-year table with a shaded Running Total column instead of the previous summary tiles and chart. The minister breakdown now tags anyone no longer active. Date presets changed to This Year, Last Year, Last 3 Years, and All Time.'
+  ]},
+  { date: 'Sep 21, 2026', version: '2026-09-21.2', items: [
     'New: Session, Training, and Drop-in Statistics are real reports now, not placeholders - session counts, a first-time vs. follow-up split (Freedom Sessions only), a month-by-month chart, and a minister breakdown you can expand. Print now force-expands the minister breakdown first, so it actually shows up on the printed page.'
   ]},
   { date: 'Sep 21, 2026', version: '2026-09-21.1', items: [

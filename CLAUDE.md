@@ -325,36 +325,46 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
 - Blackout Dates tab: grouped by minister, soonest first, Add/Edit modal with
   a single-date/date-range toggle (writes BlackoutDate + EndDate), edit/delete
   per entry
-- **Reports tab** (added 2026-09-19, real report content added 2026-09-21):
-  a date range + report-type picker (Session/Training/Drop-in Statistics).
-  Date-range presets (Year to Date, Last Year, This Month, Last Month, Last
-  90 Days — same `.range-preset` pattern Quick Add Slots uses) fill the
-  From/To fields without typing. Generate computes the report against the
-  live `sessions`/`ministers` already loaded (Completed only — same
-  retrospective convention `completedStats()` uses) and opens a standalone,
-  printable page in a new tab (Blob + `window.open`, not a `data:` URI —
-  more reliable across browsers for a full HTML document); the new tab has
-  no access back into the app, so every number is baked into plain HTML
-  before it opens, nothing there re-fetches or recomputes anything.
-  - Freedom Sessions gets three summary tiles (session count, unique
-    recipients, first-time-vs-follow-up split — same per-*recipient*, not
-    per-session, classification `completedStats()` uses); Training and
-    Drop-in get one tile (occurrence count) since neither has an individual
-    recipient concept — every occurrence shares one literal recipName
-    ("Sunday Drop-In"/"Training"), so "unique recipients" isn't meaningful
-    for those two.
-  - A month-by-month bar chart across the report's actual chosen range
-    (not fixed to "this year" like the Completed Sessions tab's own trend
-    chart) — falls back to yearly bars past 24 months so a genuinely long
-    range still renders readably.
-  - A collapsed-by-default minister breakdown (sessions + times-as-Lead per
-    minister, via a native `<details>`/`<summary>`) below the chart. The
-    page's own Print button force-sets every `<details>` open before
-    calling `window.print()` — collapsed content doesn't print, so this is
+- **Reports tab** (added 2026-09-19; real report content added 2026-09-21,
+  corrected the same day against the actual punch-list spec — see "Known
+  gotchas" #14): a date range picker only — no report-type picker, since
+  one Generate always produces all three types together. Date-range presets
+  (This Year, Last Year, Last 3 Years, All Time — same `.range-preset`
+  pattern Quick Add Slots uses) fill the From/To fields without typing;
+  "Last 3 Years" is the last 3 *full* calendar years, excluding the
+  current partial one, so it's a clean complement to "Last Year" instead of
+  overlapping it. Generate computes against the live `sessions`/`ministers`
+  already loaded (Completed only — same retrospective convention
+  `completedStats()` uses) and opens a standalone, printable page in a new
+  tab (Blob + `window.open`, not a `data:` URI — more reliable across
+  browsers for a full HTML document); the new tab has no access back into
+  the app, so every number is baked into plain HTML before it opens,
+  nothing there re-fetches or recomputes anything.
+  - **Three distinct sections on one page** — Freedom Sessions, Sunday
+    Drop-In, Training — stacked, never merged, since their totals are kept
+    intentionally separate.
+  - **Each section is a year-by-year table**, not cards/tiles: one row per
+    calendar year touched by the chosen range (a partial first/last year
+    only counts what's actually in range), Sessions + a **Running Total**
+    column (shaded background, bold — visually distinct so it's never
+    mistaken for a single year's own count; cumulative from 0 at the start
+    of *this report's* range, not a lifetime total). Freedom Sessions adds
+    Unique Recipients / First-time / Follow-up columns (same per-
+    *recipient*, not per-session, classification `completedStats()` uses);
+    Drop-In and Training skip those three — every occurrence shares one
+    literal recipName ("Sunday Drop-In"/"Training"), so there's no
+    individual-recipient concept to split.
+  - **Team-wide table shown first**; a collapsed-by-default "Show minister
+    breakdown" toggle per section (native `<details>`/`<summary>`) expands
+    into sessions + times-as-Lead per minister, tagging anyone whose
+    current PrayerMinisters Status isn't Active with a small "Inactive"
+    label — the breakdown includes everyone with a session in range
+    regardless of current roster status. The page's own Print button
+    force-sets every `<details>` on the page open before calling
+    `window.print()` — collapsed content doesn't print, so this is
     load-bearing, not cosmetic.
-  - An empty-state message replaces the summary/chart/breakdown entirely
-    when the range has no completed sessions of that type, rather than
-    rendering a misleading all-zeros report.
+  - Each section shows its own empty-state row when it has no completed
+    sessions in range, rather than a misleading all-zeros table.
   - **Not built, still a real option**: Location is a clean, trustworthy
     report dimension now (an admin-managed list via Settings, not free
     text) — "sessions by location" as an optional breakdown/filter is
@@ -587,3 +597,16 @@ testing (injecting `account`/`ministers`/`sessions`/etc. via the browser
 console) as validating the app's own logic; treat real-account testing as
 the only way to validate the Entra/SharePoint configuration around it — the
 two are not substitutes for each other.
+
+Feature requests get tracked in a separate Claude-authored artifact ("FPHM
+Scheduler — Punch List," a claude.ai artifact, not a file in this repo) that
+the user shares a link to — often with real design detail (exact columns,
+which UI pattern to reuse, what to explicitly exclude) well beyond what
+gets repeated in the chat message asking for the work. The Reports tab was
+first built from a reasonable-sounding but incomplete guess when that
+spec wasn't checked first, and had to be substantially reworked once it
+was (see gotcha-style lesson: when a request references "requirements,"
+"the punch list," "what was requested," or similar and no link is in the
+current conversation, ask for the artifact link before designing anything
+non-trivial, rather than proposing options and building from whichever one
+sounds closest).
