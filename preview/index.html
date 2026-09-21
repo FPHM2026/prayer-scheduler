@@ -613,6 +613,13 @@
 
   <section class="panel" id="panel-reports">
     <p class="helptext">Pick a date range and a report, then Generate opens it in a new tab. These are placeholders for now — the real report designs come later.</p>
+    <div class="range-presets">
+      <button type="button" class="range-preset" onclick="setReportRange('ytd')">Year to Date</button>
+      <button type="button" class="range-preset" onclick="setReportRange('lastyear')">Last Year</button>
+      <button type="button" class="range-preset" onclick="setReportRange('thismonth')">This Month</button>
+      <button type="button" class="range-preset" onclick="setReportRange('lastmonth')">Last Month</button>
+      <button type="button" class="range-preset" onclick="setReportRange('last90')">Last 90 Days</button>
+    </div>
     <div class="field-row">
       <div class="field"><label for="reportFrom">From</label><input type="date" id="reportFrom"></div>
       <div class="field"><label for="reportTo">To</label><input type="date" id="reportTo"></div>
@@ -839,7 +846,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-20.12";
+const APP_VERSION = "2026-09-21.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3677,6 +3684,21 @@ const REPORT_LABELS = {
   training: 'Training Statistics',
   dropin: 'Drop-in Statistics'
 };
+// Common backward-looking ranges for the report picker, so the usual cases
+// don't require typing two dates by hand every time - same .range-preset
+// pattern Quick Add Slots already uses for its own (forward-looking) ranges.
+window.setReportRange = function(preset){
+  const now = new Date();
+  let from, to;
+  if(preset==='ytd'){ from = new Date(now.getFullYear(),0,1); to = now; }
+  else if(preset==='lastyear'){ from = new Date(now.getFullYear()-1,0,1); to = new Date(now.getFullYear()-1,11,31); }
+  else if(preset==='thismonth'){ from = new Date(now.getFullYear(),now.getMonth(),1); to = now; }
+  else if(preset==='lastmonth'){ from = new Date(now.getFullYear(),now.getMonth()-1,1); to = new Date(now.getFullYear(),now.getMonth(),0); }
+  else if(preset==='last90'){ from = new Date(now); from.setDate(from.getDate()-90); to = now; }
+  else return;
+  $('#reportFrom').value = isoDate(from);
+  $('#reportTo').value = isoDate(to);
+};
 function generateReport(){
   const msg = $('#reportMsg');
   msg.hidden = true;
@@ -3724,6 +3746,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Sep 21, 2026', version: APP_VERSION, items: [
+    'New: the Reports tab has quick date-range buttons (Year to Date, Last Year, This Month, Last Month, Last 90 Days) so common ranges don\'t need typing.'
+  ]}
 ];
 // Entries already live in production, newest first - moved here from
 // CHANGE_LOG at promotion time rather than deleted. See the block comment

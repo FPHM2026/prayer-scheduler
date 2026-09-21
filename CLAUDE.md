@@ -131,7 +131,11 @@ scheduler's own code.
 - **BlackoutDates**: Title (minister name), BlackoutDate (Date), **EndDate
   (Date, optional)** — blank/null means a single-day blackout; set means an
   inclusive date range. Notes (Plain text)
-- **Locations**: Title (location name) — deliberately simple, just a name
+- **Locations**: Title (location name) — deliberately simple, just a name.
+  Managed from the Settings tab's Locations sub-view (add/delete) since
+  2026-09-19 — see "Features implemented" below for the deletion-safety
+  fallback that keeps a deleted location's name on any session that already
+  used it.
 - **PlanningSlots** (added 2026-09-17): Title, SlotDate (Date), StartTime/
   EndTime (plain text, "HH:MM" 24-hour — not a true Time column), Status
   (Choice: Open/Tentative/Booked/**Drop-In** — note the hyphen and capital
@@ -142,6 +146,18 @@ scheduler's own code.
   convention as AssignedMinisterIDs/LeadMinisterIDs above), LinkedSessionId
   (Number, the real PrayerSessions item once Booked), Notes (Plain text).
   See "Planning Slots" under "Features implemented" for how the states flow.
+- **TimeWindows** (added 2026-09-19): backs the Settings tab's Quick Slots
+  and Sessions sub-views. Title (free label, e.g. "Sunday", "Drop-In",
+  "Default Location"), Kind (Choice: Weekday/DropIn/DefaultLocation),
+  DayOfWeek (Number, 0=Sunday…6=Saturday — only set on Weekday rows, blank
+  on the other two kinds), StartTime/EndTime (plain text, "HH:MM" 24-hour,
+  same convention as PlanningSlots above — used on Weekday and DropIn rows,
+  blank on DefaultLocation), LocationName (plain text matching a Locations
+  list Title, same convention as PrayerSessions' own LocationName — used on
+  DropIn and DefaultLocation rows, blank on Weekday). Exactly one Weekday
+  row per configured default day, exactly one DropIn row, exactly one
+  DefaultLocation row — no separate "enabled" flag, presence as a Weekday
+  row *is* enabled for that day.
 - **Prospects**: retired. The app no longer reads this list at all — replaced
   by PrayerSessions items with Status="Waiting" (see above). The list itself
   still exists in SharePoint with whatever old data was in it; run
@@ -171,10 +187,12 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
   buttons alongside "+ New Session" — see the Drop-in/Training bullet below
   for what those prefill.
 - New/Edit/Follow-up session form: recipient info, date + day-of-week label,
-  quick-select start times (Sun 4:00/5:00/5:30pm, Tue 6:00pm — curated presets,
-  not auto-generated from a window), custom start/end time (hour/half-hour only,
-  validated both via `step="1800"` and an explicit save-time check), location
-  dropdown with inline "add new location", appointment type (First/Follow-up/
+  a quick-select start-time button auto-generated from that date's weekday
+  default (one preset per configured day — see the Settings tab's Quick Slots
+  section below; "No preset window for this day" shows instead for a day with
+  no configured default), custom start/end time (plain native time inputs, no
+  granularity restriction), location dropdown with inline "add new location",
+  appointment type (First/Follow-up/
   Drop-in/Training, smart-defaulted), status (Scheduled/Completed — hidden on
   new sessions, shown when editing), minister multi-select (2+ required) with
   Lead/Support role toggle per minister, live "also on this date" panel,
@@ -202,9 +220,12 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
   - **"+ Drop-in" / "+ Training" quick-add buttons**: prefill the form for a
     shared group event — recipient name set to "Sunday Drop-In" / "Training",
     Appointment Type set to match, every Active minister pre-selected as
-    Support, Recipient Contact and the WhatsApp fields hidden (neither
-    applies to a group session), Drop-In further defaults Start/End Time to
-    5:00–7:30pm. Excluded from every statistic (the Completed Sessions combo
+    Support, Recipient Contact, Recipient Gender, and Team Preference all
+    hidden (none apply to a group session). Drop-In further defaults Start/
+    End Time and Location from the Settings tab's own Sunday Drop-In row
+    (Quick Slots section) — falls back to 5:00–8:15pm / "Kids' Wing" by name
+    if that row hasn't been configured yet. Excluded from every statistic
+    (the Completed Sessions combo
     card, the Prayer Ministers tab's hours/serving numbers) since assigning
     every minister to the same session would otherwise wildly inflate those —
     the underlying session records still show up normally in the plain
@@ -253,12 +274,20 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
     0 — idempotent by construction, so re-running it over an
     already-provisioned or now-unavailable date adds nothing.
   - **4th Sunday = Drop-In**: `isFourthSunday()` overrides the normal
-    capacity math entirely for that one date each month — a single
-    5:00–7:30pm Drop-In slot instead of the usual 2-PM-pair slots.
+    capacity math entirely for that one date each month — a single Drop-In
+    slot instead of the usual 2-PM-pair slots, timed from the same
+    Settings-configured Sunday Drop-In row as the "+ Drop-in" button above
+    (fallback 5:00–8:15pm if unconfigured).
   - **Custom slots**: a "+ Add custom slot" affordance on any date that
-    already has calculated slots lets the admin add one more at an
-    arbitrary time — same minister-double-booking rule as everywhere else
-    (blocks only on an actual time *overlap*, not merely the same day).
+    already has calculated slots lets the admin add one more, with a Type
+    picker — Regular (a claimable PlanningSlot, same as always), Sunday
+    Drop-In (also slot-based, mirrors Quick Add's own Drop-In slot), or
+    Training (opens the normal session modal pre-filled with that date
+    instead — Training has no slot concept anywhere else in the app, so this
+    reuses the existing save path and its conflict checks rather than
+    duplicating them). Regular/Drop-In use the same minister-double-booking
+    rule as everywhere else (blocks only on an actual time *overlap*, not
+    merely the same day).
   - **Claiming**: an Open slot's picker lists every unclaimed Waiting
     candidate; expanding one shows their prior-session history (if any) to
     reuse a past team via "Use this team," or "Claim with auto-pick" to
@@ -296,6 +325,36 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
 - Blackout Dates tab: grouped by minister, soonest first, Add/Edit modal with
   a single-date/date-range toggle (writes BlackoutDate + EndDate), edit/delete
   per entry
+- **Reports tab** (added 2026-09-19): a date range + report-type picker
+  (Session/Training/Drop-in Statistics) whose Generate button opens a
+  strawdog page in a new tab — real report designs haven't been built yet,
+  this only proves the range/type selection works end to end. Date-range
+  presets (Year to Date, Last Year, This Month, Last Month, Last 90 Days —
+  same `.range-preset` pattern Quick Add Slots uses) fill the From/To fields
+  without typing. Two things to build into the real reports when they're
+  designed, not yet applicable to the placeholder: (1) if a report ends up
+  with a collapsible minister-breakdown section, the Print action must
+  force it open first — collapsed content doesn't print; (2) Location is
+  now a clean, trustworthy report dimension (an admin-managed list via
+  Settings, not free text) — "sessions by location" is a reasonable optional
+  breakdown/filter to add, not required.
+- **Settings tab** (added 2026-09-19): admin-only configuration, no code
+  changes needed, backed by a new `TimeWindows` SharePoint list (see schema
+  below). Three sub-tabs:
+  - *Quick Slots*: two cards — **Default Days** (which weekdays have a
+    default Freedom Session window and what time each runs; add/edit/remove
+    a day; feeds both the session form's quick-select button and Quick Add
+    Slots' own day-chip defaults) and **Sunday Drop-In** (default Start/End
+    Time + Location for Drop-In slots and sessions, singleton row).
+  - *Locations*: add/delete locations that feed the location dropdown
+    elsewhere. Deletion is allowed even if a location is in use (with a
+    confirmation) — existing sessions keep displaying their original
+    location name via a `locationRawName` fallback captured at load time,
+    since the live id-based lookup would otherwise go blank once the
+    location's gone.
+  - *Sessions*: the default location used when creating a brand-new session
+    before a room has been decided (singleton row; falls back to "To Be
+    Determined" by name, then the first location, if unconfigured).
 - Sign Out button (added after a multi-user bug — see "Known gotchas")
 - SVG icons instead of emoji for actions, keyboard-accessible minister
   selection (tabindex + Enter/Space), visible focus rings
@@ -377,6 +436,13 @@ like one product, not two:
 - **Calendar (month grid) view** — was planned but never built in this HTML
   version. The agenda/Schedule view covers the "chronological list" requirement
   on its own; the calendar grid is a nice-to-have, not yet started.
+- **Real report designs** — the Reports tab's Session/Training/Drop-in
+  Statistics options currently open a strawdog placeholder page confirming
+  only that the date-range/type selection works. See the Reports tab bullet
+  under "Features implemented" for two things to design in from the start
+  once real work on these begins: a collapsible minister-breakdown section
+  (if one gets built) must be force-expanded by Print, and Location is now
+  a trustworthy optional report dimension worth considering.
 
 ## Known gotchas (hard-won, don't reintroduce these bugs)
 1. **Graph list item IDs are strings, not numbers.** Comma-separated ID fields
