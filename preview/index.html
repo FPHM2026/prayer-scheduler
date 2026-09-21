@@ -612,7 +612,7 @@
   </section>
 
   <section class="panel" id="panel-reports">
-    <p class="helptext">Pick a date range and a report, then Generate opens it in a new tab. These are placeholders for now — the real report designs come later.</p>
+    <p class="helptext">Pick a date range and a report, then Generate opens it in a new tab, ready to review or print.</p>
     <div class="range-presets">
       <button type="button" class="range-preset" onclick="setReportRange('ytd')">Year to Date</button>
       <button type="button" class="range-preset" onclick="setReportRange('lastyear')">Last Year</button>
@@ -846,7 +846,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-21.1";
+const APP_VERSION = "2026-09-21.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3674,16 +3674,21 @@ function renderBlackouts(){
 }
 
 /* =========================================================================
-   REPORTS — placeholder tab. Generate opens a strawdog report in a new
-   tab (Blob + window.open, not a data: URI - more reliable across
-   browsers for a full HTML document) so the real report designs can be
-   filled in later without changing this scaffolding.
+   REPORTS — Session/Training/Drop-in Statistics for an arbitrary date
+   range, computed here against the live sessions/ministers already loaded
+   and rendered into a standalone printable page (Blob + window.open, not a
+   data: URI - more reliable across browsers for a full HTML document). The
+   new tab has no access back to this app's data, so every number is
+   pre-computed into plain HTML before it's opened - nothing in the report
+   page re-fetches or recomputes anything itself.
 ========================================================================= */
 const REPORT_LABELS = {
   sessions: 'Session Statistics (Freedom Sessions)',
   training: 'Training Statistics',
   dropin: 'Drop-in Statistics'
 };
+const REPORT_NOUN = { sessions: 'Freedom Session', training: 'Training', dropin: 'Drop-in' };
+const REPORT_EMPTY_NOUN = { sessions: 'Freedom Sessions', training: 'Training sessions', dropin: 'Drop-in sessions' };
 // Common backward-looking ranges for the report picker, so the usual cases
 // don't require typing two dates by hand every time - same .range-preset
 // pattern Quick Add Slots already uses for its own (forward-looking) ranges.
@@ -3699,6 +3704,71 @@ window.setReportRange = function(preset){
   $('#reportFrom').value = isoDate(from);
   $('#reportTo').value = isoDate(to);
 };
+// Completed only - a "statistics" report is inherently retrospective, same
+// convention completedStats() already uses for the Completed Sessions combo
+// card. Each type filters to exactly the apptType(s) it's about; Freedom
+// Sessions explicitly excludes Drop-in/Training the same way completedStats
+// does (one shared group event per occurrence, not an individual session).
+function reportSessionsFor(type, from, to){
+  return sessions.filter(s=>{
+    if(s.status!=='Completed' || s.date<from || s.date>to) return false;
+    if(type==='sessions') return s.apptType!=='Drop-in' && s.apptType!=='Training';
+    if(type==='training') return s.apptType==='Training';
+    if(type==='dropin') return s.apptType==='Drop-in';
+    return false;
+  });
+}
+// Same per-recipient (not per-session) classification completedStats()
+// uses - a recipient counts as Follow-up if ANY of their sessions in the
+// list has ApptType Follow-up, so the two counts add up to unique
+// recipients, not total sessions. Only called for Freedom Sessions -
+// Training/Drop-in share one literal recipName across every occurrence
+// ("Sunday Drop-In"/"Training"), so "unique recipients" isn't meaningful
+// there and callers skip this entirely for those two types.
+function reportRecipientSplit(list){
+  const map = new Map();
+  list.forEach(s=>{
+    const key = s.recipName.trim().toLowerCase();
+    map.set(key, (map.get(key)||false) || s.apptType==='Follow-up');
+  });
+  let firstTime=0, followUp=0;
+  map.forEach(hadFollowUp => hadFollowUp ? followUp++ : firstTime++);
+  return { firstTime, followUp, total: map.size };
+}
+function reportMinisterBreakdown(list){
+  const map = new Map();
+  list.forEach(s=>{
+    s.ministers.forEach(m=>{
+      const min = ministers.find(x=>x.id===m.id);
+      if(!map.has(m.id)) map.set(m.id, { name: min ? min.name : 'Unknown', count:0, leadCount:0 });
+      const rec = map.get(m.id);
+      rec.count++;
+      if(m.role==='Lead') rec.leadCount++;
+    });
+  });
+  return [...map.values()].sort((a,b)=> b.count-a.count || a.name.localeCompare(b.name));
+}
+// Month-by-month bucket count across the report's actual range, however
+// many calendar years it spans (not fixed to "this year" like the
+// Completed Sessions trend chart) - falls back to yearly buckets past 24
+// months so a genuinely long range still renders a readable chart instead
+// of dozens of skinny bars.
+function reportMonthlyTrend(list, from, to){
+  const fromD = new Date(from+'T00:00'), toD = new Date(to+'T00:00');
+  const months = [];
+  let d = new Date(fromD.getFullYear(), fromD.getMonth(), 1);
+  const endD = new Date(toD.getFullYear(), toD.getMonth(), 1);
+  while(d<=endD){ months.push({y:d.getFullYear(), m:d.getMonth()}); d.setMonth(d.getMonth()+1); }
+  if(months.length>24){
+    const years = [...new Set(months.map(x=>x.y))];
+    return years.map(y=>({ label:String(y), count: list.filter(s=>new Date(s.date+'T00:00').getFullYear()===y).length }));
+  }
+  const MONTH_ABBR=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return months.map(({y,m})=>({
+    label: `${MONTH_ABBR[m]} '${String(y).slice(2)}`,
+    count: list.filter(s=>{ const sd=new Date(s.date+'T00:00'); return sd.getFullYear()===y && sd.getMonth()===m; }).length
+  }));
+}
 function generateReport(){
   const msg = $('#reportMsg');
   msg.hidden = true;
@@ -3706,19 +3776,90 @@ function generateReport(){
   if(!from || !to){ msg.hidden = false; msg.textContent = 'Please pick both a from and a to date.'; return; }
   if(to < from){ msg.hidden = false; msg.textContent = 'The to date must be on or after the from date.'; return; }
   const label = REPORT_LABELS[type] || type;
+  const isIndividual = type==='sessions';
+  const list = reportSessionsFor(type, from, to);
+  const split = isIndividual ? reportRecipientSplit(list) : null;
+  const ministerRows = reportMinisterBreakdown(list);
+  const trend = reportMonthlyTrend(list, from, to);
+  const maxTrend = Math.max(1, ...trend.map(t=>t.count));
+
+  const summaryHtml = isIndividual ? `
+    <div class="summary-grid">
+      <div class="summary-tile"><div class="summary-num">${list.length}</div><div class="summary-label">Sessions</div></div>
+      <div class="summary-tile"><div class="summary-num">${split.total}</div><div class="summary-label">Unique Recipients</div></div>
+      <div class="summary-tile summary-split">
+        <div class="split-row"><span class="dot first"></span>${split.firstTime} first-time</div>
+        <div class="split-row"><span class="dot follow"></span>${split.followUp} follow-up</div>
+      </div>
+    </div>` : `
+    <div class="summary-grid">
+      <div class="summary-tile"><div class="summary-num">${list.length}</div><div class="summary-label">${escapeHtml(REPORT_NOUN[type])} Sessions</div></div>
+    </div>`;
+
+  const ministerHtml = ministerRows.length ? ministerRows.map(r=>`
+    <tr><td>${escapeHtml(r.name)}</td><td>${r.count}</td><td>${r.leadCount}</td></tr>`).join('')
+    : `<tr><td colspan="3" class="empty">No ministers recorded in this range.</td></tr>`;
+
+  const trendHtml = `<div class="trend-bars">${trend.map(t=>`
+    <div class="tbar">
+      <div class="tbar-fill" style="height:${Math.max(4, Math.round(t.count/maxTrend*90))}px;"><span class="tbar-val">${t.count}</span></div>
+      <div class="tbar-label">${escapeHtml(t.label)}</div>
+    </div>`).join('')}</div>`;
+
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(label)}</title>
 <style>
   body{font-family:Georgia,'Times New Roman',serif;background:#faf8f4;color:#2a2a2a;margin:0;padding:40px;}
   .wrap{max-width:800px;margin:0 auto;background:#fff;border:1px solid #ddd5c4;border-radius:10px;padding:36px 42px;}
-  h1{color:#aa5a3c;font-size:24px;margin:0 0 6px;}
-  .range{color:#6b6b6b;font-size:14px;margin:0 0 28px;}
-  .placeholder{background:#e7e2cf;border-radius:8px;padding:20px 24px;color:#474747;font-size:14px;line-height:1.6;}
-  @media print{ body{background:#fff;padding:0;} .wrap{border:none;} }
+  .toolbar{display:flex;justify-content:flex-end;margin-bottom:10px;}
+  .toolbar button{background:#f28a00;color:#1a1a1a;border:none;padding:9px 18px;border-radius:6px;font-weight:700;font-size:14px;cursor:pointer;font-family:Georgia,'Times New Roman',serif;}
+  .toolbar button:hover{background:#ce7500;}
+  h1{color:#8a4a30;font-size:24px;margin:0 0 6px;}
+  .range{color:#6b6b6b;font-size:14px;margin:0 0 26px;}
+  .empty-state{background:#e7e2cf;border-radius:8px;padding:20px 24px;color:#474747;font-size:14px;line-height:1.6;margin-bottom:8px;}
+  .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:0 0 30px;}
+  .summary-tile{background:#faf8f4;border:1px solid #ddd5c4;border-radius:8px;padding:16px 18px;}
+  .summary-num{font-size:30px;font-weight:700;color:#474747;line-height:1;}
+  .summary-label{font-size:11.5px;color:#6b6b6b;text-transform:uppercase;letter-spacing:.04em;margin-top:6px;}
+  .summary-split{display:flex;flex-direction:column;justify-content:center;gap:5px;}
+  .split-row{font-size:13.5px;color:#474747;display:flex;align-items:center;gap:7px;}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:0 0 auto;}
+  .dot.first{background:#cdc4ac;} .dot.follow{background:#f28a00;}
+  h2{font-size:13.5px;color:#474747;text-transform:uppercase;letter-spacing:.04em;margin:0 0 14px;border-bottom:1px solid #ddd5c4;padding-bottom:8px;font-weight:700;}
+  .trend-bars{display:flex;align-items:flex-end;gap:6px;height:128px;margin:0 0 30px;padding:0 2px;border-bottom:1px solid #ddd5c4;overflow-x:auto;}
+  .tbar{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;flex:1 0 30px;height:100%;}
+  .tbar-fill{width:100%;max-width:26px;background:#f28a00;border-radius:3px 3px 0 0;display:flex;align-items:flex-start;justify-content:center;position:relative;min-height:4px;}
+  .tbar-val{position:absolute;top:-18px;font-size:10.5px;color:#474747;font-weight:700;white-space:nowrap;}
+  .tbar-label{font-size:10px;color:#6b6b6b;margin-top:6px;white-space:nowrap;}
+  details{margin-top:6px;border:1px solid #ddd5c4;border-radius:8px;overflow:hidden;}
+  summary{cursor:pointer;font-weight:700;color:#474747;padding:13px 16px;font-size:14px;list-style:none;}
+  summary::-webkit-details-marker{display:none;}
+  summary::before{content:'▸  ';color:#aa5a3c;}
+  details[open] summary::before{content:'▾  ';}
+  table{width:calc(100% - 32px);border-collapse:collapse;margin:0 16px 14px;font-size:13px;}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid #f1ede4;}
+  th{font-size:11px;text-transform:uppercase;color:#6b6b6b;letter-spacing:.03em;font-weight:700;}
+  td.empty{color:#6b6b6b;font-style:italic;}
+  @media print{
+    body{background:#fff;padding:0;}
+    .wrap{border:none;padding:0;max-width:100%;}
+    .no-print{display:none!important;}
+    .trend-bars{overflow-x:visible;}
+  }
 </style></head><body>
   <div class="wrap">
+    <div class="toolbar no-print">
+      <button type="button" onclick="document.querySelectorAll('details').forEach(function(d){d.open=true;});window.print();">Print</button>
+    </div>
     <h1>${escapeHtml(label)}</h1>
     <p class="range">${escapeHtml(fmtShort(from))} – ${escapeHtml(fmtShort(to))}</p>
-    <div class="placeholder">This report's design hasn't been built yet — this is a placeholder to confirm the date range and report selection work end to end. The real ${escapeHtml(label.toLowerCase())} report will replace this page.</div>
+    ${!list.length ? `<div class="empty-state">No completed ${escapeHtml(REPORT_EMPTY_NOUN[type] || label)} in this date range.</div>` : `
+    ${summaryHtml}
+    <h2>By Month</h2>
+    ${trendHtml}
+    <details id="ministerBreakdown">
+      <summary>Minister Breakdown (${ministerRows.length})</summary>
+      <table><thead><tr><th>Minister</th><th>Sessions</th><th>As Lead</th></tr></thead><tbody>${ministerHtml}</tbody></table>
+    </details>`}
   </div>
 </body></html>`;
   const blob = new Blob([html], {type: 'text/html'});
@@ -3747,6 +3888,9 @@ function generateReport(){
 ========================================================================= */
 const CHANGE_LOG = [
   { date: 'Sep 21, 2026', version: APP_VERSION, items: [
+    'New: Session, Training, and Drop-in Statistics are real reports now, not placeholders - session counts, a first-time vs. follow-up split (Freedom Sessions only), a month-by-month chart, and a minister breakdown you can expand. Print now force-expands the minister breakdown first, so it actually shows up on the printed page.'
+  ]},
+  { date: 'Sep 21, 2026', version: '2026-09-21.1', items: [
     'New: the Reports tab has quick date-range buttons (Year to Date, Last Year, This Month, Last Month, Last 90 Days) so common ranges don\'t need typing.'
   ]}
 ];

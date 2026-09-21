@@ -325,19 +325,40 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
 - Blackout Dates tab: grouped by minister, soonest first, Add/Edit modal with
   a single-date/date-range toggle (writes BlackoutDate + EndDate), edit/delete
   per entry
-- **Reports tab** (added 2026-09-19): a date range + report-type picker
-  (Session/Training/Drop-in Statistics) whose Generate button opens a
-  strawdog page in a new tab — real report designs haven't been built yet,
-  this only proves the range/type selection works end to end. Date-range
-  presets (Year to Date, Last Year, This Month, Last Month, Last 90 Days —
-  same `.range-preset` pattern Quick Add Slots uses) fill the From/To fields
-  without typing. Two things to build into the real reports when they're
-  designed, not yet applicable to the placeholder: (1) if a report ends up
-  with a collapsible minister-breakdown section, the Print action must
-  force it open first — collapsed content doesn't print; (2) Location is
-  now a clean, trustworthy report dimension (an admin-managed list via
-  Settings, not free text) — "sessions by location" is a reasonable optional
-  breakdown/filter to add, not required.
+- **Reports tab** (added 2026-09-19, real report content added 2026-09-21):
+  a date range + report-type picker (Session/Training/Drop-in Statistics).
+  Date-range presets (Year to Date, Last Year, This Month, Last Month, Last
+  90 Days — same `.range-preset` pattern Quick Add Slots uses) fill the
+  From/To fields without typing. Generate computes the report against the
+  live `sessions`/`ministers` already loaded (Completed only — same
+  retrospective convention `completedStats()` uses) and opens a standalone,
+  printable page in a new tab (Blob + `window.open`, not a `data:` URI —
+  more reliable across browsers for a full HTML document); the new tab has
+  no access back into the app, so every number is baked into plain HTML
+  before it opens, nothing there re-fetches or recomputes anything.
+  - Freedom Sessions gets three summary tiles (session count, unique
+    recipients, first-time-vs-follow-up split — same per-*recipient*, not
+    per-session, classification `completedStats()` uses); Training and
+    Drop-in get one tile (occurrence count) since neither has an individual
+    recipient concept — every occurrence shares one literal recipName
+    ("Sunday Drop-In"/"Training"), so "unique recipients" isn't meaningful
+    for those two.
+  - A month-by-month bar chart across the report's actual chosen range
+    (not fixed to "this year" like the Completed Sessions tab's own trend
+    chart) — falls back to yearly bars past 24 months so a genuinely long
+    range still renders readably.
+  - A collapsed-by-default minister breakdown (sessions + times-as-Lead per
+    minister, via a native `<details>`/`<summary>`) below the chart. The
+    page's own Print button force-sets every `<details>` open before
+    calling `window.print()` — collapsed content doesn't print, so this is
+    load-bearing, not cosmetic.
+  - An empty-state message replaces the summary/chart/breakdown entirely
+    when the range has no completed sessions of that type, rather than
+    rendering a misleading all-zeros report.
+  - **Not built, still a real option**: Location is a clean, trustworthy
+    report dimension now (an admin-managed list via Settings, not free
+    text) — "sessions by location" as an optional breakdown/filter is
+    reasonable to add later, just wasn't part of this pass.
 - **Settings tab** (added 2026-09-19): admin-only configuration, no code
   changes needed, backed by a new `TimeWindows` SharePoint list (see schema
   below). Three sub-tabs:
@@ -436,13 +457,11 @@ like one product, not two:
 - **Calendar (month grid) view** — was planned but never built in this HTML
   version. The agenda/Schedule view covers the "chronological list" requirement
   on its own; the calendar grid is a nice-to-have, not yet started.
-- **Real report designs** — the Reports tab's Session/Training/Drop-in
-  Statistics options currently open a strawdog placeholder page confirming
-  only that the date-range/type selection works. See the Reports tab bullet
-  under "Features implemented" for two things to design in from the start
-  once real work on these begins: a collapsible minister-breakdown section
-  (if one gets built) must be force-expanded by Print, and Location is now
-  a trustworthy optional report dimension worth considering.
+- **Location as a report dimension** — Reports' Session/Training/Drop-in
+  Statistics (built 2026-09-21, see "Features implemented") don't break
+  down or filter by Location yet, even though it's now a clean,
+  admin-managed list via Settings rather than free text. A reasonable
+  optional addition, not started.
 
 ## Known gotchas (hard-won, don't reintroduce these bugs)
 1. **Graph list item IDs are strings, not numbers.** Comma-separated ID fields
