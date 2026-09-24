@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Freedom Prayer Healing Ministry — Intake Questionnaire</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<script src="../js/formConfig.js"></script>
+<script src="../js/formEngine.js"></script>
+<script src="js/apiClient.js"></script>
+<script>
+/* =========================================================================
+   PUBLIC INTAKE FORM — multi-step wizard over FPHM_INTAKE_CONFIG.SECTIONS,
+   plus a fixed intro screen, a fixed final liability+signature screen, and
+   a thank-you/print screen. See CLAUDE.md for the overall architecture.
+========================================================================= */
+
+const { INTRO_TEXT, LIABILITY_TEXT } = window.FPHM_INTAKE_CONFIG;
+
+const STEP = { INTRO: "intro", SECTION: "section", FINAL: "final", DONE: "done" };
+
+const state = {
+  token: null,
+  answers: {},
+  step: STEP.INTRO,
+  sectionIdx: 0,
+  online: true,
+  saving: false,
+  submitted: false,
+  signaturePad: null
+};
+
+const app = document.getElementById("app");
+
+// ---- local persistence fallback (used when the API is unreachable) -----
+function localKey() { return "fphm_intake_local_" + (state.token || "draft"); }
+function saveLocal() {
+  try {
+    localStorage.setItem(localKey(), JSON.stringify({ answers: state.answers, token: state.token }));
+    localStorage.setItem("fphm_intake_last_token", state.token || "");
+  } catch (e) {}
+}
+function loadLocal(token) {
+  try {
+    const raw = localStorage.getItem("fphm_intake_local_" + token);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+
+let saveTimer = null;
+function scheduleSave() {
+  saveLocal();
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(doSave, 900);
+}
+async function doSave(immediate) {
+  if (!state.token) return;
+  state.saving = true;
+  renderSaveStatus();
+  try {
+    await FPHM_API.save(state.token, state.answers);
+    state.online = true;
+  } catch (e) {
+    state.online = false;
+  }
+  state.saving = false;
+  renderSaveStatus();
+}
+function renderSaveStatus() {
+  const el = document.getElementById("saveStatus");
+  if (!el) return;
+  if (state.saving) el.textContent = "Saving…";
+  else if (!state.online) el.textContent = "Saved on this device (offline — will sync once reconnected)";
+  else el.textContent = "Saved";
+}
+
+// ---- boot ---------------------------------------------------------------
+async function boot() {
+  const params = new URLSearchParams(location.search);
+  const tokenFromUrl = params.get("token");
+  const token = tokenFromUrl || localStorage.getItem("fphm_intake_last_token") || null;
+
+  if (token) {
+    state.token = token;
+    try {
+      const data = await FPHM_API.load(token);
+      state.answers = data.responses || {};
+      if (data.status === "Submitted") {
+        state.submitted = true;
+        state.step = STEP.DONE;
+      } else {
+        state.step = STEP.SECTION;
+        state.sectionIdx = findFirstIncompleteSectionIndex(state.answers);
+      }
+    } catch (e) {
+      // Couldn't reach the server — fall back to whatever's on this device.
+      state.online = false;
+      const local = loadLocal(token);
+      if (local) {
+        state.answers = local.answers || {};
+        state.step = STEP.SECTION;
+        state.sectionIdx = findFirstIncompleteSectionIndex(state.answers);
+      } else {
+        state.step = STEP.INTRO;
+      }
+    }
+  }
+  render();
+}
+
+function findFirstIncompleteSectionIndex(answers) {
+  const sections = FPHM.getVisibleSections(answers);
+  for (let i = 0; i < sections.length; i++) {
+    if (FPHM.validateSection(sections[i], answers).length > 0) return i;
+  }
+  return sections.length - 1 >= 0 ? sections.length : 0; // past the last section -> final step handled by caller
+}
+
+async function beginIntake() {
+  try {
+    const data = await FPHM_API.start("", "");
+    state.token = data.token;
+    state.online = true;
+  } catch (e) {
+    state.token = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
+    state.online = false;
+  }
+  localStorage.setItem("fphm_intake_last_token", state.token);
+  saveLocal();
+  state.step = STEP.SECTION;
+  state.sectionIdx = 0;
+  render();
+}
+
+// ---- rendering ------------------------------------------------------
+function render() {
+  if (state.step === STEP.INTRO) return renderIntro();
+  if (state.step === STEP.SECTION) return renderSection();
+  if (state.step === STEP.FINAL) return renderFinal();
+  if (state.step === STEP.DONE) return renderDone();
+}
+
+function renderIntro() {
+  app.innerHTML = `
+    <div class="card">
+      <h1>${FPHM.escapeHtml(INTRO_TEXT.title)}</h1>
+      ${INTRO_TEXT.body.map((p) => `<p>${FPHM.escapeHtml(p)}</p>`).join("")}
+      <div class="nav-row">
+        <span></span>
+        <button class="btn-primary" id="btnBegin">Begin</button>
+      </div>
+    </div>
+  `;
+  document.getElementById("btnBegin").onclick = beginIntake;
+}
+
+function renderTopBar(sectionsCount, currentIdx, title) {
+  const pct = sectionsCount ? Math.round(((currentIdx) / sectionsCount) * 100) : 0;
+  return `
+    <div class="top-actions no-print">
+      <button class="btn-link" id="btnSaveExit">Save &amp; continue later</button>
+    </div>
+    <div class="progress-outer"><div class="progress-inner" style="width:${pct}%"></div></div>
+    <div class="progress-label">Section ${currentIdx + 1} of ${sectionsCount + 1}${title ? " — " + FPHM.escapeHtml(title) : ""}</div>
+    <div id="offlineBanner"></div>
+  `;
+}
+
+function renderOfflineBanner() {
+  if (state.online) return "";
+  return `<div class="resume-banner no-print">We couldn't reach the server right now. Your answers are being saved on this device and will sync automatically once the connection is back — you can keep going.</div>`;
+}
+
+function renderSection() {
+  const visibleSections = FPHM.getVisibleSections(state.answers);
+  if (state.sectionIdx >= visibleSections.length) {
+    state.step = STEP.FINAL;
+    return renderFinal();
+  }
+  const section = visibleSections[state.sectionIdx];
+  const questions = FPHM.getVisibleQuestions(section, state.answers);
+
+  app.innerHTML = `
+    ${renderTopBar(visibleSections.length, state.sectionIdx, section.title)}
+    <div class="card">
+      <h2>${FPHM.escapeHtml(section.title)}</h2>
+      ${section.intro ? `<div class="section-intro">${FPHM.escapeHtml(section.intro)}</div>` : ""}
+      <div id="questionsHost">${questions.map((q) => renderQuestion(q)).join("")}</div>
+      <div class="nav-row no-print">
+        <button class="btn-secondary" id="btnBack" ${state.sectionIdx === 0 ? "disabled" : ""}>Back</button>
+        <button class="btn-primary" id="btnNext">Next</button>
+      </div>
+      <div class="save-status" id="saveStatus"></div>
+    </div>
+  `;
+  document.getElementById("offlineBanner").innerHTML = renderOfflineBanner();
+  wireQuestionEvents(section);
+  document.getElementById("btnBack").onclick = () => {
+    state.sectionIdx = Math.max(0, state.sectionIdx - 1);
+    doSave();
+    render();
+  };
+  document.getElementById("btnNext").onclick = () => {
+    const missing = FPHM.validateSection(section, state.answers);
+    if (missing.length) {
+      markInvalid(missing);
+      return;
+    }
+    state.sectionIdx += 1;
+    doSave();
+    render();
+  };
+  document.getElementById("btnSaveExit").onclick = openSaveExitDialog;
+}
+
+function renderQuestion(q) {
+  const val = state.answers[q.id];
+  let control = "";
+  if (q.type === "text" || q.type === "email" || q.type === "number") {
+    control = `<input type="${q.type}" data-qid="${q.id}" value="${val ? FPHM.escapeHtml(val) : ""}"
+      ${q.min !== undefined ? `min="${q.min}"` : ""} ${q.max !== undefined ? `max="${q.max}"` : ""}>`;
+  } else if (q.type === "textarea") {
+    control = `<textarea data-qid="${q.id}">${val ? FPHM.escapeHtml(val) : ""}</textarea>`;
+  } else if (q.type === "select") {
+    control = `<select data-qid="${q.id}">
+      <option value="" ${!val ? "selected" : ""}>Select your answer</option>
+      ${q.options.map((o) => `<option value="${FPHM.escapeHtml(o)}" ${val === o ? "selected" : ""}>${FPHM.escapeHtml(o)}</option>`).join("")}
+    </select>`;
+  } else if (q.type === "radio") {
+    control = `<div class="choice-group">${q.options
+      .map(
+        (o) => `<label class="choice-option">
+          <input type="radio" name="${q.id}" value="${FPHM.escapeHtml(o)}" data-qid="${q.id}" ${val === o ? "checked" : ""}>
+          <span>${FPHM.escapeHtml(o)}</span>
+        </label>`
+      )
+      .join("")}</div>`;
+  } else if (q.type === "checkboxes") {
+    const arr = Array.isArray(val) ? val : [];
+    const otherVal = arr.find((v) => v.startsWith && v.startsWith("__other__:"));
+    control = `<div class="choice-group">${q.options
+      .map((o) => {
+        const checked = arr.includes(o);
+        return `<label class="choice-option">
+          <input type="checkbox" value="${FPHM.escapeHtml(o)}" data-qid="${q.id}" data-kind="checkbox" ${checked ? "checked" : ""}>
+          <span>${FPHM.escapeHtml(o)}</span>
+        </label>`;
+      })
+      .join("")}
+      ${
+        q.otherOption
+          ? `<label class="choice-option">
+              <input type="checkbox" data-qid="${q.id}" data-kind="other-toggle" ${otherVal ? "checked" : ""}>
+              <span>Other</span>
+              ${
+                otherVal
+                  ? `<input type="text" class="other-text" data-qid="${q.id}" data-kind="other-text" value="${FPHM.escapeHtml(
+                      otherVal.slice("__other__:".length)
+                    )}" placeholder="Please specify">`
+                  : ""
+              }
+            </label>`
+          : ""
+      }
+      </div>`;
+  }
+  return `<div class="question" data-qwrap="${q.id}">
+    <label class="qlabel">${FPHM.escapeHtml(q.label)}${q.required ? '<span class="required-mark">*</span>' : ""}</label>
+    ${control}
+    <div class="field-error" id="err_${q.id}"></div>
+  </div>`;
+}
+
+function wireQuestionEvents(section) {
+  const host = document.getElementById("questionsHost");
+  host.addEventListener("input", onFieldChange);
+  host.addEventListener("change", onFieldChange);
+
+  function onFieldChange(evt) {
+    const el = evt.target;
+    const qid = el.dataset.qid;
+    if (!qid) return;
+    const kind = el.dataset.kind;
+    // Only radio/select/checkbox/"other" toggles can change which
+    // questions or sections are visible — free-text fields (text,
+    // textarea, number, email, and the "other" free-text box) never do,
+    // so they must NOT trigger a full re-render on every keystroke (that
+    // would blow away focus and cursor position while typing). Those are
+    // handled by the "input" event below and just update state in place.
+    const isPlainTextInput =
+      !kind && (el.tagName === "TEXTAREA" || (el.tagName === "INPUT" && ["text", "email", "number"].includes(el.type)));
+
+    if (evt.type === "input" && (isPlainTextInput || kind === "other-text")) {
+      if (kind === "other-text") {
+        const arr = Array.isArray(state.answers[qid]) ? state.answers[qid].slice() : [];
+        const idx = arr.findIndex((v) => v.startsWith && v.startsWith("__other__:"));
+        if (idx !== -1) arr[idx] = "__other__:" + el.value;
+        state.answers[qid] = arr;
+      } else {
+        state.answers[qid] = el.value;
+      }
+      clearInvalid(qid);
+      scheduleSave();
+      return;
+    }
+    if (evt.type !== "change") return; // avoid double-handling text inputs' "change" after "input" already did
+
+    if (el.type === "radio") {
+      state.answers[qid] = el.value;
+    } else if (kind === "checkbox") {
+      const arr = Array.isArray(state.answers[qid]) ? state.answers[qid].slice() : [];
+      const idx = arr.indexOf(el.value);
+      if (el.checked && idx === -1) arr.push(el.value);
+      if (!el.checked && idx !== -1) arr.splice(idx, 1);
+      state.answers[qid] = arr;
+    } else if (kind === "other-toggle") {
+      const arr = Array.isArray(state.answers[qid]) ? state.answers[qid].slice() : [];
+      const idx = arr.findIndex((v) => v.startsWith && v.startsWith("__other__:"));
+      if (el.checked && idx === -1) arr.push("__other__:");
+      if (!el.checked && idx !== -1) arr.splice(idx, 1);
+      state.answers[qid] = arr;
+    } else if (el.tagName === "SELECT") {
+      state.answers[qid] = el.value;
+    } else {
+      return; // text/textarea/number "change" (fires on blur) — already handled via "input"
+    }
+    clearInvalid(qid);
+    // A change might reveal/hide conditional questions or entire branch
+    // sections (e.g. marital status) — re-render the visible question set.
+    renderSectionInPlace(section);
+    scheduleSave();
+  }
+}
+
+// Re-renders just the current section's question list (and nav state),
+// without losing focus more than necessary, whenever an answer changes
+// something's visibility.
+function renderSectionInPlace(section) {
+  render();
+}
+
+function markInvalid(missingIds) {
+  missingIds.forEach((id) => {
+    const wrap = document.querySelector(`[data-qwrap="${id}"]`);
+    if (wrap) wrap.classList.add("invalid");
+    const err = document.getElementById("err_" + id);
+    if (err) err.textContent = "This question is required.";
+  });
+  const firstWrap = document.querySelector(`[data-qwrap="${missingIds[0]}"]`);
+  if (firstWrap) firstWrap.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+function clearInvalid(id) {
+  const wrap = document.querySelector(`[data-qwrap="${id}"]`);
+  if (wrap) wrap.classList.remove("invalid");
+  const err = document.getElementById("err_" + id);
+  if (err) err.textContent = "";
+}
+
+function renderFinal() {
+  const visibleSections = FPHM.getVisibleSections(state.answers);
+  app.innerHTML = `
+    ${renderTopBar(visibleSections.length, visibleSections.length, LIABILITY_TEXT.title)}
+    <div class="card">
+      <h2>${FPHM.escapeHtml(LIABILITY_TEXT.title)}</h2>
+      <div class="legal-text">${FPHM.escapeHtml(LIABILITY_TEXT.body)}</div>
+      <label class="qlabel">Please sign below to confirm your agreement<span class="required-mark">*</span></label>
+      <div class="signature-box"><canvas id="sigCanvas"></canvas></div>
+      <div class="nav-row no-print" style="margin-top:10px;">
+        <button class="btn-link" id="btnClearSig">Clear signature</button>
+      </div>
+      <div class="field-error" id="err_signature"></div>
+      <div class="nav-row no-print" style="margin-top:20px;">
+        <button class="btn-secondary" id="btnBack">Back</button>
+        <button class="btn-primary" id="btnSubmit">Submit</button>
+      </div>
+      <div class="save-status" id="saveStatus"></div>
+    </div>
+  `;
+  document.getElementById("offlineBanner") && (document.getElementById("offlineBanner").innerHTML = renderOfflineBanner());
+  state.signaturePad = FPHM.attachSignaturePad(document.getElementById("sigCanvas"));
+  document.getElementById("btnClearSig").onclick = () => state.signaturePad.clear();
+  document.getElementById("btnBack").onclick = () => {
+    state.step = STEP.SECTION;
+    state.sectionIdx = Math.max(0, visibleSections.length - 1);
+    render();
+  };
+  document.getElementById("btnSaveExit").onclick = openSaveExitDialog;
+  document.getElementById("btnSubmit").onclick = onSubmit;
+}
+
+async function onSubmit() {
+  const missing = FPHM.validateAll(state.answers);
+  if (missing.length) {
+    state.step = STEP.SECTION;
+    const visibleSections = FPHM.getVisibleSections(state.answers);
+    state.sectionIdx = visibleSections.findIndex((s) => FPHM.validateSection(s, state.answers).length > 0);
+    render();
+    return;
+  }
+  if (state.signaturePad.isEmpty()) {
+    document.getElementById("err_signature").textContent = "Please sign before submitting.";
+    return;
+  }
+  document.getElementById("err_signature").textContent = "";
+  const btn = document.getElementById("btnSubmit");
+  btn.disabled = true;
+  btn.textContent = "Submitting…";
+  const signatureDataUrl = state.signaturePad.toDataUrl();
+  try {
+    await FPHM_API.submit(state.token, state.answers, signatureDataUrl);
+    state.online = true;
+  } catch (e) {
+    state.online = false;
+    // Keep signature + answers locally so nothing is lost; staff can be
+    // notified to check back, or the recipient can retry submit later.
+    try {
+      localStorage.setItem(localKey() + "_signature", signatureDataUrl);
+    } catch (err) {}
+    saveLocal();
+    alert("We couldn't reach the server to submit right now. Your answers and signature are saved on this device — please try Submit again once you're back online.");
+    btn.disabled = false;
+    btn.textContent = "Submit";
+    return;
+  }
+  state.submitted = true;
+  state.step = STEP.DONE;
+  render();
+}
+
+function renderDone() {
+  app.innerHTML = `
+    <div class="card">
+      <h1>Thank you</h1>
+      <p>Your questionnaire has been submitted to the Freedom Prayer Healing Ministry team. Thank you for taking the time to answer so honestly — it will help your prayer team prepare well for your visit.</p>
+      <div class="nav-row no-print">
+        <span></span>
+        <button class="btn-primary" id="btnPrint">Print / Save a copy</button>
+      </div>
+    </div>
+    <div id="printArea" style="display:none;">
+      <h1>${FPHM.escapeHtml(INTRO_TEXT.title)}</h1>
+      ${FPHM.renderResponsesHtml(state.answers)}
+    </div>
+  `;
+  document.getElementById("btnPrint").onclick = () => {
+    document.getElementById("printArea").style.display = "block";
+    window.print();
+  };
+}
+
+async function openSaveExitDialog() {
+  await doSave();
+  const link = location.origin + location.pathname + "?token=" + encodeURIComponent(state.token);
+  const existing = document.getElementById("saveExitModal");
+  if (existing) existing.remove();
+  const modal = document.createElement("div");
+  modal.id = "saveExitModal";
+  modal.className = "card";
+  modal.style.position = "fixed";
+  modal.style.top = "50%";
+  modal.style.left = "50%";
+  modal.style.transform = "translate(-50%,-50%)";
+  modal.style.maxWidth = "480px";
+  modal.style.width = "92%";
+  modal.style.zIndex = "1000";
+  modal.style.boxShadow = "0 10px 40px rgba(0,0,0,.25)";
+  modal.innerHTML = `
+    <h3>Your progress is saved</h3>
+    <p>Use this link to come back and finish later — from this device or any other.</p>
+    <input type="text" readonly value="${FPHM.escapeHtml(link)}" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:12px;">
+    <div class="nav-row">
+      <button class="btn-secondary" id="btnCloseModal">Close</button>
+      <button class="btn-primary" id="btnCopyLink">Copy link</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  document.getElementById("btnCloseModal").onclick = () => modal.remove();
+  document.getElementById("btnCopyLink").onclick = async () => {
+    const input = modal.querySelector("input");
+    try {
+      await navigator.clipboard.writeText(link);
+      document.getElementById("btnCopyLink").textContent = "Copied!";
+    } catch (e) {
+      input.select();
+      document.execCommand("copy");
+    }
+  };
+  history.replaceState(null, "", link);
+}
+
+boot();
+</script>
+</body>
+</html>

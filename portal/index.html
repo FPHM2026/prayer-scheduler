@@ -8,6 +8,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3/lib/msal-browser.min.js"></script>
+<!-- Shared with ../index.html, ../preview/index.html and ../intake/index.html
+     - the intake question schema + rendering logic live in ONE place
+     (../js/) so editing a question never needs touching more than that
+     file. See CLAUDE.md "Intake Forms" section. -->
+<script src="../js/formConfig.js"></script>
+<script src="../js/formEngine.js"></script>
 <style>
   /* Same design tokens and components as the main scheduler app - this is
      deliberately the SAME look, just fewer tabs and no admin actions on
@@ -117,6 +123,16 @@
   .modal-bg.sheet{align-items:flex-end;padding:0;}
   .modal-bg.sheet .modal{max-width:none;width:100%;max-height:90vh;border-radius:16px 16px 0 0;animation:sheetSlideUp .25s ease;}
   @keyframes sheetSlideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+
+  /* Intake form answers - produced by FPHM.renderResponsesHtml() in
+     js/formEngine.js, shared with the main app and the public form. */
+  .ans-section{margin-bottom:20px;}
+  .ans-section h3{font-family:'Playfair Display',Georgia,serif;color:var(--gold-dark);border-bottom:1px solid var(--border);padding-bottom:6px;margin:0 0 10px;}
+  .ans-row{display:flex;flex-direction:column;margin-bottom:10px;}
+  .ans-q{font-weight:700;font-size:var(--fs-xs);color:var(--muted);}
+  .ans-a{font-size:var(--fs-sm);white-space:pre-wrap;}
+  .intake-link-row{margin-top:8px;}
+  @media print{ .no-print{display:none!important;} }
 
   #signinScreen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:20px;background:var(--cream);}
   #signinScreen .helptext{color:var(--navy);font-size:var(--fs-sm);max-width:360px;}
@@ -313,6 +329,17 @@
   </div>
 </div>
 
+<div class="modal-bg" id="intakeViewModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="intakeViewTitle" style="max-width:680px;max-height:85vh;overflow-y:auto;">
+    <h2 id="intakeViewTitle">Intake form</h2>
+    <p class="helptext" id="intakeViewMeta"></p>
+    <div id="intakeViewBody"></div>
+    <div class="modal-actions no-print">
+      <button class="btn secondary" id="btnIntakeViewClose">Close</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="confirmModal">
   <div class="modal small" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
     <h2 id="confirmTitle">Please confirm</h2>
@@ -340,7 +367,7 @@ const MSAL_CONFIG = {
 };
 const GRAPH_SCOPES = ["Sites.ReadWrite.All", "User.Read"];
 const SITE_URL = "https://creeksidechurch.sharepoint.com/sites/FreedomPrayer";
-const LIST_NAMES = { ministers: "PrayerMinisters", sessions: "PrayerSessions", blackouts: "BlackoutDates" };
+const LIST_NAMES = { ministers: "PrayerMinisters", sessions: "PrayerSessions", blackouts: "BlackoutDates", intake: "IntakeResponses" };
 
 const msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
 const msalReady = msalInstance.initialize();
@@ -447,12 +474,23 @@ async function deleteItem(key, itemId){
 /* =========================================================================
    DATA
 ========================================================================= */
-let ministers=[], sessions=[], blackouts=[], me=null;
+let ministers=[], sessions=[], blackouts=[], intakeResponses=[], me=null;
 let sessionNumberMap = new Map();
 
 async function loadAll(){
-  const [rawMin, rawSess, rawBlack] = await Promise.all([listItems('ministers'), listItems('sessions'), listItems('blackouts')]);
+  const [rawMin, rawSess, rawBlack, rawIntake] = await Promise.all([listItems('ministers'), listItems('sessions'), listItems('blackouts'), listItems('intake')]);
   ministers = rawMin.map(m => ({ id: m.id, name: m.Title, signInEmail: m.SignInEmail||'', status: m.Status||'Active' }));
+  // ResponsesJSON parsed once here, same as the main app - see its
+  // CLAUDE.md "Intake Forms" section for the shared schema/rendering.
+  intakeResponses = rawIntake.map(i => {
+    let responses = {};
+    try { responses = JSON.parse(i.ResponsesJSON || '{}'); } catch(e) {}
+    return {
+      id: i.id, recipName: i.RecipientName||'', recipEmail: i.RecipientEmail||'',
+      status: i.Status||'InProgress', submittedAt: i.SubmittedAt||null, created: i._created||null,
+      signatureDataUrl: i.SignatureDataUrl||'', responses
+    };
+  });
   sessions = rawSess.map(s => {
     const stripHtml = v => String(v||'').replace(/<[^>]*>/g, '');
     const allIds = stripHtml(s.AssignedMinisterIDs).split(',').map(x=>x.trim()).filter(Boolean);
@@ -559,6 +597,44 @@ window.toggleStatsCollapse = function(btn){
 /* Only sessions where I'm one of the assigned ministers */
 function mySessions(){ return sessions.filter(s=> s.ministers.some(m=>m.id===me.id)); }
 
+// A small "View intake form" row, or '' if there's no match - prepended
+// to a recipient group's body in Schedule/Completed Sessions.
+function intakeLinkRowFor(name){
+  const match = findMyIntakeForRecipient(name);
+  if(!match) return '';
+  const label = match.status==='Submitted' ? 'View intake form' : 'View intake form (in progress)';
+  return `<div class="intake-link-row"><button type="button" class="btn secondary" onclick="openIntakeView(${match.id})">${escapeHtml(label)}</button></div>`;
+}
+
+// A minister can only see an intake form for a recipient they actually
+// have (or had) a session with - client-side filter only, same accepted
+// tradeoff as everywhere else in this app (see main CLAUDE.md gotcha
+// #11): the "Ministers" SharePoint group has Read on the whole
+// IntakeResponses list, not per-item, so this is a UI-level boundary,
+// not a real security one.
+function findMyIntakeForRecipient(name){
+  if(!name || !mySessions().some(s=>s.recipName.trim().toLowerCase()===name.trim().toLowerCase())) return null;
+  const norm = name.trim().toLowerCase();
+  const matches = intakeResponses.filter(i => (i.recipName||'').trim().toLowerCase()===norm);
+  if(!matches.length) return null;
+  matches.sort((a,b)=>{
+    if((a.status==='Submitted') !== (b.status==='Submitted')) return a.status==='Submitted' ? -1 : 1;
+    return new Date(b.submittedAt||b.created||0) - new Date(a.submittedAt||a.created||0);
+  });
+  return matches[0];
+}
+window.openIntakeView = function(id){
+  const i = intakeResponses.find(x=>x.id===id);
+  if(!i) return;
+  $('#intakeViewTitle').textContent = i.recipName || '(name not yet entered)';
+  $('#intakeViewMeta').textContent = i.status==='Submitted'
+    ? `${i.recipEmail||''} — Submitted ${fmtShort((i.submittedAt||'').split('T')[0])}`
+    : `${i.recipEmail||''} — In progress`;
+  $('#intakeViewBody').innerHTML = FPHM.renderResponsesHtml(i.responses) +
+    (i.signatureDataUrl ? `<h3>Signature</h3><img src="${i.signatureDataUrl}" alt="Signature" style="max-width:280px;border:1px solid var(--border);border-radius:8px;background:#fff;">` : '');
+  $('#intakeViewModal').classList.add('open');
+};
+
 /* ---- ADD TO CALENDAR (.ics download) - same mechanism and title rule as
    the main app's version; kept duplicated since this app has no shared
    module between files. location here is already the plain LocationName
@@ -661,7 +737,7 @@ function renderSchedule(){
       : `Last: ${fmtShort(g.mostRecent.date)} · ${g.mostRecent.status}`;
     const wasOpen = opened.has(g.key) ? opened.get(g.key) : false;
     return groupRow(g.key, initials(g.name), g.name, `${g.vis.length} session${g.vis.length===1?'':'s'}`, summary,
-      g.vis.map(s=>scheduleSessionRow(s)).join(''), wasOpen);
+      intakeLinkRowFor(g.name) + g.vis.map(s=>scheduleSessionRow(s)).join(''), wasOpen);
   }).join('');
 }
 
@@ -706,7 +782,7 @@ function renderCompleted(){
   box.innerHTML = groups.map(g=>{
     const wasOpen = opened.has(g.key) ? opened.get(g.key) : false;
     return groupRow(g.key, initials(g.name), g.name, `${g.done.length} completed`, `Last: ${fmtShort(g.done[0].date)}`,
-      g.done.map(s=>completedSessionRow(s)).join(''), wasOpen);
+      intakeLinkRowFor(g.name) + g.done.map(s=>completedSessionRow(s)).join(''), wasOpen);
   }).join('');
 
   renderCompletedStats();
@@ -969,6 +1045,7 @@ function wireApp(){
   $('#btnBlackoutSave').addEventListener('click', saveBlackout);
   $('#btnConfirmCancel').addEventListener('click', ()=>closeConfirm(false));
   $('#btnConfirmOk').addEventListener('click', ()=>closeConfirm(true));
+  $('#btnIntakeViewClose').addEventListener('click', ()=>$('#intakeViewModal').classList.remove('open'));
   document.querySelectorAll('.modal-bg').forEach(bg=>{
     bg.addEventListener('click', (e)=>{
       if(e.target!==bg) return;

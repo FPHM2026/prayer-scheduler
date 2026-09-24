@@ -8,6 +8,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3/lib/msal-browser.min.js"></script>
+<!-- Shared with intake/index.html and portal/index.html - the intake
+     question schema + rendering logic live in ONE place (../js/) so
+     editing a question never needs touching more than that file. See
+     CLAUDE.md "Intake Forms" section. -->
+<script src="../js/formConfig.js"></script>
+<script src="../js/formEngine.js"></script>
 <style>
   /* Palette sampled from creeksidechurch.ca and the Freedom Prayer Healing Ministry
      page/logo (creeksidechurch.ca/freedom-prayer): --gold is the ministry's terracotta
@@ -220,6 +226,15 @@
   .group-body{max-height:0;overflow:hidden;transition:max-height .25s ease;}
   .group.open .group-body{max-height:3000px;}
   .group-body-inner{padding:0 16px 14px;border-top:1px solid var(--border);}
+
+  /* Intake form answers - produced by FPHM.renderResponsesHtml() in
+     js/formEngine.js, shared with intake/index.html. */
+  .ans-section{margin-bottom:20px;}
+  .ans-section h3{font-family:'Playfair Display',Georgia,serif;color:var(--gold-dark);border-bottom:1px solid var(--border);padding-bottom:6px;margin:0 0 10px;}
+  .ans-row{display:flex;flex-direction:column;margin-bottom:10px;}
+  .ans-q{font-weight:700;font-size:var(--fs-xs);color:var(--muted);}
+  .ans-a{font-size:var(--fs-sm);white-space:pre-wrap;}
+  .intake-match-banner{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--cream);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:var(--fs-sm);flex-wrap:wrap;}
 
   .sess-row{padding:14px 4px;border-bottom:1px solid #f1ede4;display:flex;justify-content:space-between;align-items:center;gap:10px;}
   .sess-row:last-child{border-bottom:none;}
@@ -486,6 +501,7 @@
   <button data-tab="completed">Completed Sessions</button>
   <button data-tab="overview">Prayer Ministers</button>
   <button data-tab="blackouts">Blackout Dates</button>
+  <button data-tab="intake">Intake Forms</button>
   <button data-tab="reports">Reports</button>
   <button data-tab="settings">Settings</button>
 </nav>
@@ -611,6 +627,18 @@
     <div class="no-results" id="blackoutNoResults" hidden>No upcoming blackout dates.</div>
   </section>
 
+  <section class="panel" id="panel-intake">
+    <p class="helptext" id="intakeHelptext">Recipients' completed (and in-progress) intake questionnaires. Grouped by status, newest first.</p>
+    <nav class="subtabs" aria-label="Intake status" id="intakeSubtabs">
+      <button class="active" data-intakestatus="Submitted">Submitted</button>
+      <button data-intakestatus="InProgress">In progress</button>
+    </nav>
+    <div class="search-wrap" style="margin:12px 0;"><input id="intakeSearch" placeholder="Search by name or email" aria-label="Search intake forms"><button type="button" class="search-clear" aria-label="Clear search" hidden>&times;</button></div>
+    <div id="intakeGroups"></div>
+    <div class="no-results" id="intakeNoResults" hidden>No intake forms here yet.</div>
+    <div id="intakeDetail" hidden></div>
+  </section>
+
   <section class="panel" id="panel-reports">
     <p class="helptext">Pick a date range, then Generate opens a statistics report in a new tab — Freedom Sessions, Drop-In, and Training as three separate sections, ready to review or print.</p>
     <div class="range-presets">
@@ -702,6 +730,7 @@
       <div class="field"><label for="genderPref">Team Preference</label><select id="genderPref"><option value="Mixed">Mixed (no preference)</option><option value="Same-sex">Same-sex team only</option></select></div>
     </div>
     <div id="historyPanel" style="margin-top:-8px;margin-bottom:14px;"></div>
+    <div id="intakeMatchPanel" style="margin-top:-8px;margin-bottom:14px;"></div>
     <div class="field-row sched-only">
       <div class="field"><label for="apptType">Appointment Type</label>
         <select id="apptType"><option value="First">First Appointment</option><option value="Follow-up">Follow-up</option><option value="Drop-in">Sunday Drop-In</option><option value="Training">Training</option></select>
@@ -837,7 +866,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-24.10";
+const APP_VERSION = "2026-09-24.11";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -864,7 +893,8 @@ const LIST_NAMES = {
   blackouts: "BlackoutDates",
   locations: "Locations",
   slots: "PlanningSlots",
-  timeWindows: "TimeWindows"
+  timeWindows: "TimeWindows",
+  intake: "IntakeResponses"
 };
 // Relative to this file's own location (preview/) - portal/ is a sibling of
 // the repo root, one level up from here.
@@ -1026,7 +1056,8 @@ async function deleteItem(key, itemId){
 /* =========================================================================
    DATA CACHE (refreshed from Graph after loads/writes)
 ========================================================================= */
-let ministers=[], sessions=[], blackouts=[], locations=[], slots=[], timeWindows=[];
+let ministers=[], sessions=[], blackouts=[], locations=[], slots=[], timeWindows=[], intakeResponses=[];
+let intakeSubStatus='Submitted', intakeDetailId=null;
 let editingId=null, prevId=null, selectedMinisters=[]; // selectedMinisters: [{id, role}]
 // Set by bookSlot() right after it opens the session modal on a Tentative
 // slot's claimed candidate - tells onSaveSession() which PlanningSlots item
@@ -1041,9 +1072,22 @@ let overviewSubStatus='Active';
 let sessionNumberMap = new Map(); // session id -> chronological "Session #N" for that recipient
 
 async function loadAll(){
-  const [rawMin, rawSess, rawBlack, rawLoc, rawSlots, rawTW] = await Promise.all([
-    listItems('ministers'), listItems('sessions'), listItems('blackouts'), listItems('locations'), listItems('slots'), listItems('timeWindows')
+  const [rawMin, rawSess, rawBlack, rawLoc, rawSlots, rawTW, rawIntake] = await Promise.all([
+    listItems('ministers'), listItems('sessions'), listItems('blackouts'), listItems('locations'), listItems('slots'), listItems('timeWindows'), listItems('intake')
   ]);
+  // ResponsesJSON is the whole answers object, keyed by question id from
+  // formConfig.js - parsed once here so every intake render just reads
+  // .responses, never re-parses. A malformed/empty blob (e.g. a session
+  // barely started) falls back to {} rather than breaking the tab.
+  intakeResponses = rawIntake.map(i => {
+    let responses = {};
+    try { responses = JSON.parse(i.ResponsesJSON || '{}'); } catch(e) {}
+    return {
+      id: i.id, token: i.Token||'', recipName: i.RecipientName||'', recipEmail: i.RecipientEmail||'',
+      status: i.Status||'InProgress', submittedAt: i.SubmittedAt||null, created: i._created||null,
+      signatureDataUrl: i.SignatureDataUrl||'', responses
+    };
+  });
   ministers = rawMin.map(m => ({ id: m.id, name: m.Title, email: m.Email||'', phone: m.Phone||'', signInEmail: m.SignInEmail||'', status: m.Status||'Active', gender: m.Gender||'' }));
   locations = rawLoc.map(l => ({ id: l.id, name: l.Title }));
   timeWindows = rawTW.map(t => ({
@@ -1217,7 +1261,7 @@ function groupRow(key, avatarText, name, countLabel, summaryHtml, bodyHtml, wasO
   </div>`;
 }
 
-function renderAll(){ renderSchedule(); renderPlanning(); renderCompleted(); renderOverview(); renderBlackouts(); renderSchedPlan(); renderTimeWindowsSettings(); renderLocationsSettings(); }
+function renderAll(){ renderSchedule(); renderPlanning(); renderCompleted(); renderOverview(); renderBlackouts(); renderSchedPlan(); renderTimeWindowsSettings(); renderLocationsSettings(); renderIntake(); }
 
 async function withLoading(btn, loadingText, fn){
   if(!btn) return fn();
@@ -1304,6 +1348,13 @@ function wireApp(){
   $('#btnSaveDefaultLocationSetting').addEventListener('click', ()=>withLoading($('#btnSaveDefaultLocationSetting'), 'Saving…', saveDefaultLocationSetting));
   $('#settingsSubtabs').querySelectorAll('button[data-settingsview]').forEach(b=>b.addEventListener('click', ()=>switchSettingsSub(b.dataset.settingsview)));
   $('#changesSubtabs').querySelectorAll('button[data-changesview]').forEach(b=>b.addEventListener('click', ()=>switchChangesSub(b.dataset.changesview)));
+  $('#intakeSubtabs').querySelectorAll('button[data-intakestatus]').forEach(b=>b.addEventListener('click', ()=>{
+    intakeSubStatus = b.dataset.intakestatus;
+    $('#intakeSubtabs').querySelectorAll('button').forEach(x=>x.classList.toggle('active', x===b));
+    renderIntake();
+  }));
+  $('#intakeSearch').addEventListener('input', renderIntake);
+  wireSearchClear('intakeSearch');
   $('#btnAddMinister').addEventListener('click', ()=>openMinisterModal());
   $('#btnMinCancel').addEventListener('click', ()=>$('#ministerModal').classList.remove('open'));
   $('#btnMinSave').addEventListener('click', ()=>withLoading($('#btnMinSave'), 'Saving…', onSaveMinister));
@@ -2881,8 +2932,22 @@ window.pickRecipNameAt = function(i){
 // notes - each with a "Use this team" action. Collapsed by default so a
 // long history doesn't push the rest of the form down. See Change 2/3 of
 // the Planning Autofill spec (2026-09-16) for the full rationale.
+function renderIntakeMatchPanel(name){
+  const box = $('#intakeMatchPanel');
+  if(!box) return;
+  const match = findIntakeForRecipient(name);
+  if(!match){ box.innerHTML=''; return; }
+  const label = match.status==='Submitted'
+    ? `Intake form on file — submitted ${fmtShort((match.submittedAt||'').split('T')[0])}`
+    : `Intake form in progress — last saved ${fmtShort((match.created||'').split('T')[0])}`;
+  box.innerHTML = `<div class="intake-match-banner">
+    <span>${ICONS.checkCircle||''} ${escapeHtml(label)}</span>
+    <button type="button" class="btn secondary" onclick="$('#sessionModal').classList.remove('open');switchTab('intake');closeIntakeDetail();openIntakeDetail(${match.id});">View intake form</button>
+  </div>`;
+}
 function renderRecipientHistory(){
   const name = $('#recipName').value.trim();
+  renderIntakeMatchPanel(name);
   const box = $('#historyPanel');
   if(!name){ box.innerHTML=''; historyAutoName=null; return; }
   const matches = sessions.filter(s=> s.status!=='Waiting' && s.recipName.toLowerCase()===name.toLowerCase() && s.id!==editingId)
@@ -3662,6 +3727,84 @@ function renderBlackouts(){
         </div>
       </div>`).join(''), wasOpen);
   }).join('');
+}
+
+/* =========================================================================
+   INTAKE FORMS — reads the IntakeResponses list (see FPHM Intake Form's
+   CLAUDE.md for the SharePoint schema). Question labels/order come from
+   js/formConfig.js via FPHM.renderResponsesHtml() in js/formEngine.js -
+   editing a question there is reflected here automatically, no changes
+   needed in this file.
+========================================================================= */
+function renderIntake(){
+  const box = $('#intakeGroups'); const noResults = $('#intakeNoResults');
+  const opened = openState(box);
+  const q = $('#intakeSearch').value.trim().toLowerCase();
+  const filtered = intakeResponses
+    .filter(i => intakeSubStatus==='Submitted' ? i.status==='Submitted' : i.status!=='Submitted')
+    .filter(i => !q || i.recipName.toLowerCase().includes(q) || i.recipEmail.toLowerCase().includes(q))
+    .sort((a,b) => new Date(b.submittedAt||b.created||0) - new Date(a.submittedAt||a.created||0));
+
+  if(!filtered.length){
+    box.innerHTML = '';
+    noResults.hidden = false;
+    noResults.textContent = intakeSubStatus==='Submitted' ? 'No submitted intake forms yet.' : 'No in-progress intake forms right now.';
+    return;
+  }
+  noResults.hidden = true;
+  box.innerHTML = filtered.map(i=>{
+    const wasOpen = opened.get(String(i.id)) || false;
+    const initials = (i.recipName||'?').trim().split(/\s+/).map(p=>p[0]).slice(0,2).join('').toUpperCase() || '?';
+    const countLabel = i.status==='Submitted' ? 'Submitted' : 'In progress';
+    const summary = i.status==='Submitted'
+      ? 'Submitted ' + fmtShort((i.submittedAt||'').split('T')[0])
+      : 'Last saved ' + fmtShort((i.created||'').split('T')[0]);
+    const body = `<p class="helptext">${escapeHtml(i.recipEmail||'No email given yet')}</p>
+      <button type="button" class="btn" onclick="openIntakeDetail(${i.id})">View full intake form</button>`;
+    return groupRow(String(i.id), initials, i.recipName||'(name not yet entered)', countLabel, escapeHtml(summary), body, wasOpen);
+  }).join('');
+}
+window.openIntakeDetail = function(id){
+  const i = intakeResponses.find(x=>x.id===id);
+  if(!i) return;
+  intakeDetailId = id;
+  ['intakeGroups','intakeSubtabs','intakeSearch','intakeHelptext','intakeNoResults'].forEach(id=>{ const el=$('#'+id); if(el) el.hidden = true; });
+  const detail = $('#intakeDetail');
+  detail.hidden = false;
+  detail.innerHTML = `
+    <div class="toolbar no-print">
+      <button type="button" class="btn secondary" onclick="closeIntakeDetail()">&larr; Back to list</button>
+      <button type="button" class="btn" onclick="window.print()">Print / Save as PDF</button>
+    </div>
+    <h2>${escapeHtml(i.recipName||'(name not yet entered)')}</h2>
+    <p class="helptext">${escapeHtml(i.recipEmail||'')} — ${i.status==='Submitted' ? 'Submitted '+fmtShort((i.submittedAt||'').split('T')[0]) : 'In progress'}</p>
+    ${FPHM.renderResponsesHtml(i.responses)}
+    ${i.signatureDataUrl ? `<h3>Signature</h3><img src="${i.signatureDataUrl}" alt="Signature" style="max-width:300px;border:1px solid var(--border);border-radius:8px;background:#fff;">` : ''}
+  `;
+};
+window.closeIntakeDetail = function(){
+  intakeDetailId = null;
+  ['intakeGroups','intakeSubtabs','intakeSearch','intakeHelptext'].forEach(id=>{ const el=$('#'+id); if(el) el.hidden = false; });
+  const detail = $('#intakeDetail');
+  detail.hidden = true;
+  detail.innerHTML = '';
+  renderIntake();
+};
+// Best-effort match against a completed/in-progress intake form for the
+// given recipient name, used by renderRecipientHistory() below - name
+// match only (same convention as prior-session matching elsewhere in this
+// app; recipients aren't persistent records with a stable id to join on).
+function findIntakeForRecipient(name){
+  if(!name) return null;
+  const norm = name.trim().toLowerCase();
+  const matches = intakeResponses.filter(i => (i.recipName||'').trim().toLowerCase()===norm);
+  if(!matches.length) return null;
+  // Prefer a Submitted one; among ties, the most recently touched.
+  matches.sort((a,b)=>{
+    if((a.status==='Submitted') !== (b.status==='Submitted')) return a.status==='Submitted' ? -1 : 1;
+    return new Date(b.submittedAt||b.created||0) - new Date(a.submittedAt||a.created||0);
+  });
+  return matches[0];
 }
 
 /* =========================================================================
