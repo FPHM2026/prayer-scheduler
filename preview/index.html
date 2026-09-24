@@ -837,7 +837,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-24.4";
+const APP_VERSION = "2026-09-24.5";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3774,12 +3774,15 @@ function monthClampedRange(y, m, rangeFrom, rangeTo){
   return { from: mFrom<rangeFrom ? rangeFrom : mFrom, to: mTo>rangeTo ? rangeTo : mTo };
 }
 // isIndividual sections also need the recipient split per month (same
-// columns as the year row), not just a count.
+// columns as the year row), not just a count. Hours is total session
+// hours for the month (durationHours() summed once per session, not per
+// minister on it - this is "how much ministry time happened", the same
+// quantity the year row's own Hours column totals up from).
 function reportMonthRows(type, yFrom, yTo, isIndividual){
   return reportMonthsInRange(yFrom, yTo).map(({y,m})=>{
     const clamped = monthClampedRange(y, m, yFrom, yTo);
     const list = reportSessionsFor(type, clamped.from, clamped.to);
-    const row = { label: REPORT_MONTH_NAMES[m], count: list.length };
+    const row = { label: REPORT_MONTH_NAMES[m], count: list.length, hours: list.reduce((sum,s)=>sum+durationHours(s), 0) };
     if(isIndividual) row.split = reportRecipientSplit(list);
     return row;
   });
@@ -3814,7 +3817,7 @@ function buildReportSection(typeInfo, from, to){
   const isIndividual = type==='sessions';
   const fromY = new Date(from+'T00:00').getFullYear();
   const toY = new Date(to+'T00:00').getFullYear();
-  const colCount = isIndividual ? 7 : 4;
+  const colCount = isIndividual ? 8 : 5;
 
   const runningByYear = {};
   let running = 0;
@@ -3838,6 +3841,8 @@ function buildReportSection(typeInfo, from, to){
       extraCols = `<td>${split.total}</td><td>${split.firstTime}</td><td>${split.followUp}</td>`;
     }
 
+    const yearHours = list.reduce((sum,s)=>sum+durationHours(s), 0);
+
     const monthRows = reportMonthRows(type, yFrom, yTo, isIndividual);
     const monthRowsHtml = monthRows.length ? monthRows.map(m=>{
       let mExtraCols = '';
@@ -3847,7 +3852,7 @@ function buildReportSection(typeInfo, from, to){
       return `
         <tr class="detail-row month-row" data-group="${yid}" hidden>
           <td></td><td class="month-label">${m.label}</td><td>${m.count}</td><td class="dim">—</td>
-          ${mExtraCols}
+          ${mExtraCols}<td>${m.hours.toFixed(1)}</td>
         </tr>`;
     }).join('') : '';
 
@@ -3872,7 +3877,7 @@ function buildReportSection(typeInfo, from, to){
       <tr class="sub-row year-row" onclick="toggleGroup('${yid}')">
         <td class="chevron"><span id="chev-${yid}">▸</span></td>
         <td>${y}</td><td>${list.length}</td><td class="running">${runningByYear[y]}</td>
-        ${extraCols}
+        ${extraCols}<td>${yearHours.toFixed(1)}</td>
       </tr>
       ${monthRowsHtml}
       <tr class="detail-row" data-group="${yid}" hidden>
@@ -3890,8 +3895,8 @@ function buildReportSection(typeInfo, from, to){
   if(!yearRowsHtml) yearRowsHtml = `<tr><td colspan="${colCount}" class="empty">No completed ${escapeHtml(noun.toLowerCase())} sessions in this range.</td></tr>`;
 
   const theadCols = isIndividual
-    ? '<th></th><th>Year</th><th>Sessions</th><th class="running">Running Total</th><th>Unique Recipients</th><th>First-time</th><th>Follow-up</th>'
-    : '<th></th><th>Year</th><th>Sessions</th><th class="running">Running Total</th>';
+    ? '<th></th><th>Year</th><th>Sessions</th><th class="running">Running Total</th><th>Unique Recipients</th><th>First-time</th><th>Follow-up</th><th>Hours</th>'
+    : '<th></th><th>Year</th><th>Sessions</th><th class="running">Running Total</th><th>Hours</th>';
 
   return `
     <section class="report-section">
@@ -4016,7 +4021,8 @@ const CHANGE_LOG = [
   { date: 'Sep 24, 2026', version: APP_VERSION, items: [
     'Changed: the year-level monthly breakdown on Reports now shows in the same table as the year row, one row per month with every column (Sessions, Unique Recipients, First-time, Follow-up) filled in - not a separate mini-table off to the side.',
     'New: on Reports, click any year to expand its monthly numbers (through the current month, even if it\'s still partial) plus that year\'s own minister breakdown toggle, grouped together right below it - not one breakdown merged across every year.',
-    'New: the minister breakdown - still its own table, now restyled to match the year table\'s look - shows Hours and As Lead alongside Sessions, and each minister can be expanded to see their own month-by-month sessions, as-lead count, and hours for that year.'
+    'New: the minister breakdown - still its own table, now restyled to match the year table\'s look - shows Hours and As Lead alongside Sessions, and each minister can be expanded to see their own month-by-month sessions, as-lead count, and hours for that year.',
+    'New: the year and month rows on Reports now show a Hours column too (total session hours for that year/month, not per-minister) alongside Sessions and Running Total.'
   ]},
   { date: 'Sep 21, 2026', version: '2026-09-21.3', items: [
     'Changed: Reports now matches the actual spec - one Generate shows Freedom Sessions, Sunday Drop-In, and Training as three separate sections (not picked one at a time), each a year-by-year table with a shaded Running Total column instead of the previous summary tiles and chart. The minister breakdown now tags anyone no longer active. Date presets changed to This Year, Last Year, Last 3 Years, and All Time.'

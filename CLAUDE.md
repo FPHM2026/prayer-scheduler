@@ -355,7 +355,13 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
     columns (same per-*recipient*, not per-session, classification
     `completedStats()` uses); Drop-In and Training skip those three — every
     occurrence shares one literal recipName ("Sunday Drop-In"/"Training"),
-    so there's no individual-recipient concept to split.
+    so there's no individual-recipient concept to split. A trailing **Hours**
+    column (added 2026-09-24) totals `durationHours()` once per *session* in
+    that year — not per minister on it, so it isn't the same number as the
+    minister-table's own Hours column further down, which sums per minister
+    and double-counts a session for every minister who was on it. This is
+    "how much ministry time happened," not "how much time any one minister
+    gave."
   - **Click a year row to expand it** (added 2026-09-24) into month rows
     **in that same year-table** (one `<tr class="month-row">` per month,
     January through the current month for the current year — including
