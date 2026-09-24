@@ -8,18 +8,30 @@ via Microsoft Graph API (not Power Apps, not raw SharePoint hosting — both wer
 tried and abandoned; see "History" below). A companion minister-facing portal
 (`portal/index.html`) lets prayer ministers see their own sessions and manage
 their own time off without needing a licensed Microsoft 365 seat — see "Minister
-portal" below.
+portal" below. A third piece, `intake/index.html`, is the public-facing digital
+intake questionnaire recipients fill out before their first session — no sign-in,
+save-and-resume via a link, digital signature — with staff and minister views
+of completed forms built into this same app; see "Intake Forms" below.
 
 ## Architecture
-- **Frontend**: three self-contained single-file apps (vanilla JS, no build step,
-  no framework, all UI/styling/logic per file): `index.html` (production admin
-  scheduler), `preview/index.html` (staging copy for testing unreleased changes
-  against real data), `portal/index.html` (minister-facing companion app).
+- **Frontend**: four apps, mostly self-contained single files (vanilla JS, no
+  build step, no framework): `index.html` (production admin scheduler),
+  `preview/index.html` (staging copy for testing unreleased changes against
+  real data), `portal/index.html` (minister-facing companion app),
+  `intake/index.html` (public recipient-facing intake form). The one
+  deliberate exception to "all logic per file": `js/formConfig.js` (the
+  intake question schema) and `js/formEngine.js` (its rendering/validation
+  logic) are shared via `<script src="../js/...">` across all four apps that
+  touch intake data — index.html, preview/index.html, portal/index.html, and
+  intake/index.html — so editing a question is ever only a one-file change.
+  See "Intake Forms" below.
 - **Hosting**: GitHub Pages, org repo `FPHM2026/prayer-scheduler` (public),
-  deployed from the `main` branch root — `/preview/` and `/portal/` are just
-  subfolders in that same deployment, not separate hosting setups:
+  deployed from the `main` branch root — `/preview/`, `/portal/` and
+  `/intake/` are just subfolders in that same deployment, not separate
+  hosting setups:
   - Production scheduler: `https://FPHM2026.github.io/prayer-scheduler/`
   - Minister portal: `https://FPHM2026.github.io/prayer-scheduler/portal/`
+  - Public intake form: `https://FPHM2026.github.io/prayer-scheduler/intake/`
   - Preview build of the scheduler: `https://FPHM2026.github.io/prayer-scheduler/preview/`
     — see "Deployment workflow" below before editing this file.
 - **Auth**: MSAL.js (`@azure/msal-browser`, loaded via jsDelivr CDN,
@@ -158,6 +170,21 @@ scheduler's own code.
   row per configured default day, exactly one DropIn row, exactly one
   DefaultLocation row — no separate "enabled" flag, presence as a Weekday
   row *is* enabled for that day.
+- **IntakeResponses** (added 2026-09-24, see "Intake Forms" below for the
+  full feature): Title (recipient name once known, else "New intake"),
+  Token (Text, a random UUID — the anonymous recipient's resume secret,
+  never shown to staff/ministers), RecipientName / RecipientEmail (Text,
+  mirrored from the `name`/`email` answer keys on every save),
+  Status (Choice: InProgress/Submitted), ResponsesJSON (Multiple lines of
+  text, **Plain text**, "Allow unlimited length" enabled — the entire
+  answers object as JSON, keyed by question id from `js/formConfig.js`;
+  this is *why* adding/removing a question never needs a SharePoint schema
+  change), SignatureDataUrl (Multiple lines of text, Plain text, unlimited
+  length — base64 PNG from the signature canvas), SubmittedAt (Date and
+  Time, set only on final submit). The Ministers SharePoint group has Read
+  only on this list (granted separately from its Contribute on
+  BlackoutDates) — see "Intake Forms" for why that boundary is
+  client-side-only, same as everywhere else ministers' access is scoped.
 - **Prospects**: retired. The app no longer reads this list at all — replaced
   by PrayerSessions items with Status="Waiting" (see above). The list itself
   still exists in SharePoint with whatever old data was in it; run
@@ -546,6 +573,75 @@ like one product, not two:
   whole span is behind today. The "Next unavailable" summary always reflects
   the true next upcoming entry regardless of which range is currently being
   browsed below it.
+
+## Intake Forms (`/intake/`, `js/formConfig.js` + `js/formEngine.js`)
+Digital replacement for the ministry's old Microsoft Forms intake
+questionnaire — 88 questions across 17 sections, with real branching logic
+(marital status swaps in a whole different sub-section; ~20 "if Yes, please
+explain" conditionals) reverse-engineered from the original form. Originally
+built as a separate project/repo (`FPHM Intake Form`), merged into this repo
+2026-09-24 once it became clear intake responses needed to be visible from
+both the staff scheduler and the minister portal, matched to a recipient's
+existing session history.
+
+- **`js/formConfig.js`** is the single source of truth for the question
+  schema — the ONE file to edit to add/remove/reorder/rephrase a question,
+  or add a new conditional branch (`visibleIf: {id, equals/in/includes/
+  notEquals}` on a question, or a whole section, mirroring how the
+  marital-status sub-sections work — see the file's own header comment for
+  the exact shape). Every app that touches intake data (`intake/index.html`,
+  `index.html`, `preview/index.html`, `portal/index.html`) loads it via
+  `<script src="../js/formConfig.js">` — a deliberate, sole exception to
+  this repo's "single self-contained file" convention, since duplicating 88
+  questions across four files would directly defeat "one place to edit
+  questions."
+- **`js/formEngine.js`** — shared visibility/validation logic plus
+  `FPHM.renderResponsesHtml(responses)`, which every intake-answer view
+  (public print/PDF, staff detail, minister modal) calls to turn a stored
+  `responses` object into the same formatted HTML, styled by the `.ans-*`
+  CSS rules each app defines locally (matching its own palette).
+- **`intake/index.html`** — the public form. No sign-in (recipients have no
+  Microsoft 365 account); autosave + a "Save & continue later" link
+  (`?token=<uuid>`) with graceful local-only fallback if the network drops;
+  canvas signature pad (mouse + touch); print/PDF view of the final answers.
+  Talks to an Azure Function (`azure-function/`, not part of this GitHub
+  Pages deployment — deploy separately per its own SETUP.md), which holds
+  its own tightly-scoped app-only Graph credential (`Sites.Selected`,
+  granted to just this one SharePoint site) so it can create/update/submit
+  the recipient's session without any staff/minister credential ever
+  touching a browser the public can reach.
+- **Staff view** — a new "Intake Forms" tab in `index.html`/`preview/index.html`:
+  Submitted/In-progress list, search, full detail view, print/PDF. Reads
+  `IntakeResponses` directly via the same delegated Graph session as every
+  other tab (`Sites.ReadWrite.All`, already consented) — no Azure Function
+  involved for reads, staff already have real permissions.
+- **Recipient matching** — same convention as the existing "recipient
+  session history" panel in the session modal: matched by name only (no
+  persistent recipient record to join on). `findIntakeForRecipient()` in
+  `preview/index.html` powers a banner in the session modal
+  (`renderIntakeMatchPanel()`, hooked into `renderRecipientHistory()`) that
+  jumps straight to a matched intake form.
+- **Minister portal** — `portal/index.html` adds a "View intake form" link
+  on a recipient's Schedule/Completed Sessions group. `findMyIntakeForRecipient()`
+  requires the recipient to actually appear in `mySessions()` before it'll
+  match anything — **this is a client-side filter only, not a SharePoint-
+  enforced boundary**: the Ministers group has Read on the whole
+  IntakeResponses list (Graph doesn't reliably enforce per-item permissions
+  even for privileged users — see gotcha #11), so a minister with the portal
+  open could technically fetch any recipient's answers directly via Graph.
+  Explicitly accepted for this data despite its sensitivity (health, abuse,
+  addiction, spiritual/occult disclosures) — decided 2026-09-24 rather than
+  silently inherited from the BlackoutDates precedent. Revisit if a stronger
+  boundary is ever wanted (would mean routing minister reads through a
+  server-side check instead of direct Graph access).
+- **Not yet done**: the standalone `FPHM Intake Form` project/repo this was
+  merged from should be retired (repo deletion is destructive — left for the
+  user to decide/do, not done automatically). The Azure Function isn't
+  deployed yet as of this merge — `intake/js/apiClient.js`'s
+  `FUNCTION_BASE_URL` is still a placeholder, so the public form currently
+  runs in its local-only offline fallback mode for real users until that's
+  done (see the standalone project's SETUP.md for the deploy steps, still
+  valid as-is).
 
 ## Not yet built
 - **Calendar (month grid) view** — was planned but never built in this HTML
