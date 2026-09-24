@@ -356,44 +356,44 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
     `completedStats()` uses); Drop-In and Training skip those three — every
     occurrence shares one literal recipName ("Sunday Drop-In"/"Training"),
     so there's no individual-recipient concept to split.
-  - **Click a year row to expand it** (added 2026-09-24) into month rows
-    **in that same year-table** (one `<tr class="month-row">` per month,
-    January through the current month for the current year — including
-    that month while still partial, not padded out with months that
-    haven't happened), each filling in the *same columns* the year row
-    has (Sessions, and for Freedom Sessions also Unique Recipients/
-    First-time/Follow-up) rather than a separate nested mini-table off to
-    the side — the Running Total column shows an em dash on month rows
-    since a running total only means anything at the year grain. Below
-    the month rows, grouped in the same expanded area, sits that year's
-    own "Show minister breakdown" toggle — deliberately **not** one
-    breakdown merged across the whole selected range; a multi-year range
-    shows each year's numbers and that year's own minister breakdown
-    together, then the next year below it. All of a year's rows (month
-    rows + the minister-breakdown row) share one `data-group="y-{type}-
-    {year}"` attribute and toggle together via `toggleGroup(id)` (queries
-    `[data-group="id"]`, flips them as a set) — a separate mechanism from
-    the single-element `toggleRow(id)` used for the minister-breakdown
-    toggle and each minister's own drill-down, since a year's expand needs
-    to show/hide many sibling `<tr>`s at once instead of one.
-    The minister table adds an **Hours** column (`durationHours()` summed
-    per minister — a session's full duration credited to everyone on it,
-    not divided among them) alongside Sessions/As Lead, tags anyone whose
-    current PrayerMinisters Status isn't Active with a small "Inactive"
-    label (the breakdown includes everyone with a session in that year
-    regardless of current roster status), and each *minister* row is
-    itself click-to-expand into their own month-by-month sessions+hours for
-    that year — the same drill-down pattern one level deeper. All of this
-    (year rows, the minister-breakdown toggle, per-minister month rows) uses
-    one uniform mechanism: a `hidden` attribute + an inline `toggleRow(id)`
-    in the generated page's own `<script>` (not native `<details>` — table
-    rows can't contain `<details>` directly, and one hidden-attribute
-    convention throughout keeps the Print logic a single querySelectorAll
-    instead of juggling two different collapse mechanisms). The page's own
-    Print button removes `hidden` from every collapsed element before
-    calling `window.print()` — collapsed content doesn't print, so this is
-    load-bearing, not cosmetic; re-verified against the deeper nesting when
-    the drill-down levels were added.
+  - **Click a year row to expand it** (added 2026-09-24, extended the same
+    day to fold the minister breakdown in too) into month rows AND a
+    minister breakdown, all as plain `<tr>`s **in that same year-table** —
+    no nested `<table>` at any level. Every row kind (year, month, a
+    "Minister Breakdown" divider row, minister, minister's-own-month) shares
+    the one column set; a column that doesn't apply to a given row kind
+    (e.g. As Lead/Hours on a month row, Unique Recipients on a minister
+    row) shows a muted em dash (`td.dim`) instead of the row being
+    structurally different. Month rows run January through the current
+    month for the current year — including that month while still partial,
+    not padded out with months that haven't happened. The Running Total
+    column only carries a real value on year rows; every other row kind
+    dashes it out since a running total only means anything at the year
+    grain.
+    - **Two nesting depths, one toggle mechanism.** A year row's
+      `data-group="y-{type}-{year}"` covers its month rows, the "Minister
+      Breakdown" divider row, and every minister row for that year — all
+      of it appears together the instant the year opens, no separate
+      sub-toggle to reveal the minister list. A minister row is itself
+      click-to-expand via its own `data-group="m-{type}-{year}-
+      {ministerId}"` covering just that minister's month rows — the same
+      pattern one level deeper. Both levels call the same `toggleGroup(id)`
+      (queries `[data-group="id"]`, flips the whole set together, flips the
+      matching `#chev-{id}` chevron) — there's no single-row `toggleRow`
+      left in the generated page; once everything became a group of one or
+      more sibling rows, one function covers both depths.
+    - The minister row/its month rows add an **Hours** column
+      (`durationHours()` summed — a session's full duration credited to
+      everyone on it, not divided among them) and an **As Lead** column,
+      tag anyone whose current PrayerMinisters Status isn't Active with a
+      small "Inactive" label (the breakdown includes everyone with a
+      session in that year regardless of current roster status), and each
+      minister's own month rows add per-month As Lead/Hours the same way.
+    - The page's own Print button removes `hidden` from every collapsed
+      element before calling `window.print()` — collapsed content doesn't
+      print, so this is load-bearing, not cosmetic; re-verified against the
+      full three-level nesting (year → month/minister → minister's own
+      month) after the minister breakdown moved into the table too.
   - Each section shows its own empty-state row when it has no completed
     sessions in range, rather than a misleading all-zeros table.
   - **Gotcha hit while building this**: the generated report page embeds
