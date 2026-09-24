@@ -837,7 +837,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-24.1";
+const APP_VERSION = "2026-09-24.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3773,10 +3773,15 @@ function monthClampedRange(y, m, rangeFrom, rangeTo){
   const mTo = `${y}-${String(m+1).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
   return { from: mFrom<rangeFrom ? rangeFrom : mFrom, to: mTo>rangeTo ? rangeTo : mTo };
 }
-function reportMonthRows(type, yFrom, yTo){
+// isIndividual sections also need the recipient split per month (same
+// columns as the year row), not just a count.
+function reportMonthRows(type, yFrom, yTo, isIndividual){
   return reportMonthsInRange(yFrom, yTo).map(({y,m})=>{
     const clamped = monthClampedRange(y, m, yFrom, yTo);
-    return { label: REPORT_MONTH_NAMES[m], count: reportSessionsFor(type, clamped.from, clamped.to).length };
+    const list = reportSessionsFor(type, clamped.from, clamped.to);
+    const row = { label: REPORT_MONTH_NAMES[m], count: list.length };
+    if(isIndividual) row.split = reportRecipientSplit(list);
+    return row;
   });
 }
 function reportMinisterMonthRows(type, ministerId, yFrom, yTo){
@@ -3788,9 +3793,12 @@ function reportMinisterMonthRows(type, ministerId, yFrom, yTo){
 }
 // Year rows newest-first (matches how the admin actually wants to read
 // it - this year's numbers first, then last year, etc.), with each year
-// expandable into its own monthly breakdown AND (grouped right alongside
-// it, same expand) that year's own minister breakdown - not one breakdown
-// merged across the whole selected range. The running-total column still
+// expandable into month rows IN THE SAME TABLE (each column shows that
+// month's version of the stat, not a separate nested table), followed by
+// that year's own minister breakdown - not one breakdown merged across
+// the whole selected range. The running-total column only means anything
+// at the year grain, so month rows show an em dash there instead of a
+// misleading partial figure. The running-total column itself still
 // accumulates chronologically (oldest first) even though rows render
 // newest-first, so it's computed in a separate ascending pass.
 function buildReportSection(typeInfo, from, to){
@@ -3816,9 +3824,24 @@ function buildReportSection(typeInfo, from, to){
     const list = reportSessionsFor(type, yFrom, yTo);
     const yid = `y-${type}-${y}`;
 
-    const monthRows = reportMonthRows(type, yFrom, yTo);
-    const monthHtml = monthRows.length ? monthRows.map(m=>`<tr><td>${m.label}</td><td>${m.count}</td></tr>`).join('')
-      : `<tr><td colspan="2" class="empty">No months in range.</td></tr>`;
+    let extraCols = '';
+    if(isIndividual){
+      const split = reportRecipientSplit(list);
+      extraCols = `<td>${split.total}</td><td>${split.firstTime}</td><td>${split.followUp}</td>`;
+    }
+
+    const monthRows = reportMonthRows(type, yFrom, yTo, isIndividual);
+    const monthRowsHtml = monthRows.length ? monthRows.map(m=>{
+      let mExtraCols = '';
+      if(isIndividual){
+        mExtraCols = `<td>${m.split.total}</td><td>${m.split.firstTime}</td><td>${m.split.followUp}</td>`;
+      }
+      return `
+        <tr class="detail-row month-row" data-group="${yid}" hidden>
+          <td></td><td class="month-label">${m.label}</td><td>${m.count}</td><td class="running">—</td>
+          ${mExtraCols}
+        </tr>`;
+    }).join('') : '';
 
     const ministerRows = reportMinisterBreakdown(list);
     const mbid = `mb-${type}-${y}`;
@@ -3837,22 +3860,15 @@ function buildReportSection(typeInfo, from, to){
         </tr>`;
     }).join('') : `<tr><td colspan="5" class="empty">No ministers recorded in this year.</td></tr>`;
 
-    let extraCols = '';
-    if(isIndividual){
-      const split = reportRecipientSplit(list);
-      extraCols = `<td>${split.total}</td><td>${split.firstTime}</td><td>${split.followUp}</td>`;
-    }
-
     yearRowsHtml += `
-      <tr class="sub-row" onclick="toggleRow('${yid}')">
+      <tr class="sub-row year-row" onclick="toggleGroup('${yid}')">
         <td class="chevron"><span id="chev-${yid}">▸</span></td>
         <td>${y}</td><td>${list.length}</td><td class="running">${runningByYear[y]}</td>
         ${extraCols}
       </tr>
-      <tr class="detail-row" id="${yid}" hidden>
+      ${monthRowsHtml}
+      <tr class="detail-row" data-group="${yid}" hidden>
         <td colspan="${colCount}">
-          <div class="block-label">Monthly Breakdown</div>
-          <table class="month-table"><thead><tr><th>Month</th><th>Sessions</th></tr></thead><tbody>${monthHtml}</tbody></table>
           <div class="toggle-trigger" onclick="toggleRow('${mbid}')"><span id="chev-${mbid}">▸</span> Show minister breakdown (${ministerRows.length})</div>
           <div id="${mbid}" class="minister-wrap" hidden>
             <table class="minister-table">
@@ -3908,7 +3924,10 @@ function generateReport(){
   tr.sub-row:hover td{background:#faf6ee;}
   tr.sub-row td.chevron{width:20px;color:#aa5a3c;font-weight:700;}
   tr.detail-row[hidden]{display:none;}
-  tr.detail-row>td{background:#faf8f4;padding:14px 18px 20px 38px;border-bottom:1px solid #f1ede4;}
+  tr.detail-row:not(.month-row)>td{background:#faf8f4;padding:14px 18px 20px 38px;border-bottom:1px solid #f1ede4;}
+  tr.month-row td{background:#fbf9f5;color:#6b6b6b;font-size:12.5px;}
+  tr.month-row td.month-label{padding-left:34px;font-style:italic;}
+  tr.month-row td.running{background:#f7f1e4;color:#9c9484;}
   .block-label{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#6b6b6b;font-weight:700;margin:0 0 8px;}
   table.month-table{width:100%;max-width:280px;border-collapse:collapse;font-size:12.5px;margin:0 0 6px;}
   table.month-table th,table.month-table td{text-align:left;padding:5px 10px;border-bottom:1px solid #ece6d8;}
@@ -3944,6 +3963,14 @@ function generateReport(){
       var chev = document.getElementById('chev-'+id);
       if(chev) chev.textContent = el.hidden ? '▸' : '▾';
     }
+    function toggleGroup(id){
+      var rows = document.querySelectorAll('[data-group="'+id+'"]');
+      if(!rows.length) return;
+      var makeHidden = !rows[0].hidden;
+      rows.forEach(function(el){ el.hidden = makeHidden; });
+      var chev = document.getElementById('chev-'+id);
+      if(chev) chev.textContent = makeHidden ? '▸' : '▾';
+    }
   <\/script>
 </body></html>`;
   const blob = new Blob([html], {type: 'text/html'});
@@ -3972,6 +3999,7 @@ function generateReport(){
 ========================================================================= */
 const CHANGE_LOG = [
   { date: 'Sep 24, 2026', version: APP_VERSION, items: [
+    'Changed: the year-level monthly breakdown on Reports now shows in the same table as the year row, one row per month with every column (Sessions, Unique Recipients, First-time, Follow-up) filled in - not a separate mini-table off to the side.',
     'New: on Reports, click any year to expand its monthly numbers (through the current month, even if it\'s still partial) plus that year\'s own minister breakdown, grouped together right below it - not one breakdown merged across every year.',
     'New: the minister breakdown now shows Hours alongside Sessions/As Lead, and each minister can be expanded to see their own month-by-month sessions and hours for that year.'
   ]},

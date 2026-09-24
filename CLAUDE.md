@@ -356,14 +356,26 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
     `completedStats()` uses); Drop-In and Training skip those three — every
     occurrence shares one literal recipName ("Sunday Drop-In"/"Training"),
     so there's no individual-recipient concept to split.
-  - **Click a year row to expand it** (added 2026-09-24) into that year's
-    own monthly breakdown (January through the current month for the
-    current year — including that month while still partial, not padded
-    out with months that haven't happened) and, grouped in the same
-    expanded area right below it, that year's own "Show minister breakdown"
-    toggle — deliberately **not** one breakdown merged across the whole
-    selected range; a multi-year range shows each year's numbers and that
-    year's own minister breakdown together, then the next year below it.
+  - **Click a year row to expand it** (added 2026-09-24) into month rows
+    **in that same year-table** (one `<tr class="month-row">` per month,
+    January through the current month for the current year — including
+    that month while still partial, not padded out with months that
+    haven't happened), each filling in the *same columns* the year row
+    has (Sessions, and for Freedom Sessions also Unique Recipients/
+    First-time/Follow-up) rather than a separate nested mini-table off to
+    the side — the Running Total column shows an em dash on month rows
+    since a running total only means anything at the year grain. Below
+    the month rows, grouped in the same expanded area, sits that year's
+    own "Show minister breakdown" toggle — deliberately **not** one
+    breakdown merged across the whole selected range; a multi-year range
+    shows each year's numbers and that year's own minister breakdown
+    together, then the next year below it. All of a year's rows (month
+    rows + the minister-breakdown row) share one `data-group="y-{type}-
+    {year}"` attribute and toggle together via `toggleGroup(id)` (queries
+    `[data-group="id"]`, flips them as a set) — a separate mechanism from
+    the single-element `toggleRow(id)` used for the minister-breakdown
+    toggle and each minister's own drill-down, since a year's expand needs
+    to show/hide many sibling `<tr>`s at once instead of one.
     The minister table adds an **Hours** column (`durationHours()` summed
     per minister — a session's full duration credited to everyone on it,
     not divided among them) alongside Sessions/As Lead, tags anyone whose
