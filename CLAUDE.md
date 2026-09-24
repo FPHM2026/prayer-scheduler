@@ -346,12 +346,8 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
     intentionally separate.
   - **Each section is a year-by-year table**, not cards/tiles, newest year
     first: one row per calendar year touched by the chosen range (a partial
-    first/last year only counts what's actually in range), Sessions + a
-    **Running Total** column (shaded background, bold — visually distinct
-    so it's never mistaken for a single year's own count; cumulative from 0
-    at the start of *this report's* range, not a lifetime total,
-    accumulated chronologically even though rows render newest-first).
-    Freedom Sessions adds Unique Recipients / First-time / Follow-up
+    first/last year only counts what's actually in range), Sessions, and
+    (Freedom Sessions only) Unique Recipients / First-time / Follow-up
     columns (same per-*recipient*, not per-session, classification
     `completedStats()` uses); Drop-In and Training skip those three — every
     occurrence shares one literal recipName ("Sunday Drop-In"/"Training"),
@@ -362,16 +358,29 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
     and double-counts a session for every minister who was on it. This is
     "how much ministry time happened," not "how much time any one minister
     gave."
+    - **No running-total column.** Shipped one earlier on 2026-09-24
+      (shaded background, bold, cumulative from 0 at the start of the
+      report's range) then removed it the same day — the shading meant to
+      set it apart from the plain Sessions column just read as confusing,
+      and the user asked for it gone outright rather than restyled.
+    - **A "Total" row instead, only when the range spans more than one
+      year** (added 2026-09-24): a single non-expandable `<tr
+      class="total-row">` appended after the last (oldest) year, shaded
+      like the old running-total column was, with the whole range's own
+      Sessions/recipient-split/Hours — computed fresh from the *entire*
+      from/to session list via `reportSessionsFor()`/`reportRecipientSplit()`,
+      not summed from the per-year rows, so a recipient who shows up in two
+      different years is still counted once in Unique Recipients rather
+      than twice. A single-year (or partial-year) range shows no Total row
+      at all, since it would just repeat that one year's own numbers.
   - **Click a year row to expand it** (added 2026-09-24) into month rows
     **in that same year-table** (one `<tr class="month-row">` per month,
     January through the current month for the current year — including
     that month while still partial, not padded out with months that
     haven't happened), each filling in the *same columns* the year row has
     (Sessions, and for Freedom Sessions also Unique Recipients/First-time/
-    Follow-up) rather than a separate nested mini-table off to the side —
-    the Running Total column shows an em dash (`td.dim`) on month rows
-    since a running total only means anything at the year grain. Below the
-    month rows, in the same expanded area, sits that year's own "Show
+    Follow-up) rather than a separate nested mini-table off to the side.
+    Below the month rows, in the same expanded area, sits that year's own "Show
     minister breakdown" toggle — deliberately **not** one breakdown merged
     across the whole selected range; a multi-year range shows each year's
     numbers and that year's own minister-breakdown toggle together, then
