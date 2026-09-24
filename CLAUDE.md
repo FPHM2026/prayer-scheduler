@@ -21,10 +21,13 @@ of completed forms built into this same app; see "Intake Forms" below.
   `intake/index.html` (public recipient-facing intake form). The one
   deliberate exception to "all logic per file": `js/formConfig.js` (the
   intake question schema) and `js/formEngine.js` (its rendering/validation
-  logic) are shared via `<script src="../js/...">` across all four apps that
-  touch intake data — index.html, preview/index.html, portal/index.html, and
-  intake/index.html — so editing a question is ever only a one-file change.
-  See "Intake Forms" below.
+  logic) are shared via `<script src="../js/...">` — so editing a question
+  is ever only a one-file change — across `preview/index.html`,
+  `portal/index.html`, and `intake/index.html` as of the Intake Forms merge
+  (2026-09-24). **`index.html` (production) does not load either shared
+  file yet and has no Intake Forms tab** — the merge commit was explicitly
+  a "preview build," not yet promoted; see "Intake Forms" below and the
+  "Not yet done" bullet there.
 - **Hosting**: GitHub Pages, org repo `FPHM2026/prayer-scheduler` (public),
   deployed from the `main` branch root — `/preview/`, `/portal/` and
   `/intake/` are just subfolders in that same deployment, not separate
@@ -604,17 +607,24 @@ existing session history.
   Microsoft 365 account); autosave + a "Save & continue later" link
   (`?token=<uuid>`) with graceful local-only fallback if the network drops;
   canvas signature pad (mouse + touch); print/PDF view of the final answers.
-  Talks to an Azure Function (`azure-function/`, not part of this GitHub
-  Pages deployment — deploy separately per its own SETUP.md), which holds
+  Talks to an Azure Function (`azure-function/`: `host.json`,
+  `local.settings.json.example`, `package.json`, `src/graphClient.js`,
+  `src/functions/intakeStart.js`/`intakeLoad.js`/`intakeSave.js`/
+  `intakeSubmit.js` — not part of this GitHub Pages deployment, deploy
+  separately; **no SETUP.md exists in this repo's copy** — the standalone
+  `FPHM Intake Form` project's own SETUP.md, referenced below, is the only
+  deploy documentation that currently exists), which holds
   its own tightly-scoped app-only Graph credential (`Sites.Selected`,
   granted to just this one SharePoint site) so it can create/update/submit
   the recipient's session without any staff/minister credential ever
   touching a browser the public can reach.
-- **Staff view** — a new "Intake Forms" tab in `index.html`/`preview/index.html`:
-  Submitted/In-progress list, search, full detail view, print/PDF. Reads
-  `IntakeResponses` directly via the same delegated Graph session as every
-  other tab (`Sites.ReadWrite.All`, already consented) — no Azure Function
-  involved for reads, staff already have real permissions.
+- **Staff view** — a new "Intake Forms" tab, currently in
+  `preview/index.html` only (not yet promoted to production `index.html` —
+  see "Not yet done" below): Submitted/In-progress list, search, full
+  detail view, print/PDF. Reads `IntakeResponses` directly via the same
+  delegated Graph session as every other tab (`Sites.ReadWrite.All`,
+  already consented) — no Azure Function involved for reads, staff already
+  have real permissions.
 - **Recipient matching** — same convention as the existing "recipient
   session history" panel in the session modal: matched by name only (no
   persistent recipient record to join on). `findIntakeForRecipient()` in
@@ -634,12 +644,17 @@ existing session history.
   silently inherited from the BlackoutDates precedent. Revisit if a stronger
   boundary is ever wanted (would mean routing minister reads through a
   server-side check instead of direct Graph access).
-- **Not yet done**: the standalone `FPHM Intake Form` project/repo this was
-  merged from should be retired (repo deletion is destructive — left for the
-  user to decide/do, not done automatically). The Azure Function isn't
-  deployed yet as of this merge — `intake/js/apiClient.js`'s
-  `FUNCTION_BASE_URL` is still a placeholder, so the public form currently
-  runs in its local-only offline fallback mode for real users until that's
+- **Not yet done**: **not promoted to production** — the merge commit was
+  explicitly a preview build; `index.html` has no Intake Forms tab and
+  doesn't load `js/formConfig.js`/`js/formEngine.js` yet (see "Architecture"
+  above). Follow the normal "Deployment workflow" above to promote once
+  it's been tested at the live preview URL. The standalone `FPHM Intake
+  Form` project/repo this was merged from should also be retired (repo
+  deletion is destructive — left for the user to decide/do, not done
+  automatically). The Azure Function isn't deployed yet as of this merge —
+  `intake/js/apiClient.js`'s `FUNCTION_BASE_URL` is still a placeholder, so
+  the public form currently runs in its local-only offline fallback mode
+  for real users until that's
   done (see the standalone project's SETUP.md for the deploy steps, still
   valid as-is).
 

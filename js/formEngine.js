@@ -1,8 +1,9 @@
 /* =========================================================================
-   FORM ENGINE — shared logic used by both index.html (public intake form)
-   and admin/index.html (staff view). Reads question structure from
-   window.FPHM_INTAKE_CONFIG (formConfig.js), never hardcodes questions
-   itself, so editing formConfig.js is enough to change the form.
+   FORM ENGINE — shared visibility/validation logic and renderResponsesHtml()
+   used by intake/index.html (public form), preview/index.html's staff
+   "Intake Forms" tab, and portal/index.html's minister view. Reads question
+   structure from window.FPHM_INTAKE_CONFIG (formConfig.js), never hardcodes
+   questions itself, so editing formConfig.js is enough to change the form.
 ========================================================================= */
 
 const FPHM = (function () {

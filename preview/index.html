@@ -4211,6 +4211,11 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Sep 24, 2026', version: APP_VERSION, items: [
+    'New: a public digital Intake Form (at /intake/) recipients fill out before their first session - 88 questions, save-and-resume via a link, signature pad. Not yet fully live: the Azure Function that saves real submissions to SharePoint still needs to be deployed, so submissions right now stay local-only on the recipient\'s own device until that\'s done.',
+    'New: a staff "Intake Forms" tab here to review submitted/in-progress forms, search, and print/PDF a recipient\'s answers.',
+    'New: the minister portal has a "View intake form" link on a recipient\'s session card, for ministers assigned to that recipient.'
+  ]}
 ];
 // Entries already live in production, newest first - moved here from
 // CHANGE_LOG at promotion time rather than deleted. See the block comment

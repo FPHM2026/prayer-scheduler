@@ -2,9 +2,11 @@
    FORM CONFIG — the intake questionnaire's questions and flow.
 
    This is the ONE place to edit when the ministry wants to add, remove,
-   reorder or rephrase a question. Both the public intake form (index.html)
-   and the staff view (admin/index.html) render from this file, so a change
-   here shows up in both places automatically.
+   reorder or rephrase a question. The public intake form (intake/index.html),
+   the staff "Intake Forms" tab (preview/index.html, not yet promoted to
+   production index.html), and the minister portal (portal/index.html) all
+   render from this file via a shared <script src="../js/formConfig.js">,
+   so a change here shows up everywhere automatically.
 
    Shape:
      SECTIONS: array of { id, title, intro?, visibleIf?, questions: [...] }
