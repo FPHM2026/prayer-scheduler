@@ -381,28 +381,30 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
     `[data-group="id"]`, flips them as a set).
     - **The minister breakdown itself stays a separate nested `<table
       class="minister-table">`** (tried folding it into the year-table's
-      own rows on 2026-09-24 — reverted the same day: a minister's stats
-      — As Lead, Hours — aren't the same kind of figure as a year/month's
-      Sessions/Running Total/recipient split, so forcing them into the
-      same columns just meant lots of em dashes for no real gain, and the
-      user wanted the minister list visually separated as its own
-      sub-table, not blended into the year rows). What *did* carry over
-      from that attempt: the minister-table is themed with the exact same
-      palette as the year-table (`#f1ede4` border color, uppercase
-      `#6b6b6b` header treatment, `#aa5a3c` chevron) instead of the
-      slightly muted sub-table colors it originally shipped with, so it
-      reads as the same table family even though it's structurally its
-      own `<table>`. It adds an **Hours** column (`durationHours()` summed
-      — a session's full duration credited to everyone on it, not divided
-      among them) and an **As Lead** column, tags anyone whose current
-      PrayerMinisters Status isn't Active with a small "Inactive" label
-      (the breakdown includes everyone with a session in that year
-      regardless of current roster status), and each *minister* row is
-      itself click-to-expand (single-row `toggleRow(id)`, not
-      `toggleGroup`) into their own month-by-month sessions/as-lead/hours
-      for that year — a small nested `<table class="month-table">`, same
-      drill-down idea as the year's own month rows, one structural level
-      further down since it's inside an already-separate table.
+      own rows on 2026-09-24 — reverted the same day: the user wanted the
+      minister list visually separated as its own sub-table, not blended
+      into the year rows). It's themed with the exact same palette as the
+      year-table (`#f1ede4` border color, uppercase `#6b6b6b` header
+      treatment, `#aa5a3c` chevron) instead of the slightly muted sub-table
+      colors it originally shipped with, so it reads as the same table
+      family even though it's structurally its own `<table>`. Columns:
+      Sessions, then — for Freedom Sessions only — the same **Unique
+      Recipients/First-time/Follow-up** split the top-level year/month
+      rows show (added 2026-09-24, computed from just that minister's own
+      sessions via `reportRecipientSplit()`, not the whole year's list),
+      then **As Lead** and **Hours** (`durationHours()` summed — a
+      session's full duration credited to everyone on it, not divided
+      among them) — As Lead stays even on Freedom Sessions where the
+      recipient-split columns are also present, it's never replaced by
+      them. Tags anyone whose current PrayerMinisters Status isn't Active
+      with a small "Inactive" label (the breakdown includes everyone with
+      a session in that year regardless of current roster status). Each
+      *minister* row is itself click-to-expand (single-row `toggleRow(id)`,
+      not `toggleGroup`) into their own month-by-month numbers — a small
+      nested `<table class="month-table">` with the same column set as the
+      minister row itself (Sessions, the Freedom-Sessions-only recipient
+      split, As Lead, Hours) — one structural level further down since
+      it's inside an already-separate table.
     - The page's own Print button removes `hidden` from every collapsed
       element before calling `window.print()` — collapsed content doesn't
       print, so this is load-bearing, not cosmetic; re-verified against

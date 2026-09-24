@@ -837,7 +837,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-24.5";
+const APP_VERSION = "2026-09-24.6";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3739,20 +3739,28 @@ function reportRecipientSplit(list){
 // - a session's full duration credited to every minister on it, not
 // divided among them (attending a 1.5hr session is 1.5 hours spent,
 // regardless of how many others were also there).
-function reportMinisterBreakdown(list){
+// isIndividual sections also get each minister's own recipient split
+// (same Unique Recipients/First-time/Follow-up stats the top-level year
+// row shows) - computed from just the sessions that minister was on, not
+// the whole list, so it lines up with "this minister's own recipients."
+function reportMinisterBreakdown(list, isIndividual){
   const map = new Map();
   list.forEach(s=>{
     const hrs = durationHours(s);
     s.ministers.forEach(m=>{
       const min = ministers.find(x=>x.id===m.id);
-      if(!map.has(m.id)) map.set(m.id, { id: m.id, name: min ? min.name : 'Unknown', inactive: min ? min.status!=='Active' : false, count:0, leadCount:0, hours:0 });
+      if(!map.has(m.id)) map.set(m.id, { id: m.id, name: min ? min.name : 'Unknown', inactive: min ? min.status!=='Active' : false, count:0, leadCount:0, hours:0, sessions:[] });
       const rec = map.get(m.id);
       rec.count++;
       if(m.role==='Lead') rec.leadCount++;
       rec.hours += hrs;
+      rec.sessions.push(s);
     });
   });
-  return [...map.values()].sort((a,b)=> b.count-a.count || a.name.localeCompare(b.name));
+  const rows = [...map.values()];
+  if(isIndividual) rows.forEach(r=>{ r.split = reportRecipientSplit(r.sessions); });
+  rows.forEach(r=>{ delete r.sessions; });
+  return rows.sort((a,b)=> b.count-a.count || a.name.localeCompare(b.name));
 }
 const REPORT_MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 // Every calendar month touched by [from,to] - for a single year's own
@@ -3787,12 +3795,14 @@ function reportMonthRows(type, yFrom, yTo, isIndividual){
     return row;
   });
 }
-function reportMinisterMonthRows(type, ministerId, yFrom, yTo){
+function reportMinisterMonthRows(type, ministerId, yFrom, yTo, isIndividual){
   return reportMonthsInRange(yFrom, yTo).map(({y,m})=>{
     const clamped = monthClampedRange(y, m, yFrom, yTo);
     const list = reportSessionsFor(type, clamped.from, clamped.to).filter(s=>s.ministers.some(x=>x.id===ministerId));
     const leadCount = list.filter(s=>s.ministers.find(x=>x.id===ministerId).role==='Lead').length;
-    return { label: REPORT_MONTH_NAMES[m], count: list.length, leadCount, hours: list.reduce((sum,s)=>sum+durationHours(s), 0) };
+    const row = { label: REPORT_MONTH_NAMES[m], count: list.length, leadCount, hours: list.reduce((sum,s)=>sum+durationHours(s), 0) };
+    if(isIndividual) row.split = reportRecipientSplit(list);
+    return row;
   });
 }
 // Year rows newest-first (matches how the admin actually wants to read
@@ -3856,22 +3866,35 @@ function buildReportSection(typeInfo, from, to){
         </tr>`;
     }).join('') : '';
 
-    const ministerRows = reportMinisterBreakdown(list);
+    const ministerColCount = isIndividual ? 8 : 5;
+    const ministerRows = reportMinisterBreakdown(list, isIndividual);
     const mbid = `mb-${type}-${y}`;
     const ministerHtml = ministerRows.length ? ministerRows.map(r=>{
       const mid = `m-${type}-${y}-${r.id}`;
-      const mMonthHtml = reportMinisterMonthRows(type, r.id, yFrom, yTo)
-        .map(m=>`<tr><td>${m.label}</td><td>${m.count}</td><td>${m.leadCount}</td><td>${m.hours.toFixed(1)}</td></tr>`).join('');
+      let rExtraCols = '';
+      if(isIndividual){
+        rExtraCols = `<td>${r.split.total}</td><td>${r.split.firstTime}</td><td>${r.split.followUp}</td>`;
+      }
+      const mMonthHtml = reportMinisterMonthRows(type, r.id, yFrom, yTo, isIndividual).map(m=>{
+        let mmExtraCols = '';
+        if(isIndividual){
+          mmExtraCols = `<td>${m.split.total}</td><td>${m.split.firstTime}</td><td>${m.split.followUp}</td>`;
+        }
+        return `<tr><td>${m.label}</td><td>${m.count}</td>${mmExtraCols}<td>${m.leadCount}</td><td>${m.hours.toFixed(1)}</td></tr>`;
+      }).join('');
+      const mMonthTheadCols = isIndividual
+        ? '<th>Month</th><th>Sessions</th><th>Unique Recipients</th><th>First-time</th><th>Follow-up</th><th>As Lead</th><th>Hours</th>'
+        : '<th>Month</th><th>Sessions</th><th>As Lead</th><th>Hours</th>';
       return `
         <tr class="sub-row" onclick="toggleRow('${mid}')">
           <td class="chevron"><span id="chev-${mid}">▸</span></td>
           <td>${escapeHtml(r.name)}${r.inactive ? ' <span class="inactive-tag">Inactive</span>' : ''}</td>
-          <td>${r.count}</td><td>${r.leadCount}</td><td>${r.hours.toFixed(1)}</td>
+          <td>${r.count}</td>${rExtraCols}<td>${r.leadCount}</td><td>${r.hours.toFixed(1)}</td>
         </tr>
         <tr class="detail-row" id="${mid}" hidden>
-          <td colspan="5"><table class="month-table"><thead><tr><th>Month</th><th>Sessions</th><th>As Lead</th><th>Hours</th></tr></thead><tbody>${mMonthHtml}</tbody></table></td>
+          <td colspan="${ministerColCount}"><table class="month-table"><thead><tr>${mMonthTheadCols}</tr></thead><tbody>${mMonthHtml}</tbody></table></td>
         </tr>`;
-    }).join('') : `<tr><td colspan="5" class="empty">No ministers recorded in this year.</td></tr>`;
+    }).join('') : `<tr><td colspan="${ministerColCount}" class="empty">No ministers recorded in this year.</td></tr>`;
 
     yearRowsHtml += `
       <tr class="sub-row year-row" onclick="toggleGroup('${yid}')">
@@ -3885,7 +3908,7 @@ function buildReportSection(typeInfo, from, to){
           <div class="toggle-trigger" onclick="toggleRow('${mbid}')"><span id="chev-${mbid}">▸</span> Show minister breakdown (${ministerRows.length})</div>
           <div id="${mbid}" class="minister-wrap" hidden>
             <table class="minister-table">
-              <thead><tr><th></th><th>Minister</th><th>Sessions</th><th>As Lead</th><th>Hours</th></tr></thead>
+              <thead><tr><th></th><th>Minister</th><th>Sessions</th>${isIndividual ? '<th>Unique Recipients</th><th>First-time</th><th>Follow-up</th>' : ''}<th>As Lead</th><th>Hours</th></tr></thead>
               <tbody>${ministerHtml}</tbody>
             </table>
           </div>
@@ -4022,7 +4045,8 @@ const CHANGE_LOG = [
     'Changed: the year-level monthly breakdown on Reports now shows in the same table as the year row, one row per month with every column (Sessions, Unique Recipients, First-time, Follow-up) filled in - not a separate mini-table off to the side.',
     'New: on Reports, click any year to expand its monthly numbers (through the current month, even if it\'s still partial) plus that year\'s own minister breakdown toggle, grouped together right below it - not one breakdown merged across every year.',
     'New: the minister breakdown - still its own table, now restyled to match the year table\'s look - shows Hours and As Lead alongside Sessions, and each minister can be expanded to see their own month-by-month sessions, as-lead count, and hours for that year.',
-    'New: the year and month rows on Reports now show a Hours column too (total session hours for that year/month, not per-minister) alongside Sessions and Running Total.'
+    'New: the year and month rows on Reports now show a Hours column too (total session hours for that year/month, not per-minister) alongside Sessions and Running Total.',
+    'New: for Freedom Sessions, the minister breakdown (and each minister\'s own monthly drill-down) now shows Unique Recipients/First-time/Follow-up too, the same stats the year/month rows show - still alongside As Lead and Hours, not replacing them.'
   ]},
   { date: 'Sep 21, 2026', version: '2026-09-21.3', items: [
     'Changed: Reports now matches the actual spec - one Generate shows Freedom Sessions, Sunday Drop-In, and Training as three separate sections (not picked one at a time), each a year-by-year table with a shaded Running Total column instead of the previous summary tiles and chart. The minister breakdown now tags anyone no longer active. Date presets changed to This Year, Last Year, Last 3 Years, and All Time.'
