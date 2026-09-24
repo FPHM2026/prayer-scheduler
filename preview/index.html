@@ -837,7 +837,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-24.3";
+const APP_VERSION = "2026-09-24.4";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3794,30 +3794,27 @@ function reportMinisterMonthRows(type, ministerId, yFrom, yTo){
 }
 // Year rows newest-first (matches how the admin actually wants to read
 // it - this year's numbers first, then last year, etc.), with each year
-// expandable into month rows AND minister rows IN THE SAME TABLE (every
-// row - year, month, minister, minister's own month drilldown - is a
-// plain <tr> sharing the one column set, not a nested table at any
-// level). Columns that don't apply to a given row kind (e.g. As Lead/
-// Hours on a month row, Unique Recipients on a minister row) show an em
-// dash rather than being left structurally different. The running-total
-// column only means anything at the year grain, so every non-year row
-// shows an em dash there too. It still accumulates chronologically
-// (oldest first) even though rows render newest-first, so it's computed
-// in a separate ascending pass.
-//
-// Expand/collapse uses one mechanism at two nesting depths: a year row's
-// data-group covers its month rows AND its minister rows (both appear
-// together the instant the year opens - no separate "show minister
-// breakdown" sub-toggle); a minister row is itself click-to-expand via
-// its own data-group covering just that minister's month rows.
+// expandable into month rows IN THE SAME TABLE (each column shows that
+// month's version of the stat, not a separate nested table), followed by
+// that year's own minister breakdown - a separate nested table again
+// (deliberately NOT folded into the year-table's own rows/columns; a
+// minister's stats - As Lead, Hours - aren't the same kind of figure as
+// a year/month's Sessions/Running Total/recipient split, so they don't
+// share columns cleanly), just re-themed with the same border color,
+// header treatment, and chevron styling as the year-table so it reads as
+// part of one visual family instead of a visibly different sub-widget.
+// Not one minister breakdown merged across the whole selected range -
+// each year gets its own. The running-total column only means anything
+// at the year grain, so month rows show an em dash there instead of a
+// misleading partial figure. The running-total column itself still
+// accumulates chronologically (oldest first) even though rows render
+// newest-first, so it's computed in a separate ascending pass.
 function buildReportSection(typeInfo, from, to){
   const { key: type, label, noun } = typeInfo;
   const isIndividual = type==='sessions';
   const fromY = new Date(from+'T00:00').getFullYear();
   const toY = new Date(to+'T00:00').getFullYear();
-  const colCount = isIndividual ? 9 : 6;
-  const dash = '<td class="dim">—</td>';
-  const dash3 = isIndividual ? dash+dash+dash : '';
+  const colCount = isIndividual ? 7 : 4;
 
   const runningByYear = {};
   let running = 0;
@@ -3835,7 +3832,7 @@ function buildReportSection(typeInfo, from, to){
     const list = reportSessionsFor(type, yFrom, yTo);
     const yid = `y-${type}-${y}`;
 
-    let extraCols = dash3;
+    let extraCols = '';
     if(isIndividual){
       const split = reportRecipientSplit(list);
       extraCols = `<td>${split.total}</td><td>${split.firstTime}</td><td>${split.followUp}</td>`;
@@ -3843,50 +3840,58 @@ function buildReportSection(typeInfo, from, to){
 
     const monthRows = reportMonthRows(type, yFrom, yTo, isIndividual);
     const monthRowsHtml = monthRows.length ? monthRows.map(m=>{
-      let mExtraCols = dash3;
+      let mExtraCols = '';
       if(isIndividual){
         mExtraCols = `<td>${m.split.total}</td><td>${m.split.firstTime}</td><td>${m.split.followUp}</td>`;
       }
       return `
         <tr class="detail-row month-row" data-group="${yid}" hidden>
           <td></td><td class="month-label">${m.label}</td><td>${m.count}</td><td class="dim">—</td>
-          ${mExtraCols}${dash}${dash}
+          ${mExtraCols}
         </tr>`;
     }).join('') : '';
 
     const ministerRows = reportMinisterBreakdown(list);
-    const ministerRowsHtml = ministerRows.length ? ministerRows.map(r=>{
+    const mbid = `mb-${type}-${y}`;
+    const ministerHtml = ministerRows.length ? ministerRows.map(r=>{
       const mid = `m-${type}-${y}-${r.id}`;
-      const mMonthRowsHtml = reportMinisterMonthRows(type, r.id, yFrom, yTo).map(mm=>`
-        <tr class="detail-row minister-month-row" data-group="${mid}" hidden>
-          <td></td><td class="minister-month-label">${mm.label}</td><td>${mm.count}</td><td class="dim">—</td>
-          ${dash3}<td>${mm.leadCount}</td><td>${mm.hours.toFixed(1)}</td>
-        </tr>`).join('');
+      const mMonthHtml = reportMinisterMonthRows(type, r.id, yFrom, yTo)
+        .map(m=>`<tr><td>${m.label}</td><td>${m.count}</td><td>${m.leadCount}</td><td>${m.hours.toFixed(1)}</td></tr>`).join('');
       return `
-        <tr class="sub-row minister-row" data-group="${yid}" hidden onclick="toggleGroup('${mid}')">
+        <tr class="sub-row" onclick="toggleRow('${mid}')">
           <td class="chevron"><span id="chev-${mid}">▸</span></td>
-          <td class="minister-label">${escapeHtml(r.name)}${r.inactive ? ' <span class="inactive-tag">Inactive</span>' : ''}</td>
-          <td>${r.count}</td><td class="dim">—</td>
-          ${dash3}<td>${r.leadCount}</td><td>${r.hours.toFixed(1)}</td>
+          <td>${escapeHtml(r.name)}${r.inactive ? ' <span class="inactive-tag">Inactive</span>' : ''}</td>
+          <td>${r.count}</td><td>${r.leadCount}</td><td>${r.hours.toFixed(1)}</td>
         </tr>
-        ${mMonthRowsHtml}`;
-    }).join('') : `<tr class="detail-row" data-group="${yid}" hidden><td colspan="${colCount}" class="empty">No ministers recorded in this year.</td></tr>`;
+        <tr class="detail-row" id="${mid}" hidden>
+          <td colspan="5"><table class="month-table"><thead><tr><th>Month</th><th>Sessions</th><th>As Lead</th><th>Hours</th></tr></thead><tbody>${mMonthHtml}</tbody></table></td>
+        </tr>`;
+    }).join('') : `<tr><td colspan="5" class="empty">No ministers recorded in this year.</td></tr>`;
 
     yearRowsHtml += `
       <tr class="sub-row year-row" onclick="toggleGroup('${yid}')">
         <td class="chevron"><span id="chev-${yid}">▸</span></td>
         <td>${y}</td><td>${list.length}</td><td class="running">${runningByYear[y]}</td>
-        ${extraCols}${dash}${dash}
+        ${extraCols}
       </tr>
       ${monthRowsHtml}
-      <tr class="detail-row divider-row" data-group="${yid}" hidden><td colspan="${colCount}">Minister Breakdown</td></tr>
-      ${ministerRowsHtml}`;
+      <tr class="detail-row" data-group="${yid}" hidden>
+        <td colspan="${colCount}">
+          <div class="toggle-trigger" onclick="toggleRow('${mbid}')"><span id="chev-${mbid}">▸</span> Show minister breakdown (${ministerRows.length})</div>
+          <div id="${mbid}" class="minister-wrap" hidden>
+            <table class="minister-table">
+              <thead><tr><th></th><th>Minister</th><th>Sessions</th><th>As Lead</th><th>Hours</th></tr></thead>
+              <tbody>${ministerHtml}</tbody>
+            </table>
+          </div>
+        </td>
+      </tr>`;
   }
   if(!yearRowsHtml) yearRowsHtml = `<tr><td colspan="${colCount}" class="empty">No completed ${escapeHtml(noun.toLowerCase())} sessions in this range.</td></tr>`;
 
   const theadCols = isIndividual
-    ? '<th></th><th>Year</th><th>Sessions</th><th class="running">Running Total</th><th>Unique Recipients</th><th>First-time</th><th>Follow-up</th><th>As Lead</th><th>Hours</th>'
-    : '<th></th><th>Year</th><th>Sessions</th><th class="running">Running Total</th><th>As Lead</th><th>Hours</th>';
+    ? '<th></th><th>Year</th><th>Sessions</th><th class="running">Running Total</th><th>Unique Recipients</th><th>First-time</th><th>Follow-up</th>'
+    : '<th></th><th>Year</th><th>Sessions</th><th class="running">Running Total</th>';
 
   return `
     <section class="report-section">
@@ -3928,12 +3933,28 @@ function generateReport(){
   tr.sub-row:hover td{background:#faf6ee;}
   tr.sub-row td.chevron{width:20px;color:#aa5a3c;font-weight:700;}
   tr.detail-row[hidden]{display:none;}
-  tr.detail-row td{background:#faf8f4;border-bottom:1px solid #f1ede4;}
-  tr.month-row td,tr.minister-month-row td{background:#fbf9f5;color:#6b6b6b;font-size:12.5px;}
+  tr.detail-row:not(.month-row)>td{background:#faf8f4;padding:14px 18px 20px 38px;border-bottom:1px solid #f1ede4;}
+  tr.month-row td{background:#fbf9f5;color:#6b6b6b;font-size:12.5px;}
   tr.month-row td.month-label{padding-left:34px;font-style:italic;}
-  tr.minister-row td.minister-label{padding-left:34px;font-weight:600;color:#474747;}
-  tr.minister-month-row td.minister-month-label{padding-left:56px;font-style:italic;}
-  tr.divider-row td{background:#fff;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#8a8578;font-weight:700;padding-top:16px;border-bottom:1px solid #ddd5c4;}
+  /* Minister breakdown stays its own nested table (a minister's As
+     Lead/Hours aren't the same kind of figure as a year/month's
+     Sessions/Running Total, so it doesn't share the year-table's
+     columns) - but themed with the year-table's own palette (border
+     color, uppercase header treatment, chevron color/weight) so it
+     reads as the same table family instead of a visibly separate
+     sub-widget. */
+  .toggle-trigger{cursor:pointer;font-weight:700;color:#474747;font-size:13px;padding:10px 0 4px;}
+  .toggle-trigger span{color:#aa5a3c;}
+  .minister-wrap[hidden]{display:none;}
+  .minister-wrap{margin-top:6px;}
+  table.minister-table{width:100%;border-collapse:collapse;font-size:13px;}
+  table.minister-table th,table.minister-table td{text-align:left;padding:8px 10px;border-bottom:1px solid #f1ede4;}
+  table.minister-table th{font-size:11px;text-transform:uppercase;color:#6b6b6b;letter-spacing:.03em;font-weight:700;}
+  table.minister-table td.chevron{width:20px;color:#aa5a3c;font-weight:700;}
+  table.minister-table tbody tr.sub-row:hover td{background:#faf6ee;}
+  table.month-table{width:100%;max-width:360px;border-collapse:collapse;font-size:12.5px;margin:0;}
+  table.month-table th,table.month-table td{text-align:left;padding:6px 10px;border-bottom:1px solid #f1ede4;}
+  table.month-table th{font-size:10.5px;text-transform:uppercase;color:#6b6b6b;letter-spacing:.03em;font-weight:700;}
   @media print{
     body{background:#fff;padding:0;}
     .wrap{border:none;padding:0;max-width:100%;}
@@ -3950,6 +3971,13 @@ function generateReport(){
     ${sectionsHtml}
   </div>
   <script>
+    function toggleRow(id){
+      var el = document.getElementById(id);
+      if(!el) return;
+      el.hidden = !el.hidden;
+      var chev = document.getElementById('chev-'+id);
+      if(chev) chev.textContent = el.hidden ? '▸' : '▾';
+    }
     function toggleGroup(id){
       var rows = document.querySelectorAll('[data-group="'+id+'"]');
       if(!rows.length) return;
@@ -3986,10 +4014,9 @@ function generateReport(){
 ========================================================================= */
 const CHANGE_LOG = [
   { date: 'Sep 24, 2026', version: APP_VERSION, items: [
-    'Changed: the minister breakdown on Reports (and each minister\'s own monthly drill-down) is now built into the same table as the year and month rows too, instead of a separate nested table - one "Minister Breakdown" divider row, then a row per minister with As Lead/Hours filled in, expandable into that minister\'s own month rows the same way a year expands into its months.',
     'Changed: the year-level monthly breakdown on Reports now shows in the same table as the year row, one row per month with every column (Sessions, Unique Recipients, First-time, Follow-up) filled in - not a separate mini-table off to the side.',
-    'New: on Reports, click any year to expand its monthly numbers (through the current month, even if it\'s still partial) plus that year\'s own minister breakdown, grouped together right below it - not one breakdown merged across every year.',
-    'New: the minister breakdown now shows Hours alongside Sessions/As Lead, and each minister can be expanded to see their own month-by-month sessions and hours for that year.'
+    'New: on Reports, click any year to expand its monthly numbers (through the current month, even if it\'s still partial) plus that year\'s own minister breakdown toggle, grouped together right below it - not one breakdown merged across every year.',
+    'New: the minister breakdown - still its own table, now restyled to match the year table\'s look - shows Hours and As Lead alongside Sessions, and each minister can be expanded to see their own month-by-month sessions, as-lead count, and hours for that year.'
   ]},
   { date: 'Sep 21, 2026', version: '2026-09-21.3', items: [
     'Changed: Reports now matches the actual spec - one Generate shows Freedom Sessions, Sunday Drop-In, and Training as three separate sections (not picked one at a time), each a year-by-year table with a shaded Running Total column instead of the previous summary tiles and chart. The minister breakdown now tags anyone no longer active. Date presets changed to This Year, Last Year, Last 3 Years, and All Time.'
