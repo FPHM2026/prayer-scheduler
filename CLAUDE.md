@@ -646,6 +646,23 @@ like one product, not two:
     **Changes tab** (`panel-changes` section, its nav button, `CHANGE_LOG`/
     `renderChangeLog()`) — production never had any of these. Check all of
     it by hand after every promotion; nothing catches this automatically.
+    **Hit for real on 2026-09-24/25**: stripping the Changes tab's HTML and
+    the `CHANGE_LOG`/`renderChangeLog()` block is not the whole surface —
+    `wireApp()` (way up near the top of the script, nowhere near either of
+    those) also has its own line binding the Recent/Archive subtabs:
+    `$('#changesSubtabs').querySelectorAll('button[data-changesview]')
+    .forEach(...)`. Left in place after `#changesSubtabs` itself is gone,
+    `$('#changesSubtabs')` returns `null` and `.querySelectorAll` on it
+    throws `TypeError: Cannot read properties of null (reading
+    'querySelectorAll')` — caught by `afterSignIn()`'s try/catch and shown
+    to every signed-in user as "Could not load data: ... Check the
+    SharePoint site URL in setup..." which reads exactly like a real Graph/
+    permissions failure and sent troubleshooting in the wrong direction
+    entirely. **After every promotion, grep production `index.html` for
+    "changes" case-insensitively** (`changesSubtabs`, `changesSubView`,
+    `changesHelptext`, `switchChangesSub`, `data-changesview`) and confirm
+    zero hits — that catches this line and anything else like it in one
+    pass, rather than hoping the manual strip got everything.
 14. **A literal `</script>` inside a JS string breaks the *enclosing*
     `<script>` tag, even though it's just string content to the JS parser.**
     The Reports feature builds a whole standalone HTML page (with its own

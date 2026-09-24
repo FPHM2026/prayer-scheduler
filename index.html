@@ -1277,7 +1277,6 @@ function wireApp(){
   $('#btnSaveDropInSettings').addEventListener('click', ()=>withLoading($('#btnSaveDropInSettings'), 'Saving…', saveDropInSettings));
   $('#btnSaveDefaultLocationSetting').addEventListener('click', ()=>withLoading($('#btnSaveDefaultLocationSetting'), 'Saving…', saveDefaultLocationSetting));
   $('#settingsSubtabs').querySelectorAll('button[data-settingsview]').forEach(b=>b.addEventListener('click', ()=>switchSettingsSub(b.dataset.settingsview)));
-  $('#changesSubtabs').querySelectorAll('button[data-changesview]').forEach(b=>b.addEventListener('click', ()=>switchChangesSub(b.dataset.changesview)));
   $('#btnAddMinister').addEventListener('click', ()=>openMinisterModal());
   $('#btnMinCancel').addEventListener('click', ()=>$('#ministerModal').classList.remove('open'));
   $('#btnMinSave').addEventListener('click', ()=>withLoading($('#btnMinSave'), 'Saving…', onSaveMinister));
