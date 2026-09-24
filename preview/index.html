@@ -4050,7 +4050,12 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
-  { date: 'Sep 24, 2026', version: APP_VERSION, items: [
+];
+// Entries already live in production, newest first - moved here from
+// CHANGE_LOG at promotion time rather than deleted. See the block comment
+// above for the maintenance rule.
+const CHANGE_LOG_ARCHIVE = [
+  { date: 'Sep 24, 2026', version: '2026-09-24.9', items: [
     'Changed: the year-level monthly breakdown on Reports now shows in the same table as the year row, one row per month with every column (Sessions, Unique Recipients, First-time, Follow-up) filled in - not a separate mini-table off to the side.',
     'New: on Reports, click any year to expand its monthly numbers (through the current month, even if it\'s still partial) plus that year\'s own minister breakdown toggle, grouped together right below it - not one breakdown merged across every year.',
     'New: the minister breakdown - still its own table, now restyled to match the year table\'s look - shows Hours and As Lead alongside Sessions, and each minister can be expanded to see their own month-by-month sessions, as-lead count, and hours for that year.',
@@ -4067,12 +4072,7 @@ const CHANGE_LOG = [
   ]},
   { date: 'Sep 21, 2026', version: '2026-09-21.1', items: [
     'New: the Reports tab has quick date-range buttons (Year to Date, Last Year, This Month, Last Month, Last 90 Days) so common ranges don\'t need typing.'
-  ]}
-];
-// Entries already live in production, newest first - moved here from
-// CHANGE_LOG at promotion time rather than deleted. See the block comment
-// above for the maintenance rule.
-const CHANGE_LOG_ARCHIVE = [
+  ]},
   { date: 'Sep 20, 2026', version: '2026-09-20.12', items: [
     'New: session cards on Schedule & Planning now show the "Session #N" chip (first-time vs follow-up) next to the recipient\'s name, same as Completed Sessions already had.'
   ]},

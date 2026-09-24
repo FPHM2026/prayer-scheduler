@@ -586,18 +586,16 @@
   </section>
 
   <section class="panel" id="panel-reports">
-    <p class="helptext">Pick a date range and a report, then Generate opens it in a new tab. These are placeholders for now — the real report designs come later.</p>
+    <p class="helptext">Pick a date range, then Generate opens a statistics report in a new tab — Freedom Sessions, Drop-In, and Training as three separate sections, ready to review or print.</p>
+    <div class="range-presets">
+      <button type="button" class="range-preset" onclick="setReportRange('thisyear')">This Year</button>
+      <button type="button" class="range-preset" onclick="setReportRange('lastyear')">Last Year</button>
+      <button type="button" class="range-preset" onclick="setReportRange('last2years')">Last Year + This Year</button>
+      <button type="button" class="range-preset" onclick="setReportRange('alltime')">All Time</button>
+    </div>
     <div class="field-row">
       <div class="field"><label for="reportFrom">From</label><input type="date" id="reportFrom"></div>
       <div class="field"><label for="reportTo">To</label><input type="date" id="reportTo"></div>
-    </div>
-    <div class="field">
-      <label for="reportType">Report</label>
-      <select id="reportType">
-        <option value="sessions">Session Statistics (Freedom Sessions)</option>
-        <option value="training">Training Statistics</option>
-        <option value="dropin">Drop-in Statistics</option>
-      </select>
     </div>
     <div class="toolbar">
       <button class="btn" id="btnGenerateReport">Generate Report</button>
@@ -813,7 +811,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-20.12";
+const APP_VERSION = "2026-09-24.9";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1279,6 +1277,7 @@ function wireApp(){
   $('#btnSaveDropInSettings').addEventListener('click', ()=>withLoading($('#btnSaveDropInSettings'), 'Saving…', saveDropInSettings));
   $('#btnSaveDefaultLocationSetting').addEventListener('click', ()=>withLoading($('#btnSaveDefaultLocationSetting'), 'Saving…', saveDefaultLocationSetting));
   $('#settingsSubtabs').querySelectorAll('button[data-settingsview]').forEach(b=>b.addEventListener('click', ()=>switchSettingsSub(b.dataset.settingsview)));
+  $('#changesSubtabs').querySelectorAll('button[data-changesview]').forEach(b=>b.addEventListener('click', ()=>switchChangesSub(b.dataset.changesview)));
   $('#btnAddMinister').addEventListener('click', ()=>openMinisterModal());
   $('#btnMinCancel').addEventListener('click', ()=>$('#ministerModal').classList.remove('open'));
   $('#btnMinSave').addEventListener('click', ()=>withLoading($('#btnMinSave'), 'Saving…', onSaveMinister));
@@ -3640,37 +3639,365 @@ function renderBlackouts(){
 }
 
 /* =========================================================================
-   REPORTS — placeholder tab. Generate opens a strawdog report in a new
-   tab (Blob + window.open, not a data: URI - more reliable across
-   browsers for a full HTML document) so the real report designs can be
-   filled in later without changing this scaffolding.
+   REPORTS — Freedom Sessions / Drop-In / Training statistics for an
+   arbitrary date range, computed here against the live sessions/ministers
+   already loaded and rendered into a standalone printable page (Blob +
+   window.open, not a data: URI - more reliable across browsers for a full
+   HTML document). The new tab has no access back to this app's data, so
+   every number is pre-computed into plain HTML before it's opened -
+   nothing in the report page re-fetches or recomputes anything itself.
+   Per the punch-list spec (item 10): one Generate produces all three as
+   distinct sections (not merged, not picked one-at-a-time), each a
+   year-by-year table with a shaded running-total column, plus a
+   collapsed-by-default minister breakdown that tags inactive ministers.
 ========================================================================= */
-const REPORT_LABELS = {
-  sessions: 'Session Statistics (Freedom Sessions)',
-  training: 'Training Statistics',
-  dropin: 'Drop-in Statistics'
+const REPORT_TYPES = [
+  { key: 'sessions', label: 'Freedom Sessions', noun: 'Freedom Session' },
+  { key: 'dropin', label: 'Sunday Drop-In', noun: 'Drop-In' },
+  { key: 'training', label: 'Training', noun: 'Training' }
+];
+// This Year/Last Year/Last Year + This Year/All Time, per the punch-list
+// spec (Last 3 Years swapped for a rolling 2-year range on 2026-09-24 at
+// the user's request - first tried as "Last Year to Date" meaning just
+// last year's own YTD slice, but that wasn't what was wanted; the actual
+// ask was last year PLUS this year together, i.e. Jan 1 of last year
+// through today) - same .range-preset pattern Quick Add Slots already
+// uses for its own (forward-looking) ranges.
+window.setReportRange = function(preset){
+  const now = new Date();
+  let from, to;
+  if(preset==='thisyear'){ from = new Date(now.getFullYear(),0,1); to = now; }
+  else if(preset==='lastyear'){ from = new Date(now.getFullYear()-1,0,1); to = new Date(now.getFullYear()-1,11,31); }
+  else if(preset==='last2years'){ from = new Date(now.getFullYear()-1,0,1); to = now; }
+  else if(preset==='alltime'){
+    const allCompleted = sessions.filter(s=>s.status==='Completed');
+    const earliest = allCompleted.length ? allCompleted.reduce((min,s)=> s.date<min ? s.date : min, allCompleted[0].date) : isoDate(now);
+    from = new Date(earliest+'T00:00'); to = now;
+  }
+  else return;
+  $('#reportFrom').value = isoDate(from);
+  $('#reportTo').value = isoDate(to);
 };
+// Completed only - a "statistics" report is inherently retrospective, same
+// convention completedStats() already uses for the Completed Sessions combo
+// card. Each type filters to exactly the apptType(s) it's about; Freedom
+// Sessions explicitly excludes Drop-in/Training the same way completedStats
+// does (one shared group event per occurrence, not an individual session).
+function reportSessionsFor(type, from, to){
+  return sessions.filter(s=>{
+    if(s.status!=='Completed' || s.date<from || s.date>to) return false;
+    if(type==='sessions') return s.apptType!=='Drop-in' && s.apptType!=='Training';
+    if(type==='training') return s.apptType==='Training';
+    if(type==='dropin') return s.apptType==='Drop-in';
+    return false;
+  });
+}
+// Same per-recipient (not per-session) classification completedStats()
+// uses - a recipient counts as Follow-up if ANY of their sessions in the
+// list has ApptType Follow-up, so the two counts add up to unique
+// recipients, not total sessions. Only called for Freedom Sessions -
+// Training/Drop-in share one literal recipName across every occurrence
+// ("Sunday Drop-In"/"Training"), so "unique recipients" isn't meaningful
+// there and callers skip this entirely for those two types.
+function reportRecipientSplit(list){
+  const map = new Map();
+  list.forEach(s=>{
+    const key = s.recipName.trim().toLowerCase();
+    map.set(key, (map.get(key)||false) || s.apptType==='Follow-up');
+  });
+  let firstTime=0, followUp=0;
+  map.forEach(hadFollowUp => hadFollowUp ? followUp++ : firstTime++);
+  return { firstTime, followUp, total: map.size };
+}
+// Tags anyone no longer Active - the breakdown includes everyone with a
+// session in range regardless of current roster status, per the spec.
+// Hours use the same durationHours() the Prayer Ministers stats tile does
+// - a session's full duration credited to every minister on it, not
+// divided among them (attending a 1.5hr session is 1.5 hours spent,
+// regardless of how many others were also there).
+// isIndividual sections also get each minister's own recipient split
+// (same Unique Recipients/First-time/Follow-up stats the top-level year
+// row shows) - computed from just the sessions that minister was on, not
+// the whole list, so it lines up with "this minister's own recipients."
+function reportMinisterBreakdown(list, isIndividual){
+  const map = new Map();
+  list.forEach(s=>{
+    const hrs = durationHours(s);
+    s.ministers.forEach(m=>{
+      const min = ministers.find(x=>x.id===m.id);
+      if(!map.has(m.id)) map.set(m.id, { id: m.id, name: min ? min.name : 'Unknown', inactive: min ? min.status!=='Active' : false, count:0, leadCount:0, hours:0, sessions:[] });
+      const rec = map.get(m.id);
+      rec.count++;
+      if(m.role==='Lead') rec.leadCount++;
+      rec.hours += hrs;
+      rec.sessions.push(s);
+    });
+  });
+  const rows = [...map.values()];
+  if(isIndividual) rows.forEach(r=>{ r.split = reportRecipientSplit(r.sessions); });
+  rows.forEach(r=>{ delete r.sessions; });
+  return rows.sort((a,b)=> b.count-a.count || a.name.localeCompare(b.name));
+}
+const REPORT_MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+// Every calendar month touched by [from,to] - for a single year's own
+// clamped range this is at most 12, naturally stopping at the current
+// (partial) month when `to` is today rather than padding out the rest of
+// the year with months that haven't happened yet.
+function reportMonthsInRange(from, to){
+  const fromD = new Date(from+'T00:00'), toD = new Date(to+'T00:00');
+  const months = [];
+  let d = new Date(fromD.getFullYear(), fromD.getMonth(), 1);
+  const endD = new Date(toD.getFullYear(), toD.getMonth(), 1);
+  while(d<=endD){ months.push({y:d.getFullYear(), m:d.getMonth()}); d.setMonth(d.getMonth()+1); }
+  return months;
+}
+function monthClampedRange(y, m, rangeFrom, rangeTo){
+  const mFrom = `${y}-${String(m+1).padStart(2,'0')}-01`;
+  const lastDay = new Date(y, m+1, 0).getDate();
+  const mTo = `${y}-${String(m+1).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+  return { from: mFrom<rangeFrom ? rangeFrom : mFrom, to: mTo>rangeTo ? rangeTo : mTo };
+}
+// isIndividual sections also need the recipient split per month (same
+// columns as the year row), not just a count. Hours is total session
+// hours for the month (durationHours() summed once per session, not per
+// minister on it - this is "how much ministry time happened", the same
+// quantity the year row's own Hours column totals up from).
+function reportMonthRows(type, yFrom, yTo, isIndividual){
+  return reportMonthsInRange(yFrom, yTo).map(({y,m})=>{
+    const clamped = monthClampedRange(y, m, yFrom, yTo);
+    const list = reportSessionsFor(type, clamped.from, clamped.to);
+    const row = { label: REPORT_MONTH_NAMES[m], count: list.length, hours: list.reduce((sum,s)=>sum+durationHours(s), 0) };
+    if(isIndividual) row.split = reportRecipientSplit(list);
+    return row;
+  });
+}
+function reportMinisterMonthRows(type, ministerId, yFrom, yTo, isIndividual){
+  return reportMonthsInRange(yFrom, yTo).map(({y,m})=>{
+    const clamped = monthClampedRange(y, m, yFrom, yTo);
+    const list = reportSessionsFor(type, clamped.from, clamped.to).filter(s=>s.ministers.some(x=>x.id===ministerId));
+    const leadCount = list.filter(s=>s.ministers.find(x=>x.id===ministerId).role==='Lead').length;
+    const row = { label: REPORT_MONTH_NAMES[m], count: list.length, leadCount, hours: list.reduce((sum,s)=>sum+durationHours(s), 0) };
+    if(isIndividual) row.split = reportRecipientSplit(list);
+    return row;
+  });
+}
+// Year rows newest-first (matches how the admin actually wants to read
+// it - this year's numbers first, then last year, etc.), with each year
+// expandable into month rows IN THE SAME TABLE (each column shows that
+// month's version of the stat, not a separate nested table), followed by
+// that year's own minister breakdown - a separate nested table again
+// (deliberately NOT folded into the year-table's own rows/columns; a
+// minister's stats - As Lead, Hours - aren't the same kind of figure as
+// a year/month's Sessions/recipient split, so they don't share columns
+// cleanly), just re-themed with the same border color, header treatment,
+// and chevron styling as the year-table so it reads as part of one
+// visual family instead of a visibly different sub-widget. Not one
+// minister breakdown merged across the whole selected range - each year
+// gets its own.
+//
+// No running-total column (removed 2026-09-24 - shaded to stand out from
+// the plain Sessions column, but the user found the shading itself the
+// confusing part and just wanted it gone). Instead, when the picked date
+// range spans more than one calendar year, a single non-expandable Total
+// row is appended after the last year with the whole range's own totals
+// - Sessions/Hours/(Freedom Sessions) recipient split computed fresh
+// from the full from/to list, not summed from the per-year rows, so a
+// recipient who shows up in two different years is still only counted
+// once in Unique Recipients.
+function buildReportSection(typeInfo, from, to){
+  const { key: type, label, noun } = typeInfo;
+  const isIndividual = type==='sessions';
+  const fromY = new Date(from+'T00:00').getFullYear();
+  const toY = new Date(to+'T00:00').getFullYear();
+  const colCount = isIndividual ? 7 : 4;
+
+  let yearRowsHtml = '';
+  for(let y=toY; y>=fromY; y--){
+    const yFrom = y===fromY ? from : `${y}-01-01`;
+    const yTo = y===toY ? to : `${y}-12-31`;
+    const list = reportSessionsFor(type, yFrom, yTo);
+    const yid = `y-${type}-${y}`;
+
+    let extraCols = '';
+    if(isIndividual){
+      const split = reportRecipientSplit(list);
+      extraCols = `<td>${split.total}</td><td>${split.firstTime}</td><td>${split.followUp}</td>`;
+    }
+
+    const yearHours = list.reduce((sum,s)=>sum+durationHours(s), 0);
+
+    const monthRows = reportMonthRows(type, yFrom, yTo, isIndividual);
+    const monthRowsHtml = monthRows.length ? monthRows.map(m=>{
+      let mExtraCols = '';
+      if(isIndividual){
+        mExtraCols = `<td>${m.split.total}</td><td>${m.split.firstTime}</td><td>${m.split.followUp}</td>`;
+      }
+      return `
+        <tr class="detail-row month-row" data-group="${yid}" hidden>
+          <td></td><td class="month-label">${m.label}</td><td>${m.count}</td>
+          ${mExtraCols}<td>${m.hours.toFixed(1)}</td>
+        </tr>`;
+    }).join('') : '';
+
+    const ministerColCount = isIndividual ? 8 : 5;
+    const ministerRows = reportMinisterBreakdown(list, isIndividual);
+    const mbid = `mb-${type}-${y}`;
+    const ministerHtml = ministerRows.length ? ministerRows.map(r=>{
+      const mid = `m-${type}-${y}-${r.id}`;
+      let rExtraCols = '';
+      if(isIndividual){
+        rExtraCols = `<td>${r.split.total}</td><td>${r.split.firstTime}</td><td>${r.split.followUp}</td>`;
+      }
+      const mMonthHtml = reportMinisterMonthRows(type, r.id, yFrom, yTo, isIndividual).map(m=>{
+        let mmExtraCols = '';
+        if(isIndividual){
+          mmExtraCols = `<td>${m.split.total}</td><td>${m.split.firstTime}</td><td>${m.split.followUp}</td>`;
+        }
+        return `<tr><td>${m.label}</td><td>${m.count}</td>${mmExtraCols}<td>${m.leadCount}</td><td>${m.hours.toFixed(1)}</td></tr>`;
+      }).join('');
+      const mMonthTheadCols = isIndividual
+        ? '<th>Month</th><th>Sessions</th><th>Unique Recipients</th><th>First-time</th><th>Follow-up</th><th>As Lead</th><th>Hours</th>'
+        : '<th>Month</th><th>Sessions</th><th>As Lead</th><th>Hours</th>';
+      return `
+        <tr class="sub-row" onclick="toggleRow('${mid}')">
+          <td class="chevron"><span id="chev-${mid}">▸</span></td>
+          <td>${escapeHtml(r.name)}${r.inactive ? ' <span class="inactive-tag">Inactive</span>' : ''}</td>
+          <td>${r.count}</td>${rExtraCols}<td>${r.leadCount}</td><td>${r.hours.toFixed(1)}</td>
+        </tr>
+        <tr class="detail-row" id="${mid}" hidden>
+          <td colspan="${ministerColCount}"><table class="month-table"><thead><tr>${mMonthTheadCols}</tr></thead><tbody>${mMonthHtml}</tbody></table></td>
+        </tr>`;
+    }).join('') : `<tr><td colspan="${ministerColCount}" class="empty">No ministers recorded in this year.</td></tr>`;
+
+    yearRowsHtml += `
+      <tr class="sub-row year-row" onclick="toggleGroup('${yid}')">
+        <td class="chevron"><span id="chev-${yid}">▸</span></td>
+        <td>${y}</td><td>${list.length}</td>
+        ${extraCols}<td>${yearHours.toFixed(1)}</td>
+      </tr>
+      ${monthRowsHtml}
+      <tr class="detail-row" data-group="${yid}" hidden>
+        <td colspan="${colCount}">
+          <div class="toggle-trigger" onclick="toggleRow('${mbid}')"><span id="chev-${mbid}">▸</span> Show minister breakdown (${ministerRows.length})</div>
+          <div id="${mbid}" class="minister-wrap" hidden>
+            <table class="minister-table">
+              <thead><tr><th></th><th>Minister</th><th>Sessions</th>${isIndividual ? '<th>Unique Recipients</th><th>First-time</th><th>Follow-up</th>' : ''}<th>As Lead</th><th>Hours</th></tr></thead>
+              <tbody>${ministerHtml}</tbody>
+            </table>
+          </div>
+        </td>
+      </tr>`;
+  }
+  if(!yearRowsHtml) yearRowsHtml = `<tr><td colspan="${colCount}" class="empty">No completed ${escapeHtml(noun.toLowerCase())} sessions in this range.</td></tr>`;
+  else if(toY > fromY){
+    const fullList = reportSessionsFor(type, from, to);
+    const totalHours = fullList.reduce((sum,s)=>sum+durationHours(s), 0);
+    let totalExtraCols = '';
+    if(isIndividual){
+      const split = reportRecipientSplit(fullList);
+      totalExtraCols = `<td>${split.total}</td><td>${split.firstTime}</td><td>${split.followUp}</td>`;
+    }
+    yearRowsHtml += `
+      <tr class="total-row">
+        <td></td><td>Total</td><td>${fullList.length}</td>
+        ${totalExtraCols}<td>${totalHours.toFixed(1)}</td>
+      </tr>`;
+  }
+
+  const theadCols = isIndividual
+    ? '<th></th><th>Year</th><th>Sessions</th><th>Unique Recipients</th><th>First-time</th><th>Follow-up</th><th>Hours</th>'
+    : '<th></th><th>Year</th><th>Sessions</th><th>Hours</th>';
+
+  return `
+    <section class="report-section">
+      <h2>${escapeHtml(label)}</h2>
+      <table class="year-table">
+        <thead><tr>${theadCols}</tr></thead>
+        <tbody>${yearRowsHtml}</tbody>
+      </table>
+    </section>`;
+}
 function generateReport(){
   const msg = $('#reportMsg');
   msg.hidden = true;
-  const from = $('#reportFrom').value, to = $('#reportTo').value, type = $('#reportType').value;
+  const from = $('#reportFrom').value, to = $('#reportTo').value;
   if(!from || !to){ msg.hidden = false; msg.textContent = 'Please pick both a from and a to date.'; return; }
   if(to < from){ msg.hidden = false; msg.textContent = 'The to date must be on or after the from date.'; return; }
-  const label = REPORT_LABELS[type] || type;
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(label)}</title>
+  const sectionsHtml = REPORT_TYPES.map(t => buildReportSection(t, from, to)).join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ministry Statistics</title>
 <style>
   body{font-family:Georgia,'Times New Roman',serif;background:#faf8f4;color:#2a2a2a;margin:0;padding:40px;}
   .wrap{max-width:800px;margin:0 auto;background:#fff;border:1px solid #ddd5c4;border-radius:10px;padding:36px 42px;}
-  h1{color:#aa5a3c;font-size:24px;margin:0 0 6px;}
-  .range{color:#6b6b6b;font-size:14px;margin:0 0 28px;}
-  .placeholder{background:#e7e2cf;border-radius:8px;padding:20px 24px;color:#474747;font-size:14px;line-height:1.6;}
-  @media print{ body{background:#fff;padding:0;} .wrap{border:none;} }
+  .toolbar{display:flex;justify-content:flex-end;margin-bottom:10px;}
+  .toolbar button{background:#f28a00;color:#1a1a1a;border:none;padding:9px 18px;border-radius:6px;font-weight:700;font-size:14px;cursor:pointer;font-family:Georgia,'Times New Roman',serif;}
+  .toolbar button:hover{background:#ce7500;}
+  h1{color:#8a4a30;font-size:24px;margin:0 0 6px;}
+  .range{color:#6b6b6b;font-size:14px;margin:0 0 30px;}
+  .report-section{margin-bottom:34px;}
+  .report-section:last-child{margin-bottom:0;}
+  .report-section h2{font-size:16.5px;color:#474747;margin:0 0 14px;border-bottom:1px solid #ddd5c4;padding-bottom:9px;font-weight:700;}
+  table.year-table{width:100%;border-collapse:collapse;margin:0 0 10px;font-size:13.5px;}
+  table.year-table th,table.year-table td{text-align:left;padding:9px 11px;border-bottom:1px solid #f1ede4;}
+  table.year-table th{font-size:11px;text-transform:uppercase;color:#6b6b6b;letter-spacing:.03em;font-weight:700;}
+  tr.total-row td{background:#f3ead9;font-weight:700;color:#474747;border-top:2px solid #ddd5c4;}
+  td.empty{color:#6b6b6b;font-style:italic;}
+  .inactive-tag{display:inline-block;background:#e7e2cf;color:#7a7a7a;font-size:10px;text-transform:uppercase;letter-spacing:.03em;font-weight:700;border-radius:8px;padding:2px 7px;margin-left:6px;}
+  tr.sub-row{cursor:pointer;}
+  tr.sub-row:hover td{background:#faf6ee;}
+  tr.sub-row td.chevron{width:20px;color:#aa5a3c;font-weight:700;}
+  tr.detail-row[hidden]{display:none;}
+  tr.detail-row:not(.month-row)>td{background:#faf8f4;padding:14px 18px 20px 38px;border-bottom:1px solid #f1ede4;}
+  tr.month-row td{background:#fbf9f5;color:#6b6b6b;font-size:12.5px;}
+  tr.month-row td.month-label{padding-left:34px;font-style:italic;}
+  /* Minister breakdown stays its own nested table - but themed with the
+     year-table's own palette (border color, uppercase header treatment,
+     chevron color/weight) so it reads as the same table family instead
+     of a visibly separate sub-widget. */
+  .toggle-trigger{cursor:pointer;font-weight:700;color:#474747;font-size:13px;padding:10px 0 4px;}
+  .toggle-trigger span{color:#aa5a3c;}
+  .minister-wrap[hidden]{display:none;}
+  .minister-wrap{margin-top:6px;}
+  table.minister-table{width:100%;border-collapse:collapse;font-size:13px;}
+  table.minister-table th,table.minister-table td{text-align:left;padding:8px 10px;border-bottom:1px solid #f1ede4;}
+  table.minister-table th{font-size:11px;text-transform:uppercase;color:#6b6b6b;letter-spacing:.03em;font-weight:700;}
+  table.minister-table td.chevron{width:20px;color:#aa5a3c;font-weight:700;}
+  table.minister-table tbody tr.sub-row:hover td{background:#faf6ee;}
+  table.month-table{width:100%;max-width:360px;border-collapse:collapse;font-size:12.5px;margin:0;}
+  table.month-table th,table.month-table td{text-align:left;padding:6px 10px;border-bottom:1px solid #f1ede4;}
+  table.month-table th{font-size:10.5px;text-transform:uppercase;color:#6b6b6b;letter-spacing:.03em;font-weight:700;}
+  @media print{
+    body{background:#fff;padding:0;}
+    .wrap{border:none;padding:0;max-width:100%;}
+    .no-print{display:none!important;}
+    .report-section{break-inside:avoid;}
+  }
 </style></head><body>
   <div class="wrap">
-    <h1>${escapeHtml(label)}</h1>
+    <div class="toolbar no-print">
+      <button type="button" onclick="document.querySelectorAll('[hidden]').forEach(function(el){el.hidden=false;});document.querySelectorAll('[id^=chev-]').forEach(function(c){c.textContent='▾';});window.print();">Print</button>
+    </div>
+    <h1>Ministry Statistics</h1>
     <p class="range">${escapeHtml(fmtShort(from))} – ${escapeHtml(fmtShort(to))}</p>
-    <div class="placeholder">This report's design hasn't been built yet — this is a placeholder to confirm the date range and report selection work end to end. The real ${escapeHtml(label.toLowerCase())} report will replace this page.</div>
+    ${sectionsHtml}
   </div>
+  <script>
+    function toggleRow(id){
+      var el = document.getElementById(id);
+      if(!el) return;
+      el.hidden = !el.hidden;
+      var chev = document.getElementById('chev-'+id);
+      if(chev) chev.textContent = el.hidden ? '▸' : '▾';
+    }
+    function toggleGroup(id){
+      var rows = document.querySelectorAll('[data-group="'+id+'"]');
+      if(!rows.length) return;
+      var makeHidden = !rows[0].hidden;
+      rows.forEach(function(el){ el.hidden = makeHidden; });
+      var chev = document.getElementById('chev-'+id);
+      if(chev) chev.textContent = makeHidden ? '▸' : '▾';
+    }
+  <\/script>
 </body></html>`;
   const blob = new Blob([html], {type: 'text/html'});
   const url = URL.createObjectURL(blob);
