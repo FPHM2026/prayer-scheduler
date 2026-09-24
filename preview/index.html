@@ -4068,14 +4068,14 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
-  { date: 'Sep 24, 2026', version: APP_VERSION, items: [
-    'Fixed: on Reports, the year/minister tables spilled off the right edge of the card on phone-sized screens instead of staying contained. Each table now scrolls horizontally within its own card instead of overflowing past it, and a proper mobile viewport tag was added so phones render the page at actual screen width instead of a zoomed-out desktop layout.'
-  ]}
 ];
 // Entries already live in production, newest first - moved here from
 // CHANGE_LOG at promotion time rather than deleted. See the block comment
 // above for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Sep 24, 2026', version: '2026-09-24.10', items: [
+    'Fixed: on Reports, the year/minister tables spilled off the right edge of the card on phone-sized screens instead of staying contained. Each table now scrolls horizontally within its own card instead of overflowing past it, and a proper mobile viewport tag was added so phones render the page at actual screen width instead of a zoomed-out desktop layout.'
+  ]},
   { date: 'Sep 24, 2026', version: '2026-09-24.9', items: [
     'Changed: the year-level monthly breakdown on Reports now shows in the same table as the year row, one row per month with every column (Sessions, Unique Recipients, First-time, Follow-up) filled in - not a separate mini-table off to the side.',
     'New: on Reports, click any year to expand its monthly numbers (through the current month, even if it\'s still partial) plus that year\'s own minister breakdown toggle, grouped together right below it - not one breakdown merged across every year.',

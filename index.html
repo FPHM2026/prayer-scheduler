@@ -811,7 +811,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-24.9";
+const APP_VERSION = "2026-09-24.10";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3865,7 +3865,7 @@ function buildReportSection(typeInfo, from, to){
           <td>${r.count}</td>${rExtraCols}<td>${r.leadCount}</td><td>${r.hours.toFixed(1)}</td>
         </tr>
         <tr class="detail-row" id="${mid}" hidden>
-          <td colspan="${ministerColCount}"><table class="month-table"><thead><tr>${mMonthTheadCols}</tr></thead><tbody>${mMonthHtml}</tbody></table></td>
+          <td colspan="${ministerColCount}"><div class="table-scroll"><table class="month-table"><thead><tr>${mMonthTheadCols}</tr></thead><tbody>${mMonthHtml}</tbody></table></div></td>
         </tr>`;
     }).join('') : `<tr><td colspan="${ministerColCount}" class="empty">No ministers recorded in this year.</td></tr>`;
 
@@ -3880,10 +3880,12 @@ function buildReportSection(typeInfo, from, to){
         <td colspan="${colCount}">
           <div class="toggle-trigger" onclick="toggleRow('${mbid}')"><span id="chev-${mbid}">▸</span> Show minister breakdown (${ministerRows.length})</div>
           <div id="${mbid}" class="minister-wrap" hidden>
+            <div class="table-scroll">
             <table class="minister-table">
               <thead><tr><th></th><th>Minister</th><th>Sessions</th>${isIndividual ? '<th>Unique Recipients</th><th>First-time</th><th>Follow-up</th>' : ''}<th>As Lead</th><th>Hours</th></tr></thead>
               <tbody>${ministerHtml}</tbody>
             </table>
+            </div>
           </div>
         </td>
       </tr>`;
@@ -3911,10 +3913,12 @@ function buildReportSection(typeInfo, from, to){
   return `
     <section class="report-section">
       <h2>${escapeHtml(label)}</h2>
+      <div class="table-scroll">
       <table class="year-table">
         <thead><tr>${theadCols}</tr></thead>
         <tbody>${yearRowsHtml}</tbody>
       </table>
+      </div>
     </section>`;
 }
 function generateReport(){
@@ -3925,10 +3929,23 @@ function generateReport(){
   if(to < from){ msg.hidden = false; msg.textContent = 'The to date must be on or after the from date.'; return; }
   const sectionsHtml = REPORT_TYPES.map(t => buildReportSection(t, from, to)).join('');
 
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ministry Statistics</title>
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Ministry Statistics</title>
 <style>
   body{font-family:Georgia,'Times New Roman',serif;background:#faf8f4;color:#2a2a2a;margin:0;padding:40px;}
   .wrap{max-width:800px;margin:0 auto;background:#fff;border:1px solid #ddd5c4;border-radius:10px;padding:36px 42px;}
+  /* Report tables can run to 8-9 columns (Freedom Sessions with the
+     recipient split + As Lead/Hours) - too wide for a phone screen no
+     matter how tight the padding gets. Rather than squeezing columns
+     down to unreadable widths, each table gets its own horizontally
+     scrollable strip so it can keep natural column widths and just
+     scroll within the card instead of overflowing past its edge. */
+  .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  @media (max-width:640px){
+    body{padding:16px;}
+    .wrap{padding:20px 16px;border-radius:8px;}
+    tr.detail-row:not(.month-row)>td{padding:12px 10px 16px 18px;}
+    tr.month-row td.month-label{padding-left:18px;}
+  }
   .toolbar{display:flex;justify-content:flex-end;margin-bottom:10px;}
   .toolbar button{background:#f28a00;color:#1a1a1a;border:none;padding:9px 18px;border-radius:6px;font-weight:700;font-size:14px;cursor:pointer;font-family:Georgia,'Times New Roman',serif;}
   .toolbar button:hover{background:#ce7500;}
@@ -3937,7 +3954,7 @@ function generateReport(){
   .report-section{margin-bottom:34px;}
   .report-section:last-child{margin-bottom:0;}
   .report-section h2{font-size:16.5px;color:#474747;margin:0 0 14px;border-bottom:1px solid #ddd5c4;padding-bottom:9px;font-weight:700;}
-  table.year-table{width:100%;border-collapse:collapse;margin:0 0 10px;font-size:13.5px;}
+  table.year-table{width:100%;min-width:620px;border-collapse:collapse;margin:0 0 10px;font-size:13.5px;}
   table.year-table th,table.year-table td{text-align:left;padding:9px 11px;border-bottom:1px solid #f1ede4;}
   table.year-table th{font-size:11px;text-transform:uppercase;color:#6b6b6b;letter-spacing:.03em;font-weight:700;}
   tr.total-row td{background:#f3ead9;font-weight:700;color:#474747;border-top:2px solid #ddd5c4;}
@@ -3958,12 +3975,12 @@ function generateReport(){
   .toggle-trigger span{color:#aa5a3c;}
   .minister-wrap[hidden]{display:none;}
   .minister-wrap{margin-top:6px;}
-  table.minister-table{width:100%;border-collapse:collapse;font-size:13px;}
+  table.minister-table{width:100%;min-width:640px;border-collapse:collapse;font-size:13px;}
   table.minister-table th,table.minister-table td{text-align:left;padding:8px 10px;border-bottom:1px solid #f1ede4;}
   table.minister-table th{font-size:11px;text-transform:uppercase;color:#6b6b6b;letter-spacing:.03em;font-weight:700;}
   table.minister-table td.chevron{width:20px;color:#aa5a3c;font-weight:700;}
   table.minister-table tbody tr.sub-row:hover td{background:#faf6ee;}
-  table.month-table{width:100%;max-width:360px;border-collapse:collapse;font-size:12.5px;margin:0;}
+  table.month-table{width:100%;min-width:520px;border-collapse:collapse;font-size:12.5px;margin:0;}
   table.month-table th,table.month-table td{text-align:left;padding:6px 10px;border-bottom:1px solid #f1ede4;}
   table.month-table th{font-size:10.5px;text-transform:uppercase;color:#6b6b6b;letter-spacing:.03em;font-weight:700;}
   @media print{
@@ -3971,6 +3988,7 @@ function generateReport(){
     .wrap{border:none;padding:0;max-width:100%;}
     .no-print{display:none!important;}
     .report-section{break-inside:avoid;}
+    .table-scroll{overflow-x:visible;}
   }
 </style></head><body>
   <div class="wrap">
