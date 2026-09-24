@@ -330,11 +330,13 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
   "Style/tone notes" below on checking the punch-list artifact first): a
   date range picker only — no report-type picker, since
   one Generate always produces all three types together. Date-range presets
-  (This Year, Last Year, Last 3 Years, All Time — same `.range-preset`
+  (This Year, Last Year, Last Year to Date, All Time — same `.range-preset`
   pattern Quick Add Slots uses) fill the From/To fields without typing;
-  "Last 3 Years" is the last 3 *full* calendar years, excluding the
-  current partial one, so it's a clean complement to "Last Year" instead of
-  overlapping it. Generate computes against the live `sessions`/`ministers`
+  "Last Year to Date" (swapped in for the original "Last 3 Years" on
+  2026-09-24 at the user's request) is Jan 1 of last year through *last
+  year's* version of today's date, not through Dec 31 — it exists to be
+  the apples-to-apples comparison range for "This Year" (same stretch of
+  the calendar, one year back), not a longer lookback window. Generate computes against the live `sessions`/`ministers`
   already loaded (Completed only — same retrospective convention
   `completedStats()` uses) and opens a standalone, printable page in a new
   tab (Blob + `window.open`, not a `data:` URI — more reliable across
