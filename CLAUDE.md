@@ -326,8 +326,9 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
   a single-date/date-range toggle (writes BlackoutDate + EndDate), edit/delete
   per entry
 - **Reports tab** (added 2026-09-19; real report content added 2026-09-21,
-  corrected the same day against the actual punch-list spec — see "Known
-  gotchas" #14): a date range picker only — no report-type picker, since
+  corrected the same day against the actual punch-list spec — see
+  "Style/tone notes" below on checking the punch-list artifact first): a
+  date range picker only — no report-type picker, since
   one Generate always produces all three types together. Date-range presets
   (This Year, Last Year, Last 3 Years, All Time — same `.range-preset`
   pattern Quick Add Slots uses) fill the From/To fields without typing;
@@ -343,28 +344,56 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
   - **Three distinct sections on one page** — Freedom Sessions, Sunday
     Drop-In, Training — stacked, never merged, since their totals are kept
     intentionally separate.
-  - **Each section is a year-by-year table**, not cards/tiles: one row per
-    calendar year touched by the chosen range (a partial first/last year
-    only counts what's actually in range), Sessions + a **Running Total**
-    column (shaded background, bold — visually distinct so it's never
-    mistaken for a single year's own count; cumulative from 0 at the start
-    of *this report's* range, not a lifetime total). Freedom Sessions adds
-    Unique Recipients / First-time / Follow-up columns (same per-
-    *recipient*, not per-session, classification `completedStats()` uses);
-    Drop-In and Training skip those three — every occurrence shares one
-    literal recipName ("Sunday Drop-In"/"Training"), so there's no
-    individual-recipient concept to split.
-  - **Team-wide table shown first**; a collapsed-by-default "Show minister
-    breakdown" toggle per section (native `<details>`/`<summary>`) expands
-    into sessions + times-as-Lead per minister, tagging anyone whose
+  - **Each section is a year-by-year table**, not cards/tiles, newest year
+    first: one row per calendar year touched by the chosen range (a partial
+    first/last year only counts what's actually in range), Sessions + a
+    **Running Total** column (shaded background, bold — visually distinct
+    so it's never mistaken for a single year's own count; cumulative from 0
+    at the start of *this report's* range, not a lifetime total,
+    accumulated chronologically even though rows render newest-first).
+    Freedom Sessions adds Unique Recipients / First-time / Follow-up
+    columns (same per-*recipient*, not per-session, classification
+    `completedStats()` uses); Drop-In and Training skip those three — every
+    occurrence shares one literal recipName ("Sunday Drop-In"/"Training"),
+    so there's no individual-recipient concept to split.
+  - **Click a year row to expand it** (added 2026-09-24) into that year's
+    own monthly breakdown (January through the current month for the
+    current year — including that month while still partial, not padded
+    out with months that haven't happened) and, grouped in the same
+    expanded area right below it, that year's own "Show minister breakdown"
+    toggle — deliberately **not** one breakdown merged across the whole
+    selected range; a multi-year range shows each year's numbers and that
+    year's own minister breakdown together, then the next year below it.
+    The minister table adds an **Hours** column (`durationHours()` summed
+    per minister — a session's full duration credited to everyone on it,
+    not divided among them) alongside Sessions/As Lead, tags anyone whose
     current PrayerMinisters Status isn't Active with a small "Inactive"
-    label — the breakdown includes everyone with a session in range
-    regardless of current roster status. The page's own Print button
-    force-sets every `<details>` on the page open before calling
-    `window.print()` — collapsed content doesn't print, so this is
-    load-bearing, not cosmetic.
+    label (the breakdown includes everyone with a session in that year
+    regardless of current roster status), and each *minister* row is
+    itself click-to-expand into their own month-by-month sessions+hours for
+    that year — the same drill-down pattern one level deeper. All of this
+    (year rows, the minister-breakdown toggle, per-minister month rows) uses
+    one uniform mechanism: a `hidden` attribute + an inline `toggleRow(id)`
+    in the generated page's own `<script>` (not native `<details>` — table
+    rows can't contain `<details>` directly, and one hidden-attribute
+    convention throughout keeps the Print logic a single querySelectorAll
+    instead of juggling two different collapse mechanisms). The page's own
+    Print button removes `hidden` from every collapsed element before
+    calling `window.print()` — collapsed content doesn't print, so this is
+    load-bearing, not cosmetic; re-verified against the deeper nesting when
+    the drill-down levels were added.
   - Each section shows its own empty-state row when it has no completed
     sessions in range, rather than a misleading all-zeros table.
+  - **Gotcha hit while building this**: the generated report page embeds
+    its own `<script>...<\/script>` (for `toggleRow`) inside the *main
+    app's* template-literal string. Writing a literal `</script>` inside
+    that string — even though it's just string content to the JS parser —
+    makes the **browser's HTML tokenizer** end the outer `<script>` tag
+    right there, since HTML parsing doesn't know about JS string
+    boundaries; everything after it in the file silently stops being
+    treated as script. Must stay written as `<\/script>` (or equivalent)
+    wherever a literal `</script>` needs to appear inside a `<script>`
+    block's own source text. See "Known gotchas" #14.
   - **Not built, still a real option**: Location is a clean, trustworthy
     report dimension now (an admin-managed list via Settings, not free
     text) — "sessions by location" as an optional breakdown/filter is
@@ -562,6 +591,25 @@ like one product, not two:
     **Changes tab** (`panel-changes` section, its nav button, `CHANGE_LOG`/
     `renderChangeLog()`) — production never had any of these. Check all of
     it by hand after every promotion; nothing catches this automatically.
+14. **A literal `</script>` inside a JS string breaks the *enclosing*
+    `<script>` tag, even though it's just string content to the JS parser.**
+    The Reports feature builds a whole standalone HTML page (with its own
+    `<script>...</script>` for `toggleRow`) inside a template literal in
+    this app's own script. The **browser's HTML tokenizer** scans for the
+    literal character sequence `</script` to end a script element — it has
+    no concept of JS string/template-literal boundaries, so the first
+    `</script>` anywhere in the raw file, even one meant as plain string
+    content three template-literals deep, silently ends the outer
+    `<script>` tag right there. Everything after it in the file stops being
+    treated as script (functions defined below it just don't exist -
+    `ReferenceError: X is not defined` on things that are clearly right
+    there in the source), with no build step or linter to catch it, since
+    the file is syntactically valid JS on its own and only breaks once
+    embedded in HTML. Fix: write it as `<\/script>` (or any other escape
+    that changes the source text without changing the resulting string)
+    anywhere a literal `</script>` needs to appear inside a `<script>`
+    block's own content. Applies symmetrically to nested `<style>` tags
+    too, though this codebase hasn't hit that case yet.
 
 ## History (why it's built this way, not some other way)
 1. Started as a plan to host raw HTML/JS directly in a SharePoint document
