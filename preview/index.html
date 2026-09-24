@@ -616,7 +616,7 @@
     <div class="range-presets">
       <button type="button" class="range-preset" onclick="setReportRange('thisyear')">This Year</button>
       <button type="button" class="range-preset" onclick="setReportRange('lastyear')">Last Year</button>
-      <button type="button" class="range-preset" onclick="setReportRange('lastyeartodate')">Last Year to Date</button>
+      <button type="button" class="range-preset" onclick="setReportRange('last2years')">Last Year + This Year</button>
       <button type="button" class="range-preset" onclick="setReportRange('alltime')">All Time</button>
     </div>
     <div class="field-row">
@@ -837,7 +837,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-24.8";
+const APP_VERSION = "2026-09-24.9";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3682,20 +3682,19 @@ const REPORT_TYPES = [
   { key: 'dropin', label: 'Sunday Drop-In', noun: 'Drop-In' },
   { key: 'training', label: 'Training', noun: 'Training' }
 ];
-// This Year/Last Year/Last Year to Date/All Time, per the punch-list
-// spec (Last 3 Years swapped for Last Year to Date on 2026-09-24 at the
-// user's request) - same .range-preset pattern Quick Add Slots already
-// uses for its own (forward-looking) ranges. "Last Year to Date" is
-// Jan 1 of last year through *last year's* version of today's date
-// (not through Dec 31) - it's the apples-to-apples comparison range for
-// "This Year," covering the same stretch of the calendar one year back
-// rather than the full prior year.
+// This Year/Last Year/Last Year + This Year/All Time, per the punch-list
+// spec (Last 3 Years swapped for a rolling 2-year range on 2026-09-24 at
+// the user's request - first tried as "Last Year to Date" meaning just
+// last year's own YTD slice, but that wasn't what was wanted; the actual
+// ask was last year PLUS this year together, i.e. Jan 1 of last year
+// through today) - same .range-preset pattern Quick Add Slots already
+// uses for its own (forward-looking) ranges.
 window.setReportRange = function(preset){
   const now = new Date();
   let from, to;
   if(preset==='thisyear'){ from = new Date(now.getFullYear(),0,1); to = now; }
   else if(preset==='lastyear'){ from = new Date(now.getFullYear()-1,0,1); to = new Date(now.getFullYear()-1,11,31); }
-  else if(preset==='lastyeartodate'){ from = new Date(now.getFullYear()-1,0,1); to = new Date(now.getFullYear()-1,now.getMonth(),now.getDate()); }
+  else if(preset==='last2years'){ from = new Date(now.getFullYear()-1,0,1); to = now; }
   else if(preset==='alltime'){
     const allCompleted = sessions.filter(s=>s.status==='Completed');
     const earliest = allCompleted.length ? allCompleted.reduce((min,s)=> s.date<min ? s.date : min, allCompleted[0].date) : isoDate(now);
@@ -4058,7 +4057,7 @@ const CHANGE_LOG = [
     'New: the year and month rows on Reports now show an Hours column too (total session hours for that year/month, not per-minister).',
     'New: for Freedom Sessions, the minister breakdown (and each minister\'s own monthly drill-down) now shows Unique Recipients/First-time/Follow-up too, the same stats the year/month rows show - still alongside As Lead and Hours, not replacing them.',
     'Changed: removed the shaded Running Total column from Reports. When the picked date range spans more than one year, a Total row now appears at the bottom of each table instead, with its own Sessions/recipient-split/Hours figures for the whole range.',
-    'Changed: the "Last 3 Years" quick-range button on Reports is now "Last Year to Date" - Jan 1 of last year through last year\'s version of today\'s date, so it lines up with "This Year" for an apples-to-apples comparison instead of covering the full prior 3 calendar years.'
+    'Changed: the "Last 3 Years" quick-range button on Reports is now "Last Year + This Year" - Jan 1 of last year through today, so it covers all of last year plus this year to date in one range instead of the prior 3 full calendar years.'
   ]},
   { date: 'Sep 21, 2026', version: '2026-09-21.3', items: [
     'Changed: Reports now matches the actual spec - one Generate shows Freedom Sessions, Sunday Drop-In, and Training as three separate sections (not picked one at a time), each a year-by-year table with a shaded Running Total column instead of the previous summary tiles and chart. The minister breakdown now tags anyone no longer active. Date presets changed to This Year, Last Year, Last 3 Years, and All Time.'
