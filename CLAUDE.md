@@ -426,6 +426,19 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
       after the minister breakdown moved back out to its own table.
   - Each section shows its own empty-state row when it has no completed
     sessions in range, rather than a misleading all-zeros table.
+  - **Mobile: every table scrolls horizontally within its own card**
+    (added 2026-09-24, `.table-scroll` div wrapping each `<table>`, plus a
+    `min-width` on the table itself so columns keep their natural width
+    instead of getting squeezed illegibly thin) — a Freedom Sessions
+    year-table can run 7 columns and the minister-table 8, too wide for a
+    phone screen no matter how tight the padding gets, and it was
+    overflowing past the card's right edge before this. Also added a
+    `<meta name="viewport" content="width=device-width, initial-scale=1">`
+    to the generated report's own `<head>` (it had none — without it a
+    phone renders the page at a zoomed-out desktop-width viewport instead
+    of actual screen width), and a `@media (max-width:640px)` block that
+    trims the card's own padding and the drill-down indentation so more
+    of that limited width goes to content.
   - **Gotcha hit while building this**: the generated report page embeds
     its own `<script>...<\/script>` (for `toggleRow`) inside the *main
     app's* template-literal string. Writing a literal `</script>` inside
