@@ -3909,11 +3909,26 @@ function findQuestionById(id){
   return null;
 }
 
+// One-line, human-readable summary of a visibleIf condition, shown on a
+// question/section's collapsed row so branching is visible at a glance
+// without opening it - e.g. "Shows if \"Do you have siblings?\" = Yes".
+function describeVisibleIf(cond){
+  if(!cond || !cond.id) return null;
+  const target = findQuestionById(cond.id);
+  const label = target ? target.label : cond.id;
+  if(cond.equals!==undefined) return `Shows if "${label}" = ${cond.equals}`;
+  if(cond.notEquals!==undefined) return `Shows if "${label}" ≠ ${cond.notEquals}`;
+  if(cond.in) return `Shows if "${label}" is one of: ${cond.in.join(', ')}`;
+  if(cond.includes!==undefined) return `Shows if "${label}" includes "${cond.includes}"`;
+  return null;
+}
+
 function renderFormEditor(){
   const box = $('#formEditorSections');
   if(!box) return;
   if(!schemaDraft){ box.innerHTML = '<p class="helptext">Loading…</p>'; return; }
-  box.innerHTML = schemaDraft.SECTIONS.map((sec,sIdx)=>renderSectionEditor(sec,sIdx)).join('');
+  const opened = openState(box);
+  box.innerHTML = schemaDraft.SECTIONS.map((sec,sIdx)=>renderSectionEditor(sec,sIdx,opened)).join('');
 }
 
 function visibleIfPickerHtml(kind, sIdx, qIdx, cond, candidateQuestions){
@@ -3963,16 +3978,16 @@ function visibleIfPickerHtml(kind, sIdx, qIdx, cond, candidateQuestions){
   </div>`;
 }
 
-function renderSectionEditor(sec, sIdx){
+function renderSectionEditor(sec, sIdx, opened){
   const candidateQuestions = questionsBefore(sIdx, null);
-  return `<div class="card" style="margin-bottom:14px;" data-section-card="${sIdx}">
-    <div class="toolbar no-print" style="justify-content:space-between;">
-      <strong>${escapeHtml(sec.title||'(untitled section)')}</strong>
-      <div class="toolbar" style="gap:4px;">
-        <button class="icon-btn" title="Move up" onclick="moveSection(${sIdx},-1)" ${sIdx===0?'disabled':''}>&uarr;</button>
-        <button class="icon-btn" title="Move down" onclick="moveSection(${sIdx},1)" ${sIdx===schemaDraft.SECTIONS.length-1?'disabled':''}>&darr;</button>
-        <button class="icon-btn danger" title="Delete section" onclick="deleteSection(${sIdx})">${ICONS.trash}</button>
-      </div>
+  const wasOpen = opened.has(sec.id) ? opened.get(sec.id) : false;
+  const visSummary = describeVisibleIf(sec.visibleIf);
+  const summaryHtml = escapeHtml([visSummary || 'Always shown', sec.intro ? 'has intro text' : null].filter(Boolean).join(' · '));
+  const body = `
+    <div class="toolbar no-print" style="justify-content:flex-end;margin-bottom:10px;">
+      <button class="icon-btn" title="Move up" onclick="moveSection(${sIdx},-1)" ${sIdx===0?'disabled':''}>&uarr;</button>
+      <button class="icon-btn" title="Move down" onclick="moveSection(${sIdx},1)" ${sIdx===schemaDraft.SECTIONS.length-1?'disabled':''}>&darr;</button>
+      <button class="icon-btn danger" title="Delete section" onclick="deleteSection(${sIdx})">${ICONS.trash}</button>
     </div>
     <div class="field"><label>Section title</label>
       <input type="text" value="${escapeHtml(sec.title||'')}" oninput="updateSectionField(${sIdx},'title',this.value)">
@@ -3981,26 +3996,27 @@ function renderSectionEditor(sec, sIdx){
       <textarea rows="2" oninput="updateSectionField(${sIdx},'intro',this.value)">${escapeHtml(sec.intro||'')}</textarea>
     </div>
     ${visibleIfPickerHtml('section', sIdx, null, sec.visibleIf, candidateQuestions)}
-    <div style="margin-top:12px;">
-      ${sec.questions.map((q,qIdx)=>renderQuestionEditor(q,sIdx,qIdx,sec)).join('')}
+    <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px;">
+      ${sec.questions.map((q,qIdx)=>renderQuestionEditor(q,sIdx,qIdx,sec,opened)).join('')}
     </div>
     <div class="toolbar no-print">
       <button class="btn secondary" onclick="addQuestion(${sIdx})">+ Add question</button>
-    </div>
-  </div>`;
+    </div>`;
+  return groupRow(sec.id, String(sIdx+1), sec.title||'(untitled section)', `${sec.questions.length} question${sec.questions.length===1?'':'s'}`, summaryHtml, body, wasOpen);
 }
 
-function renderQuestionEditor(q, sIdx, qIdx, sec){
+function renderQuestionEditor(q, sIdx, qIdx, sec, opened){
   const candidateQuestions = questionsBefore(sIdx, qIdx);
   const hasOptions = TYPES_WITH_OPTIONS.includes(q.type);
-  return `<div class="card" style="margin:0 0 10px;background:var(--bg);" data-question-card="${sIdx}.${qIdx}">
-    <div class="toolbar no-print" style="justify-content:space-between;">
-      <span class="tag">${escapeHtml(q.type)}</span>
-      <div class="toolbar" style="gap:4px;">
-        <button class="icon-btn" title="Move up" onclick="moveQuestion(${sIdx},${qIdx},-1)" ${qIdx===0?'disabled':''}>&uarr;</button>
-        <button class="icon-btn" title="Move down" onclick="moveQuestion(${sIdx},${qIdx},1)" ${qIdx===sec.questions.length-1?'disabled':''}>&darr;</button>
-        <button class="icon-btn danger" title="Delete question" onclick="deleteQuestion(${sIdx},${qIdx})">${ICONS.trash}</button>
-      </div>
+  const wasOpen = opened.has(q.id) ? opened.get(q.id) : false;
+  const visSummary = describeVisibleIf(q.visibleIf);
+  const summaryHtml = escapeHtml([q.required ? 'Required' : 'Optional', visSummary || 'Always shown'].join(' · '));
+  const avatar = { text:'Ab', email:'@', number:'#', textarea:'¶', radio:'◉', select:'▾', checkboxes:'☑' }[q.type] || '?';
+  const body = `
+    <div class="toolbar no-print" style="justify-content:flex-end;margin-bottom:10px;">
+      <button class="icon-btn" title="Move up" onclick="moveQuestion(${sIdx},${qIdx},-1)" ${qIdx===0?'disabled':''}>&uarr;</button>
+      <button class="icon-btn" title="Move down" onclick="moveQuestion(${sIdx},${qIdx},1)" ${qIdx===sec.questions.length-1?'disabled':''}>&darr;</button>
+      <button class="icon-btn danger" title="Delete question" onclick="deleteQuestion(${sIdx},${qIdx})">${ICONS.trash}</button>
     </div>
     <div class="field"><label>Question text</label>
       <input type="text" value="${escapeHtml(q.label||'')}" oninput="updateQuestionField(${sIdx},${qIdx},'label',this.value)">
@@ -4029,8 +4045,8 @@ function renderQuestionEditor(q, sIdx, qIdx, sec){
       <div class="field"><label>Minimum</label><input type="number" value="${q.min??''}" oninput="updateQuestionField(${sIdx},${qIdx},'min',this.value===''?undefined:Number(this.value))"></div>
       <div class="field"><label>Maximum</label><input type="number" value="${q.max??''}" oninput="updateQuestionField(${sIdx},${qIdx},'max',this.value===''?undefined:Number(this.value))"></div>
     </div>` : ''}
-    ${visibleIfPickerHtml('question', sIdx, qIdx, q.visibleIf, candidateQuestions)}
-  </div>`;
+    ${visibleIfPickerHtml('question', sIdx, qIdx, q.visibleIf, candidateQuestions)}`;
+  return groupRow(q.id, avatar, q.label||'(untitled question)', q.type, summaryHtml, body, wasOpen);
 }
 
 // ---- mutation handlers (called from the inline event handlers above) ----
