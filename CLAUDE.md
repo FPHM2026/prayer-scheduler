@@ -841,3 +841,23 @@ was (see gotcha-style lesson: when a request references "requirements,"
 current conversation, ask for the artifact link before designing anything
 non-trivial, rather than proposing options and building from whichever one
 sounds closest).
+
+## Working on this repo across multiple chat sessions
+This repo now has several features developed in parallel across different
+Claude Code chats at once (e.g. the Intake Forms merge and a WhatsApp
+booking-notification feature landed around the same time, 2026-09-24/25).
+Two sessions editing the same checked-out working directory at once step on
+each other's uncommitted changes — this was discovered the hard way when one
+session's readiness check turned up another session's in-progress,
+uncommitted `preview/index.html` edits sitting in the shared directory.
+
+**Standing policy: start a new feature in its own git worktree**, not the
+main checkout. Use the `EnterWorktree` tool (name it after the feature,
+e.g. `intake-forms`, `whatsapp-notify`) at the start of a session doing
+non-trivial new work in this repo — this project's own CLAUDE.md content
+counts as the "project instructions" that tool checks for, so a session
+reading this file should treat starting a worktree as the default for new
+feature work here, not something that needs to be asked for every time.
+Small doc-only or single-line fixes to the main checkout are fine without
+one. When a feature is done, merge its branch into `main` (or `preview`,
+per the promotion workflow above) normally and clean up the worktree.
