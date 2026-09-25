@@ -91,6 +91,11 @@
   .search-clear:hover{background:#f1ede4;color:var(--text);}
   .search-clear[hidden]{display:none;}
   input,select,textarea{font-family:inherit;font-size:var(--fs-base);line-height:1.3;padding:10px 12px;border:1px solid var(--border);border-radius:6px;min-height:44px;background:#fff;color:var(--text);}
+  /* Checkboxes/radios must not inherit the 44px touch-target min-height
+     above - that's meant for text-style fields, not a native checkbox,
+     which has no padding/border to absorb it and just renders huge and
+     stretched instead (found in the Form Editor's "Allow Other" checkbox). */
+  input[type=checkbox],input[type=radio]{min-height:0;padding:0;width:16px;height:16px;}
   input:hover,select:hover,textarea:hover{border-color:var(--gold);}
   input:focus,select:focus,textarea:focus{border-color:var(--gold);}
   textarea{min-height:60px;}
@@ -132,6 +137,7 @@
   .field{margin-bottom:14px;}
   .field label{display:block;font-size:var(--fs-sm);font-weight:700;margin-bottom:5px;}
   .field input,.field select,.field textarea{width:100%;}
+  .field input[type=checkbox],.field input[type=radio]{width:16px;flex:0 0 auto;}
   .field-row{display:grid;grid-template-columns:1fr;gap:10px;}
   @media (min-width:640px){ .field-row{grid-template-columns:1fr 1fr;} }
 
@@ -3979,17 +3985,43 @@ function visibleIfPickerHtml(kind, sIdx, qIdx, cond, candidateQuestions){
   </div>`;
 }
 
+// Same group-row-wrap / group-row-toggle pattern already used by the
+// Prayer Ministers tab (renderOverview) for header-level action icons
+// alongside a collapsible toggle - a <button> can't legally contain
+// another <button>, so the toggle and the action icons are siblings, not
+// nested. Move/delete need to be reachable without opening the row (per
+// user feedback on the first version, which buried them in the body).
+function editorGroupRow(key, avatarText, name, countLabel, summaryHtml, bodyHtml, wasOpen, actionsHtml){
+  return `
+  <div class="group${wasOpen ? ' open' : ''}" data-key="${escapeHtml(key)}">
+    <div class="group-row-wrap">
+      <button class="group-row-toggle" onclick="this.closest('.group').classList.toggle('open')" aria-expanded="${wasOpen}">
+        <span class="group-avatar" aria-hidden="true">${escapeHtml(avatarText)}</span>
+        <span class="group-main">
+          <span class="group-name-row">
+            <span class="group-name">${escapeHtml(name)}</span>
+            <span class="group-count">${escapeHtml(countLabel)}</span>
+          </span>
+          <span class="group-summary">${summaryHtml}</span>
+        </span>
+        <span class="group-chevron">${ICONS.chevron}</span>
+      </button>
+      <div class="sess-actions">${actionsHtml}</div>
+    </div>
+    <div class="group-body"><div class="group-body-inner">${bodyHtml}</div></div>
+  </div>`;
+}
+
 function renderSectionEditor(sec, sIdx, opened){
   const candidateQuestions = questionsBefore(sIdx, null);
   const wasOpen = opened.has(sec.id) ? opened.get(sec.id) : false;
   const visSummary = describeVisibleIf(sec.visibleIf);
   const summaryHtml = escapeHtml([visSummary || 'Always shown', sec.intro ? 'has intro text' : null].filter(Boolean).join(' · '));
+  const actions = `
+    <button class="icon-btn" title="Move up" onclick="moveSection(${sIdx},-1)" ${sIdx===0?'disabled':''}>&uarr;</button>
+    <button class="icon-btn" title="Move down" onclick="moveSection(${sIdx},1)" ${sIdx===schemaDraft.SECTIONS.length-1?'disabled':''}>&darr;</button>
+    <button class="icon-btn danger" title="Delete section" onclick="deleteSection(${sIdx})">${ICONS.trash}</button>`;
   const body = `
-    <div class="toolbar no-print" style="justify-content:flex-end;margin-bottom:10px;">
-      <button class="icon-btn" title="Move up" onclick="moveSection(${sIdx},-1)" ${sIdx===0?'disabled':''}>&uarr;</button>
-      <button class="icon-btn" title="Move down" onclick="moveSection(${sIdx},1)" ${sIdx===schemaDraft.SECTIONS.length-1?'disabled':''}>&darr;</button>
-      <button class="icon-btn danger" title="Delete section" onclick="deleteSection(${sIdx})">${ICONS.trash}</button>
-    </div>
     <div class="field"><label>Section title</label>
       <input type="text" value="${escapeHtml(sec.title||'')}" oninput="updateSectionField(${sIdx},'title',this.value)">
     </div>
@@ -4003,7 +4035,7 @@ function renderSectionEditor(sec, sIdx, opened){
     <div class="toolbar no-print">
       <button class="btn secondary" onclick="addQuestion(${sIdx})">+ Add question</button>
     </div>`;
-  return groupRow(sec.id, String(sIdx+1), sec.title||'(untitled section)', `${sec.questions.length} question${sec.questions.length===1?'':'s'}`, summaryHtml, body, wasOpen);
+  return editorGroupRow(sec.id, String(sIdx+1), sec.title||'(untitled section)', `${sec.questions.length} question${sec.questions.length===1?'':'s'}`, summaryHtml, body, wasOpen, actions);
 }
 
 function renderQuestionEditor(q, sIdx, qIdx, sec, opened){
@@ -4013,12 +4045,11 @@ function renderQuestionEditor(q, sIdx, qIdx, sec, opened){
   const visSummary = describeVisibleIf(q.visibleIf);
   const summaryHtml = escapeHtml([q.required ? 'Required' : 'Optional', visSummary || 'Always shown'].join(' · '));
   const avatar = { text:'Ab', email:'@', number:'#', textarea:'¶', radio:'◉', select:'▾', checkboxes:'☑' }[q.type] || '?';
+  const actions = `
+    <button class="icon-btn" title="Move up" onclick="moveQuestion(${sIdx},${qIdx},-1)" ${qIdx===0?'disabled':''}>&uarr;</button>
+    <button class="icon-btn" title="Move down" onclick="moveQuestion(${sIdx},${qIdx},1)" ${qIdx===sec.questions.length-1?'disabled':''}>&darr;</button>
+    <button class="icon-btn danger" title="Delete question" onclick="deleteQuestion(${sIdx},${qIdx})">${ICONS.trash}</button>`;
   const body = `
-    <div class="toolbar no-print" style="justify-content:flex-end;margin-bottom:10px;">
-      <button class="icon-btn" title="Move up" onclick="moveQuestion(${sIdx},${qIdx},-1)" ${qIdx===0?'disabled':''}>&uarr;</button>
-      <button class="icon-btn" title="Move down" onclick="moveQuestion(${sIdx},${qIdx},1)" ${qIdx===sec.questions.length-1?'disabled':''}>&darr;</button>
-      <button class="icon-btn danger" title="Delete question" onclick="deleteQuestion(${sIdx},${qIdx})">${ICONS.trash}</button>
-    </div>
     <div class="field"><label>Question text</label>
       <input type="text" value="${escapeHtml(q.label||'')}" oninput="updateQuestionField(${sIdx},${qIdx},'label',this.value)">
     </div>
@@ -4047,7 +4078,7 @@ function renderQuestionEditor(q, sIdx, qIdx, sec, opened){
       <div class="field"><label>Maximum</label><input type="number" value="${q.max??''}" oninput="updateQuestionField(${sIdx},${qIdx},'max',this.value===''?undefined:Number(this.value))"></div>
     </div>` : ''}
     ${visibleIfPickerHtml('question', sIdx, qIdx, q.visibleIf, candidateQuestions)}`;
-  return groupRow(q.id, avatar, q.label||'(untitled question)', q.type, summaryHtml, body, wasOpen);
+  return editorGroupRow(q.id, avatar, q.label||'(untitled question)', q.type, summaryHtml, body, wasOpen, actions);
 }
 
 // ---- mutation handlers (called from the inline event handlers above) ----
