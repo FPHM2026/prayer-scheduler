@@ -607,24 +607,32 @@ existing session history.
   Microsoft 365 account); autosave + a "Save & continue later" link
   (`?token=<uuid>`) with graceful local-only fallback if the network drops;
   canvas signature pad (mouse + touch); print/PDF view of the final answers.
-  Talks to an Azure Function (`azure-function/`: `host.json`,
-  `local.settings.json.example`, `package.json`, `src/graphClient.js`,
-  `src/functions/intakeStart.js`/`intakeLoad.js`/`intakeSave.js`/
-  `intakeSubmit.js` — not part of this GitHub Pages deployment, deploy
-  separately; **no SETUP.md exists in this repo's copy** — the standalone
-  `FPHM Intake Form` project's own SETUP.md, referenced below, is the only
-  deploy documentation that currently exists), which holds
-  its own tightly-scoped app-only Graph credential (`Sites.Selected`,
-  granted to just this one SharePoint site) so it can create/update/submit
-  the recipient's session without any staff/minister credential ever
-  touching a browser the public can reach.
+  Talks to a Cloudflare Worker (`cloudflare-worker/`: `wrangler.toml`,
+  `src/index.js`, `DEPLOY.md` — not part of this GitHub Pages deployment,
+  deployed separately via `wrangler deploy`, live at
+  `https://fphm-intake-func.ajjamoore.workers.dev`), which holds its own
+  tightly-scoped app-only Graph credential (`Sites.Selected`, granted to
+  just this one SharePoint site) so it can create/update/submit the
+  recipient's session without any staff/minister credential ever touching
+  a browser the public can reach. **Originally built as an Azure
+  Function** (see git history around 2026-09-24/25, and the standalone
+  `FPHM Intake Form` project's `azure-function/` + `SETUP.md` for the
+  abandoned version) — switched to Cloudflare Workers 2026-09-25 after
+  discovering the account with the right Entra/SharePoint roles had no
+  Azure subscription, and the user didn't want to open one just for this;
+  Cloudflare was already in use for the WhatsApp notification feature, so
+  this reuses that same free-tier account rather than adding a new one.
+  The `Sites.Selected` grant to the "FPHM Intake Form" Entra app
+  registration (Client ID `5580dcc8-7837-48fe-a0cf-92eda3959cb0`) carried
+  over unchanged — only where the credential runs changed, not the
+  credential itself or the SharePoint-side permission model.
 - **Staff view** — a new "Intake Forms" tab, currently in
   `preview/index.html` only (not yet promoted to production `index.html` —
   see "Not yet done" below): Submitted/In-progress list, search, full
   detail view, print/PDF. Reads `IntakeResponses` directly via the same
   delegated Graph session as every other tab (`Sites.ReadWrite.All`,
-  already consented) — no Azure Function involved for reads, staff already
-  have real permissions.
+  already consented) — no Worker involved for reads, staff already have
+  real permissions.
 - **Recipient matching** — same convention as the existing "recipient
   session history" panel in the session modal: matched by name only (no
   persistent recipient record to join on). `findIntakeForRecipient()` in
@@ -651,12 +659,8 @@ existing session history.
   it's been tested at the live preview URL. The standalone `FPHM Intake
   Form` project/repo this was merged from should also be retired (repo
   deletion is destructive — left for the user to decide/do, not done
-  automatically). The Azure Function isn't deployed yet as of this merge —
-  `intake/js/apiClient.js`'s `FUNCTION_BASE_URL` is still a placeholder, so
-  the public form currently runs in its local-only offline fallback mode
-  for real users until that's
-  done (see the standalone project's SETUP.md for the deploy steps, still
-  valid as-is).
+  automatically) — its `azure-function/` folder is the abandoned Azure
+  version, kept there for reference only, not used by anything live.
 
 ## Not yet built
 - **Calendar (month grid) view** — was planned but never built in this HTML

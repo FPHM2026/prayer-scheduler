@@ -1,0 +1,17 @@
+name = "fphm-intake-func"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+
+# Non-secret config. CLIENT_SECRET is deliberately NOT here - set it with:
+#   wrangler secret put CLIENT_SECRET
+# so it never ends up in source control or `wrangler.toml`.
+[vars]
+TENANT_ID = "b9e447ab-c42c-4b04-92c8-d629b0ce320d"
+CLIENT_ID = "5580dcc8-7837-48fe-a0cf-92eda3959cb0"
+SITE_URL = "https://creeksidechurch.sharepoint.com/sites/FreedomPrayer"
+LIST_NAME = "IntakeResponses"
+
+# Allowed origins for the public intake form(s) that call this Worker.
+# Both origins point at the same GitHub Pages account, kept separate in
+# case the standalone FPHM Intake Form site is still live when you deploy.
+ALLOWED_ORIGINS = "https://fphm2026.github.io"
