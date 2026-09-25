@@ -609,17 +609,19 @@ existing session history.
   canvas signature pad (mouse + touch); print/PDF view of the final answers.
   Talks to a Cloudflare Worker (`cloudflare-worker/`: `wrangler.toml`,
   `src/index.js`, `DEPLOY.md` — not part of this GitHub Pages deployment,
-  deployed separately via `wrangler deploy`, live at
+  deployed separately via `wrangler deploy`, live and verified working at
   `https://fphm-intake-func.ajjamoore.workers.dev`), which holds its own
   tightly-scoped app-only Graph credential (`Sites.Selected`, granted to
   just this one SharePoint site) so it can create/update/submit the
   recipient's session without any staff/minister credential ever touching
   a browser the public can reach. **Originally built as an Azure
-  Function** (see git history around 2026-09-24/25, and the standalone
-  `FPHM Intake Form` project's `azure-function/` + `SETUP.md` for the
-  abandoned version) — switched to Cloudflare Workers 2026-09-25 after
-  discovering the account with the right Entra/SharePoint roles had no
-  Azure subscription, and the user didn't want to open one just for this;
+  Function** (`azure-function/SETUP.md` in this repo still has that
+  abandoned setup guide, preserved 2026-09-25 when the standalone `FPHM
+  Intake Form` project's GitHub repo was deleted — see "Not yet done"
+  below — kept only as historical reference, not the live path) —
+  switched to Cloudflare Workers the same day after discovering the
+  account with the right Entra/SharePoint roles had no Azure
+  subscription, and the user didn't want to open one just for this;
   Cloudflare was already in use for the WhatsApp notification feature, so
   this reuses that same free-tier account rather than adding a new one.
   The `Sites.Selected` grant to the "FPHM Intake Form" Entra app
@@ -656,11 +658,18 @@ existing session history.
   explicitly a preview build; `index.html` has no Intake Forms tab and
   doesn't load `js/formConfig.js`/`js/formEngine.js` yet (see "Architecture"
   above). Follow the normal "Deployment workflow" above to promote once
-  it's been tested at the live preview URL. The standalone `FPHM Intake
-  Form` project/repo this was merged from should also be retired (repo
-  deletion is destructive — left for the user to decide/do, not done
-  automatically) — its `azure-function/` folder is the abandoned Azure
-  version, kept there for reference only, not used by anything live.
+  it's been tested at the live preview URL. **The standalone `FPHM Intake
+  Form` project's GitHub repo (`FPHM2026/prayer-intake`) was deleted
+  2026-09-25** (at the user's request, this merge already confirmed
+  complete) — its Azure deploy guide was copied into this repo first as
+  `azure-function/SETUP.md` before deletion, so nothing was lost, even
+  though that path was abandoned for Cloudflare the same day; the local
+  folder (`H:\My Drive\Claude\FPHM Intake Form`) still exists on disk as
+  an unlinked historical reference if ever needed, just not on GitHub
+  anymore. Unlike that abandoned path, **the Cloudflare Worker actually
+  is deployed and live-verified** — `intake/js/apiClient.js`'s
+  `FUNCTION_BASE_URL` points at it for real, so the public form is no
+  longer running in its offline fallback mode for real users.
 
 ## Not yet built
 - **Calendar (month grid) view** — was planned but never built in this HTML
