@@ -1,13 +1,35 @@
 /* =========================================================================
    FORM ENGINE — shared visibility/validation logic and renderResponsesHtml()
    used by intake/index.html (public form), preview/index.html's staff
-   "Intake Forms" tab, and portal/index.html's minister view. Reads question
-   structure from window.FPHM_INTAKE_CONFIG (formConfig.js), never hardcodes
-   questions itself, so editing formConfig.js is enough to change the form.
+   "Intake Forms" tab, and portal/index.html's minister view.
+
+   Question structure comes from window.FPHM_INTAKE_CONFIG, which starts as
+   the hardcoded default from formConfig.js but is meant to be OVERWRITTEN
+   at runtime by the live, staff-editable schema stored in the
+   IntakeFormSchema SharePoint list (see the "Intake Forms" section of
+   CLAUDE.md and the Form Editor tab in preview/index.html). Every function
+   below reads `window.FPHM_INTAKE_CONFIG.SECTIONS` fresh on each call
+   rather than capturing a snapshot at load time — deliberately, so
+   `applyLiveSchema()` swapping in a fetched schema after this script has
+   already run takes effect immediately, without needing to reload the
+   page or re-run this file.
 ========================================================================= */
 
 const FPHM = (function () {
-  const { SECTIONS } = window.FPHM_INTAKE_CONFIG;
+  function currentSections() {
+    return window.FPHM_INTAKE_CONFIG.SECTIONS;
+  }
+
+  // Overwrites the active schema (e.g. after fetching the live version
+  // from SharePoint/the Worker). Accepts either a parsed object or a JSON
+  // string. Throws on anything that doesn't look like a real schema, so a
+  // caller can catch it and fall back to the hardcoded default instead of
+  // silently rendering a broken form.
+  function applyLiveSchema(schema) {
+    const parsed = typeof schema === "string" ? JSON.parse(schema) : schema;
+    if (!parsed || !Array.isArray(parsed.SECTIONS)) throw new Error("Invalid schema: missing SECTIONS array");
+    window.FPHM_INTAKE_CONFIG = parsed;
+  }
 
   // ---- conditional visibility ------------------------------------------
   function evalCond(cond, answers) {
@@ -29,7 +51,7 @@ const FPHM = (function () {
   }
 
   function getVisibleSections(answers) {
-    return SECTIONS.filter((s) => isSectionVisible(s, answers));
+    return currentSections().filter((s) => isSectionVisible(s, answers));
   }
 
   function getVisibleQuestions(section, answers) {
@@ -78,7 +100,7 @@ const FPHM = (function () {
   // grouped by section. Used for the print/PDF view and the staff view.
   function renderResponsesHtml(responses) {
     let html = "";
-    for (const section of SECTIONS) {
+    for (const section of currentSections()) {
       const rows = section.questions
         .filter((q) => responses[q.id] !== undefined && responses[q.id] !== null && responses[q.id] !== "" &&
           !(Array.isArray(responses[q.id]) && responses[q.id].length === 0))
@@ -170,7 +192,10 @@ const FPHM = (function () {
   }
 
   return {
-    SECTIONS,
+    get SECTIONS() {
+      return currentSections();
+    },
+    applyLiveSchema,
     evalCond,
     isQuestionVisible,
     isSectionVisible,

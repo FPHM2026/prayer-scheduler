@@ -22,6 +22,17 @@ const FPHM_API = {
   },
   async submit(token, responses, signatureDataUrl) {
     return post("/intake/submit", { token, responses, signatureDataUrl });
+  },
+  // The staff-editable question schema (see the Form Editor tab in
+  // preview/index.html and the IntakeFormSchema SharePoint list). GET,
+  // not POST - a pure read, no body.
+  async schema() {
+    const res = await fetch(FUNCTION_BASE_URL + "/intake/schema");
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`Request to /intake/schema failed (${res.status}): ${text.slice(0, 300)}`);
+    }
+    return res.json();
   }
 };
 

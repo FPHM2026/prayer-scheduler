@@ -43,7 +43,6 @@ function jsonResponse(body, status, extraHeaders) {
 let cachedToken = null;
 let cachedTokenExpiry = 0;
 let cachedSiteId = null;
-let cachedListId = null;
 
 async function getAppToken(env) {
   if (cachedToken && Date.now() < cachedTokenExpiry - 60000) return cachedToken;
@@ -78,17 +77,32 @@ async function graphFetch(env, path, options = {}) {
   return res.json();
 }
 
-async function resolveSiteAndList(env) {
-  if (cachedSiteId && cachedListId) return { siteId: cachedSiteId, listId: cachedListId };
+async function resolveSiteId(env) {
+  if (cachedSiteId) return cachedSiteId;
   const siteUrl = new URL(env.SITE_URL);
   const site = await graphFetch(env, `/sites/${siteUrl.hostname}:${siteUrl.pathname}`);
   cachedSiteId = site.id;
-  const listName = env.LIST_NAME || "IntakeResponses";
-  const listsResp = await graphFetch(env, `/sites/${cachedSiteId}/lists?$select=id,displayName`);
+  return cachedSiteId;
+}
+
+// listId cache keyed by display name, so the Worker can talk to more than
+// one list (IntakeResponses for responses, IntakeFormSchema for the
+// staff-editable question schema) without re-resolving the site each time.
+const listIdCache = {};
+async function resolveListId(env, listName) {
+  if (listIdCache[listName]) return listIdCache[listName];
+  const siteId = await resolveSiteId(env);
+  const listsResp = await graphFetch(env, `/sites/${siteId}/lists?$select=id,displayName`);
   const match = listsResp.value.find((l) => l.displayName === listName);
   if (!match) throw new Error(`List "${listName}" not found on site.`);
-  cachedListId = match.id;
-  return { siteId: cachedSiteId, listId: cachedListId };
+  listIdCache[listName] = match.id;
+  return match.id;
+}
+
+async function resolveSiteAndList(env) {
+  const siteId = await resolveSiteId(env);
+  const listId = await resolveListId(env, env.LIST_NAME || "IntakeResponses");
+  return { siteId, listId };
 }
 
 // Token is our own generated crypto.randomUUID() - safe to interpolate
@@ -193,12 +207,39 @@ async function handleSubmit(env, request) {
   return { ok: true };
 }
 
+// Read-only: the current staff-editable question schema, for the public
+// form to render from instead of its own hardcoded default. Cached
+// in-memory per warm isolate (same pattern as the Graph token/site/list
+// caches above) - a schema edit takes effect for new isolates immediately,
+// and for warm ones within a few minutes as they naturally recycle.
+let cachedSchema = null;
+let cachedSchemaExpiry = 0;
+async function handleSchema(env) {
+  if (cachedSchema && Date.now() < cachedSchemaExpiry) return cachedSchema;
+  const listId = await resolveListId(env, "IntakeFormSchema");
+  const siteId = await resolveSiteId(env);
+  const resp = await graphFetch(env, `/sites/${siteId}/lists/${listId}/items?$expand=fields&$top=1`);
+  const item = resp.value[0];
+  if (!item) return { __status: 404, error: "no schema found" };
+  let schema;
+  try {
+    schema = JSON.parse(item.fields.SchemaJSON);
+  } catch (e) {
+    return { __status: 500, error: "stored schema is not valid JSON" };
+  }
+  cachedSchema = schema;
+  cachedSchemaExpiry = Date.now() + 5 * 60 * 1000; // 5 minutes
+  return schema;
+}
+
 const ROUTES = {
   "/api/intake/start": handleStart,
   "/api/intake/load": handleLoad,
   "/api/intake/save": handleSave,
-  "/api/intake/submit": handleSubmit
+  "/api/intake/submit": handleSubmit,
+  "/api/intake/schema": handleSchema
 };
+const GET_ROUTES = new Set(["/api/intake/schema"]);
 
 export default {
   async fetch(request, env, ctx) {
@@ -211,7 +252,8 @@ export default {
     const url = new URL(request.url);
     const handler = ROUTES[url.pathname];
     if (!handler) return jsonResponse({ error: "not found" }, 404, cors);
-    if (request.method !== "POST") return jsonResponse({ error: "method not allowed" }, 405, cors);
+    const allowedMethod = GET_ROUTES.has(url.pathname) ? "GET" : "POST";
+    if (request.method !== allowedMethod) return jsonResponse({ error: "method not allowed" }, 405, cors);
 
     try {
       const result = await handler(env, request);

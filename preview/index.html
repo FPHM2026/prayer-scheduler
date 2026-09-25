@@ -502,6 +502,7 @@
   <button data-tab="overview">Prayer Ministers</button>
   <button data-tab="blackouts">Blackout Dates</button>
   <button data-tab="intake">Intake Forms</button>
+  <button data-tab="formeditor">Edit Intake Questions</button>
   <button data-tab="reports">Reports</button>
   <button data-tab="settings">Settings</button>
 </nav>
@@ -637,6 +638,20 @@
     <div id="intakeGroups"></div>
     <div class="no-results" id="intakeNoResults" hidden>No intake forms here yet.</div>
     <div id="intakeDetail" hidden></div>
+  </section>
+
+  <section class="panel" id="panel-formeditor">
+    <p class="helptext">Edit the intake questionnaire's sections, questions and wording. Changes take effect for anyone opening the public form as soon as you save — no deploy needed.</p>
+    <div class="toolbar no-print">
+      <button class="btn" id="btnFormEditorSave">Save changes</button>
+      <button class="btn secondary" id="btnFormEditorDiscard">Discard unsaved changes</button>
+      <span id="formEditorDirtyBadge" class="tag" style="display:none;">Unsaved changes</span>
+    </div>
+    <p class="errbox" role="alert" id="formEditorMsg" hidden></p>
+    <div id="formEditorSections"></div>
+    <div class="toolbar" style="margin-top:16px;">
+      <button class="btn secondary" id="btnFormEditorAddSection">+ Add section</button>
+    </div>
   </section>
 
   <section class="panel" id="panel-reports">
@@ -866,7 +881,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-24.11";
+const APP_VERSION = "2026-09-25.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -894,7 +909,8 @@ const LIST_NAMES = {
   locations: "Locations",
   slots: "PlanningSlots",
   timeWindows: "TimeWindows",
-  intake: "IntakeResponses"
+  intake: "IntakeResponses",
+  formSchema: "IntakeFormSchema"
 };
 // Relative to this file's own location (preview/) - portal/ is a sibling of
 // the repo root, one level up from here.
@@ -1058,6 +1074,12 @@ async function deleteItem(key, itemId){
 ========================================================================= */
 let ministers=[], sessions=[], blackouts=[], locations=[], slots=[], timeWindows=[], intakeResponses=[];
 let intakeSubStatus='Submitted', intakeDetailId=null;
+// The staff-editable question schema - schemaItemId/schemaVersion identify
+// the single IntakeFormSchema list item to PATCH back on save;
+// schemaDraft is a mutable working copy the Form Editor tab edits freely
+// (deep-cloned from the loaded schema) without touching
+// window.FPHM_INTAKE_CONFIG until "Save changes" is actually clicked.
+let schemaItemId = null, schemaVersion = 0, schemaDraft = null, schemaDirty = false;
 let editingId=null, prevId=null, selectedMinisters=[]; // selectedMinisters: [{id, role}]
 // Set by bookSlot() right after it opens the session modal on a Tentative
 // slot's claimed candidate - tells onSaveSession() which PlanningSlots item
@@ -1072,9 +1094,25 @@ let overviewSubStatus='Active';
 let sessionNumberMap = new Map(); // session id -> chronological "Session #N" for that recipient
 
 async function loadAll(){
-  const [rawMin, rawSess, rawBlack, rawLoc, rawSlots, rawTW, rawIntake] = await Promise.all([
-    listItems('ministers'), listItems('sessions'), listItems('blackouts'), listItems('locations'), listItems('slots'), listItems('timeWindows'), listItems('intake')
+  const [rawMin, rawSess, rawBlack, rawLoc, rawSlots, rawTW, rawIntake, rawSchema] = await Promise.all([
+    listItems('ministers'), listItems('sessions'), listItems('blackouts'), listItems('locations'), listItems('slots'), listItems('timeWindows'), listItems('intake'), listItems('formSchema')
   ]);
+  const schemaItem = rawSchema[0];
+  if(schemaItem){
+    schemaItemId = schemaItem.id;
+    schemaVersion = schemaItem.SchemaVersion || 0;
+    try{
+      const parsed = JSON.parse(schemaItem.SchemaJSON);
+      FPHM.applyLiveSchema(parsed);
+      // Only reset the working draft if there's nothing unsaved - a
+      // background loadAll() refresh (e.g. after some other save
+      // elsewhere in the app) must never clobber an editor session in
+      // progress.
+      if(!schemaDirty) schemaDraft = JSON.parse(JSON.stringify(parsed));
+    }catch(e){
+      console.warn('Stored intake schema is not valid JSON:', e.message);
+    }
+  }
   // ResponsesJSON is the whole answers object, keyed by question id from
   // formConfig.js - parsed once here so every intake render just reads
   // .responses, never re-parses. A malformed/empty blob (e.g. a session
@@ -1261,7 +1299,7 @@ function groupRow(key, avatarText, name, countLabel, summaryHtml, bodyHtml, wasO
   </div>`;
 }
 
-function renderAll(){ renderSchedule(); renderPlanning(); renderCompleted(); renderOverview(); renderBlackouts(); renderSchedPlan(); renderTimeWindowsSettings(); renderLocationsSettings(); renderIntake(); }
+function renderAll(){ renderSchedule(); renderPlanning(); renderCompleted(); renderOverview(); renderBlackouts(); renderSchedPlan(); renderTimeWindowsSettings(); renderLocationsSettings(); renderIntake(); renderFormEditor(); }
 
 async function withLoading(btn, loadingText, fn){
   if(!btn) return fn();
@@ -1355,6 +1393,9 @@ function wireApp(){
   }));
   $('#intakeSearch').addEventListener('input', renderIntake);
   wireSearchClear('intakeSearch');
+  $('#btnFormEditorSave').addEventListener('click', ()=>withLoading($('#btnFormEditorSave'), 'Saving…', saveFormSchema));
+  $('#btnFormEditorDiscard').addEventListener('click', discardFormSchemaChanges);
+  $('#btnFormEditorAddSection').addEventListener('click', addFormSection);
   $('#btnAddMinister').addEventListener('click', ()=>openMinisterModal());
   $('#btnMinCancel').addEventListener('click', ()=>$('#ministerModal').classList.remove('open'));
   $('#btnMinSave').addEventListener('click', ()=>withLoading($('#btnMinSave'), 'Saving…', onSaveMinister));
@@ -3808,6 +3849,338 @@ function findIntakeForRecipient(name){
 }
 
 /* =========================================================================
+   FORM EDITOR — staff-facing UI over schemaDraft (a mutable working copy
+   of the live schema, see loadAll()). "Save changes" writes schemaDraft
+   back to the IntakeFormSchema SharePoint list item and calls
+   FPHM.applyLiveSchema() so this app's own Intake Forms tab picks up the
+   change immediately too, not just the public form on its next load.
+
+   Text-field edits (label wording, option lists, intro/liability text,
+   min/max) update schemaDraft in place WITHOUT a full re-render - same
+   lesson learned earlier building index.html's own answer inputs: a
+   full-panel re-render on every keystroke fights focus/cursor position.
+   Only structural changes (add/remove/reorder/type change/visibleIf
+   target change) trigger renderFormEditor() to redraw.
+========================================================================= */
+const QUESTION_TYPES = ['text','email','number','textarea','radio','select','checkboxes'];
+const TYPES_WITH_OPTIONS = ['radio','select','checkboxes'];
+
+function markSchemaDirty(){
+  schemaDirty = true;
+  const badge = $('#formEditorDirtyBadge');
+  if(badge) badge.style.display = 'inline-block';
+}
+function slugify(label){
+  return String(label||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'') || 'question';
+}
+function uniqueQuestionId(base){
+  const existing = new Set();
+  (schemaDraft.SECTIONS||[]).forEach(s=>(s.questions||[]).forEach(q=>existing.add(q.id)));
+  let id = base, n = 2;
+  while(existing.has(id)){ id = base + '_' + n; n++; }
+  return id;
+}
+function uniqueSectionId(base){
+  const existing = new Set((schemaDraft.SECTIONS||[]).map(s=>s.id));
+  let id = base, n = 2;
+  while(existing.has(id)){ id = base + '_' + n; n++; }
+  return id;
+}
+// Every question in the schema, flattened, for the "show this only if"
+// target picker - excludes the question/section being edited (a
+// condition can't reference itself) and anything AFTER it (a forward
+// reference to a not-yet-answered question can't drive visibility).
+function questionsBefore(sIdx, qIdx){
+  const out = [];
+  for(let i=0;i<schemaDraft.SECTIONS.length;i++){
+    const sec = schemaDraft.SECTIONS[i];
+    for(let j=0;j<sec.questions.length;j++){
+      if(i>sIdx || (i===sIdx && (qIdx===null || j>=qIdx))) return out;
+      out.push(sec.questions[j]);
+    }
+  }
+  return out;
+}
+function findQuestionById(id){
+  for(const sec of schemaDraft.SECTIONS){
+    const q = sec.questions.find(x=>x.id===id);
+    if(q) return q;
+  }
+  return null;
+}
+
+function renderFormEditor(){
+  const box = $('#formEditorSections');
+  if(!box) return;
+  if(!schemaDraft){ box.innerHTML = '<p class="helptext">Loading…</p>'; return; }
+  box.innerHTML = schemaDraft.SECTIONS.map((sec,sIdx)=>renderSectionEditor(sec,sIdx)).join('');
+}
+
+function visibleIfPickerHtml(kind, sIdx, qIdx, cond, candidateQuestions){
+  // kind: 'section' | 'question' — distinguishes the data-* attrs used by
+  // the delegated-free inline handlers below.
+  const target = cond ? findQuestionById(cond.id) : null;
+  const condType = !cond ? 'always' : cond.equals!==undefined ? 'equals' : cond.notEquals!==undefined ? 'notEquals' : cond.in ? 'in' : cond.includes!==undefined ? 'includes' : 'always';
+  const optionsForTarget = target && Array.isArray(target.options) ? target.options : null;
+
+  const targetSelect = `<select onchange="onVisibleIfTargetChange('${kind}',${sIdx},${qIdx===null?'null':qIdx},this.value)">
+    <option value="">Select a question…</option>
+    ${candidateQuestions.map(q=>`<option value="${escapeHtml(q.id)}" ${cond&&cond.id===q.id?'selected':''}>${escapeHtml(q.label)}</option>`).join('')}
+  </select>`;
+
+  let valueControl = '';
+  if(target){
+    if(condType==='in'){
+      const chosen = cond.in||[];
+      valueControl = optionsForTarget
+        ? `<select multiple size="${Math.min(6,optionsForTarget.length)}" onchange="onVisibleIfValueChange('${kind}',${sIdx},${qIdx===null?'null':qIdx},Array.from(this.selectedOptions).map(o=>o.value),true)">
+            ${optionsForTarget.map(o=>`<option value="${escapeHtml(o)}" ${chosen.includes(o)?'selected':''}>${escapeHtml(o)}</option>`).join('')}
+          </select>`
+        : `<input type="text" placeholder="comma-separated values" value="${escapeHtml(chosen.join(', '))}" onchange="onVisibleIfValueChange('${kind}',${sIdx},${qIdx===null?'null':qIdx},this.value.split(',').map(s=>s.trim()).filter(Boolean),true)">`;
+    } else {
+      const val = cond.equals!==undefined?cond.equals:cond.notEquals!==undefined?cond.notEquals:cond.includes!==undefined?cond.includes:'';
+      valueControl = optionsForTarget
+        ? `<select onchange="onVisibleIfValueChange('${kind}',${sIdx},${qIdx===null?'null':qIdx},this.value,false)">
+            ${optionsForTarget.map(o=>`<option value="${escapeHtml(o)}" ${val===o?'selected':''}>${escapeHtml(o)}</option>`).join('')}
+          </select>`
+        : `<input type="text" value="${escapeHtml(val)}" onchange="onVisibleIfValueChange('${kind}',${sIdx},${qIdx===null?'null':qIdx},this.value,false)">`;
+    }
+  }
+
+  return `<div class="field">
+    <label>Visibility</label>
+    <select onchange="onVisibleIfModeChange('${kind}',${sIdx},${qIdx===null?'null':qIdx},this.value)">
+      <option value="always" ${condType==='always'?'selected':''}>Always show</option>
+      <option value="equals" ${condType==='equals'?'selected':''}>Show only if a question equals a value</option>
+      <option value="notEquals" ${condType==='notEquals'?'selected':''}>Show only if a question does NOT equal a value</option>
+      <option value="in" ${condType==='in'?'selected':''}>Show only if a question is one of several values</option>
+      <option value="includes" ${condType==='includes'?'selected':''}>Show only if a checkbox question includes a value</option>
+    </select>
+    ${condType!=='always' ? `<div class="field-row" style="margin-top:8px;">
+      <div class="field"><label>Question</label>${targetSelect}</div>
+      ${target ? `<div class="field"><label>Value</label>${valueControl}</div>` : ''}
+    </div>` : ''}
+  </div>`;
+}
+
+function renderSectionEditor(sec, sIdx){
+  const candidateQuestions = questionsBefore(sIdx, null);
+  return `<div class="card" style="margin-bottom:14px;" data-section-card="${sIdx}">
+    <div class="toolbar no-print" style="justify-content:space-between;">
+      <strong>${escapeHtml(sec.title||'(untitled section)')}</strong>
+      <div class="toolbar" style="gap:4px;">
+        <button class="icon-btn" title="Move up" onclick="moveSection(${sIdx},-1)" ${sIdx===0?'disabled':''}>&uarr;</button>
+        <button class="icon-btn" title="Move down" onclick="moveSection(${sIdx},1)" ${sIdx===schemaDraft.SECTIONS.length-1?'disabled':''}>&darr;</button>
+        <button class="icon-btn danger" title="Delete section" onclick="deleteSection(${sIdx})">${ICONS.trash}</button>
+      </div>
+    </div>
+    <div class="field"><label>Section title</label>
+      <input type="text" value="${escapeHtml(sec.title||'')}" oninput="updateSectionField(${sIdx},'title',this.value)">
+    </div>
+    <div class="field"><label>Intro text (optional, shown above the questions)</label>
+      <textarea rows="2" oninput="updateSectionField(${sIdx},'intro',this.value)">${escapeHtml(sec.intro||'')}</textarea>
+    </div>
+    ${visibleIfPickerHtml('section', sIdx, null, sec.visibleIf, candidateQuestions)}
+    <div style="margin-top:12px;">
+      ${sec.questions.map((q,qIdx)=>renderQuestionEditor(q,sIdx,qIdx,sec)).join('')}
+    </div>
+    <div class="toolbar no-print">
+      <button class="btn secondary" onclick="addQuestion(${sIdx})">+ Add question</button>
+    </div>
+  </div>`;
+}
+
+function renderQuestionEditor(q, sIdx, qIdx, sec){
+  const candidateQuestions = questionsBefore(sIdx, qIdx);
+  const hasOptions = TYPES_WITH_OPTIONS.includes(q.type);
+  return `<div class="card" style="margin:0 0 10px;background:var(--bg);" data-question-card="${sIdx}.${qIdx}">
+    <div class="toolbar no-print" style="justify-content:space-between;">
+      <span class="tag">${escapeHtml(q.type)}</span>
+      <div class="toolbar" style="gap:4px;">
+        <button class="icon-btn" title="Move up" onclick="moveQuestion(${sIdx},${qIdx},-1)" ${qIdx===0?'disabled':''}>&uarr;</button>
+        <button class="icon-btn" title="Move down" onclick="moveQuestion(${sIdx},${qIdx},1)" ${qIdx===sec.questions.length-1?'disabled':''}>&darr;</button>
+        <button class="icon-btn danger" title="Delete question" onclick="deleteQuestion(${sIdx},${qIdx})">${ICONS.trash}</button>
+      </div>
+    </div>
+    <div class="field"><label>Question text</label>
+      <input type="text" value="${escapeHtml(q.label||'')}" oninput="updateQuestionField(${sIdx},${qIdx},'label',this.value)">
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Answer type</label>
+        <select onchange="onQuestionTypeChange(${sIdx},${qIdx},this.value)">
+          ${QUESTION_TYPES.map(t=>`<option value="${t}" ${q.type===t?'selected':''}>${t}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field" style="display:flex;align-items:flex-end;">
+        <label style="display:flex;align-items:center;gap:6px;font-weight:400;">
+          <input type="checkbox" ${q.required?'checked':''} onchange="updateQuestionFieldAndRerender(${sIdx},${qIdx},'required',this.checked)"> Required
+        </label>
+      </div>
+    </div>
+    ${hasOptions ? `<div class="field"><label>Choices (one per line)</label>
+      <textarea rows="4" oninput="updateQuestionOptions(${sIdx},${qIdx},this.value)">${escapeHtml((q.options||[]).join('\n'))}</textarea>
+    </div>` : ''}
+    ${q.type==='checkboxes' ? `<div class="field">
+      <label style="display:flex;align-items:center;gap:6px;font-weight:400;">
+        <input type="checkbox" ${q.otherOption?'checked':''} onchange="updateQuestionFieldAndRerender(${sIdx},${qIdx},'otherOption',this.checked)"> Allow an "Other, please specify" choice
+      </label>
+    </div>` : ''}
+    ${q.type==='number' ? `<div class="field-row">
+      <div class="field"><label>Minimum</label><input type="number" value="${q.min??''}" oninput="updateQuestionField(${sIdx},${qIdx},'min',this.value===''?undefined:Number(this.value))"></div>
+      <div class="field"><label>Maximum</label><input type="number" value="${q.max??''}" oninput="updateQuestionField(${sIdx},${qIdx},'max',this.value===''?undefined:Number(this.value))"></div>
+    </div>` : ''}
+    ${visibleIfPickerHtml('question', sIdx, qIdx, q.visibleIf, candidateQuestions)}
+  </div>`;
+}
+
+// ---- mutation handlers (called from the inline event handlers above) ----
+window.updateSectionField = function(sIdx, field, value){
+  schemaDraft.SECTIONS[sIdx][field] = value;
+  markSchemaDirty();
+};
+window.updateQuestionField = function(sIdx, qIdx, field, value){
+  schemaDraft.SECTIONS[sIdx].questions[qIdx][field] = value;
+  markSchemaDirty();
+};
+window.updateQuestionFieldAndRerender = function(sIdx, qIdx, field, value){
+  schemaDraft.SECTIONS[sIdx].questions[qIdx][field] = value;
+  markSchemaDirty();
+  renderFormEditor();
+};
+window.updateQuestionOptions = function(sIdx, qIdx, text){
+  schemaDraft.SECTIONS[sIdx].questions[qIdx].options = text.split('\n').map(s=>s.trim()).filter(Boolean);
+  markSchemaDirty();
+};
+window.onQuestionTypeChange = function(sIdx, qIdx, newType){
+  const q = schemaDraft.SECTIONS[sIdx].questions[qIdx];
+  q.type = newType;
+  if(TYPES_WITH_OPTIONS.includes(newType) && !Array.isArray(q.options)) q.options = ['Yes','No'];
+  if(!TYPES_WITH_OPTIONS.includes(newType)){ delete q.options; delete q.otherOption; }
+  if(newType!=='checkboxes') delete q.otherOption;
+  if(newType!=='number'){ delete q.min; delete q.max; }
+  markSchemaDirty();
+  renderFormEditor();
+};
+window.addQuestion = function(sIdx){
+  const id = uniqueQuestionId('question');
+  schemaDraft.SECTIONS[sIdx].questions.push({ id, type:'text', label:'New question', required:false });
+  markSchemaDirty();
+  renderFormEditor();
+};
+window.deleteQuestion = async function(sIdx, qIdx){
+  const q = schemaDraft.SECTIONS[sIdx].questions[qIdx];
+  if(!(await askConfirm(`Delete the question "${q.label}"? Any other question whose visibility depends on this one will need to be fixed manually.`))) return;
+  schemaDraft.SECTIONS[sIdx].questions.splice(qIdx,1);
+  markSchemaDirty();
+  renderFormEditor();
+};
+window.moveQuestion = function(sIdx, qIdx, dir){
+  const arr = schemaDraft.SECTIONS[sIdx].questions;
+  const j = qIdx+dir;
+  if(j<0||j>=arr.length) return;
+  [arr[qIdx],arr[j]] = [arr[j],arr[qIdx]];
+  markSchemaDirty();
+  renderFormEditor();
+};
+window.addFormSection = function(){
+  const id = uniqueSectionId('section');
+  schemaDraft.SECTIONS.push({ id, title:'New section', questions:[] });
+  markSchemaDirty();
+  renderFormEditor();
+};
+window.deleteSection = async function(sIdx){
+  const sec = schemaDraft.SECTIONS[sIdx];
+  if(!(await askConfirm(`Delete the whole "${sec.title}" section and all ${sec.questions.length} question(s) in it?`))) return;
+  schemaDraft.SECTIONS.splice(sIdx,1);
+  markSchemaDirty();
+  renderFormEditor();
+};
+window.moveSection = function(sIdx, dir){
+  const arr = schemaDraft.SECTIONS;
+  const j = sIdx+dir;
+  if(j<0||j>=arr.length) return;
+  [arr[sIdx],arr[j]] = [arr[j],arr[sIdx]];
+  markSchemaDirty();
+  renderFormEditor();
+};
+
+// visibleIf editing - kind/sIdx/qIdx locate the section or question being
+// edited; qIdx is `null` for a section-level visibleIf.
+function targetOf(kind, sIdx, qIdx){
+  return qIdx===null ? schemaDraft.SECTIONS[sIdx] : schemaDraft.SECTIONS[sIdx].questions[qIdx];
+}
+window.onVisibleIfModeChange = function(kind, sIdx, qIdx, mode){
+  const obj = targetOf(kind, sIdx, qIdx);
+  if(mode==='always'){ delete obj.visibleIf; }
+  else if(mode==='in'){ obj.visibleIf = { id:'', in:[] }; }
+  else { obj.visibleIf = { id:'', [mode]: '' }; }
+  markSchemaDirty();
+  renderFormEditor();
+};
+window.onVisibleIfTargetChange = function(kind, sIdx, qIdx, targetId){
+  const obj = targetOf(kind, sIdx, qIdx);
+  obj.visibleIf.id = targetId;
+  markSchemaDirty();
+  renderFormEditor();
+};
+window.onVisibleIfValueChange = function(kind, sIdx, qIdx, value, isArray){
+  const obj = targetOf(kind, sIdx, qIdx);
+  const cond = obj.visibleIf;
+  if(cond.in!==undefined) cond.in = isArray ? value : String(value).split(',').map(s=>s.trim()).filter(Boolean);
+  else if(cond.equals!==undefined) cond.equals = value;
+  else if(cond.notEquals!==undefined) cond.notEquals = value;
+  else if(cond.includes!==undefined) cond.includes = value;
+  markSchemaDirty();
+};
+
+async function saveFormSchema(){
+  const msg = $('#formEditorMsg');
+  msg.hidden = true;
+  // Lightweight validation - catch the two mistakes most likely to
+  // silently break the live form before they ever reach it.
+  const allIds = [];
+  schemaDraft.SECTIONS.forEach(s=>s.questions.forEach(q=>allIds.push(q.id)));
+  const dupes = allIds.filter((id,i)=>allIds.indexOf(id)!==i);
+  const idSet = new Set(allIds);
+  const brokenRefs = [];
+  schemaDraft.SECTIONS.forEach(s=>{
+    if(s.visibleIf && !idSet.has(s.visibleIf.id)) brokenRefs.push(`Section "${s.title}"`);
+    s.questions.forEach(q=>{ if(q.visibleIf && !idSet.has(q.visibleIf.id)) brokenRefs.push(`Question "${q.label}"`); });
+  });
+  if(dupes.length || brokenRefs.length){
+    msg.hidden = false;
+    msg.innerHTML = [
+      dupes.length ? `Duplicate question id(s): ${[...new Set(dupes)].join(', ')}.` : '',
+      brokenRefs.length ? `These have a "show only if" pointing at a question that no longer exists or hasn't been chosen yet: ${brokenRefs.join(', ')}.` : ''
+    ].filter(Boolean).join(' ');
+    return;
+  }
+  try{
+    await updateItem('formSchema', schemaItemId, { SchemaJSON: JSON.stringify(schemaDraft), SchemaVersion: schemaVersion+1 });
+    schemaVersion += 1;
+    schemaDirty = false;
+    $('#formEditorDirtyBadge').style.display = 'none';
+    FPHM.applyLiveSchema(schemaDraft);
+    renderIntake();
+    msg.hidden = false;
+    msg.className = 'helptext';
+    msg.textContent = 'Saved — the public form will use these changes immediately.';
+    setTimeout(()=>{ msg.hidden = true; msg.className='errbox'; }, 4000);
+  }catch(e){
+    msg.hidden = false;
+    msg.className = 'errbox';
+    msg.textContent = 'Save failed: ' + e.message;
+  }
+}
+async function discardFormSchemaChanges(){
+  if(schemaDirty && !(await askConfirm('Discard all unsaved question edits and reload the last saved version?'))) return;
+  schemaDirty = false; // must be cleared BEFORE loadAll() - its own guard checks this flag to decide whether to reset schemaDraft
+  $('#formEditorDirtyBadge').style.display = 'none';
+  await loadAll();
+  renderFormEditor();
+}
+
+/* =========================================================================
    REPORTS — Freedom Sessions / Drop-In / Training statistics for an
    arbitrary date range, computed here against the live sessions/ministers
    already loaded and rendered into a standalone printable page (Blob +
@@ -4211,8 +4584,13 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
-  { date: 'Sep 24, 2026', version: APP_VERSION, items: [
-    'New: a public digital Intake Form (at /intake/) recipients fill out before their first session - 88 questions, save-and-resume via a link, signature pad. Not yet fully live: the Azure Function that saves real submissions to SharePoint still needs to be deployed, so submissions right now stay local-only on the recipient\'s own device until that\'s done.',
+  { date: 'Sep 25, 2026', version: APP_VERSION, items: [
+    'New: the public Intake Form is fully live - submissions really do save to SharePoint now, via a Cloudflare Worker (not the originally-planned Azure Function, switched after finding no Azure subscription was available and the team didn\'t want to open one).',
+    'New: "Edit Intake Questions" tab - add, remove, reorder and reword sections and questions, including the "show this only if" branching logic, without any code change or deploy. Saves to a new IntakeFormSchema SharePoint list; the public form and this app both pick up a saved change immediately.',
+    'Fixed: the "Freedom Intake" account needed a SharePoint Administrator role and a fresh Sites.Selected grant before the Worker could actually write to SharePoint - the original grant attempt had silently never taken effect.'
+  ]},
+  { date: 'Sep 24, 2026', version: '2026-09-24.11', items: [
+    'New: a public digital Intake Form (at /intake/) recipients fill out before their first session - 88 questions, save-and-resume via a link, signature pad.',
     'New: a staff "Intake Forms" tab here to review submitted/in-progress forms, search, and print/PDF a recipient\'s answers.',
     'New: the minister portal has a "View intake form" link on a recipient\'s session card, for ministers assigned to that recipient.'
   ]}
