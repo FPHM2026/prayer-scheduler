@@ -502,7 +502,6 @@
   <button data-tab="overview">Prayer Ministers</button>
   <button data-tab="blackouts">Blackout Dates</button>
   <button data-tab="intake">Intake Forms</button>
-  <button data-tab="formeditor">Edit Intake Questions</button>
   <button data-tab="reports">Reports</button>
   <button data-tab="settings">Settings</button>
 </nav>
@@ -640,20 +639,6 @@
     <div id="intakeDetail" hidden></div>
   </section>
 
-  <section class="panel" id="panel-formeditor">
-    <p class="helptext">Edit the intake questionnaire's sections, questions and wording. Changes take effect for anyone opening the public form as soon as you save — no deploy needed.</p>
-    <div class="toolbar no-print">
-      <button class="btn" id="btnFormEditorSave">Save changes</button>
-      <button class="btn secondary" id="btnFormEditorDiscard">Discard unsaved changes</button>
-      <span id="formEditorDirtyBadge" class="tag" style="display:none;">Unsaved changes</span>
-    </div>
-    <p class="errbox" role="alert" id="formEditorMsg" hidden></p>
-    <div id="formEditorSections"></div>
-    <div class="toolbar" style="margin-top:16px;">
-      <button class="btn secondary" id="btnFormEditorAddSection">+ Add section</button>
-    </div>
-  </section>
-
   <section class="panel" id="panel-reports">
     <p class="helptext">Pick a date range, then Generate opens a statistics report in a new tab — Freedom Sessions, Drop-In, and Training as three separate sections, ready to review or print.</p>
     <div class="range-presets">
@@ -678,6 +663,7 @@
       <button class="active" data-settingsview="timewindows">Quick Slots</button>
       <button data-settingsview="locations">Locations</button>
       <button data-settingsview="defaultlocation">Sessions</button>
+      <button data-settingsview="intakequestions">Intake Questions</button>
     </nav>
 
     <div class="settings-subview active" id="settingsTimeWindowsView">
@@ -726,6 +712,20 @@
         <button class="btn" id="btnSaveDefaultLocationSetting">Save Default Location</button>
       </div>
       <p class="helptext" id="settingsDefaultLocationMsg"></p>
+    </div>
+
+    <div class="settings-subview" id="settingsIntakeQuestionsView">
+      <p class="helptext">Edit the intake questionnaire's sections, questions and wording. Changes take effect for anyone opening the public form as soon as you save — no deploy needed.</p>
+      <div class="toolbar no-print">
+        <button class="btn" id="btnFormEditorSave">Save changes</button>
+        <button class="btn secondary" id="btnFormEditorDiscard">Discard unsaved changes</button>
+        <span id="formEditorDirtyBadge" class="tag" style="display:none;">Unsaved changes</span>
+      </div>
+      <p class="errbox" role="alert" id="formEditorMsg" hidden></p>
+      <div id="formEditorSections"></div>
+      <div class="toolbar" style="margin-top:16px;">
+        <button class="btn secondary" id="btnFormEditorAddSection">+ Add section</button>
+      </div>
     </div>
   </section>
 
@@ -3179,6 +3179,7 @@ function switchSettingsSub(view){
   $('#settingsTimeWindowsView').classList.toggle('active', view==='timewindows');
   $('#settingsLocationsView').classList.toggle('active', view==='locations');
   $('#settingsDefaultLocationView').classList.toggle('active', view==='defaultlocation');
+  $('#settingsIntakeQuestionsView').classList.toggle('active', view==='intakequestions');
 }
 function upcomingCountFor(ministerId){
   const now = new Date();
