@@ -611,10 +611,11 @@ existing session history.
   `local.settings.json.example`, `package.json`, `src/graphClient.js`,
   `src/functions/intakeStart.js`/`intakeLoad.js`/`intakeSave.js`/
   `intakeSubmit.js` — not part of this GitHub Pages deployment, deploy
-  separately; **no SETUP.md exists in this repo's copy** — the standalone
-  `FPHM Intake Form` project's own SETUP.md, referenced below, is the only
-  deploy documentation that currently exists), which holds
-  its own tightly-scoped app-only Graph credential (`Sites.Selected`,
+  separately; **`azure-function/SETUP.md`** (added 2026-09-25, adapted from
+  the standalone project's own setup guide) has the full step-by-step —
+  SharePoint list creation, the Function's own separate Azure AD app
+  registration, Function App deployment, pointing `apiClient.js` at it),
+  which holds its own tightly-scoped app-only Graph credential (`Sites.Selected`,
   granted to just this one SharePoint site) so it can create/update/submit
   the recipient's session without any staff/minister credential ever
   touching a browser the public can reach.
@@ -648,15 +649,18 @@ existing session history.
   explicitly a preview build; `index.html` has no Intake Forms tab and
   doesn't load `js/formConfig.js`/`js/formEngine.js` yet (see "Architecture"
   above). Follow the normal "Deployment workflow" above to promote once
-  it's been tested at the live preview URL. The standalone `FPHM Intake
-  Form` project/repo this was merged from should also be retired (repo
-  deletion is destructive — left for the user to decide/do, not done
-  automatically). The Azure Function isn't deployed yet as of this merge —
+  it's been tested at the live preview URL. **The standalone `FPHM Intake
+  Form` project's GitHub repo (`FPHM2026/prayer-intake`) was deleted
+  2026-09-25** (at the user's request, this merge already confirmed
+  complete) — its deploy guide was copied into this repo first, see
+  `azure-function/SETUP.md`, so nothing was lost; the local folder
+  (`H:\My Drive\Claude\FPHM Intake Form`) still exists on disk as an
+  unlinked historical reference if ever needed, just not on GitHub anymore.
+  The Azure Function itself still isn't deployed —
   `intake/js/apiClient.js`'s `FUNCTION_BASE_URL` is still a placeholder, so
   the public form currently runs in its local-only offline fallback mode
-  for real users until that's
-  done (see the standalone project's SETUP.md for the deploy steps, still
-  valid as-is).
+  for real users until that's done (see `azure-function/SETUP.md`,
+  steps 1-5).
 
 ## Not yet built
 - **Calendar (month grid) view** — was planned but never built in this HTML
