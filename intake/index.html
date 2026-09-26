@@ -79,8 +79,26 @@ async function doSave(immediate) {
     await FPHM_API.save(state.token, state.answers);
     state.online = true;
   } catch (e) {
-    state.online = false;
+    if (e.status === 404) {
+      // Same recovery as boot()'s - the record this token pointed to was
+      // deleted server-side mid-session (e.g. staff cleaned it up as an
+      // abandoned duplicate while this visitor was still filling it out).
+      // Get a fresh token and keep saving under it, transparently, rather
+      // than marking "offline" forever with nothing left to sync to.
+      try {
+        const data = await FPHM_API.start("", "");
+        state.token = data.token;
+        localStorage.setItem("fphm_intake_last_token", state.token);
+        await FPHM_API.save(state.token, state.answers);
+        state.online = true;
+      } catch (e2) {
+        state.online = false;
+      }
+    } else {
+      state.online = false;
+    }
   }
+  saveLocal();
   state.saving = false;
   renderSaveStatus();
 }
@@ -106,6 +124,36 @@ async function fetchLiveSchema() {
   }
 }
 
+// Called when a saved/URL token comes back 404 - the server-side record
+// is gone (deleted, not just unreachable). Starts a brand new token and
+// carries over whatever answers are still sitting in this device's local
+// fallback storage under the old token, so a visitor whose in-progress
+// form staff cleaned up doesn't lose their progress or get stuck in a
+// permanent "offline, waiting to sync to a record that no longer exists"
+// state. If even getting a fresh token fails (genuinely offline), falls
+// back to local-only, same as the ordinary network-failure path.
+async function recoverFromDeletedToken(oldToken) {
+  const local = loadLocal(oldToken);
+  state.answers = (local && local.answers) || {};
+  try {
+    const data = await FPHM_API.start("", "");
+    state.token = data.token;
+    state.online = true;
+    localStorage.setItem("fphm_intake_last_token", state.token);
+    if (Object.keys(state.answers).length) await FPHM_API.save(state.token, state.answers);
+  } catch (e) {
+    state.token = crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
+    state.online = false;
+  }
+  saveLocal();
+  if (Object.keys(state.answers).length) {
+    state.step = STEP.SECTION;
+    state.sectionIdx = findFirstIncompleteSectionIndex(state.answers);
+  } else {
+    state.step = STEP.INTRO;
+  }
+}
+
 async function boot() {
   await fetchLiveSchema();
   const params = new URLSearchParams(location.search);
@@ -126,15 +174,27 @@ async function boot() {
         state.sectionIdx = findFirstIncompleteSectionIndex(state.answers);
       }
     } catch (e) {
-      // Couldn't reach the server — fall back to whatever's on this device.
-      state.online = false;
-      const local = loadLocal(token);
-      if (local) {
-        state.answers = local.answers || {};
-        state.step = STEP.SECTION;
-        state.sectionIdx = findFirstIncompleteSectionIndex(state.answers);
+      if (e.status === 404) {
+        // This token doesn't exist on the server any more (most likely
+        // staff deleted an abandoned in-progress form - see CLAUDE.md's
+        // Intake Forms section). Treating this as a network blip like the
+        // branch below would set state.online=false and trap the visitor
+        // in permanent "offline" mode with nothing left to ever sync
+        // to - instead, get a fresh token and re-adopt whatever's saved
+        // locally under the old one, so their progress isn't lost even
+        // though the old server-side record is gone.
+        await recoverFromDeletedToken(token);
       } else {
-        state.step = STEP.INTRO;
+        // Couldn't reach the server — fall back to whatever's on this device.
+        state.online = false;
+        const local = loadLocal(token);
+        if (local) {
+          state.answers = local.answers || {};
+          state.step = STEP.SECTION;
+          state.sectionIdx = findFirstIncompleteSectionIndex(state.answers);
+        } else {
+          state.step = STEP.INTRO;
+        }
       }
     }
   }
@@ -231,11 +291,18 @@ async function resumeWithToken(token) {
       state.sectionIdx = findFirstIncompleteSectionIndex(state.answers);
     }
   } catch (e) {
-    state.online = false;
-    const local = loadLocal(token);
-    state.answers = (local && local.answers) || {};
-    state.step = STEP.SECTION;
-    state.sectionIdx = findFirstIncompleteSectionIndex(state.answers);
+    if (e.status === 404) {
+      // Rare race: the other form (see checkForDuplicateAndOfferResume)
+      // was deleted between the duplicate check and clicking "Continue
+      // that one" - same recovery as boot()'s.
+      await recoverFromDeletedToken(token);
+    } else {
+      state.online = false;
+      const local = loadLocal(token);
+      state.answers = (local && local.answers) || {};
+      state.step = STEP.SECTION;
+      state.sectionIdx = findFirstIncompleteSectionIndex(state.answers);
+    }
   }
   saveLocal();
   render();

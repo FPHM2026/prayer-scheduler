@@ -52,7 +52,14 @@ async function post(path, body) {
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Request to ${path} failed (${res.status}): ${text.slice(0, 300)}`);
+    const err = new Error(`Request to ${path} failed (${res.status}): ${text.slice(0, 300)}`);
+    // Callers (boot()'s resume-from-token path in particular) need to tell
+    // "the server is unreachable, fall back to local data" apart from "the
+    // server answered and this token genuinely doesn't exist any more"
+    // (e.g. staff deleted an abandoned in-progress form) - only the first
+    // one should fall back to offline mode; the second should start fresh.
+    err.status = res.status;
+    throw err;
   }
   return res.json();
 }
