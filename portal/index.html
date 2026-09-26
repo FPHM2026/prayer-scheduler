@@ -367,7 +367,7 @@ const MSAL_CONFIG = {
 };
 const GRAPH_SCOPES = ["Sites.ReadWrite.All", "User.Read"];
 const SITE_URL = "https://creeksidechurch.sharepoint.com/sites/FreedomPrayer";
-const LIST_NAMES = { ministers: "PrayerMinisters", sessions: "PrayerSessions", blackouts: "BlackoutDates", intake: "IntakeResponses" };
+const LIST_NAMES = { ministers: "PrayerMinisters", sessions: "PrayerSessions", blackouts: "BlackoutDates", intake: "IntakeResponses", formSchema: "IntakeFormSchema" };
 
 const msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
 const msalReady = msalInstance.initialize();
@@ -478,8 +478,17 @@ let ministers=[], sessions=[], blackouts=[], intakeResponses=[], me=null;
 let sessionNumberMap = new Map();
 
 async function loadAll(){
-  const [rawMin, rawSess, rawBlack, rawIntake] = await Promise.all([listItems('ministers'), listItems('sessions'), listItems('blackouts'), listItems('intake')]);
+  const [rawMin, rawSess, rawBlack, rawIntake, rawSchema] = await Promise.all([listItems('ministers'), listItems('sessions'), listItems('blackouts'), listItems('intake'), listItems('formSchema')]);
   ministers = rawMin.map(m => ({ id: m.id, name: m.Title, signInEmail: m.SignInEmail||'', status: m.Status||'Active' }));
+  // Live-editable question schema (see the "Edit Intake Questions" tab in
+  // the main app's CLAUDE.md "Intake Forms" section) - overrides the
+  // hardcoded default from js/formConfig.js so a minister viewing an
+  // intake form sees current question wording, not stale labels.
+  const schemaItem = rawSchema[0];
+  if(schemaItem){
+    try{ FPHM.applyLiveSchema(schemaItem.SchemaJSON); }
+    catch(e){ console.warn('Stored intake schema is not valid JSON:', e.message); }
+  }
   // ResponsesJSON parsed once here, same as the main app - see its
   // CLAUDE.md "Intake Forms" section for the shared schema/rendering.
   intakeResponses = rawIntake.map(i => {

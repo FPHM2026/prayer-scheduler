@@ -19,7 +19,17 @@
    a thank-you/print screen. See CLAUDE.md for the overall architecture.
 ========================================================================= */
 
-const { INTRO_TEXT, LIABILITY_TEXT } = window.FPHM_INTAKE_CONFIG;
+// Read fresh each call, not destructured once - a live schema fetched from
+// the Worker (see fetchLiveSchema() in boot()) overwrites
+// window.FPHM_INTAKE_CONFIG after this script has already run, so a
+// captured-at-load-time constant would silently keep showing the stale
+// default text forever.
+function introText() {
+  return window.FPHM_INTAKE_CONFIG.INTRO_TEXT;
+}
+function liabilityText() {
+  return window.FPHM_INTAKE_CONFIG.LIABILITY_TEXT;
+}
 
 const STEP = { INTRO: "intro", SECTION: "section", FINAL: "final", DONE: "done" };
 
@@ -79,7 +89,21 @@ function renderSaveStatus() {
 }
 
 // ---- boot ---------------------------------------------------------------
+// Fetches the live, staff-editable schema before anything renders. Failure
+// (Worker unreachable, bad data) is silent by design - the page just keeps
+// using the hardcoded default from formConfig.js, same offline-tolerant
+// philosophy as everything else in this app.
+async function fetchLiveSchema() {
+  try {
+    const schema = await FPHM_API.schema();
+    FPHM.applyLiveSchema(schema);
+  } catch (e) {
+    console.warn("Could not load live intake schema, using built-in default:", e.message);
+  }
+}
+
 async function boot() {
+  await fetchLiveSchema();
   const params = new URLSearchParams(location.search);
   const tokenFromUrl = params.get("token");
   const token = tokenFromUrl || localStorage.getItem("fphm_intake_last_token") || null;
@@ -147,8 +171,8 @@ function render() {
 function renderIntro() {
   app.innerHTML = `
     <div class="card">
-      <h1>${FPHM.escapeHtml(INTRO_TEXT.title)}</h1>
-      ${INTRO_TEXT.body.map((p) => `<p>${FPHM.escapeHtml(p)}</p>`).join("")}
+      <h1>${FPHM.escapeHtml(introText().title)}</h1>
+      ${introText().body.map((p) => `<p>${FPHM.escapeHtml(p)}</p>`).join("")}
       <div class="nav-row">
         <span></span>
         <button class="btn-primary" id="btnBegin">Begin</button>
@@ -363,10 +387,10 @@ function clearInvalid(id) {
 function renderFinal() {
   const visibleSections = FPHM.getVisibleSections(state.answers);
   app.innerHTML = `
-    ${renderTopBar(visibleSections.length, visibleSections.length, LIABILITY_TEXT.title)}
+    ${renderTopBar(visibleSections.length, visibleSections.length, liabilityText().title)}
     <div class="card">
-      <h2>${FPHM.escapeHtml(LIABILITY_TEXT.title)}</h2>
-      <div class="legal-text">${FPHM.escapeHtml(LIABILITY_TEXT.body)}</div>
+      <h2>${FPHM.escapeHtml(liabilityText().title)}</h2>
+      <div class="legal-text">${FPHM.escapeHtml(liabilityText().body)}</div>
       <label class="qlabel">Please sign below to confirm your agreement<span class="required-mark">*</span></label>
       <div class="signature-box"><canvas id="sigCanvas"></canvas></div>
       <div class="nav-row no-print" style="margin-top:10px;">
@@ -442,7 +466,7 @@ function renderDone() {
       </div>
     </div>
     <div id="printArea" style="display:none;">
-      <h1>${FPHM.escapeHtml(INTRO_TEXT.title)}</h1>
+      <h1>${FPHM.escapeHtml(introText().title)}</h1>
       ${FPHM.renderResponsesHtml(state.answers)}
     </div>
   `;

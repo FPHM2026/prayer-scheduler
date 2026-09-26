@@ -188,6 +188,21 @@ scheduler's own code.
   only on this list (granted separately from its Contribute on
   BlackoutDates) — see "Intake Forms" for why that boundary is
   client-side-only, same as everywhere else ministers' access is scoped.
+- **IntakeFormSchema** (added 2026-09-25): a single-item list holding the
+  ENTIRE intake question schema as one JSON blob — Title (always
+  "Current"), SchemaJSON (Multiple lines of text, Plain text, unlimited
+  length — same JSON shape as `js/formConfig.js`'s
+  `window.FPHM_INTAKE_CONFIG`), SchemaVersion (Number, incremented on every
+  save, purely informational — no code reads it). This is what the "Edit
+  Intake Questions" tab writes to and what `intake/index.html` fetches
+  (via the Cloudflare Worker's `/api/intake/schema`) and both
+  `preview/index.html`/`portal/index.html` fetch (via their own delegated
+  Graph session) to override the hardcoded default from `js/formConfig.js`
+  at runtime — see "Intake Forms" below for the full mechanism. No new
+  SharePoint permission grant was needed for this one: staff already have
+  full read/write via existing delegated access, and it's covered by the
+  same app-only `Sites.Selected` grant the Worker already had for
+  IntakeResponses.
 - **Prospects**: retired. The app no longer reads this list at all — replaced
   by PrayerSessions items with Status="Waiting" (see above). The list itself
   still exists in SharePoint with whatever old data was in it; run
@@ -587,12 +602,18 @@ built as a separate project/repo (`FPHM Intake Form`), merged into this repo
 both the staff scheduler and the minister portal, matched to a recipient's
 existing session history.
 
-- **`js/formConfig.js`** is the single source of truth for the question
-  schema — the ONE file to edit to add/remove/reorder/rephrase a question,
-  or add a new conditional branch (`visibleIf: {id, equals/in/includes/
-  notEquals}` on a question, or a whole section, mirroring how the
-  marital-status sub-sections work — see the file's own header comment for
-  the exact shape). Every app that touches intake data (`intake/index.html`,
+- **`js/formConfig.js`** holds the HARDCODED DEFAULT question schema —
+  used only as a fallback if the live schema (see below) can't be fetched
+  (Worker unreachable, malformed data). As of 2026-09-25 it is **not**
+  the actual source of truth anymore: staff edit questions live through
+  the "Edit Intake Questions" tab (`preview/index.html`), which writes to
+  the `IntakeFormSchema` SharePoint list, not this file. The shape
+  (`visibleIf: {id, equals/in/includes/notEquals}` on a question or a
+  whole section, mirroring how the marital-status sub-sections work) is
+  unchanged and still documented in this file's own header comment — the
+  live editor produces schemas in exactly this shape, and the fallback
+  needs to stay structurally compatible with whatever the editor can
+  produce. Every app that touches intake data (`intake/index.html`,
   `index.html`, `preview/index.html`, `portal/index.html`) loads it via
   `<script src="../js/formConfig.js">` — a deliberate, sole exception to
   this repo's "single self-contained file" convention, since duplicating 88
@@ -602,29 +623,84 @@ existing session history.
   `FPHM.renderResponsesHtml(responses)`, which every intake-answer view
   (public print/PDF, staff detail, minister modal) calls to turn a stored
   `responses` object into the same formatted HTML, styled by the `.ans-*`
-  CSS rules each app defines locally (matching its own palette).
+  CSS rules each app defines locally (matching its own palette). Every
+  internal reference to `SECTIONS` reads `window.FPHM_INTAKE_CONFIG.SECTIONS`
+  live on each call rather than a value captured once at load time — this
+  is what actually makes the live-schema override below work: swapping
+  `window.FPHM_INTAKE_CONFIG` after this script has already run takes
+  effect on the very next render, no reload needed. `FPHM.applyLiveSchema
+  (schema)` does that swap (accepts a parsed object or a JSON string, throws
+  if it doesn't look like a real schema so a caller can catch it and keep
+  the hardcoded default instead of rendering a broken form).
+- **Live schema loading (staff-editable, added 2026-09-25)** — the actual
+  question schema lives in the `IntakeFormSchema` SharePoint list (see
+  above), not in code. Each app fetches it differently, matching how it
+  already talks to SharePoint elsewhere: `intake/index.html` calls
+  `fetchLiveSchema()` in `boot()`, which hits the Worker's `GET
+  /api/intake/schema` (the Worker caches the parsed schema in memory for 5
+  minutes per warm isolate — a saved edit can take up to that long to
+  reach a given edge location, not instant); `preview/index.html`/
+  `index.html`/`portal/index.html` fetch it as just another list via their
+  existing delegated Graph session in `loadAll()`, no new permission
+  needed. All three call `FPHM.applyLiveSchema()` on success and silently
+  keep the `js/formConfig.js` default on failure — same offline-tolerant
+  philosophy as everything else here. `INTRO_TEXT`/`LIABILITY_TEXT` in
+  `intake/index.html` are read via `introText()`/`liabilityText()`
+  functions rather than a destructured constant, for the same
+  live-override reason as `formEngine.js`'s `SECTIONS`.
+- **"Edit Intake Questions" tab** (`preview/index.html`, staff-facing,
+  not yet promoted to production `index.html`) — add/remove/reorder
+  sections and questions, edit labels/type/required/options/min-max, and a
+  guided (not raw-JSON) picker for `visibleIf` branching: pick a target
+  question (only ones earlier in the form — a forward reference to an
+  unanswered question can't drive visibility), a comparison
+  (equals/notEquals/in/includes), and a value (a dropdown of the target's
+  own options where it has fixed choices, free text otherwise). Edits a
+  working copy (`schemaDraft`, deep-cloned on load) — nothing touches the
+  live schema until "Save changes", which validates first (no duplicate
+  question ids; every `visibleIf.id` must reference a question that still
+  exists) and refuses to save with a specific error message if either
+  check fails, PATCHes `IntakeFormSchema`, then calls
+  `FPHM.applyLiveSchema()` locally so this app's own Intake Forms tab
+  reflects the change immediately too, not just the public form on its
+  next fetch. Text-field edits (label wording, option lists, intro/
+  liability text) update `schemaDraft` in place WITHOUT a full re-render —
+  same lesson as the public form's own answer inputs (see git history,
+  index.html was originally re-rendering on every keystroke and losing
+  focus/cursor position); only structural changes (add/remove/reorder/type
+  change/`visibleIf` target change) call `renderFormEditor()`.
 - **`intake/index.html`** — the public form. No sign-in (recipients have no
   Microsoft 365 account); autosave + a "Save & continue later" link
   (`?token=<uuid>`) with graceful local-only fallback if the network drops;
   canvas signature pad (mouse + touch); print/PDF view of the final answers.
-  Talks to an Azure Function (`azure-function/`: `host.json`,
-  `local.settings.json.example`, `package.json`, `src/graphClient.js`,
-  `src/functions/intakeStart.js`/`intakeLoad.js`/`intakeSave.js`/
-  `intakeSubmit.js` — not part of this GitHub Pages deployment, deploy
-  separately; **no SETUP.md exists in this repo's copy** — the standalone
-  `FPHM Intake Form` project's own SETUP.md, referenced below, is the only
-  deploy documentation that currently exists), which holds
-  its own tightly-scoped app-only Graph credential (`Sites.Selected`,
-  granted to just this one SharePoint site) so it can create/update/submit
-  the recipient's session without any staff/minister credential ever
-  touching a browser the public can reach.
+  Talks to a Cloudflare Worker (`cloudflare-worker/`: `wrangler.toml`,
+  `src/index.js`, `DEPLOY.md` — not part of this GitHub Pages deployment,
+  deployed separately via `wrangler deploy`, live and verified working at
+  `https://fphm-intake-func.ajjamoore.workers.dev`), which holds its own
+  tightly-scoped app-only Graph credential (`Sites.Selected`, granted to
+  just this one SharePoint site) so it can create/update/submit the
+  recipient's session without any staff/minister credential ever touching
+  a browser the public can reach. **Originally built as an Azure
+  Function** (`azure-function/SETUP.md` in this repo still has that
+  abandoned setup guide, preserved 2026-09-25 when the standalone `FPHM
+  Intake Form` project's GitHub repo was deleted — see "Not yet done"
+  below — kept only as historical reference, not the live path) —
+  switched to Cloudflare Workers the same day after discovering the
+  account with the right Entra/SharePoint roles had no Azure
+  subscription, and the user didn't want to open one just for this;
+  Cloudflare was already in use for the WhatsApp notification feature, so
+  this reuses that same free-tier account rather than adding a new one.
+  The `Sites.Selected` grant to the "FPHM Intake Form" Entra app
+  registration (Client ID `5580dcc8-7837-48fe-a0cf-92eda3959cb0`) carried
+  over unchanged — only where the credential runs changed, not the
+  credential itself or the SharePoint-side permission model.
 - **Staff view** — a new "Intake Forms" tab, currently in
   `preview/index.html` only (not yet promoted to production `index.html` —
   see "Not yet done" below): Submitted/In-progress list, search, full
   detail view, print/PDF. Reads `IntakeResponses` directly via the same
   delegated Graph session as every other tab (`Sites.ReadWrite.All`,
-  already consented) — no Azure Function involved for reads, staff already
-  have real permissions.
+  already consented) — no Worker involved for reads, staff already have
+  real permissions.
 - **Recipient matching** — same convention as the existing "recipient
   session history" panel in the session modal: matched by name only (no
   persistent recipient record to join on). `findIntakeForRecipient()` in
@@ -648,15 +724,26 @@ existing session history.
   explicitly a preview build; `index.html` has no Intake Forms tab and
   doesn't load `js/formConfig.js`/`js/formEngine.js` yet (see "Architecture"
   above). Follow the normal "Deployment workflow" above to promote once
-  it's been tested at the live preview URL. The standalone `FPHM Intake
-  Form` project/repo this was merged from should also be retired (repo
-  deletion is destructive — left for the user to decide/do, not done
-  automatically). The Azure Function isn't deployed yet as of this merge —
-  `intake/js/apiClient.js`'s `FUNCTION_BASE_URL` is still a placeholder, so
-  the public form currently runs in its local-only offline fallback mode
-  for real users until that's
-  done (see the standalone project's SETUP.md for the deploy steps, still
-  valid as-is).
+  it's been tested at the live preview URL. **The standalone `FPHM Intake
+  Form` project's GitHub repo (`FPHM2026/prayer-intake`) was deleted
+  2026-09-25** (at the user's request, this merge already confirmed
+  complete) — its Azure deploy guide was copied into this repo first as
+  `azure-function/SETUP.md` before deletion, so nothing was lost, even
+  though that path was abandoned for Cloudflare the same day; the local
+  folder (`H:\My Drive\Claude\FPHM Intake Form`) still exists on disk as
+  an unlinked historical reference if ever needed, just not on GitHub
+  anymore. Unlike that abandoned path, **the Cloudflare Worker actually
+  is deployed and live-verified** — `intake/js/apiClient.js`'s
+  `FUNCTION_BASE_URL` points at it for real, so the public form is no
+  longer running in its offline fallback mode for real users. The **"Edit
+  Intake Questions" tab is also preview-only so far** — same promotion
+  step needed. It also can't edit `INTRO_TEXT`/`LIABILITY_TEXT` (the
+  framework-explanation intro screen and the liability release wording) —
+  only `SECTIONS` — and has no raw-JSON fallback for a `visibleIf` shape
+  the guided picker can't express (per the explicit 2026-09-25 decision to
+  keep the picker guided-only rather than exposing the schema directly);
+  either would mean hand-editing `js/formConfig.js`'s shape or extending
+  the editor later if that's ever actually needed.
 
 ## Not yet built
 - **Calendar (month grid) view** — was planned but never built in this HTML

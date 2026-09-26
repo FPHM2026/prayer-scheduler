@@ -1,14 +1,14 @@
 /* =========================================================================
-   API CLIENT — talks to the Azure Function backend (azure-function/) which
-   holds the app-only Graph credential and writes to the IntakeResponses
-   SharePoint list. The public form never talks to Graph/SharePoint
-   directly (it has no sign-in), only to these four endpoints.
-
-   Set FUNCTION_BASE_URL after you deploy the Azure Function App — see
-   SETUP.md. Example: "https://fphm-intake-func.azurewebsites.net/api"
+   API CLIENT — talks to the Cloudflare Worker backend (cloudflare-worker/)
+   which holds the app-only Graph credential and writes to the
+   IntakeResponses SharePoint list. The public form never talks to
+   Graph/SharePoint directly (it has no sign-in), only to these four
+   endpoints. (Originally an Azure Function - switched to Cloudflare
+   Workers 2026-09-25 to avoid opening a new Azure subscription; see
+   cloudflare-worker/DEPLOY.md.)
 ========================================================================= */
 
-const FUNCTION_BASE_URL = "https://REPLACE-WITH-YOUR-FUNCTION-APP.azurewebsites.net/api";
+const FUNCTION_BASE_URL = "https://fphm-intake-func.ajjamoore.workers.dev/api";
 
 const FPHM_API = {
   async start(recipientName, recipientEmail) {
@@ -22,6 +22,17 @@ const FPHM_API = {
   },
   async submit(token, responses, signatureDataUrl) {
     return post("/intake/submit", { token, responses, signatureDataUrl });
+  },
+  // The staff-editable question schema (see the Form Editor tab in
+  // preview/index.html and the IntakeFormSchema SharePoint list). GET,
+  // not POST - a pure read, no body.
+  async schema() {
+    const res = await fetch(FUNCTION_BASE_URL + "/intake/schema");
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`Request to /intake/schema failed (${res.status}): ${text.slice(0, 300)}`);
+    }
+    return res.json();
   }
 };
 
