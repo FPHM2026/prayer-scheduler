@@ -920,6 +920,22 @@ const MSAL_CONFIG = {
 const GRAPH_SCOPES = ["Sites.ReadWrite.All", "User.Read"];
 const SITE_URL = "https://creeksidechurch.sharepoint.com/sites/FreedomPrayer";
 
+// WhatsApp booking notifications — calls the fphm-whatsapp-notify Cloudflare
+// Worker, which holds the real Meta WhatsApp credentials server-side. This
+// shared secret is a bearer token the Worker requires from callers; since
+// this is a public static file, anyone could read it out of the page source
+// and call the Worker themselves — an accepted, low-stakes tradeoff (worst
+// case: a few cents of spam template messages), not a real access boundary.
+const WHATSAPP_NOTIFY = {
+  workerUrl: "https://fphm-whatsapp-notify.ajjamoore.workers.dev/notify",
+  sharedSecret: "b1c2a40435ceb1ce60e247c16c0fe2d3aa75ee53f2c6acf6",
+  // The "prayer_session_booked" template was approved in WhatsApp Manager
+  // and live-tested (2026-09-25, real send to a verified test number via
+  // curl) before this was flipped to false. Set back to true to validate
+  // without actually sending, e.g. while testing a change to this section.
+  dryRun: false
+};
+
 // List display names as created in SharePoint — edit here if yours differ.
 // "Prospects" is intentionally not listed here — Planning is now just
 // PrayerSessions filtered to Status="Waiting" (see CLAUDE.md for the
@@ -1208,6 +1224,11 @@ async function loadAll(){
       apptType: s.ApptType||'First', status: s.Status||'Scheduled',
       prevId: s.PreviousSessionId||null,
       waCreated: !!s.WaCreated, waLink: s.WaLink||'',
+      // Whether the assigned ministers have been sent a WhatsApp booking
+      // notification for this session. Reads false/undefined safely if the
+      // WaNotified column doesn't exist in SharePoint yet (same convention
+      // as Contacted below).
+      waNotified: !!s.WaNotified,
       priority: !!s.Priority,
       // Contacted: whether the admin has reached out to this waiting entry -
       // a manual record of an external action, same pattern as WaCreated.
@@ -1484,8 +1505,7 @@ function scheduleSessionRow(s){
       <div class="sess-meta">${fmtDate(new Date(s.date+'T'+s.time))} · ${fmt12(s.time)}–${fmt12(s.endTime)} · ${escapeHtml(sessionLocationDisplay(s))}</div>
       <div class="sess-meta">${escapeHtml(ministerNamesOf(s))}</div>
       ${s.notes ? `<div class="sess-meta">${escapeHtml(s.notes)}</div>` : ''}
-      <button type="button" class="wa-note ${s.waCreated?'on':''}" aria-pressed="${s.waCreated?'true':'false'}" onclick="toggleWa(${s.id})" style="cursor:pointer;background:none;border:none;padding:4px 0;font-family:inherit;">${ICONS.chat} ${s.waCreated?'WhatsApp group created':'No WhatsApp group yet — tap to mark created'}</button>
-      ${s.waCreated && s.waLink ? ` · <a href="${escapeHtml(s.waLink)}" target="_blank" rel="noopener">open chat</a>` : ''}
+      ${waSectionHtml(s)}
     </div>
     <div class="sess-actions">
       ${s.status!=='Completed' ? `<button class="icon-btn success" onclick="markComplete(${s.id})" title="Mark Completed" aria-label="Mark session for ${escapeHtml(s.recipName)} as completed">${ICONS.checkCircle}</button>` : ''}
@@ -1558,6 +1578,68 @@ window.toggleWa = async function(id){
   const newVal = !s.waCreated;
   await updateItem('sessions', id, { WaCreated: newVal, WaLink: newVal ? s.waLink : '' });
   await loadAll();
+};
+// The WhatsApp-group toggle/link plus the "Notify ministers" button - shared
+// markup used by every place a session's details are shown (the live Booked
+// slot card, the unlinked-session fallback card, and the old Schedule tab's
+// row), so the three don't drift out of sync with each other.
+function waSectionHtml(s){
+  return `<button type="button" class="wa-note ${s.waCreated?'on':''}" aria-pressed="${s.waCreated?'true':'false'}" onclick="toggleWa(${s.id})" style="cursor:pointer;background:none;border:none;padding:4px 0;font-family:inherit;">${ICONS.chat} ${s.waCreated?'WhatsApp group created':'No WhatsApp group yet — tap to mark created'}</button>
+    ${s.waCreated && s.waLink ? ` · <a href="${escapeHtml(s.waLink)}" target="_blank" rel="noopener">open chat</a>` : ''}
+    ${s.waCreated && s.waLink && s.ministers.length ? `<br><button type="button" class="wa-note ${s.waNotified?'on':''}" onclick="notifyMinistersWhatsApp(${s.id})" style="cursor:pointer;background:none;border:none;padding:4px 0;font-family:inherit;">${ICONS.chat} ${s.waNotified?'Ministers notified — tap to re-send':'Notify ministers via WhatsApp'}</button>` : ''}`;
+}
+// Normalizes a minister's free-typed Phone field to E.164 for the WhatsApp
+// API. Assumes US numbers (10 digits, or 11 starting with a leading 1) since
+// that's this ministry's roster; a number already starting with "+" is
+// trusted as-is. Returns null if nothing usable is on file.
+function toE164(raw){
+  const digits = (raw||'').replace(/\D/g,'');
+  if(raw && raw.trim().startsWith('+') && digits.length>=7) return raw.trim();
+  if(digits.length===10) return '+1'+digits;
+  if(digits.length===11 && digits[0]==='1') return '+'+digits;
+  return null;
+}
+window.notifyMinistersWhatsApp = async function(id){
+  const s = sessions.find(x=>x.id===id);
+  if(!s || !s.waLink) return;
+  const assigned = s.ministers.map(ref=>ministers.find(x=>x.id===ref.id)).filter(Boolean);
+  const withPhone = assigned.map(m=>({m, to: toE164(m.phone)})).filter(x=>x.to);
+  const withoutPhone = assigned.filter(m=>!toE164(m.phone));
+  if(!withPhone.length){
+    showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">No WhatsApp numbers on file</div><div>None of the assigned ministers have a usable phone number.</div>`);
+    return;
+  }
+  const ok = await askConfirm(
+    `Send a WhatsApp notification to ${withPhone.length} minister${withPhone.length===1?'':'s'} for ${s.recipName}'s session${withoutPhone.length?` (skipping ${withoutPhone.length} with no phone on file)`:''}?${WHATSAPP_NOTIFY.dryRun?' (dry run — no message will actually be sent)':''}`,
+    { confirmLabel: 'Notify', danger: false }
+  );
+  if(!ok) return;
+  const results = await Promise.all(withPhone.map(async ({m, to})=>{
+    try{
+      const resp = await fetch(WHATSAPP_NOTIFY.workerUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + WHATSAPP_NOTIFY.sharedSecret },
+        body: JSON.stringify({
+          to, recipientName: s.recipName, sessionDate: fmtDate(new Date(s.date+'T'+s.time)),
+          sessionTime: fmt12(s.time), groupLink: s.waLink, dryRun: WHATSAPP_NOTIFY.dryRun
+        })
+      });
+      const data = await resp.json();
+      return { m, ok: resp.ok, data };
+    }catch(e){
+      return { m, ok: false, data: { error: e.message } };
+    }
+  }));
+  const failed = results.filter(r=>!r.ok);
+  if(failed.length){
+    showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">${failed.length} notification${failed.length===1?'':'s'} failed</div>${failed.map(f=>`<div>${escapeHtml(f.m.name)}: ${escapeHtml(f.data.error||'Unknown error')}</div>`).join('')}`);
+  } else if(WHATSAPP_NOTIFY.dryRun){
+    showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Dry run OK</div><div>Would notify: ${results.map(r=>escapeHtml(r.m.name)).join(', ')}</div>`);
+  }
+  if(!WHATSAPP_NOTIFY.dryRun && results.some(r=>r.ok)){
+    await updateItem('sessions', id, { WaNotified: true });
+    await loadAll();
+  }
 };
 window.editSession = function(id){ openModal(sessions.find(s=>s.id===id)); };
 window.openFollowup = function(id){ openModal(null, sessions.find(s=>s.id===id), {forceKind:'session'}); };
@@ -2264,6 +2346,7 @@ function renderUnlinkedSessionCard(s){
       <div class="slot-detail-row">Team: ${escapeHtml(ministerNamesOf(s))||'<span class="helptext">None assigned</span>'}</div>
       ${s.location?`<div class="slot-detail-row">${escapeHtml(sessionLocationDisplay(s))}</div>`:''}
       ${s.notes?`<div class="notes">${escapeHtml(s.notes)}</div>`:''}
+      <div class="slot-detail-row">${waSectionHtml(s)}</div>
       <div class="toolbar" style="margin-top:10px;">
         <button class="btn secondary" onclick="assignSlotToSession(${s.id},this)">Assign to a Slot</button>
         <button class="icon-btn" onclick="addToCalendar(${s.id})" title="Add to Calendar" aria-label="Add session for ${escapeHtml(s.recipName)} to your calendar">${ICONS.calendarPlus}<span class="btn-label">Add to Calendar</span></button>
@@ -2597,6 +2680,7 @@ function renderBookedBody(sl){
     <div class="slot-detail-row">Team: ${escapeHtml(ministerNamesOf(linked))}</div>
     <div class="slot-detail-row">${escapeHtml(sessionLocationDisplay(linked))}</div>
     ${linked.notes?`<div class="notes">${escapeHtml(linked.notes)}</div>`:''}
+    <div class="slot-detail-row">${waSectionHtml(linked)}</div>
     <div class="toolbar" style="margin-top:10px;">
       <button class="icon-btn" onclick="addToCalendar(${linked.id})" title="Add to Calendar" aria-label="Add session for ${escapeHtml(linked.recipName)} to your calendar">${ICONS.calendarPlus}<span class="btn-label">Add to Calendar</span></button>
       <button class="icon-btn" onclick="editBookedSession(${sl.id},${linked.id})" title="Edit" aria-label="Edit session for ${escapeHtml(linked.recipName)}">${ICONS.pencil}<span class="btn-label">Edit</span></button>
@@ -4580,7 +4664,13 @@ function buildReportSection(typeInfo, from, to){
 
   return `
     <section class="report-section">
-      <h2>${escapeHtml(label)}</h2>
+      <div class="section-head">
+        <h2>${escapeHtml(label)}</h2>
+        <div class="section-toggle no-print">
+          <button type="button" onclick="setSectionYears(this.closest('.report-section'),true)">Expand years</button>
+          <button type="button" onclick="setSectionYears(this.closest('.report-section'),false)">Collapse years</button>
+        </div>
+      </div>
       <div class="table-scroll">
       <table class="year-table">
         <thead><tr>${theadCols}</tr></thead>
@@ -4614,14 +4704,18 @@ function generateReport(){
     tr.detail-row:not(.month-row)>td{padding:12px 10px 16px 18px;}
     tr.month-row td.month-label{padding-left:18px;}
   }
-  .toolbar{display:flex;justify-content:flex-end;margin-bottom:10px;}
+  .toolbar{display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
   .toolbar button{background:#f28a00;color:#1a1a1a;border:none;padding:9px 18px;border-radius:6px;font-weight:700;font-size:14px;cursor:pointer;font-family:Georgia,'Times New Roman',serif;}
   .toolbar button:hover{background:#ce7500;}
   h1{color:#8a4a30;font-size:24px;margin:0 0 6px;}
   .range{color:#6b6b6b;font-size:14px;margin:0 0 30px;}
   .report-section{margin-bottom:34px;}
   .report-section:last-child{margin-bottom:0;}
-  .report-section h2{font-size:16.5px;color:#474747;margin:0 0 14px;border-bottom:1px solid #ddd5c4;padding-bottom:9px;font-weight:700;}
+  .section-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;border-bottom:1px solid #ddd5c4;padding-bottom:9px;margin:0 0 14px;flex-wrap:wrap;}
+  .report-section h2{font-size:16.5px;color:#474747;margin:0;font-weight:700;}
+  .section-toggle{display:flex;gap:8px;}
+  .section-toggle button{background:none;border:1px solid #ddd5c4;color:#8a4a30;padding:4px 10px;border-radius:5px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:Georgia,'Times New Roman',serif;}
+  .section-toggle button:hover{background:#f3ead9;}
   table.year-table{width:100%;min-width:620px;border-collapse:collapse;margin:0 0 10px;font-size:13.5px;}
   table.year-table th,table.year-table td{text-align:left;padding:9px 11px;border-bottom:1px solid #f1ede4;}
   table.year-table th{font-size:11px;text-transform:uppercase;color:#6b6b6b;letter-spacing:.03em;font-weight:700;}
@@ -4661,7 +4755,9 @@ function generateReport(){
 </style></head><body>
   <div class="wrap">
     <div class="toolbar no-print">
-      <button type="button" onclick="document.querySelectorAll('[hidden]').forEach(function(el){el.hidden=false;});document.querySelectorAll('[id^=chev-]').forEach(function(c){c.textContent='▾';});window.print();">Print</button>
+      <button type="button" onclick="setAllYears(true)">Expand All Years</button>
+      <button type="button" onclick="setAllYears(false)">Collapse All Years</button>
+      <button type="button" onclick="window.print()">Print</button>
     </div>
     <h1>Ministry Statistics</h1>
     <p class="range">${escapeHtml(fmtShort(from))} – ${escapeHtml(fmtShort(to))}</p>
@@ -4682,6 +4778,36 @@ function generateReport(){
       rows.forEach(function(el){ el.hidden = makeHidden; });
       var chev = document.getElementById('chev-'+id);
       if(chev) chev.textContent = makeHidden ? '▸' : '▾';
+    }
+    // Expands/collapses every year row within one section (or, via
+    // setAllYears, every section) without touching any "Show minister
+    // breakdown" toggle nested inside - those stay exactly as they were,
+    // so "expand all years" never also reveals per-minister detail nobody
+    // asked to see.
+    function setSectionYears(sectionEl, expand){
+      if(!sectionEl) return;
+      sectionEl.querySelectorAll('tr.year-row').forEach(function(row){
+        var chev = row.querySelector('[id^="chev-"]');
+        if(!chev) return;
+        var yid = chev.id.slice(5);
+        var rows = document.querySelectorAll('[data-group="'+yid+'"]');
+        rows.forEach(function(el){ el.hidden = !expand; });
+        chev.textContent = expand ? '▾' : '▸';
+        if(!expand){
+          // Collapsing a year also resets any minister breakdown left open
+          // inside it, so a later re-expand doesn't silently start pre-opened.
+          rows.forEach(function(el){
+            el.querySelectorAll('[id^="mb-"]').forEach(function(mb){
+              mb.hidden = true;
+              var mbChev = document.getElementById('chev-'+mb.id);
+              if(mbChev) mbChev.textContent = '▸';
+            });
+          });
+        }
+      });
+    }
+    function setAllYears(expand){
+      document.querySelectorAll('.report-section').forEach(function(sec){ setSectionYears(sec, expand); });
     }
   <\/script>
 </body></html>`;
@@ -4715,6 +4841,9 @@ const CHANGE_LOG = [
     'New: on the public form\'s signature step, a visitor can now type their name instead of drawing with a mouse or finger - it renders in a cursive script font on the same signature pad, so submissions still save the same way.'
   ]},
   { date: 'Sep 25, 2026', version: '2026-09-25.1', items: [
+    'WhatsApp booking notifications are now live (no longer dry-run) — the "Notify via WhatsApp" button on a session with a WhatsApp group created sends a real WhatsApp message to each assigned minister with a phone number on file.'
+  ]},
+  { date: 'Sep 24, 2026', version: '2026-09-25.1', items: [
     'New: the public Intake Form is fully live - submissions really do save to SharePoint now, via a Cloudflare Worker (not the originally-planned Azure Function, switched after finding no Azure subscription was available and the team didn\'t want to open one).',
     'New: "Edit Intake Questions" tab - add, remove, reorder and reword sections and questions, including the "show this only if" branching logic, without any code change or deploy. Saves to a new IntakeFormSchema SharePoint list; the public form and this app both pick up a saved change immediately.',
     'Fixed: the "Freedom Intake" account needed a SharePoint Administrator role and a fresh Sites.Selected grant before the Worker could actually write to SharePoint - the original grant attempt had silently never taken effect.'
@@ -4722,7 +4851,10 @@ const CHANGE_LOG = [
   { date: 'Sep 24, 2026', version: '2026-09-24.11', items: [
     'New: a public digital Intake Form (at /intake/) recipients fill out before their first session - 88 questions, save-and-resume via a link, signature pad.',
     'New: a staff "Intake Forms" tab here to review submitted/in-progress forms, search, and print/PDF a recipient\'s answers.',
-    'New: the minister portal has a "View intake form" link on a recipient\'s session card, for ministers assigned to that recipient.'
+    'New: the minister portal has a "View intake form" link on a recipient\'s session card, for ministers assigned to that recipient.',
+    'New: a "Notify via WhatsApp" button on a session with a WhatsApp group already created — sends each assigned minister a WhatsApp message with the session details and group link, via an external notification service. Currently running in dry-run mode (validates everything but doesn\'t actually send) until the WhatsApp message template is approved by Meta - flip WHATSAPP_NOTIFY.dryRun to false in the code once that happens. Requires a new "WaNotified" (Yes/No) column on PrayerSessions in SharePoint, not yet added.',
+    'Fixed: printing a Report no longer force-expands every year and minister breakdown - Print now just prints whatever is currently expanded on screen.',
+    'New: "Expand All Years" / "Collapse All Years" buttons on the Report page, both a global pair at the top and one pair per section (Freedom Sessions, Sunday Drop-In, Training). These only expand/collapse the year rows - any "Show minister breakdown" toggle stays exactly as it was.'
   ]}
 ];
 // Entries already live in production, newest first - moved here from
