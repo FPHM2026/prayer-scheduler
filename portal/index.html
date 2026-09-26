@@ -132,7 +132,26 @@
   .ans-q{font-weight:700;font-size:var(--fs-xs);color:var(--muted);}
   .ans-a{font-size:var(--fs-sm);white-space:pre-wrap;}
   .intake-link-row{margin-top:8px;}
-  @media print{ .no-print{display:none!important;} }
+  .legal-text{font-size:var(--fs-sm);color:var(--muted);background:var(--cream);padding:14px;border-radius:8px;}
+  .rich-text p{margin:0 0 1em;} .rich-text p:last-child{margin-bottom:0;}
+  .rich-text ul,.rich-text ol{margin:0 0 1em;padding-left:1.4em;}
+  #intakePrintArea{display:none;}
+  @media print{
+    .no-print{display:none!important;}
+    /* Isolate #intakePrintArea for print (printIntakeView() above) -
+       everything else hidden via visibility rather than display, and
+       #intakePrintArea repositioned to the page origin, since a modal
+       (position:fixed) can't reliably print itself in place across
+       browsers. Same two-column question/answer print layout as the
+       recipient's own printout and the staff Intake Forms tab. */
+    body.printing-intake > *{visibility:hidden;}
+    body.printing-intake #intakePrintArea{visibility:visible;display:block;position:absolute;left:0;top:0;width:100%;}
+    body.printing-intake #intakePrintArea *{visibility:visible;}
+    #intakePrintArea .ans-section{margin-bottom:14px;}
+    #intakePrintArea .ans-row{flex-direction:row;align-items:baseline;gap:10px;margin-bottom:5px;break-inside:avoid;}
+    #intakePrintArea .ans-q{flex:0 0 30%;max-width:30%;font-size:.78rem;}
+    #intakePrintArea .ans-a{flex:1 1 auto;font-size:.85rem;}
+  }
 
   #signinScreen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:20px;background:var(--cream);}
   #signinScreen .helptext{color:var(--navy);font-size:var(--fs-sm);max-width:360px;}
@@ -336,9 +355,11 @@
     <div id="intakeViewBody"></div>
     <div class="modal-actions no-print">
       <button class="btn secondary" id="btnIntakeViewClose">Close</button>
+      <button class="btn" id="btnIntakeViewPrint">Print / Save as PDF</button>
     </div>
   </div>
 </div>
+<div id="intakePrintArea"></div>
 
 <div class="modal-bg" id="confirmModal">
   <div class="modal small" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
@@ -615,8 +636,7 @@ function mySessions(){ return sessions.filter(s=> s.ministers.some(m=>m.id===me.
 function intakeLinkRowFor(name){
   const match = findMyIntakeForRecipient(name);
   if(!match) return '';
-  const label = match.status==='Submitted' ? 'View intake form' : 'View intake form (in progress)';
-  return `<div class="intake-link-row"><button type="button" class="btn secondary" onclick="openIntakeView(${match.id})">${escapeHtml(label)}</button></div>`;
+  return `<div class="intake-link-row"><button type="button" class="btn secondary" onclick="openIntakeView(${match.id})">View intake form</button></div>`;
 }
 
 // A minister can only see an intake form for a recipient they actually
@@ -624,7 +644,11 @@ function intakeLinkRowFor(name){
 // tradeoff as everywhere else in this app (see main CLAUDE.md gotcha
 // #11): the "Ministers" SharePoint group has Read on the whole
 // IntakeResponses list, not per-item, so this is a UI-level boundary,
-// not a real security one.
+// not a real security one. Submitted only, deliberately - an in-progress
+// form isn't a finished record yet and a minister has no business
+// (staff's own linking/unlinking above is admin-only too, portal has no
+// equivalent) seeing a recipient's answers before they've actually
+// finished and signed.
 function findMyIntakeForRecipient(name){
   if(!name) return null;
   const myMatching = mySessions().filter(s=>s.recipName.trim().toLowerCase()===name.trim().toLowerCase());
@@ -635,28 +659,53 @@ function findMyIntakeForRecipient(name){
   const linkedId = myMatching.map(s=>s.intakeResponseId).find(id=>id!=null);
   if(linkedId){
     const linked = intakeResponses.find(i=>i.id===linkedId);
-    if(linked) return linked;
+    if(linked && linked.status==='Submitted') return linked;
   }
   const norm = name.trim().toLowerCase();
-  const matches = intakeResponses.filter(i => (i.recipName||'').trim().toLowerCase()===norm);
+  const matches = intakeResponses.filter(i => i.status==='Submitted' && (i.recipName||'').trim().toLowerCase()===norm);
   if(!matches.length) return null;
-  matches.sort((a,b)=>{
-    if((a.status==='Submitted') !== (b.status==='Submitted')) return a.status==='Submitted' ? -1 : 1;
-    return new Date(b.submittedAt||b.created||0) - new Date(a.submittedAt||a.created||0);
-  });
+  matches.sort((a,b)=> new Date(b.submittedAt||b.created||0) - new Date(a.submittedAt||a.created||0));
   return matches[0];
 }
+// Ministers only ever reach this for a Submitted form (see
+// findMyIntakeForRecipient() above) - no in-progress branch needed here.
+let intakeViewingId = null;
 window.openIntakeView = function(id){
   const i = intakeResponses.find(x=>x.id===id);
   if(!i) return;
+  intakeViewingId = id;
   $('#intakeViewTitle').textContent = i.recipName || '(name not yet entered)';
-  $('#intakeViewMeta').textContent = i.status==='Submitted'
-    ? `${i.recipEmail||''} — Submitted ${fmtShort((i.submittedAt||'').split('T')[0])}`
-    : `${i.recipEmail||''} — In progress`;
+  $('#intakeViewMeta').textContent = `${i.recipEmail||''} — Submitted ${fmtShort((i.submittedAt||'').split('T')[0])}`;
   $('#intakeViewBody').innerHTML = FPHM.renderResponsesHtml(i.responses) +
     (i.signatureDataUrl ? `<h3>Signature</h3><img src="${i.signatureDataUrl}" alt="Signature" style="max-width:280px;border:1px solid var(--border);border-radius:8px;background:#fff;">` : '');
   $('#intakeViewModal').classList.add('open');
 };
+// Print/PDF for a minister's read-only view - same document shape as the
+// recipient's own printout (intake/index.html's #printArea): answers
+// first, then the Liability Release wording and signature together at
+// the bottom. A modal can't reliably print on its own (position:fixed
+// overlays behave inconsistently across browsers' print engines), so
+// this builds a separate, normally-hidden #intakePrintArea and isolates
+// it for print via the .printing-intake body class below rather than
+// printing the modal in place.
+window.printIntakeView = function(){
+  const i = intakeResponses.find(x=>x.id===intakeViewingId);
+  if(!i) return;
+  const liability = window.FPHM_INTAKE_CONFIG.LIABILITY_TEXT || { title:'', body:'' };
+  $('#intakePrintArea').innerHTML = `
+    <h1>${escapeHtml(i.recipName || '(name not yet entered)')}</h1>
+    <p>${escapeHtml(i.recipEmail||'')} — Submitted ${escapeHtml(fmtShort((i.submittedAt||'').split('T')[0]))}</p>
+    ${FPHM.renderResponsesHtml(i.responses)}
+    <section class="ans-section">
+      <h2>${escapeHtml(liability.title)}</h2>
+      <div class="legal-text rich-text">${FPHM.liabilityBodyHtml(liability.body)}</div>
+      ${i.signatureDataUrl ? `<div class="ans-row" style="flex-direction:column;"><div class="ans-q">Signature</div><img src="${i.signatureDataUrl}" alt="Signature" style="max-width:280px;border:1px solid var(--border);border-radius:8px;background:#fff;margin-top:6px;"></div>` : ''}
+    </section>
+  `;
+  document.body.classList.add('printing-intake');
+  window.print();
+};
+window.addEventListener('afterprint', () => document.body.classList.remove('printing-intake'));
 
 /* ---- ADD TO CALENDAR (.ics download) - same mechanism and title rule as
    the main app's version; kept duplicated since this app has no shared
@@ -1069,6 +1118,7 @@ function wireApp(){
   $('#btnConfirmCancel').addEventListener('click', ()=>closeConfirm(false));
   $('#btnConfirmOk').addEventListener('click', ()=>closeConfirm(true));
   $('#btnIntakeViewClose').addEventListener('click', ()=>$('#intakeViewModal').classList.remove('open'));
+  $('#btnIntakeViewPrint').addEventListener('click', printIntakeView);
   document.querySelectorAll('.modal-bg').forEach(bg=>{
     bg.addEventListener('click', (e)=>{
       if(e.target!==bg) return;

@@ -814,6 +814,22 @@ existing session history.
   silently inherited from the BlackoutDates precedent. Revisit if a stronger
   boundary is ever wanted (would mean routing minister reads through a
   server-side check instead of direct Graph access).
+  **Submitted forms only** (tightened 2026-09-26, at the user's explicit
+  request) — `findMyIntakeForRecipient()` now filters out InProgress
+  matches entirely, both in the staff-link lookup and the plain
+  name-match fallback; a minister has no reason to see a recipient's
+  answers before they've actually finished and signed, and staff's own
+  linking/unlinking is admin-only with no equivalent in this app. The
+  view modal is otherwise unchanged read-only (no edit/link/unlink here,
+  ever) except for a new **"Print / Save as PDF"** button
+  (`printIntakeView()`) — the modal itself can't reliably print in place
+  (a `position:fixed` overlay behaves inconsistently across browsers'
+  print engines), so this builds the same document shape as the
+  recipient's own printout (answers, then the Liability Release wording
+  and signature together at the bottom) into a separate, normally-hidden
+  `#intakePrintArea`, isolated for print via a `.printing-intake` body
+  class (`visibility:hidden` on everything else, that one area repositioned
+  to the page origin) rather than the modal itself.
 - **Not yet done**: **not promoted to production** — the merge commit was
   explicitly a preview build; `index.html` has no Intake Forms tab and
   doesn't load `js/formConfig.js`/`js/formEngine.js` yet (see "Architecture"
