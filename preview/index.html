@@ -742,6 +742,7 @@
         <span id="formEditorDirtyBadge" class="tag" style="display:none;">Unsaved changes</span>
       </div>
       <p class="errbox" role="alert" id="formEditorMsg" hidden></p>
+      <div id="formEditorIntro"></div>
       <div id="formEditorSections"></div>
       <div class="toolbar" style="margin-top:16px;">
         <button class="btn secondary" id="btnFormEditorAddSection">+ Add section</button>
@@ -3946,9 +3947,41 @@ function describeVisibleIf(cond){
   return null;
 }
 
+// The framework-explanation intro screen and the liability release
+// wording aren't questions - they don't live in SECTIONS, so they get
+// their own small editor above the sections list rather than being
+// squeezed into the same add/reorder/branching UI those use.
+function renderFormEditorIntro(){
+  const box = $('#formEditorIntro');
+  if(!box || !schemaDraft) return;
+  const opened = openState(box);
+  const intro = schemaDraft.INTRO_TEXT || { title: '', body: [] };
+  const wasOpen = opened.has('intro-text') ? opened.get('intro-text') : false;
+  const summaryHtml = escapeHtml(`${(intro.body||[]).length} paragraph${(intro.body||[]).length===1?'':'s'}`);
+  const body = `
+    <div class="field"><label>Screen title</label>
+      <input type="text" value="${escapeHtml(intro.title||'')}" oninput="updateIntroField('title',this.value)">
+    </div>
+    <div class="field"><label>Body text (one paragraph per line)</label>
+      <textarea rows="10" oninput="updateIntroBody(this.value)">${escapeHtml((intro.body||[]).join('\n'))}</textarea>
+    </div>`;
+  box.innerHTML = editorGroupRow('intro-text', 'i', 'Introduction Text', 'First screen', summaryHtml, body, wasOpen, '');
+}
+window.updateIntroField = function(field, value){
+  if(!schemaDraft.INTRO_TEXT) schemaDraft.INTRO_TEXT = { title: '', body: [] };
+  schemaDraft.INTRO_TEXT[field] = value;
+  markSchemaDirty();
+};
+window.updateIntroBody = function(text){
+  if(!schemaDraft.INTRO_TEXT) schemaDraft.INTRO_TEXT = { title: '', body: [] };
+  schemaDraft.INTRO_TEXT.body = text.split('\n').filter(line => line.trim());
+  markSchemaDirty();
+};
+
 function renderFormEditor(){
   const box = $('#formEditorSections');
   if(!box) return;
+  renderFormEditorIntro();
   if(!schemaDraft){ box.innerHTML = '<p class="helptext">Loading…</p>'; return; }
   const opened = openState(box);
   box.innerHTML = schemaDraft.SECTIONS.map((sec,sIdx)=>renderSectionEditor(sec,sIdx,opened)).join('');

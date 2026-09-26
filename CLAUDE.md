@@ -737,12 +737,16 @@ existing session history.
   `FUNCTION_BASE_URL` points at it for real, so the public form is no
   longer running in its offline fallback mode for real users. The **"Edit
   Intake Questions" tab is also preview-only so far** — same promotion
-  step needed. It also can't edit `INTRO_TEXT`/`LIABILITY_TEXT` (the
-  framework-explanation intro screen and the liability release wording) —
-  only `SECTIONS` — and has no raw-JSON fallback for a `visibleIf` shape
-  the guided picker can't express (per the explicit 2026-09-25 decision to
-  keep the picker guided-only rather than exposing the schema directly);
-  either would mean hand-editing `js/formConfig.js`'s shape or extending
+  step needed. It can edit `INTRO_TEXT` (the framework-explanation intro
+  screen, added 2026-09-25 - `renderFormEditorIntro()`, its own small
+  editor above the sections list since it isn't a question and doesn't
+  live in `SECTIONS`) but still not `LIABILITY_TEXT` (the liability
+  release wording on the final signature screen) — nobody's asked for
+  that one edited yet. There's also no raw-JSON fallback for a
+  `visibleIf` shape the guided picker can't express (per the explicit
+  2026-09-25 decision to keep the picker guided-only rather than exposing
+  the schema directly); either would mean hand-editing `js/formConfig.js`'s
+  shape or extending
   the editor later if that's ever actually needed.
 
 ## Not yet built
