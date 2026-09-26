@@ -176,10 +176,10 @@ function renderIntro() {
     <div class="card">
       <h1>${FPHM.escapeHtml(introText().title)}</h1>
       ${introText().body.map((p) => `<p>${FPHM.escapeHtml(p)}</p>`).join("")}
-      <div class="nav-row">
-        <span></span>
-        <button class="btn-primary" id="btnBegin">Begin</button>
-      </div>
+    </div>
+    <div class="nav-row nav-row-sticky">
+      <span></span>
+      <button class="btn-primary" id="btnBegin">Begin</button>
     </div>
   `;
   document.getElementById("btnBegin").onclick = beginIntake;
@@ -217,15 +217,16 @@ function renderSection() {
       <h2>${FPHM.escapeHtml(section.title)}</h2>
       ${section.intro ? `<div class="section-intro">${FPHM.escapeHtml(section.intro)}</div>` : ""}
       <div id="questionsHost">${questions.map((q) => renderQuestion(q)).join("")}</div>
-      <div class="nav-row no-print">
-        <button class="btn-secondary" id="btnBack" ${state.sectionIdx === 0 ? "disabled" : ""}>Back</button>
-        <button class="btn-primary" id="btnNext">Next</button>
-      </div>
       <div class="save-status" id="saveStatus"></div>
+    </div>
+    <div class="nav-row nav-row-sticky no-print">
+      <button class="btn-secondary" id="btnBack" ${state.sectionIdx === 0 ? "disabled" : ""}>Back</button>
+      <button class="btn-primary" id="btnNext">Next</button>
     </div>
   `;
   document.getElementById("offlineBanner").innerHTML = renderOfflineBanner();
   wireQuestionEvents(section);
+  updateNextButtonState(section);
   document.getElementById("btnBack").onclick = () => {
     state.sectionIdx = Math.max(0, state.sectionIdx - 1);
     doSave();
@@ -331,6 +332,7 @@ function wireQuestionEvents(section) {
         state.answers[qid] = el.value;
       }
       clearInvalid(qid);
+      updateNextButtonState(section);
       scheduleSave();
       return;
     }
@@ -370,6 +372,15 @@ function renderSectionInPlace(section) {
   render();
 }
 
+// Keeps the Next button disabled while any required question on the
+// current page is still unanswered, re-checked on every answer change
+// (including plain-text keystrokes, which otherwise skip a full render).
+function updateNextButtonState(section) {
+  const btn = document.getElementById("btnNext");
+  if (!btn) return;
+  btn.disabled = FPHM.validateSection(section, state.answers).length > 0;
+}
+
 function markInvalid(missingIds) {
   missingIds.forEach((id) => {
     const wrap = document.querySelector(`[data-qwrap="${id}"]`);
@@ -407,11 +418,11 @@ function renderFinal() {
         <button class="btn-link" id="btnClearSig">Clear signature</button>
       </div>
       <div class="field-error" id="err_signature"></div>
-      <div class="nav-row no-print" style="margin-top:20px;">
-        <button class="btn-secondary" id="btnBack">Back</button>
-        <button class="btn-primary" id="btnSubmit">Submit</button>
-      </div>
       <div class="save-status" id="saveStatus"></div>
+    </div>
+    <div class="nav-row nav-row-sticky no-print">
+      <button class="btn-secondary" id="btnBack">Back</button>
+      <button class="btn-primary" id="btnSubmit">Submit</button>
     </div>
   `;
   document.getElementById("offlineBanner") && (document.getElementById("offlineBanner").innerHTML = renderOfflineBanner());

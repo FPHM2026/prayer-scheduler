@@ -137,6 +137,21 @@ input:focus, textarea:focus, select:focus {
   margin-top: 8px;
 }
 
+.nav-row-sticky {
+  position: sticky;
+  bottom: 0;
+  background: var(--bg);
+  padding: 12px 0 16px;
+  margin-top: 0;
+  box-shadow: 0 -8px 12px -8px rgba(0,0,0,.12);
+}
+.nav-row-sticky button {
+  flex: 1 1 auto;
+}
+@media print {
+  .nav-row-sticky { position: static; box-shadow: none; }
+}
+
 button {
   font-family: inherit;
   font-size: 1rem;
