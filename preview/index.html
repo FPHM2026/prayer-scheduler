@@ -109,6 +109,12 @@
   button.btn.success:hover:not(:disabled){background:#245f28;}
   button.btn:disabled{opacity:.5;cursor:not-allowed;}
   button.icon-btn{background:none;border:none;cursor:pointer;padding:8px 10px;color:var(--navy);min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;}
+  /* Larger variant for the Form Editor's move/delete row - the plain
+     up/down text arrows read as noticeably smaller/thinner than an SVG
+     icon like trash sitting right next to them, and felt cramped next to
+     the chevron toggle. Bigger, consistently-sized SVGs for all three. */
+  button.icon-btn-lg{padding:10px 14px;min-width:52px;min-height:52px;background:#f7f5f1;border:1px solid var(--border);}
+  button.icon-btn-lg:hover{background:#f1ede4;}
   button.icon-btn:hover{background:#f1ede4;color:var(--gold);}
   button.icon-btn.danger{color:var(--danger);}
   button.icon-btn.danger:hover{background:var(--danger-bg);color:var(--danger);}
@@ -227,10 +233,18 @@
   .group-count{font-size:var(--fs-2xs);color:var(--muted);background:#f1ede4;border-radius:10px;padding:2px 8px;font-weight:700;white-space:nowrap;}
   .group-summary{font-size:var(--fs-sm);color:var(--muted);margin-top:2px;}
   .group-summary .next{color:var(--gold-dark);font-weight:600;}
-  .group-chevron{flex-shrink:0;color:var(--muted);transition:transform .2s ease;}
+  .group-chevron{flex-shrink:0;color:var(--muted);transition:transform .2s ease;pointer-events:none;}
   .group.open .group-chevron{transform:rotate(180deg);}
   .group-body{max-height:0;overflow:hidden;transition:max-height .25s ease;}
-  .group.open .group-body{max-height:3000px;}
+  /* Direct-child combinator, not descendant (space) - the Form Editor
+     nests a question's .group inside its section's .group-body, and a
+     plain descendant selector here would cascade a section being open
+     onto every nested question's body too, regardless of that question's
+     own open/closed state - which is exactly why individual questions
+     couldn't be collapsed while their section stayed open. Every other
+     (non-nested) use of .group/.group-body elsewhere in this app is
+     unaffected, since .group-body is already a direct child there too. */
+  .group.open > .group-body{max-height:3000px;}
   .group-body-inner{padding:0 16px 14px;border-top:1px solid var(--border);}
 
   /* Intake form answers - produced by FPHM.renderResponsesHtml() in
@@ -728,6 +742,7 @@
         <span id="formEditorDirtyBadge" class="tag" style="display:none;">Unsaved changes</span>
       </div>
       <p class="errbox" role="alert" id="formEditorMsg" hidden></p>
+      <div id="formEditorIntro"></div>
       <div id="formEditorSections"></div>
       <div class="toolbar" style="margin-top:16px;">
         <button class="btn secondary" id="btnFormEditorAddSection">+ Add section</button>
@@ -1251,6 +1266,8 @@ const ICONS = {
   check: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>',
   checkCircle: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
   chevron: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>',
+  arrowUp: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>',
+  arrowDown: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>',
   flag: (filled) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="${filled?'currentColor':'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22V4a1 1 0 0 1 1-1h13.5a.5.5 0 0 1 .4.8l-3.6 4.7 3.6 4.7a.5.5 0 0 1-.4.8H5"/></svg>`,
   calendarPlus: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 14v6M9 17h6"/></svg>',
   power: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>',
@@ -4014,9 +4031,41 @@ function describeVisibleIf(cond){
   return null;
 }
 
+// The framework-explanation intro screen and the liability release
+// wording aren't questions - they don't live in SECTIONS, so they get
+// their own small editor above the sections list rather than being
+// squeezed into the same add/reorder/branching UI those use.
+function renderFormEditorIntro(){
+  const box = $('#formEditorIntro');
+  if(!box || !schemaDraft) return;
+  const opened = openState(box);
+  const intro = schemaDraft.INTRO_TEXT || { title: '', body: [] };
+  const wasOpen = opened.has('intro-text') ? opened.get('intro-text') : false;
+  const summaryHtml = escapeHtml(`${(intro.body||[]).length} paragraph${(intro.body||[]).length===1?'':'s'}`);
+  const body = `
+    <div class="field"><label>Screen title</label>
+      <input type="text" value="${escapeHtml(intro.title||'')}" oninput="updateIntroField('title',this.value)">
+    </div>
+    <div class="field"><label>Body text (one paragraph per line)</label>
+      <textarea rows="10" oninput="updateIntroBody(this.value)">${escapeHtml((intro.body||[]).join('\n'))}</textarea>
+    </div>`;
+  box.innerHTML = editorGroupRow('intro-text', 'i', 'Introduction Text', 'First screen', summaryHtml, body, wasOpen, '');
+}
+window.updateIntroField = function(field, value){
+  if(!schemaDraft.INTRO_TEXT) schemaDraft.INTRO_TEXT = { title: '', body: [] };
+  schemaDraft.INTRO_TEXT[field] = value;
+  markSchemaDirty();
+};
+window.updateIntroBody = function(text){
+  if(!schemaDraft.INTRO_TEXT) schemaDraft.INTRO_TEXT = { title: '', body: [] };
+  schemaDraft.INTRO_TEXT.body = text.split('\n').filter(line => line.trim());
+  markSchemaDirty();
+};
+
 function renderFormEditor(){
   const box = $('#formEditorSections');
   if(!box) return;
+  renderFormEditorIntro();
   if(!schemaDraft){ box.innerHTML = '<p class="helptext">Loading…</p>'; return; }
   const opened = openState(box);
   box.innerHTML = schemaDraft.SECTIONS.map((sec,sIdx)=>renderSectionEditor(sec,sIdx,opened)).join('');
@@ -4102,9 +4151,9 @@ function renderSectionEditor(sec, sIdx, opened){
   const visSummary = describeVisibleIf(sec.visibleIf);
   const summaryHtml = escapeHtml([visSummary || 'Always shown', sec.intro ? 'has intro text' : null].filter(Boolean).join(' · '));
   const actions = `
-    <button class="icon-btn" title="Move up" onclick="moveSection(${sIdx},-1)" ${sIdx===0?'disabled':''}>&uarr;</button>
-    <button class="icon-btn" title="Move down" onclick="moveSection(${sIdx},1)" ${sIdx===schemaDraft.SECTIONS.length-1?'disabled':''}>&darr;</button>
-    <button class="icon-btn danger" title="Delete section" onclick="deleteSection(${sIdx})">${ICONS.trash}</button>`;
+    <button class="icon-btn icon-btn-lg" title="Move up" onclick="moveSection(${sIdx},-1)" ${sIdx===0?'disabled':''}>${ICONS.arrowUp}</button>
+    <button class="icon-btn icon-btn-lg" title="Move down" onclick="moveSection(${sIdx},1)" ${sIdx===schemaDraft.SECTIONS.length-1?'disabled':''}>${ICONS.arrowDown}</button>
+    <button class="icon-btn icon-btn-lg danger" title="Delete section" onclick="deleteSection(${sIdx})">${ICONS.trash}</button>`;
   const body = `
     <div class="field"><label>Section title</label>
       <input type="text" value="${escapeHtml(sec.title||'')}" oninput="updateSectionField(${sIdx},'title',this.value)">
@@ -4130,9 +4179,9 @@ function renderQuestionEditor(q, sIdx, qIdx, sec, opened){
   const summaryHtml = escapeHtml([q.required ? 'Required' : 'Optional', visSummary || 'Always shown'].join(' · '));
   const avatar = { text:'Ab', email:'@', number:'#', textarea:'¶', radio:'◉', select:'▾', checkboxes:'☑' }[q.type] || '?';
   const actions = `
-    <button class="icon-btn" title="Move up" onclick="moveQuestion(${sIdx},${qIdx},-1)" ${qIdx===0?'disabled':''}>&uarr;</button>
-    <button class="icon-btn" title="Move down" onclick="moveQuestion(${sIdx},${qIdx},1)" ${qIdx===sec.questions.length-1?'disabled':''}>&darr;</button>
-    <button class="icon-btn danger" title="Delete question" onclick="deleteQuestion(${sIdx},${qIdx})">${ICONS.trash}</button>`;
+    <button class="icon-btn icon-btn-lg" title="Move up" onclick="moveQuestion(${sIdx},${qIdx},-1)" ${qIdx===0?'disabled':''}>${ICONS.arrowUp}</button>
+    <button class="icon-btn icon-btn-lg" title="Move down" onclick="moveQuestion(${sIdx},${qIdx},1)" ${qIdx===sec.questions.length-1?'disabled':''}>${ICONS.arrowDown}</button>
+    <button class="icon-btn icon-btn-lg danger" title="Delete question" onclick="deleteQuestion(${sIdx},${qIdx})">${ICONS.trash}</button>`;
   const body = `
     <div class="field"><label>Question text</label>
       <input type="text" value="${escapeHtml(q.label||'')}" oninput="updateQuestionField(${sIdx},${qIdx},'label',this.value)">
