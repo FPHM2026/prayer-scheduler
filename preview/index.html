@@ -648,6 +648,11 @@
   </section>
 
   <section class="panel" id="panel-intake">
+    <div class="toolbar no-print" style="margin-bottom:12px;">
+      <a class="btn" id="btnOpenIntakeForm" href="../intake/" target="_blank" rel="noopener">Open Intake Form</a>
+      <button class="btn secondary" type="button" id="btnCopyIntakeLink">Copy Link to Intake Form</button>
+      <span class="helptext" id="intakeLinkCopiedMsg" style="display:none;">Link copied!</span>
+    </div>
     <p class="helptext" id="intakeHelptext">Recipients' completed (and in-progress) intake questionnaires. Grouped by status, newest first.</p>
     <nav class="subtabs" aria-label="Intake status" id="intakeSubtabs">
       <button class="active" data-intakestatus="Submitted">Submitted</button>
@@ -953,6 +958,7 @@ const LIST_NAMES = {
 // Relative to this file's own location (preview/) - portal/ is a sibling of
 // the repo root, one level up from here.
 const PORTAL_URL = "../portal/";
+const INTAKE_URL = "../intake/";
 
 const msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
 const msalReady = msalInstance.initialize();
@@ -1438,6 +1444,8 @@ function wireApp(){
   }));
   $('#intakeSearch').addEventListener('input', renderIntake);
   wireSearchClear('intakeSearch');
+  $('#btnOpenIntakeForm').href = absoluteIntakeUrl();
+  $('#btnCopyIntakeLink').addEventListener('click', copyIntakeLink);
   $('#btnFormEditorSave').addEventListener('click', ()=>withLoading($('#btnFormEditorSave'), 'Saving…', saveFormSchema));
   $('#btnFormEditorDiscard').addEventListener('click', discardFormSchemaChanges);
   $('#btnFormEditorAddSection').addEventListener('click', addFormSection);
@@ -3886,6 +3894,22 @@ function renderBlackouts(){
    editing a question there is reflected here automatically, no changes
    needed in this file.
 ========================================================================= */
+function absoluteIntakeUrl(){
+  return new URL(INTAKE_URL, window.location.href).href;
+}
+async function copyIntakeLink(){
+  const url = absoluteIntakeUrl();
+  const msg = $('#intakeLinkCopiedMsg');
+  try {
+    await navigator.clipboard.writeText(url);
+  } catch (e) {
+    window.prompt('Copy this link:', url);
+    return;
+  }
+  msg.style.display = '';
+  clearTimeout(copyIntakeLink._t);
+  copyIntakeLink._t = setTimeout(()=>{ msg.style.display = 'none'; }, 2500);
+}
 function renderIntake(){
   const box = $('#intakeGroups'); const noResults = $('#intakeNoResults');
   const opened = openState(box);
