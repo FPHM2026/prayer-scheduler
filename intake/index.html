@@ -45,7 +45,8 @@ const state = {
   saving: false,
   submitted: false,
   signaturePad: null,
-  duplicateCheckDone: false
+  duplicateCheckDone: false,
+  signatureDataUrl: null
 };
 
 const app = document.getElementById("app");
@@ -186,6 +187,7 @@ async function boot() {
     try {
       const data = await FPHM_API.load(token);
       state.answers = data.responses || {};
+      state.signatureDataUrl = data.signatureDataUrl || null;
       if (data.status === "Submitted") {
         state.submitted = true;
         state.step = STEP.DONE;
@@ -303,6 +305,7 @@ async function resumeWithToken(token) {
   try {
     const data = await FPHM_API.load(token);
     state.answers = data.responses || {};
+    state.signatureDataUrl = data.signatureDataUrl || null;
     if (data.status === "Submitted") {
       state.submitted = true;
       state.step = STEP.DONE;
@@ -346,12 +349,15 @@ async function beginIntake() {
   scrollToTop();
 }
 
-// Lets the visitor delete their own form (in progress or already
-// submitted) and start clean - offered next to "Save & continue later"
-// while filling it out, and on the thank-you screen after submitting, in
-// case they change their mind about having shared it. Uses the plain
-// browser confirm() rather than this app's own modal machinery (it has
-// none - the public form deliberately stays simple), which is fine for a
+// Lets the visitor delete their own in-progress form and start clean -
+// offered next to "Save & continue later" while filling it out. Not
+// offered once a form is Submitted (deliberately, per the user - once
+// staff/ministers may already be relying on it for a scheduled session,
+// the recipient shouldn't be able to pull it out from under them; the
+// Worker's own handleDelete() rejects a Submitted token too, so this
+// isn't just a hidden-button UI restriction). Uses the plain browser
+// confirm() rather than this app's own modal machinery (it has none -
+// the public form deliberately stays simple), which is fine for a
 // one-off destructive action gated behind an explicit click.
 async function confirmAndDeleteForm() {
   if (!state.token) return;
@@ -359,10 +365,20 @@ async function confirmAndDeleteForm() {
   try {
     await FPHM_API.deleteForm(state.token);
   } catch (e) {
-    // Even offline, still reset below - the visitor asked to start over
-    // and their local copy is what they actually see; if a server-side
-    // copy is left behind, staff's own "Delete this in-progress form"
-    // cleanup action (Intake Forms tab) can remove it later.
+    if (e.status === 403) {
+      // The Worker rejected this because the form is already Submitted
+      // (see its own handleDelete() comment) - shouldn't normally be
+      // reachable since the delete option isn't shown once Submitted,
+      // but could happen from a stale page open in another tab. Don't
+      // touch local state; the form genuinely wasn't deleted.
+      alert("This form has already been submitted and can no longer be deleted.");
+      return;
+    }
+    // Any other failure (offline, etc.) - still reset below, the visitor
+    // asked to start over and their local copy is what they actually
+    // see; if a server-side copy is left behind, staff's own "Delete
+    // this in-progress form" cleanup action (Intake Forms tab) can
+    // remove it later.
   }
   try {
     localStorage.removeItem("fphm_intake_local_" + state.token);
@@ -374,6 +390,7 @@ async function confirmAndDeleteForm() {
   state.submitted = false;
   state.online = true;
   state.duplicateCheckDone = false;
+  state.signatureDataUrl = null;
   state.step = STEP.INTRO;
   state.sectionIdx = 0;
   render();
@@ -716,6 +733,7 @@ async function onSubmit() {
   try {
     await FPHM_API.submit(state.token, state.answers, signatureDataUrl);
     state.online = true;
+    state.signatureDataUrl = signatureDataUrl;
   } catch (e) {
     state.online = false;
     // Keep signature + answers locally so nothing is lost; staff can be
@@ -741,22 +759,28 @@ function renderDone() {
       <h1>Thank you</h1>
       <p>Your questionnaire has been submitted to the Freedom Prayer Healing Ministry team. Thank you for taking the time to answer so honestly — it will help your prayer team prepare well for your visit.</p>
       <div class="nav-row no-print">
-        <button class="btn-link" id="btnDeleteForm">Delete my submitted answers</button>
+        <span></span>
         <button class="btn-primary" id="btnPrint">Print / Save a copy</button>
       </div>
     </div>
     <div id="printArea" style="display:none;">
       <h1>${FPHM.escapeHtml(introText().title)}</h1>
-      <h2>${FPHM.escapeHtml(liabilityText().title)}</h2>
-      <div class="legal-text rich-text">${FPHM.liabilityBodyHtml(liabilityText().body)}</div>
       ${FPHM.renderResponsesHtml(state.answers)}
+      <section class="ans-section">
+        <h2>${FPHM.escapeHtml(liabilityText().title)}</h2>
+        <div class="legal-text rich-text">${FPHM.liabilityBodyHtml(liabilityText().body)}</div>
+        ${
+          state.signatureDataUrl
+            ? `<div class="ans-row" style="flex-direction:column;"><div class="ans-q">Signature</div><img src="${state.signatureDataUrl}" alt="Signature" style="max-width:300px;border:1px solid #ccc;border-radius:8px;background:#fff;margin-top:6px;"></div>`
+            : ""
+        }
+      </section>
     </div>
   `;
   document.getElementById("btnPrint").onclick = () => {
     document.getElementById("printArea").style.display = "block";
     window.print();
   };
-  document.getElementById("btnDeleteForm").onclick = confirmAndDeleteForm;
 }
 
 async function openSaveExitDialog() {

@@ -23,8 +23,9 @@
        on a different device); see the handler's own comment for why it
        requires all three fields to match, not just name.
      POST /api/intake/delete         { token } -> { ok: true } - added
-       2026-09-26 so a visitor can delete their own form (in progress or
-       already submitted), given only their own token.
+       2026-09-26 so a visitor can delete their own form given only their
+       own token; InProgress only, 403 once Submitted (see the handler's
+       own comment).
 ========================================================================= */
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
@@ -182,7 +183,11 @@ async function handleLoad(env, request) {
     status: item.fields.Status || "InProgress",
     responses,
     recipientName: item.fields.RecipientName || "",
-    submittedAt: item.fields.SubmittedAt || null
+    submittedAt: item.fields.SubmittedAt || null,
+    // Added 2026-09-26 so a visitor revisiting their resume link after
+    // submitting (no in-memory copy left from the submit flow itself)
+    // can still see/print their signature, not just their answers.
+    signatureDataUrl: item.fields.SignatureDataUrl || ""
   };
 }
 
@@ -223,18 +228,24 @@ async function handleSubmit(env, request) {
   return { ok: true };
 }
 
-// Lets the visitor delete their own form - in progress or already
-// submitted - given only their own token, the same trust boundary
-// load/save/submit already use (the token is a random UUID only the
-// visitor and whoever they shared their resume link with would know; see
-// CLAUDE.md's Intake Forms section on this data's sensitivity, which is
-// exactly why being able to retract it themselves is worth having, not
-// just staff's own "Delete this in-progress form" cleanup action).
+// Lets the visitor delete their own form, given only their own token -
+// the same trust boundary load/save/submit already use (the token is a
+// random UUID only the visitor and whoever they shared their resume link
+// with would know; see CLAUDE.md's Intake Forms section on this data's
+// sensitivity). InProgress only, deliberately - once a form is
+// Submitted, staff/ministers may already be relying on it for a
+// scheduled session, so the recipient shouldn't be able to pull it out
+// from under them. Enforced here, not just by hiding the delete button
+// once Submitted client-side, so it can't be bypassed by calling this
+// endpoint directly.
 async function handleDelete(env, request) {
   const body = await request.json().catch(() => ({}));
   if (!body.token) return { __status: 400, error: "token required" };
   const item = await findItemByToken(env, body.token);
   if (!item) return { __status: 404, error: "not found" };
+  if (item.fields.Status === "Submitted") {
+    return { __status: 403, error: "This form has already been submitted and can no longer be deleted." };
+  }
   await deleteItem(env, item.id);
   return { ok: true };
 }

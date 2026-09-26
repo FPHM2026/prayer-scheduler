@@ -771,17 +771,21 @@ existing session history.
   token and re-adopts whatever's saved locally under the old one (or
   lands on a clean Intro screen if there's nothing local), instead of
   leaving the visitor stuck.
-- **Visitor can delete their own form** (added 2026-09-26) — a "Delete my
-  answers" link sits next to "Save & continue later" in the sticky top
-  bar while filling the form out, and "Delete my submitted answers" on
-  the thank-you screen after submitting, in case someone wants to retract
-  what they shared. Both call `confirmAndDeleteForm()`, which hits the
-  Worker's new `POST /api/intake/delete { token }` (`handleDelete()`) and
-  then resets to a clean Intro screen. Trust boundary is the same one
-  load/save/submit already use: knowing the token (a random UUID) is
-  proof enough, no separate check - this works regardless of Submitted/
-  InProgress status, unlike staff's own "Delete this in-progress form"
-  action above which is InProgress-only.
+- **Visitor can delete their own in-progress form** (added 2026-09-26) —
+  a "Delete my answers" link sits next to "Save & continue later" in the
+  sticky top bar while filling the form out, calling
+  `confirmAndDeleteForm()`, which hits the Worker's new `POST
+  /api/intake/delete { token }` (`handleDelete()`) and then resets to a
+  clean Intro screen. Trust boundary is the same one load/save/submit
+  already use: knowing the token (a random UUID) is proof enough, no
+  separate check. **InProgress only, not Submitted** - originally also
+  offered on the thank-you screen after submitting, removed the same day
+  at the user's explicit request: once a form is Submitted, staff/
+  ministers may already be relying on it for a scheduled session, so the
+  recipient shouldn't be able to pull it out from under them. Enforced in
+  both places, not just by hiding the button - `handleDelete()` itself
+  returns 403 for a Submitted item, so it can't be bypassed by calling
+  the endpoint directly.
 - **Long free-text answers auto-grow instead of clipping/scrolling**
   (added 2026-09-26) — every `<textarea>` (the "please explain"
   questions, and the checkboxes "Other, please specify" box) grows to
@@ -847,10 +851,18 @@ existing session history.
   this same editor, the same trust level as every other part of the
   schema staff already fully control. The public form's own print/PDF
   view (`#printArea` on the thank-you screen) now also shows the
-  Liability Release title and wording above the answers, not just the
-  answers themselves - added 2026-09-26 alongside the rich-text change,
-  so what the recipient signed is part of their own printed copy. The
-  same 2026-09-26 change also added a "type your name instead" mode to
+  Liability Release title, wording, and the recipient's own signature
+  image - added 2026-09-26 alongside the rich-text change (initially
+  placed above the answers, moved to the bottom next to the signature
+  the same day per explicit request, so the printout reads answers
+  first then what was agreed to and signed, together, at the end).
+  Needed two follow-on changes to actually have a signature available to
+  show: the Worker's `handleLoad()` now returns `signatureDataUrl` too
+  (previously only `handleSubmit()`'s request body ever saw it - a
+  revisit via a resume link had no way to get it back), and
+  `state.signatureDataUrl` is now populated on a successful submit, not
+  just the offline-fallback path that already saved it to
+  `localStorage`. The same 2026-09-26 change also added a "type your name instead" mode to
   the public form's signature step (`js/formEngine.js`'s
   `attachSignaturePad` gained `setMode()`/`setTypedText()`): a visitor can
   toggle between drawing with mouse/touch and typing their name, which
