@@ -832,9 +832,24 @@ existing session history.
   editor above the sections list since it isn't a question and doesn't
   live in `SECTIONS`) and, as of 2026-09-26, `LIABILITY_TEXT` too (the
   liability release wording on the final signature screen -
-  `renderFormEditorLiability()`, same pattern as the intro editor except
-  `LIABILITY_TEXT.body` is a single string rather than an array of
-  paragraphs, so its textarea binds directly with no split/join). The
+  `renderFormEditorLiability()`, same pattern as the intro editor). Both
+  became rich text later the same day - a `contenteditable` box
+  (`.rte-editable`) with a `document.execCommand()`-based toolbar
+  (`richTextToolbarHtml()`: bold/italic/underline/lists/clear formatting,
+  no external library) instead of a plain textarea, storing real HTML in
+  `INTRO_TEXT.body`/`LIABILITY_TEXT.body` rather than an array of
+  paragraphs or a plain pre-wrapped string. `FPHM.introBodyHtml()` /
+  `FPHM.liabilityBodyHtml()` (`js/formEngine.js`) render that HTML and
+  transparently upgrade either legacy shape the first time it's loaded
+  into the editor or shown on the public form, via an `isHtmlBody()`
+  heuristic (a real tag present means "already migrated"). Rendered
+  trusted/unescaped everywhere - safe, since it's staff-authored through
+  this same editor, the same trust level as every other part of the
+  schema staff already fully control. The public form's own print/PDF
+  view (`#printArea` on the thank-you screen) now also shows the
+  Liability Release title and wording above the answers, not just the
+  answers themselves - added 2026-09-26 alongside the rich-text change,
+  so what the recipient signed is part of their own printed copy. The
   same 2026-09-26 change also added a "type your name instead" mode to
   the public form's signature step (`js/formEngine.js`'s
   `attachSignaturePad` gained `setMode()`/`setTypedText()`): a visitor can

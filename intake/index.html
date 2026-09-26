@@ -392,7 +392,7 @@ function renderIntro() {
   app.innerHTML = `
     <div class="card">
       <h1>${FPHM.escapeHtml(introText().title)}</h1>
-      ${introText().body.map((p) => `<p>${FPHM.escapeHtml(p)}</p>`).join("")}
+      <div class="rich-text">${FPHM.introBodyHtml(introText().body)}</div>
     </div>
     <div class="nav-row nav-row-sticky">
       <span></span>
@@ -637,7 +637,7 @@ function renderFinal() {
     ${renderTopBar(visibleSections.length, visibleSections.length, liabilityText().title)}
     <div class="card">
       <h2>${FPHM.escapeHtml(liabilityText().title)}</h2>
-      <div class="legal-text">${FPHM.escapeHtml(liabilityText().body)}</div>
+      <div class="legal-text rich-text">${FPHM.liabilityBodyHtml(liabilityText().body)}</div>
       <label class="qlabel">Please sign below to confirm your agreement<span class="required-mark">*</span></label>
       <div class="sig-mode-toggle no-print">
         <button type="button" class="sig-mode-btn active" id="btnSigModeDraw">Draw with mouse or finger</button>
@@ -747,6 +747,8 @@ function renderDone() {
     </div>
     <div id="printArea" style="display:none;">
       <h1>${FPHM.escapeHtml(introText().title)}</h1>
+      <h2>${FPHM.escapeHtml(liabilityText().title)}</h2>
+      <div class="legal-text rich-text">${FPHM.liabilityBodyHtml(liabilityText().body)}</div>
       ${FPHM.renderResponsesHtml(state.answers)}
     </div>
   `;

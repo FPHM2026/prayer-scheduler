@@ -124,6 +124,54 @@ const FPHM = (function () {
       .replace(/>/g, "&gt;");
   }
 
+  // ---- rich-text intro/liability body -------------------------------
+  // INTRO_TEXT.body and LIABILITY_TEXT.body are staff-authored HTML
+  // (added 2026-09-26, edited via a contenteditable rich-text box in the
+  // Form Editor - see preview/index.html) rendered trusted/unescaped, the
+  // same trust level as every other staff-authored piece of the schema
+  // (labels, options, etc.) that already ends up on the page unescaped
+  // elsewhere in this app. A body is only ever untrusted if it came from
+  // somewhere other than a signed-in staff member's own edit, which never
+  // happens here - the public form only ever reads this value, never
+  // writes it.
+  //
+  // Two legacy shapes still need to render correctly without a one-time
+  // migration step: INTRO_TEXT.body used to be an array of paragraph
+  // strings (pre-2026-09-26), and LIABILITY_TEXT.body used to be a single
+  // plain-text string relying on CSS white-space:pre-wrap for its line
+  // breaks. isHtmlBody() tells "already rich HTML" apart from either -
+  // legacy plain text/arrays never contain a real tag, so the heuristic
+  // is reliable in practice. The Form Editor calls these same functions
+  // when it first loads a legacy value into its editor box, which is what
+  // actually performs the one-time migration (the next save writes back
+  // real HTML) - the public form's own read path needs the same fallback
+  // regardless, in case a schema is ever loaded that hasn't been through
+  // the editor since.
+  function isHtmlBody(str) {
+    return typeof str === "string" && /<[a-z][\s\S]*>/i.test(str);
+  }
+  function introBodyHtml(body) {
+    if (Array.isArray(body)) return body.map((p) => `<p>${escapeHtml(p)}</p>`).join("");
+    if (typeof body === "string" && isHtmlBody(body)) return body;
+    if (typeof body === "string" && body.trim()) {
+      return body
+        .split(/\n{2,}/)
+        .map((p) => `<p>${escapeHtml(p)}</p>`)
+        .join("");
+    }
+    return "";
+  }
+  function liabilityBodyHtml(body) {
+    if (typeof body === "string" && isHtmlBody(body)) return body;
+    if (typeof body === "string" && body.trim()) {
+      return body
+        .split(/\n{2,}/)
+        .map((p) => `<p>${escapeHtml(p).replace(/\n/g, "<br>")}</p>`)
+        .join("");
+    }
+    return "";
+  }
+
   // ---- signature pad ------------------------------------------------
   // A signature is drawn with mouse/touch strokes onto `canvas` (mode
   // "draw"), OR rendered as a cursive rendition of a typed name (mode
@@ -255,6 +303,9 @@ const FPHM = (function () {
     formatAnswer,
     renderResponsesHtml,
     escapeHtml,
+    isHtmlBody,
+    introBodyHtml,
+    liabilityBodyHtml,
     attachSignaturePad
   };
 })();

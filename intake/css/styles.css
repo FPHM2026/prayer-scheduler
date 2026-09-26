@@ -265,7 +265,6 @@ button {
 }
 
 .legal-text {
-  white-space: pre-wrap;
   font-size: .92rem;
   color: var(--ink-soft);
   background: #f0ede4;
@@ -273,6 +272,18 @@ button {
   border-radius: 8px;
   margin-bottom: 20px;
 }
+
+/* Staff-authored rich text (Introduction/Liability Release wording,
+   edited as HTML via the Form Editor's rich-text box - see
+   preview/index.html and js/formEngine.js's introBodyHtml()/
+   liabilityBodyHtml()). Only basic paragraph/list/inline-formatting
+   tags are ever produced there, so this only needs to style those. */
+.rich-text p { margin: 0 0 1em; }
+.rich-text p:last-child { margin-bottom: 0; }
+.rich-text ul, .rich-text ol { margin: 0 0 1em; padding-left: 1.4em; }
+.rich-text li { margin-bottom: .3em; }
+.rich-text strong { font-weight: 700; }
+.rich-text em { font-style: italic; }
 
 /* ---- response / answer view (print + admin) ---- */
 .ans-section { margin-bottom: 22px; }
