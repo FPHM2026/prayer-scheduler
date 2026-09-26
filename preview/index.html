@@ -3933,11 +3933,29 @@ function renderIntake(){
     const summary = i.status==='Submitted'
       ? 'Submitted ' + fmtShort((i.submittedAt||'').split('T')[0])
       : 'Last saved ' + fmtShort((i.created||'').split('T')[0]);
+    const deleteBtn = i.status!=='Submitted'
+      ? `<button type="button" class="btn danger" onclick="deleteIntakeForm(${i.id})">Delete this in-progress form</button>`
+      : '';
     const body = `<p class="helptext">${escapeHtml(i.recipEmail||'No email given yet')}</p>
-      <button type="button" class="btn" onclick="openIntakeDetail(${i.id})">View full intake form</button>`;
+      <button type="button" class="btn" onclick="openIntakeDetail(${i.id})">View full intake form</button>
+      ${deleteBtn}`;
     return groupRow(String(i.id), initials, i.recipName||'(name not yet entered)', countLabel, escapeHtml(summary), body, wasOpen);
   }).join('');
 }
+// Cleans up an abandoned/duplicate in-progress form - e.g. one half of a
+// pair created when the same recipient started the form on two devices
+// without using their saved resume link (see intake/index.html's
+// find-duplicate check, which now offers to prevent this going forward,
+// but doesn't touch forms already sitting here from before that existed).
+// Deliberately only offered for InProgress forms, never Submitted ones -
+// a submitted form is a real record, not an orphan.
+window.deleteIntakeForm = async function(id){
+  const i = intakeResponses.find(x=>x.id===id);
+  if(!i || i.status==='Submitted') return;
+  if(!(await askConfirm(`Delete this in-progress intake form${i.recipName ? ' for '+i.recipName : ''}? This can't be undone.`))) return;
+  await deleteItem('intake', id);
+  await loadAll();
+};
 window.openIntakeDetail = function(id){
   const i = intakeResponses.find(x=>x.id===id);
   if(!i) return;
