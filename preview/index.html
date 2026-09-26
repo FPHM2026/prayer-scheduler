@@ -743,6 +743,7 @@
       </div>
       <p class="errbox" role="alert" id="formEditorMsg" hidden></p>
       <div id="formEditorIntro"></div>
+      <div id="formEditorLiability"></div>
       <div id="formEditorSections"></div>
       <div class="toolbar" style="margin-top:16px;">
         <button class="btn secondary" id="btnFormEditorAddSection">+ Add section</button>
@@ -902,7 +903,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-25.1";
+const APP_VERSION = "2026-09-26.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3978,10 +3979,38 @@ window.updateIntroBody = function(text){
   markSchemaDirty();
 };
 
+// Liability release wording, shown on the final signature screen.
+// Unlike INTRO_TEXT.body (an array of paragraphs), LIABILITY_TEXT.body is
+// a single string with its own embedded blank-line paragraph breaks, so
+// the textarea binds directly with no split/join.
+function renderFormEditorLiability(){
+  const box = $('#formEditorLiability');
+  if(!box || !schemaDraft) return;
+  const opened = openState(box);
+  const liability = schemaDraft.LIABILITY_TEXT || { title: '', body: '' };
+  const wasOpen = opened.has('liability-text') ? opened.get('liability-text') : false;
+  const wordCount = (liability.body||'').trim().split(/\s+/).filter(Boolean).length;
+  const summaryHtml = escapeHtml(`${wordCount} word${wordCount===1?'':'s'}`);
+  const body = `
+    <div class="field"><label>Screen title</label>
+      <input type="text" value="${escapeHtml(liability.title||'')}" oninput="updateLiabilityField('title',this.value)">
+    </div>
+    <div class="field"><label>Liability release wording</label>
+      <textarea rows="10" oninput="updateLiabilityField('body',this.value)">${escapeHtml(liability.body||'')}</textarea>
+    </div>`;
+  box.innerHTML = editorGroupRow('liability-text', 'L', 'Liability Release & Signature', 'Final screen', summaryHtml, body, wasOpen, '');
+}
+window.updateLiabilityField = function(field, value){
+  if(!schemaDraft.LIABILITY_TEXT) schemaDraft.LIABILITY_TEXT = { title: '', body: '' };
+  schemaDraft.LIABILITY_TEXT[field] = value;
+  markSchemaDirty();
+};
+
 function renderFormEditor(){
   const box = $('#formEditorSections');
   if(!box) return;
   renderFormEditorIntro();
+  renderFormEditorLiability();
   if(!schemaDraft){ box.innerHTML = '<p class="helptext">Loading…</p>'; return; }
   const opened = openState(box);
   box.innerHTML = schemaDraft.SECTIONS.map((sec,sIdx)=>renderSectionEditor(sec,sIdx,opened)).join('');
@@ -4681,7 +4710,11 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
-  { date: 'Sep 25, 2026', version: APP_VERSION, items: [
+  { date: 'Sep 26, 2026', version: APP_VERSION, items: [
+    'New: "Edit Intake Questions" can now edit the Liability Release wording (title and body) shown on the public form\'s final signature screen, same as it already could for the intro screen text.',
+    'New: on the public form\'s signature step, a visitor can now type their name instead of drawing with a mouse or finger - it renders in a cursive script font on the same signature pad, so submissions still save the same way.'
+  ]},
+  { date: 'Sep 25, 2026', version: '2026-09-25.1', items: [
     'New: the public Intake Form is fully live - submissions really do save to SharePoint now, via a Cloudflare Worker (not the originally-planned Azure Function, switched after finding no Azure subscription was available and the team didn\'t want to open one).',
     'New: "Edit Intake Questions" tab - add, remove, reorder and reword sections and questions, including the "show this only if" branching logic, without any code change or deploy. Saves to a new IntakeFormSchema SharePoint list; the public form and this app both pick up a saved change immediately.',
     'Fixed: the "Freedom Intake" account needed a SharePoint Administrator role and a fresh Sites.Selected grant before the Worker could actually write to SharePoint - the original grant attempt had silently never taken effect.'

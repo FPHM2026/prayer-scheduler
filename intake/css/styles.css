@@ -179,6 +179,37 @@ button {
   margin-bottom: 20px;
 }
 
+.sig-mode-toggle {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 10px;
+}
+.sig-mode-btn {
+  flex: 1 1 auto;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  font-size: .9rem;
+  cursor: pointer;
+}
+.sig-mode-btn.active {
+  border-color: var(--accent-dark);
+  background: var(--accent-dark);
+  color: #fff;
+}
+#sigTypeInputWrap {
+  margin-bottom: 10px;
+}
+#sigTypeInput {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 1rem;
+  box-sizing: border-box;
+}
+
 .signature-box {
   border: 1px solid var(--border);
   border-radius: 8px;

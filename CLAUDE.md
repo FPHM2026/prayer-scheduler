@@ -740,9 +740,20 @@ existing session history.
   step needed. It can edit `INTRO_TEXT` (the framework-explanation intro
   screen, added 2026-09-25 - `renderFormEditorIntro()`, its own small
   editor above the sections list since it isn't a question and doesn't
-  live in `SECTIONS`) but still not `LIABILITY_TEXT` (the liability
-  release wording on the final signature screen) — nobody's asked for
-  that one edited yet. There's also no raw-JSON fallback for a
+  live in `SECTIONS`) and, as of 2026-09-26, `LIABILITY_TEXT` too (the
+  liability release wording on the final signature screen -
+  `renderFormEditorLiability()`, same pattern as the intro editor except
+  `LIABILITY_TEXT.body` is a single string rather than an array of
+  paragraphs, so its textarea binds directly with no split/join). The
+  same 2026-09-26 change also added a "type your name instead" mode to
+  the public form's signature step (`js/formEngine.js`'s
+  `attachSignaturePad` gained `setMode()`/`setTypedText()`): a visitor can
+  toggle between drawing with mouse/touch and typing their name, which
+  gets rendered onto the same signature canvas in a cursive Google Font
+  ("Dancing Script", loaded via `<link>` in `intake/index.html`) so the
+  stored `SignatureDataUrl` stays a plain PNG data URL either way — every
+  downstream consumer (staff Intake Forms tab, minister portal modal)
+  needed zero changes. There's also no raw-JSON fallback for a
   `visibleIf` shape the guided picker can't express (per the explicit
   2026-09-25 decision to keep the picker guided-only rather than exposing
   the schema directly); either would mean hand-editing `js/formConfig.js`'s

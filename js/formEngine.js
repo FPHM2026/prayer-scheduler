@@ -125,11 +125,30 @@ const FPHM = (function () {
   }
 
   // ---- signature pad ------------------------------------------------
+  // A signature is drawn with mouse/touch strokes onto `canvas` (mode
+  // "draw"), OR rendered as a cursive rendition of a typed name (mode
+  // "type", via drawTyped()) - either way the final pixels live on the
+  // same canvas, so isEmpty()/toDataUrl() work identically regardless of
+  // which mode the visitor used, and the stored SignatureDataUrl stays a
+  // plain PNG data URL either way.
+  const SIGNATURE_FONT_FAMILY = "'Dancing Script', cursive";
+  let signatureFontLoadPromise = null;
+  function ensureSignatureFontLoaded() {
+    if (!signatureFontLoadPromise) {
+      signatureFontLoadPromise = (document.fonts && document.fonts.load)
+        ? document.fonts.load(`48px ${SIGNATURE_FONT_FAMILY}`).catch(() => {})
+        : Promise.resolve();
+    }
+    return signatureFontLoadPromise;
+  }
+
   function attachSignaturePad(canvas) {
     const ctx = canvas.getContext("2d");
     let drawing = false;
     let hasSignature = false;
     let last = null;
+    let mode = "draw";
+    let typedText = "";
 
     function resize() {
       const ratio = window.devicePixelRatio || 1;
@@ -142,6 +161,7 @@ const FPHM = (function () {
       ctx.lineCap = "round";
       ctx.strokeStyle = "#1a1a1a";
       if (img) ctx.putImageData(img, 0, 0);
+      else if (mode === "type" && typedText) renderTyped();
     }
     resize();
     window.addEventListener("resize", resize);
@@ -152,13 +172,14 @@ const FPHM = (function () {
       return { x: point.clientX - rect.left, y: point.clientY - rect.top };
     }
     function start(evt) {
+      if (mode !== "draw") return;
       evt.preventDefault();
       drawing = true;
       hasSignature = true;
       last = pos(evt);
     }
     function move(evt) {
-      if (!drawing) return;
+      if (mode !== "draw" || !drawing) return;
       evt.preventDefault();
       const p = pos(evt);
       ctx.beginPath();
@@ -177,16 +198,44 @@ const FPHM = (function () {
     canvas.addEventListener("touchmove", move, { passive: false });
     canvas.addEventListener("touchend", end);
 
+    function renderTyped() {
+      const rect = canvas.getBoundingClientRect();
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      const text = typedText.trim();
+      hasSignature = !!text;
+      if (!text) return;
+      const fontSize = Math.max(20, Math.min(48, rect.height * 0.55));
+      ctx.fillStyle = "#1a1a1a";
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "center";
+      ctx.font = `${fontSize}px ${SIGNATURE_FONT_FAMILY}`;
+      ctx.fillText(text, rect.width / 2, rect.height / 2, rect.width - 20);
+    }
+
     return {
       clear() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         hasSignature = false;
+        typedText = "";
       },
       isEmpty() {
         return !hasSignature;
       },
       toDataUrl() {
         return canvas.toDataURL("image/png");
+      },
+      setMode(m) {
+        mode = m === "type" ? "type" : "draw";
+        if (mode === "type") renderTyped();
+        else {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          hasSignature = false;
+        }
+      },
+      setTypedText(text) {
+        typedText = text || "";
+        ensureSignatureFontLoaded().then(renderTyped);
+        renderTyped();
       }
     };
   }

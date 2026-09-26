@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Freedom Prayer Healing Ministry — Intake Questionnaire</title>
 <link rel="stylesheet" href="css/styles.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&display=swap" rel="stylesheet">
 </head>
 <body>
 <div class="wrap" id="app"></div>
@@ -392,6 +395,13 @@ function renderFinal() {
       <h2>${FPHM.escapeHtml(liabilityText().title)}</h2>
       <div class="legal-text">${FPHM.escapeHtml(liabilityText().body)}</div>
       <label class="qlabel">Please sign below to confirm your agreement<span class="required-mark">*</span></label>
+      <div class="sig-mode-toggle no-print">
+        <button type="button" class="sig-mode-btn active" id="btnSigModeDraw">Draw with mouse or finger</button>
+        <button type="button" class="sig-mode-btn" id="btnSigModeType">Type my name instead</button>
+      </div>
+      <div id="sigTypeInputWrap" class="no-print" style="display:none;">
+        <input type="text" id="sigTypeInput" placeholder="Type your full name" autocomplete="off">
+      </div>
       <div class="signature-box"><canvas id="sigCanvas"></canvas></div>
       <div class="nav-row no-print" style="margin-top:10px;">
         <button class="btn-link" id="btnClearSig">Clear signature</button>
@@ -406,7 +416,30 @@ function renderFinal() {
   `;
   document.getElementById("offlineBanner") && (document.getElementById("offlineBanner").innerHTML = renderOfflineBanner());
   state.signaturePad = FPHM.attachSignaturePad(document.getElementById("sigCanvas"));
-  document.getElementById("btnClearSig").onclick = () => state.signaturePad.clear();
+  const sigTypeInputWrap = document.getElementById("sigTypeInputWrap");
+  const sigTypeInput = document.getElementById("sigTypeInput");
+  const btnSigModeDraw = document.getElementById("btnSigModeDraw");
+  const btnSigModeType = document.getElementById("btnSigModeType");
+  sigTypeInput.value = state.answers.name || "";
+  sigTypeInput.oninput = () => state.signaturePad.setTypedText(sigTypeInput.value);
+  btnSigModeDraw.onclick = () => {
+    btnSigModeDraw.classList.add("active");
+    btnSigModeType.classList.remove("active");
+    sigTypeInputWrap.style.display = "none";
+    state.signaturePad.setMode("draw");
+  };
+  btnSigModeType.onclick = () => {
+    btnSigModeType.classList.add("active");
+    btnSigModeDraw.classList.remove("active");
+    sigTypeInputWrap.style.display = "";
+    state.signaturePad.setMode("type");
+    state.signaturePad.setTypedText(sigTypeInput.value);
+    sigTypeInput.focus();
+  };
+  document.getElementById("btnClearSig").onclick = () => {
+    state.signaturePad.clear();
+    sigTypeInput.value = "";
+  };
   document.getElementById("btnBack").onclick = () => {
     state.step = STEP.SECTION;
     state.sectionIdx = Math.max(0, visibleSections.length - 1);
