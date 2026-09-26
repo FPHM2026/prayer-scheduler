@@ -44,7 +44,8 @@ const state = {
   online: true,
   saving: false,
   submitted: false,
-  signaturePad: null
+  signaturePad: null,
+  duplicateCheckDone: false
 };
 
 const app = document.getElementById("app");
@@ -113,6 +114,7 @@ async function boot() {
 
   if (token) {
     state.token = token;
+    state.duplicateCheckDone = true; // already resuming a known form - nothing to dedupe against
     try {
       const data = await FPHM_API.load(token);
       state.answers = data.responses || {};
@@ -145,6 +147,98 @@ function findFirstIncompleteSectionIndex(answers) {
     if (FPHM.validateSection(sections[i], answers).length > 0) return i;
   }
   return sections.length - 1 >= 0 ? sections.length : 0; // past the last section -> final step handled by caller
+}
+
+// Runs once, right after the Personal Information section (name, email,
+// countryOfBirth all live there) is completed - checks whether the same
+// person already has another form in progress (e.g. started on a
+// different device) and, if so, offers to resume that one instead of
+// silently letting a second copy pile up. Resolves true only if the
+// visitor chose to resume (resumeWithToken() takes over rendering from
+// there); resolves false in every other case (no match, check failed,
+// or they chose to keep this new form), so the caller knows whether to
+// continue advancing normally.
+function checkForDuplicateAndOfferResume() {
+  return new Promise((resolve) => {
+    const name = state.answers.name || "";
+    const email = state.answers.email || "";
+    const countryOfBirth = state.answers.countryOfBirth || "";
+    if (!name || !email || !countryOfBirth) return resolve(false);
+    FPHM_API.findDuplicate(name, email, countryOfBirth, state.token)
+      .then((result) => {
+        if (!result || !result.found || !result.token) return resolve(false);
+        showDuplicateFormModal(
+          () => resolve(true),
+          () => resolve(false),
+          result.token
+        );
+      })
+      .catch(() => resolve(false)); // offline or Worker unreachable - never block progress
+  });
+}
+
+function showDuplicateFormModal(onResume, onContinueNew, matchedToken) {
+  const existing = document.getElementById("duplicateFormModal");
+  if (existing) existing.remove();
+  const modal = document.createElement("div");
+  modal.id = "duplicateFormModal";
+  modal.className = "card";
+  modal.style.position = "fixed";
+  modal.style.top = "50%";
+  modal.style.left = "50%";
+  modal.style.transform = "translate(-50%,-50%)";
+  modal.style.maxWidth = "480px";
+  modal.style.width = "92%";
+  modal.style.zIndex = "1000";
+  modal.style.boxShadow = "0 10px 40px rgba(0,0,0,.25)";
+  modal.innerHTML = `
+    <h3>Already started on another device?</h3>
+    <p>It looks like a questionnaire with this same name, email, and country of birth is already in progress. Would you like to continue that one, or keep going with this new one?</p>
+    <div class="nav-row">
+      <button class="btn-secondary" id="btnContinueNewForm">Keep this new one</button>
+      <button class="btn-primary" id="btnResumeOtherForm">Continue that one</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  document.getElementById("btnContinueNewForm").onclick = () => {
+    modal.remove();
+    onContinueNew();
+  };
+  document.getElementById("btnResumeOtherForm").onclick = () => {
+    modal.remove();
+    resumeWithToken(matchedToken);
+    onResume();
+  };
+}
+
+// Switches the in-progress session over to a different, already-started
+// token (see checkForDuplicateAndOfferResume above) - same load path
+// boot() uses for a "Save & continue later" link, just triggered from
+// mid-form instead of on page load. The form's own now-duplicate
+// in-progress record is simply abandoned (staff can delete it from the
+// Intake Forms tab's "In progress" list, same as any other orphaned form).
+async function resumeWithToken(token) {
+  state.token = token;
+  localStorage.setItem("fphm_intake_last_token", token);
+  try {
+    const data = await FPHM_API.load(token);
+    state.answers = data.responses || {};
+    if (data.status === "Submitted") {
+      state.submitted = true;
+      state.step = STEP.DONE;
+    } else {
+      state.step = STEP.SECTION;
+      state.sectionIdx = findFirstIncompleteSectionIndex(state.answers);
+    }
+  } catch (e) {
+    state.online = false;
+    const local = loadLocal(token);
+    state.answers = (local && local.answers) || {};
+    state.step = STEP.SECTION;
+    state.sectionIdx = findFirstIncompleteSectionIndex(state.answers);
+  }
+  saveLocal();
+  render();
 }
 
 async function beginIntake() {
@@ -234,11 +328,19 @@ function renderSection() {
     doSave();
     render();
   };
-  document.getElementById("btnNext").onclick = () => {
+  document.getElementById("btnNext").onclick = async () => {
     const missing = FPHM.validateSection(section, state.answers);
     if (missing.length) {
       markInvalid(missing);
       return;
+    }
+    if (state.sectionIdx === 0 && !state.duplicateCheckDone) {
+      state.duplicateCheckDone = true;
+      const btn = document.getElementById("btnNext");
+      btn.disabled = true;
+      const resumed = await checkForDuplicateAndOfferResume();
+      if (!resumed) btn.disabled = false;
+      if (resumed) return; // resumeWithToken() takes over rendering
     }
     state.sectionIdx += 1;
     doSave();

@@ -33,6 +33,14 @@ const FPHM_API = {
       throw new Error(`Request to /intake/schema failed (${res.status}): ${text.slice(0, 300)}`);
     }
     return res.json();
+  },
+  // Checks for an already-in-progress form belonging to the same person
+  // (matched on name + email + country of birth together, not name
+  // alone - see the Worker handler's own comment), so the public form
+  // can offer to resume that one instead of silently creating a second
+  // copy when someone starts over on a different device.
+  async findDuplicate(name, email, countryOfBirth, token) {
+    return post("/intake/find-duplicate", { name, email, countryOfBirth, token });
   }
 };
 

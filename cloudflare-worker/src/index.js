@@ -11,11 +11,17 @@
    any staff/minister credential ever touching a browser the public can
    reach.
 
-   Four routes, same shape as before:
-     POST /api/intake/start   { recipientName?, recipientEmail? } -> { token }
-     POST /api/intake/load    { token } -> { status, responses, recipientName, submittedAt }
-     POST /api/intake/save    { token, responses } -> { ok: true }
-     POST /api/intake/submit  { token, responses, signatureDataUrl } -> { ok: true }
+   Routes:
+     POST /api/intake/start          { recipientName?, recipientEmail? } -> { token }
+     POST /api/intake/load           { token } -> { status, responses, recipientName, submittedAt }
+     POST /api/intake/save           { token, responses } -> { ok: true }
+     POST /api/intake/submit         { token, responses, signatureDataUrl } -> { ok: true }
+     GET  /api/intake/schema         -> the live staff-editable question schema
+     POST /api/intake/find-duplicate { name, email, countryOfBirth, token } ->
+       { found, token? } - added 2026-09-26 so the public form can offer
+       "resume that one" when the same person starts a second copy (e.g.
+       on a different device); see the handler's own comment for why it
+       requires all three fields to match, not just name.
 ========================================================================= */
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
@@ -207,6 +213,46 @@ async function handleSubmit(env, request) {
   return { ok: true };
 }
 
+// Checks for an already-InProgress intake response belonging to the same
+// person, so the public form can offer "resume that one" instead of
+// silently letting them start a second copy (the common case: someone
+// starts on one device, comes back on another without their saved
+// resume link). Requires name + email + country of birth to ALL match
+// an existing InProgress item (not just name) before handing back its
+// token - an explicit, deliberately-chosen tradeoff given this data's
+// sensitivity (see CLAUDE.md's Intake Forms section): name alone is
+// easy to guess/share and would let a stranger hijack someone else's
+// in-progress form; this three-factor match is a much smaller target.
+async function handleFindDuplicate(env, request) {
+  const body = await request.json().catch(() => ({}));
+  const { name, email, countryOfBirth, token } = body;
+  if (!name || !email || !countryOfBirth) return { __status: 400, error: "name, email, countryOfBirth required" };
+  const { siteId, listId } = await resolveSiteAndList(env);
+  const resp = await graphFetch(
+    env,
+    `/sites/${siteId}/lists/${listId}/items?$expand=fields&$filter=fields/Status eq 'InProgress'`,
+    { headers: { Prefer: "HonorNonIndexedQueriesWarningMayFailRandomly" } }
+  );
+  const normName = name.trim().toLowerCase();
+  const normEmail = email.trim().toLowerCase();
+  const normCountry = countryOfBirth.trim().toLowerCase();
+  for (const item of resp.value) {
+    const f = item.fields;
+    if (f.Token === token) continue; // never match the caller's own in-progress item
+    if ((f.RecipientName || "").trim().toLowerCase() !== normName) continue;
+    if ((f.RecipientEmail || "").trim().toLowerCase() !== normEmail) continue;
+    let responses = {};
+    try {
+      responses = JSON.parse(f.ResponsesJSON || "{}");
+    } catch (e) {
+      continue;
+    }
+    if ((responses.countryOfBirth || "").trim().toLowerCase() !== normCountry) continue;
+    return { found: true, token: f.Token };
+  }
+  return { found: false };
+}
+
 // Read-only: the current staff-editable question schema, for the public
 // form to render from instead of its own hardcoded default. Cached
 // in-memory per warm isolate (same pattern as the Graph token/site/list
@@ -237,7 +283,8 @@ const ROUTES = {
   "/api/intake/load": handleLoad,
   "/api/intake/save": handleSave,
   "/api/intake/submit": handleSubmit,
-  "/api/intake/schema": handleSchema
+  "/api/intake/schema": handleSchema,
+  "/api/intake/find-duplicate": handleFindDuplicate
 };
 const GET_ROUTES = new Set(["/api/intake/schema"]);
 
