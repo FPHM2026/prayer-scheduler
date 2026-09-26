@@ -426,6 +426,12 @@
   .slot-meta{font-size:var(--fs-2xs);color:var(--muted);margin-bottom:8px;}
   .slot-detail-row{font-size:var(--fs-sm);margin-bottom:6px;}
   .slot-detail-row strong{color:var(--navy);font-weight:700;}
+  .intake-link-block{font-size:var(--fs-sm);background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;margin-top:8px;}
+  .intake-link-block.mismatch{border-color:var(--danger);}
+  .intake-link-picker{margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
+  .intake-link-picker input{width:100%;margin-bottom:8px;}
+  .intake-link-result{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);}
+  .intake-link-result:last-child{border-bottom:none;}
   .picker-cand{border:1px solid var(--border);border-radius:8px;margin-bottom:6px;overflow:hidden;}
   .picker-cand:last-child{margin-bottom:0;}
   .picker-row{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--bg);padding:8px 11px;cursor:pointer;font-size:var(--fs-sm);width:100%;border:none;text-align:left;font-family:inherit;}
@@ -908,7 +914,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-26.1";
+const APP_VERSION = "2026-09-26.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1247,7 +1253,13 @@ async function loadAll(){
       recipGender: s.RecipientGender||'', genderPref: s.GenderPreference||'Mixed',
       // "Days waiting" for a Waiting-status entry is computed from SharePoint's
       // own createdDateTime item metadata rather than a dedicated field.
-      added: (s._created||'').split('T')[0]
+      added: (s._created||'').split('T')[0],
+      // Staff-confirmed link to a specific IntakeResponses item (see
+      // "Intake form linking" below) - overrides the plain name-match
+      // findIntakeForRecipient() falls back to when this is unset. Reads
+      // null safely if the IntakeResponseId column doesn't exist in
+      // SharePoint yet, same convention as Contacted/WaNotified above.
+      intakeResponseId: (s.IntakeResponseId!=null && s.IntakeResponseId!=='') ? parseInt(s.IntakeResponseId,10) : null
     };
   });
   computeSessionNumbers();
@@ -2078,6 +2090,7 @@ function renderUnplacedCandidates(){
       </div>
       <div class="helptext" style="margin:2px 0 0;">${escapeHtml(s.recipContact||'No contact info')} · Waiting ${waiting} day${waiting===1?'':'s'} · added ${fmtShort(s.added||s.date)}</div>
       ${s.notes?`<div class="notes">${escapeHtml(s.notes)}</div>`:''}
+      ${renderIntakeLinkBlock(s)}
       <div class="toolbar" style="margin-top:10px;">
         <button class="icon-btn${s.contacted?' success':''}" onclick="toggleContacted(${s.id})" title="${s.contacted?'Mark as not yet contacted':'Mark as contacted'}" aria-pressed="${s.contacted}" aria-label="${s.contacted?'Mark as not yet contacted':'Mark as contacted'}: ${escapeHtml(s.recipName)}">${ICONS.phone}<span class="btn-label">${s.contacted?'Not Contacted':'Contacted'}</span></button>
         <button class="icon-btn flag-btn${s.priority?' active':''}" onclick="togglePriority(${s.id})" title="${s.priority?'Remove priority':'Flag as priority'}" aria-pressed="${s.priority}" aria-label="${s.priority?'Remove priority from':'Flag as priority'} ${escapeHtml(s.recipName)}">${ICONS.flag(s.priority)}<span class="btn-label">${s.priority?'Remove Priority':'Flag Priority'}</span></button>
@@ -2689,6 +2702,7 @@ function renderBookedBody(sl){
     <div class="slot-detail-row">${escapeHtml(sessionLocationDisplay(linked))}</div>
     ${linked.notes?`<div class="notes">${escapeHtml(linked.notes)}</div>`:''}
     <div class="slot-detail-row">${waSectionHtml(linked)}</div>
+    <div class="slot-detail-row">${renderIntakeLinkBlock(linked)}</div>
     <div class="toolbar" style="margin-top:10px;">
       <button class="icon-btn" onclick="addToCalendar(${linked.id})" title="Add to Calendar" aria-label="Add session for ${escapeHtml(linked.recipName)} to your calendar">${ICONS.calendarPlus}<span class="btn-label">Add to Calendar</span></button>
       <button class="icon-btn" onclick="editBookedSession(${sl.id},${linked.id})" title="Edit" aria-label="Edit session for ${escapeHtml(linked.recipName)}">${ICONS.pencil}<span class="btn-label">Edit</span></button>
@@ -4000,6 +4014,110 @@ function findIntakeForRecipient(name){
 }
 
 /* =========================================================================
+   INTAKE FORM LINKING — a persistent, staff-controlled connection from a
+   PrayerSessions item (booked or Waiting) to a specific IntakeResponses
+   item, stored as that session's own IntakeResponseId (see the sessions
+   mapping above). Falls back to the plain name-match findIntakeForRecipient()
+   above as a SUGGESTION when nothing's been explicitly linked yet - staff
+   confirm it with one click ("Link this form"), or search for a different
+   one (name misspelling, two recipients sharing a name, etc.) via "Choose
+   a different form" / "Search & link an intake form". Added 2026-09-26;
+   requires the IntakeResponseId (Number) column on PrayerSessions - added
+   manually in SharePoint, same as Priority/Contacted before it, since
+   this app has no ability to create SharePoint columns itself.
+========================================================================= */
+// Which session's (by id) "choose/search a different form" panel is open -
+// same single-open-at-a-time pattern as customAddOpenFor elsewhere in this
+// file.
+let intakeLinkPickerFor = null;
+window.toggleIntakeLinkPicker = function(sessionId){
+  intakeLinkPickerFor = intakeLinkPickerFor===sessionId ? null : sessionId;
+  renderSchedPlan();
+};
+window.linkIntakeForm = async function(sessionId, intakeId){
+  await updateItem('sessions', sessionId, { IntakeResponseId: intakeId });
+  intakeLinkPickerFor = null;
+  await loadAll();
+};
+window.unlinkIntakeForm = async function(sessionId){
+  const ok = await askConfirm('Unlink this intake form from the recipient? The intake form itself is not deleted or changed.', {confirmLabel:'Unlink', danger:false});
+  if(!ok) return;
+  await updateItem('sessions', sessionId, { IntakeResponseId: null });
+  await loadAll();
+};
+window.viewLinkedIntake = function(id){
+  switchTab('intake');
+  closeIntakeDetail();
+  openIntakeDetail(id);
+};
+// Filters the picker's result list via direct DOM update rather than a
+// full renderSchedPlan() re-render on every keystroke - same
+// lose-focus-on-rerender lesson noted elsewhere in this app (see the Form
+// Editor's text-field handlers) applies to this search box too.
+window.filterIntakeLinkResults = function(sessionId){
+  const input = document.getElementById('intakeLinkSearch-'+sessionId);
+  const resultsBox = document.getElementById('intakeLinkResults-'+sessionId);
+  if(!input || !resultsBox) return;
+  resultsBox.innerHTML = intakeLinkPickerResultsHtml(sessionId, input.value);
+};
+function intakeLinkPickerResultsHtml(sessionId, query){
+  const q = (query||'').trim().toLowerCase();
+  const matches = intakeResponses
+    .filter(i => !q || (i.recipName||'').toLowerCase().includes(q) || (i.recipEmail||'').toLowerCase().includes(q))
+    .slice(0, 8);
+  if(!matches.length) return '<p class="helptext">No matching intake forms.</p>';
+  return matches.map(i=>`<div class="intake-link-result">
+    <span>${escapeHtml(i.recipName||'(name not yet entered)')} <span class="helptext">${i.status==='Submitted'?'Submitted':'In progress'}${i.recipEmail?' · '+escapeHtml(i.recipEmail):''}</span></span>
+    <button type="button" class="btn secondary" onclick="linkIntakeForm(${sessionId},${i.id})">Link</button>
+  </div>`).join('');
+}
+function renderIntakeLinkPicker(sessionId){
+  return `<div class="intake-link-picker">
+    <input type="text" id="intakeLinkSearch-${sessionId}" placeholder="Search intake forms by name or email" oninput="filterIntakeLinkResults(${sessionId})">
+    <div id="intakeLinkResults-${sessionId}">${intakeLinkPickerResultsHtml(sessionId, '')}</div>
+  </div>`;
+}
+// Shown on a Booked slot's card and on each Waiting/Unplaced Candidates
+// entry - session is the PrayerSessions record either way.
+function renderIntakeLinkBlock(session){
+  const pickerOpen = intakeLinkPickerFor === session.id;
+  const linked = session.intakeResponseId ? intakeResponses.find(i=>i.id===session.intakeResponseId) : null;
+  if(linked){
+    const mismatch = linked.recipName && session.recipName
+      && linked.recipName.trim().toLowerCase()!==session.recipName.trim().toLowerCase();
+    return `<div class="intake-link-block${mismatch?' mismatch':''}">
+      <div>${ICONS.checkCircle||''} Intake form linked${linked.status==='Submitted'?'':' (in progress)'}</div>
+      ${mismatch ? `<div class="tag priority">Linked form is for "${escapeHtml(linked.recipName)}" — different from this recipient's name</div>` : ''}
+      <div class="toolbar" style="margin-top:6px;">
+        <button type="button" class="btn secondary" onclick="viewLinkedIntake(${linked.id})">View</button>
+        <button type="button" class="btn secondary" onclick="toggleIntakeLinkPicker(${session.id})">Change</button>
+        <button type="button" class="btn secondary" onclick="unlinkIntakeForm(${session.id})">Unlink</button>
+      </div>
+      ${pickerOpen ? renderIntakeLinkPicker(session.id) : ''}
+    </div>`;
+  }
+  const suggestion = findIntakeForRecipient(session.recipName);
+  if(suggestion){
+    return `<div class="intake-link-block">
+      <div>Possible intake form match: <strong>${escapeHtml(suggestion.recipName)}</strong> <span class="helptext">${suggestion.status==='Submitted'?'Submitted':'In progress'}</span></div>
+      <div class="toolbar" style="margin-top:6px;">
+        <button type="button" class="btn secondary" onclick="viewLinkedIntake(${suggestion.id})">View</button>
+        <button type="button" class="btn" onclick="linkIntakeForm(${session.id},${suggestion.id})">Link this form</button>
+        <button type="button" class="btn secondary" onclick="toggleIntakeLinkPicker(${session.id})">Choose a different form</button>
+      </div>
+      ${pickerOpen ? renderIntakeLinkPicker(session.id) : ''}
+    </div>`;
+  }
+  return `<div class="intake-link-block">
+    <div class="helptext">No intake form found for this name.</div>
+    <div class="toolbar" style="margin-top:6px;">
+      <button type="button" class="btn secondary" onclick="toggleIntakeLinkPicker(${session.id})">Search &amp; link an intake form</button>
+    </div>
+    ${pickerOpen ? renderIntakeLinkPicker(session.id) : ''}
+  </div>`;
+}
+
+/* =========================================================================
    FORM EDITOR — staff-facing UI over schemaDraft (a mutable working copy
    of the live schema, see loadAll()). "Save changes" writes schemaDraft
    back to the IntakeFormSchema SharePoint list item and calls
@@ -4879,6 +4997,12 @@ function generateReport(){
 ========================================================================= */
 const CHANGE_LOG = [
   { date: 'Sep 26, 2026', version: APP_VERSION, items: [
+    'New: staff can now link an intake form directly to a specific recipient on their Booked or Waiting-list card ("Intake Forms" panel), instead of relying only on an automatic name match - handles a misspelled name or two recipients sharing a name.',
+    'New: the public intake form now warns and offers to resume when the same person (matched on name, email, and country of birth together) already has one in progress, instead of silently letting a second copy pile up from someone starting over on another device.',
+    'New: staff can delete an abandoned/duplicate in-progress intake form from the Intake Forms tab\'s In-progress list.',
+    'New: the intake form\'s progress bar and Back/Next buttons are now sticky at the top and bottom of the screen while scrolling through questions, and Next is disabled until every required question on the page is answered.'
+  ]},
+  { date: 'Sep 26, 2026', version: '2026-09-26.1', items: [
     'New: "Edit Intake Questions" can now edit the Liability Release wording (title and body) shown on the public form\'s final signature screen, same as it already could for the intro screen text.',
     'New: on the public form\'s signature step, a visitor can now type their name instead of drawing with a mouse or finger - it renders in a cursive script font on the same signature pad, so submissions still save the same way.'
   ]},

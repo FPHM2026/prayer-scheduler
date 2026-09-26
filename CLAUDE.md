@@ -143,6 +143,11 @@ scheduler's own code.
   AssignedMinisterIDs/LeadMinisterIDs blank until it's actually scheduled.
   "Days waiting" is computed client-side from the item's own SharePoint
   `createdDateTime` metadata — there is no dedicated DateAdded field for this.
+  **IntakeResponseId (Number, optional, added 2026-09-26)** — a
+  staff-confirmed link from this session/Waiting entry to a specific
+  IntakeResponses item, overriding the plain name-match
+  `findIntakeForRecipient()` otherwise falls back to. See "Intake form
+  linking" under "Intake Forms" below.
 - **BlackoutDates**: Title (minister name), BlackoutDate (Date), **EndDate
   (Date, optional)** — blank/null means a single-day blackout; set means an
   inclusive date range. Notes (Plain text)
@@ -707,6 +712,42 @@ existing session history.
   `preview/index.html` powers a banner in the session modal
   (`renderIntakeMatchPanel()`, hooked into `renderRecipientHistory()`) that
   jumps straight to a matched intake form.
+- **Intake form linking (added 2026-09-26)** — the plain name-match above
+  is only ever a suggestion now, not the final word: a Booked slot's card
+  and each Waiting/Unplaced Candidates entry in the Schedule & Planning
+  tab show a persistent `renderIntakeLinkBlock()` panel that reads/writes
+  that session's own `IntakeResponseId` column (see the PrayerSessions
+  schema above). If unset, it shows the name-match suggestion with a
+  one-click "Link this form"; either way, "Change"/"Choose a different
+  form" opens a small search-by-name-or-email picker
+  (`renderIntakeLinkPicker()`) for the misspelling/duplicate-name case,
+  and "Unlink" clears it back to the plain suggestion. A linked form whose
+  own name doesn't match the recipient's is still shown (staff explicitly
+  chose it — an override, not a bug) but flagged with a visible mismatch
+  warning. `portal/index.html`'s `findMyIntakeForRecipient()` prefers the
+  same link when one of the minister's own sessions for that recipient has
+  it set, falling back to its own name match otherwise. **Requires the
+  IntakeResponseId column to actually exist in SharePoint** — added
+  manually by the user (same as Priority/Contacted before it, see history
+  above), not by this app; the mapping code reads it safely as null if the
+  column isn't there yet, same convention as those two.
+- **Preventing accidental duplicate in-progress forms (added
+  2026-09-26)** — the two-device case (someone starts the form, doesn't
+  save/use their resume link, then opens it fresh on another device) used
+  to silently create two separate InProgress records for the same person.
+  Once the Personal Information section (name, email, country of birth)
+  is complete, the public form calls the Worker's new
+  `/api/intake/find-duplicate` endpoint; if another InProgress record
+  matches all three fields, it offers "Continue that one" (switches over
+  via `resumeWithToken()`, the same load path a saved resume link uses)
+  or "Keep this new one". Deliberately requires all three fields to
+  match, not name alone — a name-only match would let anyone who knows or
+  guesses a name pull up a stranger's in-progress form and its answers,
+  which this data's sensitivity can't take on. Staff can clean up
+  whatever's left from before this existed (or the rare case someone
+  declines to resume) via the "Delete this in-progress form" action on
+  the Intake Forms tab's In-progress list (`deleteIntakeForm()`) — offered
+  only for InProgress forms, never Submitted ones.
 - **Minister portal** — `portal/index.html` adds a "View intake form" link
   on a recipient's Schedule/Completed Sessions group. `findMyIntakeForRecipient()`
   requires the recipient to actually appear in `mySessions()` before it'll

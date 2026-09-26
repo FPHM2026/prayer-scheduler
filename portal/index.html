@@ -511,7 +511,11 @@ async function loadAll(){
       apptType: s.ApptType||'First',
       waCreated: !!s.WaCreated, waLink: s.WaLink||'',
       added: (s._created||'').split('T')[0],
-      ministers: allIds.map(id=>({ id: parseInt(id,10), role: leadIds.has(id) ? 'Lead' : 'Support' })).filter(m=>!isNaN(m.id))
+      ministers: allIds.map(id=>({ id: parseInt(id,10), role: leadIds.has(id) ? 'Lead' : 'Support' })).filter(m=>!isNaN(m.id)),
+      // Staff-confirmed intake form link (see preview/index.html's "Intake
+      // form linking" section) - findMyIntakeForRecipient() below prefers
+      // this over its own name match when it's set.
+      intakeResponseId: (s.IntakeResponseId!=null && s.IntakeResponseId!=='') ? parseInt(s.IntakeResponseId,10) : null
     };
   });
   blackouts = rawBlack.map(b => ({ id: b.id, ministerName: b.Title, date: (b.BlackoutDate||'').split('T')[0], endDate: b.EndDate ? b.EndDate.split('T')[0] : null, notes: b.Notes||'' }));
@@ -622,7 +626,17 @@ function intakeLinkRowFor(name){
 // IntakeResponses list, not per-item, so this is a UI-level boundary,
 // not a real security one.
 function findMyIntakeForRecipient(name){
-  if(!name || !mySessions().some(s=>s.recipName.trim().toLowerCase()===name.trim().toLowerCase())) return null;
+  if(!name) return null;
+  const myMatching = mySessions().filter(s=>s.recipName.trim().toLowerCase()===name.trim().toLowerCase());
+  if(!myMatching.length) return null;
+  // Prefer a staff-confirmed link (see preview/index.html's "Intake form
+  // linking") over the plain name match below - handles a misspelling or
+  // two recipients sharing a name the same way staff already resolved it.
+  const linkedId = myMatching.map(s=>s.intakeResponseId).find(id=>id!=null);
+  if(linkedId){
+    const linked = intakeResponses.find(i=>i.id===linkedId);
+    if(linked) return linked;
+  }
   const norm = name.trim().toLowerCase();
   const matches = intakeResponses.filter(i => (i.recipName||'').trim().toLowerCase()===norm);
   if(!matches.length) return null;
