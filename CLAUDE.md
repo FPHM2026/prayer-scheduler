@@ -747,7 +747,18 @@ existing session history.
   whatever's left from before this existed (or the rare case someone
   declines to resume) via the "Delete this in-progress form" action on
   the Intake Forms tab's In-progress list (`deleteIntakeForm()`) — offered
-  only for InProgress forms, never Submitted ones.
+  only for InProgress forms, never Submitted ones. That delete action
+  surfaced a real bug the same day: a visitor whose token got deleted
+  this way came back to a 404 on load, which the code treated exactly
+  like a network failure - it fell into "offline" mode and just stayed
+  there forever, since the record it was waiting to sync to no longer
+  existed. Fixed by having `apiClient.js`'s `post()` tag a failed
+  request with its HTTP status, so `boot()`/`resumeWithToken()`/`doSave()`
+  can tell "genuinely offline" apart from "that token doesn't exist any
+  more" and call `recoverFromDeletedToken()` on the latter - gets a fresh
+  token and re-adopts whatever's saved locally under the old one (or
+  lands on a clean Intro screen if there's nothing local), instead of
+  leaving the visitor stuck.
 - **Minister portal** — `portal/index.html` adds a "View intake form" link
   on a recipient's Schedule/Completed Sessions group. `findMyIntakeForRecipient()`
   requires the recipient to actually appear in `mySessions()` before it'll
