@@ -254,6 +254,22 @@
   .ans-row{display:flex;flex-direction:column;margin-bottom:10px;}
   .ans-q{font-weight:700;font-size:var(--fs-xs);color:var(--muted);}
   .ans-a{font-size:var(--fs-sm);white-space:pre-wrap;}
+  @media print{
+    @page{size:letter;margin:0.5in;}
+    body{background:#fff;}
+    .no-print{display:none!important;}
+    nav[aria-label="Primary"]{display:none!important;}
+    /* Same two-column question/answer layout as intake/index.html's own
+       print view - a narrow label column, a wide answer column (long
+       free-text answers wrap far more than labels do, so they get the
+       space), tighter spacing throughout, to keep the printout to as few
+       pages as possible while staying legible. */
+    .ans-section{margin-bottom:14px;}
+    .ans-section h3{font-size:1rem;margin:0 0 6px;padding-bottom:4px;}
+    .ans-row{flex-direction:row;align-items:baseline;gap:10px;margin-bottom:5px;break-inside:avoid;}
+    .ans-q{flex:0 0 30%;max-width:30%;font-size:.78rem;}
+    .ans-a{flex:1 1 auto;font-size:.85rem;}
+  }
   .intake-match-banner{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--cream);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:var(--fs-sm);flex-wrap:wrap;}
 
   .sess-row{padding:14px 4px;border-bottom:1px solid #f1ede4;display:flex;justify-content:space-between;align-items:center;gap:10px;}

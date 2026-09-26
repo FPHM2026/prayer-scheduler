@@ -628,7 +628,19 @@ existing session history.
   `FPHM.renderResponsesHtml(responses)`, which every intake-answer view
   (public print/PDF, staff detail, minister modal) calls to turn a stored
   `responses` object into the same formatted HTML, styled by the `.ans-*`
-  CSS rules each app defines locally (matching its own palette). Every
+  CSS rules each app defines locally (matching its own palette). Both
+  print consumers (`intake/index.html`'s own `#printArea`, and
+  `preview/index.html`'s Intake Forms tab detail view) give `.ans-row` a
+  print-only two-column layout (added 2026-09-26) - a narrow ~30% label
+  column plus a wide answer column, since a long free-text answer wraps
+  far more than its label does, and stacking label-above-answer (the
+  on-screen layout, unchanged) used noticeably more vertical space and
+  pushed the printout to more pages than it needed. This also defined
+  `.no-print`/`@media print` for `preview/index.html`'s main app for the
+  first time - the `no-print` class was already sprinkled through its
+  markup (including on `openIntakeDetail`'s own toolbar) but had never
+  actually done anything outside the separate Reports-generator page,
+  since no CSS rule for it existed there. Every
   internal reference to `SECTIONS` reads `window.FPHM_INTAKE_CONFIG.SECTIONS`
   live on each call rather than a value captured once at load time — this
   is what actually makes the live-schema override below work: swapping

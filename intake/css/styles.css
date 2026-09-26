@@ -282,10 +282,27 @@ button {
 .ans-a { font-size: 1rem; }
 
 @media print {
+  @page { size: letter; margin: 0.5in; }
   body { background: #fff; }
   .no-print { display: none !important; }
   .card { border: none; padding: 0; }
   .wrap { max-width: 100%; padding: 0; }
+  /* Two columns per question - a narrow label column (long labels wrap,
+     which is fine) and a wide answer column (long free-text answers wrap
+     far more often, so they get the space) - instead of stacking label
+     above answer, which used noticeably more vertical space per question
+     and pushed the printout to more pages than needed. */
+  .ans-section { margin-bottom: 14px; }
+  .ans-section h3 { font-size: 1rem; margin: 0 0 6px; padding-bottom: 4px; }
+  .ans-row {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 5px;
+    break-inside: avoid;
+  }
+  .ans-q { flex: 0 0 30%; max-width: 30%; font-size: .78rem; }
+  .ans-a { flex: 1 1 auto; font-size: .85rem; }
 }
 
 @media (max-width: 480px) {
