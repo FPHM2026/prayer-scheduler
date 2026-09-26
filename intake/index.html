@@ -188,11 +188,13 @@ function renderIntro() {
 function renderTopBar(sectionsCount, currentIdx, title) {
   const pct = sectionsCount ? Math.round(((currentIdx) / sectionsCount) * 100) : 0;
   return `
-    <div class="top-actions no-print">
-      <button class="btn-link" id="btnSaveExit">Save &amp; continue later</button>
+    <div class="top-bar-sticky">
+      <div class="top-actions no-print">
+        <button class="btn-link" id="btnSaveExit">Save &amp; continue later</button>
+      </div>
+      <div class="progress-outer"><div class="progress-inner" style="width:${pct}%"></div></div>
+      <div class="progress-label">Section ${currentIdx + 1} of ${sectionsCount + 1}${title ? " — " + FPHM.escapeHtml(title) : ""}</div>
     </div>
-    <div class="progress-outer"><div class="progress-inner" style="width:${pct}%"></div></div>
-    <div class="progress-label">Section ${currentIdx + 1} of ${sectionsCount + 1}${title ? " — " + FPHM.escapeHtml(title) : ""}</div>
     <div id="offlineBanner"></div>
   `;
 }

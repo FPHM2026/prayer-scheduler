@@ -179,6 +179,21 @@ button {
   margin-bottom: 10px;
 }
 
+.top-bar-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--bg);
+  padding-top: 12px;
+  margin: -12px -18px 0;
+  padding-left: 18px;
+  padding-right: 18px;
+}
+.top-bar-sticky .progress-label { margin-bottom: 10px; }
+@media print {
+  .top-bar-sticky { position: static; margin: 0; padding: 0; }
+}
+
 .save-status {
   font-size: .82rem;
   color: var(--ink-soft);
