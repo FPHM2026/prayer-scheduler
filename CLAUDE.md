@@ -759,6 +759,32 @@ existing session history.
   token and re-adopts whatever's saved locally under the old one (or
   lands on a clean Intro screen if there's nothing local), instead of
   leaving the visitor stuck.
+- **Visitor can delete their own form** (added 2026-09-26) — a "Delete my
+  answers" link sits next to "Save & continue later" in the sticky top
+  bar while filling the form out, and "Delete my submitted answers" on
+  the thank-you screen after submitting, in case someone wants to retract
+  what they shared. Both call `confirmAndDeleteForm()`, which hits the
+  Worker's new `POST /api/intake/delete { token }` (`handleDelete()`) and
+  then resets to a clean Intro screen. Trust boundary is the same one
+  load/save/submit already use: knowing the token (a random UUID) is
+  proof enough, no separate check - this works regardless of Submitted/
+  InProgress status, unlike staff's own "Delete this in-progress form"
+  action above which is InProgress-only.
+- **Long free-text answers auto-grow instead of clipping/scrolling**
+  (added 2026-09-26) — every `<textarea>` (the "please explain"
+  questions, and the checkboxes "Other, please specify" box) grows to
+  fit what's typed via `autoGrowTextarea()`, called on every keystroke
+  and once per question on render (so a prefilled multi-line answer
+  starts at the right height too). This also fixed a real layout bug:
+  the "Other" box used to be a plain `<input>` sized by CSS `width:100%`
+  inside a `display:flex` (row) `.choice-option` with no `flex-wrap` -
+  without a line break, that width was computed against the whole row's
+  space *in addition to* the checkbox and label already sitting there,
+  so it visibly overflowed past the card's right edge instead of
+  wrapping onto its own line. Fixed by adding `flex-wrap:wrap` to
+  `.choice-option` and `flex:1 1 100%` to `.other-text`, which now forces
+  it onto its own full-width line the way `margin-top:6px` alone never
+  actually did.
 - **Minister portal** — `portal/index.html` adds a "View intake form" link
   on a recipient's Schedule/Completed Sessions group. `findMyIntakeForRecipient()`
   requires the recipient to actually appear in `mySessions()` before it'll

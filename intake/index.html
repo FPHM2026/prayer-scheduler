@@ -50,6 +50,26 @@ const state = {
 
 const app = document.getElementById("app");
 
+// Called after an explicit Back/Next/Begin/Submit navigation (never after
+// a same-page re-render, e.g. an answer revealing a conditional question -
+// that would yank the visitor's scroll position out from under them while
+// they're still mid-section). The sticky top/bottom bars mean the new
+// page's content can otherwise load still scrolled to wherever the
+// previous page left off.
+function scrollToTop() {
+  window.scrollTo(0, 0);
+}
+
+// Grows a textarea to fit whatever's typed into it (long explanations, the
+// "Other, please specify" free-text box) instead of leaving it a fixed
+// size that either wastes space or clips/scrolls what someone typed.
+// Shrinks back down too, e.g. after deleting text, so it never gets stuck
+// oversized.
+function autoGrowTextarea(el) {
+  el.style.height = "auto";
+  el.style.height = el.scrollHeight + 2 + "px";
+}
+
 // ---- local persistence fallback (used when the API is unreachable) -----
 function localKey() { return "fphm_intake_local_" + (state.token || "draft"); }
 function saveLocal() {
@@ -306,6 +326,7 @@ async function resumeWithToken(token) {
   }
   saveLocal();
   render();
+  scrollToTop();
 }
 
 async function beginIntake() {
@@ -322,6 +343,41 @@ async function beginIntake() {
   state.step = STEP.SECTION;
   state.sectionIdx = 0;
   render();
+  scrollToTop();
+}
+
+// Lets the visitor delete their own form (in progress or already
+// submitted) and start clean - offered next to "Save & continue later"
+// while filling it out, and on the thank-you screen after submitting, in
+// case they change their mind about having shared it. Uses the plain
+// browser confirm() rather than this app's own modal machinery (it has
+// none - the public form deliberately stays simple), which is fine for a
+// one-off destructive action gated behind an explicit click.
+async function confirmAndDeleteForm() {
+  if (!state.token) return;
+  if (!window.confirm("Delete your answers and start over? This can't be undone.")) return;
+  try {
+    await FPHM_API.deleteForm(state.token);
+  } catch (e) {
+    // Even offline, still reset below - the visitor asked to start over
+    // and their local copy is what they actually see; if a server-side
+    // copy is left behind, staff's own "Delete this in-progress form"
+    // cleanup action (Intake Forms tab) can remove it later.
+  }
+  try {
+    localStorage.removeItem("fphm_intake_local_" + state.token);
+    localStorage.removeItem("fphm_intake_local_" + state.token + "_signature");
+    localStorage.removeItem("fphm_intake_last_token");
+  } catch (e) {}
+  state.token = null;
+  state.answers = {};
+  state.submitted = false;
+  state.online = true;
+  state.duplicateCheckDone = false;
+  state.step = STEP.INTRO;
+  state.sectionIdx = 0;
+  render();
+  scrollToTop();
 }
 
 // ---- rendering ------------------------------------------------------
@@ -351,6 +407,7 @@ function renderTopBar(sectionsCount, currentIdx, title) {
   return `
     <div class="top-bar-sticky">
       <div class="top-actions no-print">
+        <button class="btn-link" id="btnDeleteForm">Delete my answers</button>
         <button class="btn-link" id="btnSaveExit">Save &amp; continue later</button>
       </div>
       <div class="progress-outer"><div class="progress-inner" style="width:${pct}%"></div></div>
@@ -390,10 +447,12 @@ function renderSection() {
   document.getElementById("offlineBanner").innerHTML = renderOfflineBanner();
   wireQuestionEvents(section);
   updateNextButtonState(section);
+  document.querySelectorAll("#questionsHost textarea").forEach(autoGrowTextarea);
   document.getElementById("btnBack").onclick = () => {
     state.sectionIdx = Math.max(0, state.sectionIdx - 1);
     doSave();
     render();
+    scrollToTop();
   };
   document.getElementById("btnNext").onclick = async () => {
     const missing = FPHM.validateSection(section, state.answers);
@@ -412,8 +471,10 @@ function renderSection() {
     state.sectionIdx += 1;
     doSave();
     render();
+    scrollToTop();
   };
   document.getElementById("btnSaveExit").onclick = openSaveExitDialog;
+  document.getElementById("btnDeleteForm").onclick = confirmAndDeleteForm;
 }
 
 function renderQuestion(q) {
@@ -457,9 +518,9 @@ function renderQuestion(q) {
               <span>Other</span>
               ${
                 otherVal
-                  ? `<input type="text" class="other-text" data-qid="${q.id}" data-kind="other-text" value="${FPHM.escapeHtml(
+                  ? `<textarea class="other-text" rows="1" data-qid="${q.id}" data-kind="other-text" placeholder="Please specify">${FPHM.escapeHtml(
                       otherVal.slice("__other__:".length)
-                    )}" placeholder="Please specify">`
+                    )}</textarea>`
                   : ""
               }
             </label>`
@@ -502,6 +563,7 @@ function wireQuestionEvents(section) {
       } else {
         state.answers[qid] = el.value;
       }
+      if (el.tagName === "TEXTAREA") autoGrowTextarea(el);
       clearInvalid(qid);
       updateNextButtonState(section);
       scheduleSave();
@@ -626,8 +688,10 @@ function renderFinal() {
     state.step = STEP.SECTION;
     state.sectionIdx = Math.max(0, visibleSections.length - 1);
     render();
+    scrollToTop();
   };
   document.getElementById("btnSaveExit").onclick = openSaveExitDialog;
+  document.getElementById("btnDeleteForm").onclick = confirmAndDeleteForm;
   document.getElementById("btnSubmit").onclick = onSubmit;
 }
 
@@ -668,6 +732,7 @@ async function onSubmit() {
   state.submitted = true;
   state.step = STEP.DONE;
   render();
+  scrollToTop();
 }
 
 function renderDone() {
@@ -676,7 +741,7 @@ function renderDone() {
       <h1>Thank you</h1>
       <p>Your questionnaire has been submitted to the Freedom Prayer Healing Ministry team. Thank you for taking the time to answer so honestly — it will help your prayer team prepare well for your visit.</p>
       <div class="nav-row no-print">
-        <span></span>
+        <button class="btn-link" id="btnDeleteForm">Delete my submitted answers</button>
         <button class="btn-primary" id="btnPrint">Print / Save a copy</button>
       </div>
     </div>
@@ -689,6 +754,7 @@ function renderDone() {
     document.getElementById("printArea").style.display = "block";
     window.print();
   };
+  document.getElementById("btnDeleteForm").onclick = confirmAndDeleteForm;
 }
 
 async function openSaveExitDialog() {

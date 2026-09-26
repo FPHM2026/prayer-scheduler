@@ -103,6 +103,7 @@ input:focus, textarea:focus, select:focus {
 .choice-group { display: flex; flex-direction: column; gap: 8px; }
 .choice-option {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
@@ -117,8 +118,18 @@ input:focus, textarea:focus, select:focus {
 }
 .choice-option input { width: 18px; height: 18px; flex-shrink: 0; }
 .choice-option .other-text {
-  margin-top: 6px;
-  width: 100%;
+  /* flex-basis:100% forces this onto its own line below the checkbox and
+     label instead of squeezing onto the same row - without flex-wrap on
+     the parent too, a plain width:100% here just overflows the row
+     (checkbox + label + a full-container-width box) rather than wrapping. */
+  flex: 1 1 100%;
+  width: auto;
+  min-width: 0;
+  margin-top: 2px;
+  resize: vertical;
+  min-height: 38px;
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 .field-error {

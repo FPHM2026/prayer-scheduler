@@ -41,6 +41,11 @@ const FPHM_API = {
   // copy when someone starts over on a different device.
   async findDuplicate(name, email, countryOfBirth, token) {
     return post("/intake/find-duplicate", { name, email, countryOfBirth, token });
+  },
+  // Lets the visitor delete their own form (in progress or already
+  // submitted) given only their own token.
+  async deleteForm(token) {
+    return post("/intake/delete", { token });
   }
 };
 

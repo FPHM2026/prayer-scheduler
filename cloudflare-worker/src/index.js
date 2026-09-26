@@ -22,6 +22,9 @@
        "resume that one" when the same person starts a second copy (e.g.
        on a different device); see the handler's own comment for why it
        requires all three fields to match, not just name.
+     POST /api/intake/delete         { token } -> { ok: true } - added
+       2026-09-26 so a visitor can delete their own form (in progress or
+       already submitted), given only their own token.
 ========================================================================= */
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
@@ -143,6 +146,13 @@ async function updateItem(env, itemId, fields) {
   });
 }
 
+async function deleteItem(env, itemId) {
+  const { siteId, listId } = await resolveSiteAndList(env);
+  return graphFetch(env, `/sites/${siteId}/lists/${listId}/items/${itemId}`, {
+    method: "DELETE"
+  });
+}
+
 // ---- route handlers -----------------------------------------------------
 async function handleStart(env, request) {
   const body = await request.json().catch(() => ({}));
@@ -210,6 +220,22 @@ async function handleSubmit(env, request) {
   }
   if (responses.email) fields.RecipientEmail = String(responses.email);
   await updateItem(env, item.id, fields);
+  return { ok: true };
+}
+
+// Lets the visitor delete their own form - in progress or already
+// submitted - given only their own token, the same trust boundary
+// load/save/submit already use (the token is a random UUID only the
+// visitor and whoever they shared their resume link with would know; see
+// CLAUDE.md's Intake Forms section on this data's sensitivity, which is
+// exactly why being able to retract it themselves is worth having, not
+// just staff's own "Delete this in-progress form" cleanup action).
+async function handleDelete(env, request) {
+  const body = await request.json().catch(() => ({}));
+  if (!body.token) return { __status: 400, error: "token required" };
+  const item = await findItemByToken(env, body.token);
+  if (!item) return { __status: 404, error: "not found" };
+  await deleteItem(env, item.id);
   return { ok: true };
 }
 
@@ -284,7 +310,8 @@ const ROUTES = {
   "/api/intake/save": handleSave,
   "/api/intake/submit": handleSubmit,
   "/api/intake/schema": handleSchema,
-  "/api/intake/find-duplicate": handleFindDuplicate
+  "/api/intake/find-duplicate": handleFindDuplicate,
+  "/api/intake/delete": handleDelete
 };
 const GET_ROUTES = new Set(["/api/intake/schema"]);
 
