@@ -459,6 +459,14 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
       requests `SP_SCOPES` (`https://creeksidechurch.sharepoint.com/
       AllSites.Manage`, delegated) separately from `GRAPH_SCOPES` — **its
       own admin consent step**, same category as the Graph scopes above.
+      A brand-new Entra account is often not yet resolvable by SharePoint
+      at all right after `createMinisterAccount()` returns — real-world
+      testing the same day hit `"The user does not exist or is not
+      unique"` from the group-add call, which is SharePoint not having
+      caught up yet, not a real error — so `addMinisterToSharePointGroup()`
+      calls `ensureSharePointUser()` (SharePoint's `/_api/web/ensureuser`,
+      which forces that resolution) and retries the whole ensure+add pair
+      up to 4 times, 4 seconds apart, before actually failing.
       With account creation now doing both the Entra account and the
       SharePoint group membership, adding a minister to the team is just
       filling out the form — no manual step left afterward.
