@@ -954,7 +954,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-27.9";
+const APP_VERSION = "2026-09-27.10";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -974,17 +974,23 @@ const MSAL_CONFIG = {
 // for a signed-in admin who actually holds a role that can manage users
 // (User Administrator or similar) - a signed-in account without it gets a
 // normal Graph 403, surfaced in the modal, not a silent failure.
-const GRAPH_SCOPES = ["Sites.ReadWrite.All", "User.Read", "User.ReadWrite.All", "Directory.AccessAsUser.All"];
+// GroupMember.ReadWrite.All (delegated) is needed to add/remove a minister
+// from ENTRA_MINISTERS_GROUP_ID below - see addMinisterToEntraGroup()/
+// removeMinisterFromEntraGroup(). Needs its own admin consent, same as the
+// other scopes here.
+const GRAPH_SCOPES = ["Sites.ReadWrite.All", "User.Read", "User.ReadWrite.All", "Directory.AccessAsUser.All", "GroupMember.ReadWrite.All"];
 const SITE_URL = "https://creeksidechurch.sharepoint.com/sites/FreedomPrayer";
-// Separate delegated scope for the SharePoint REST API (not Graph) - see
-// addMinisterToSharePointGroup() and getSharePointToken() below. Needs its
-// own admin consent on the app registration, same as the Graph scopes.
-const SP_SCOPES = ["https://creeksidechurch.sharepoint.com/AllSites.Manage"];
-// The SharePoint site permission group that actually grants minister
-// portal access - membership in this is what makes the portal usable, not
-// the Entra account by itself. Must match the group's name exactly as
-// shown in Site Permissions > Advanced permissions settings on SITE_URL.
-const SHAREPOINT_MINISTERS_GROUP = "Prayer Ministers";
+// The Entra security group that actually grants minister portal access -
+// membership in this is what makes the portal usable, not the Entra
+// account by itself; the site's own SharePoint permissions are granted to
+// this group rather than to individual users. Switched from a classic
+// SharePoint site permission group on 2026-09-27 specifically because
+// SharePoint could take well over a minute to recognize a just-created
+// Entra account when membership went through the SharePoint REST API -
+// Graph's own group-membership endpoints have no such lag. Find/verify
+// this GUID at entra.microsoft.com > Groups > (the group) > Overview >
+// Object Id.
+const ENTRA_MINISTERS_GROUP_ID = "dbee503e-a287-42c8-a4f3-ae67feecdec7";
 // Domain new minister sign-in accounts are created under - see
 // generateSignInEmail() below.
 const PORTAL_ACCOUNT_DOMAIN = "creeksidechurch.ca";
@@ -1068,22 +1074,6 @@ document.getElementById('btnSignIn').addEventListener('click', async ()=>{
 
 async function getToken(){
   const req = { scopes: GRAPH_SCOPES, account };
-  try{
-    const res = await msalInstance.acquireTokenSilent(req);
-    return res.accessToken;
-  }catch(e){
-    const res = await msalInstance.acquireTokenPopup(req);
-    return res.accessToken;
-  }
-}
-// A SharePoint REST token is a SEPARATE token from the Graph one above -
-// different resource (https://creeksidechurch.sharepoint.com vs
-// graph.microsoft.com), so it needs its own scope request and can't reuse
-// getToken()'s result. Only used by addMinisterToSharePointGroup() below -
-// Graph v1.0 has no endpoint for classic SharePoint site-group membership,
-// so that one call goes straight to the SharePoint REST API instead.
-async function getSharePointToken(){
-  const req = { scopes: SP_SCOPES, account };
   try{
     const res = await msalInstance.acquireTokenSilent(req);
     return res.accessToken;
@@ -3879,9 +3869,9 @@ window.deleteMinister = async function(id){
   // just get a clear warning to remove access by hand instead.
   if(m && m.signInEmail){
     try{
-      await removeMinisterFromSharePointGroup(m.signInEmail);
+      await removeMinisterFromEntraGroup(m.signInEmail);
     }catch(e){
-      alert(`Deleted from the roster, but couldn't remove ${m.name} from the "${SHAREPOINT_MINISTERS_GROUP}" SharePoint group: ${e.message}\n\nThey may still have portal access - remove them from that group by hand in SharePoint.`);
+      alert(`Deleted from the roster, but couldn't remove ${m.name} from the Prayer Ministers group: ${e.message}\n\nThey may still have portal access - remove them from that group by hand in Entra.`);
     }
   }
   await deleteItem('ministers', id);
@@ -3925,101 +3915,30 @@ async function createMinisterAccount(displayName, upn, password){
     })
   });
 }
-// Adds the minister's new account to the SharePoint site permission group
-// that actually gates minister-portal access (SHAREPOINT_MINISTERS_GROUP) -
-// the Entra account alone doesn't grant that, group membership does.
-// Microsoft Graph v1.0 has no endpoint for classic SharePoint site-group
-// membership, so this goes straight to the SharePoint REST API instead,
-// using its own token (getSharePointToken(), a different resource/scope
-// than every other call in this file). The login name format
-// (i:0#.f|membership|<upn>) is the standard claims-encoded form Microsoft
-// Entra accounts take in modern SharePoint Online - not specific to this
-// tenant.
-function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
-// Forces SharePoint to resolve/provision a login name into this site's own
-// User Information List. A brand-new Entra account (created seconds ago by
-// createMinisterAccount()) is often not yet resolvable by SharePoint at
-// all - "The user does not exist or is not unique" from sitegroups/users
-// is that propagation lag, not a real permission or naming problem -
-// EnsureUser is Microsoft's documented way to force that resolution rather
-// than just waiting blind.
-async function ensureSharePointUser(loginName, token){
-  const res = await fetch(`${SITE_URL}/_api/web/ensureuser`, {
+// Adds the minister's new account to ENTRA_MINISTERS_GROUP_ID, the Entra
+// security group that actually gates minister-portal access (the site's
+// SharePoint permissions are granted to this group, not to individuals) -
+// the Entra account alone doesn't grant that, group membership does. Plain
+// Graph delegated call, same token/pattern as everything else in this
+// file - no separate resource, no propagation-lag retry loop needed, which
+// is exactly why this replaced the original SharePoint-REST-API version
+// (see CLAUDE.md for that history).
+async function addMinisterToEntraGroup(upn){
+  return graphFetch(`/groups/${ENTRA_MINISTERS_GROUP_ID}/members/$ref`, {
     method: 'POST',
-    headers: {
-      'Authorization': 'Bearer ' + token,
-      'Accept': 'application/json;odata=verbose',
-      'Content-Type': 'application/json;odata=verbose'
-    },
-    body: JSON.stringify({ logonName: loginName })
+    body: JSON.stringify({ '@odata.id': `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(upn)}` })
   });
-  if(!res.ok){
-    const text = await res.text();
-    throw new Error(`EnsureUser failed (${res.status}): ${text.slice(0,300)}`);
-  }
 }
-async function addMinisterToSharePointGroup(upn, onRetry){
-  const token = await getSharePointToken();
-  const loginName = 'i:0#.f|membership|' + upn;
-  const url = `${SITE_URL}/_api/web/sitegroups/getbyname('${encodeURIComponent(SHAREPOINT_MINISTERS_GROUP)}')/users`;
-  // A just-created Entra account can take SharePoint well over a minute to
-  // recognize at all (confirmed live 2026-09-27 - a manual add via the
-  // SharePoint UI succeeded on an account that had just failed here
-  // repeatedly), so EnsureUser + the add itself both get a generous number
-  // of attempts with a wait between them rather than failing fast - this
-  // is expected propagation lag, not a real error, for an account created
-  // moments ago. onRetry(attemptNumber, totalAttempts), if given, lets the
-  // caller show progress instead of the save just looking frozen for up to
-  // ~2 minutes.
-  const attempts = 10, delayMs = 12000;
-  let lastErr;
-  for(let i=0; i<attempts; i++){
-    if(i>0 && onRetry) onRetry(i+1, attempts);
-    try{
-      await ensureSharePointUser(loginName, token);
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + token,
-          'Accept': 'application/json;odata=verbose',
-          'Content-Type': 'application/json;odata=verbose'
-        },
-        body: JSON.stringify({ '__metadata': { type: 'SP.User' }, LoginName: loginName })
-      });
-      if(res.ok) return;
-      const text = await res.text();
-      lastErr = new Error(`SharePoint group add failed (${res.status}): ${text.slice(0,300)}`);
-    }catch(e){
-      lastErr = e;
-    }
-    if(i < attempts-1) await sleep(delayMs);
-  }
-  throw lastErr;
-}
-// Removes a minister from the SharePoint permission group when they're
-// deleted from the roster - deliberately does NOT touch their Entra
-// account at all (no disable, no delete). One of the people on this list
-// is a church employee whose actual Microsoft 365 account must never be
-// affected by a roster change here; SharePoint group membership is the
-// only thing this app should ever revoke. removeByLoginName mirrors
-// addMinisterToSharePointGroup()'s getbyname() call/token/login-name
-// format above.
-async function removeMinisterFromSharePointGroup(upn){
-  const token = await getSharePointToken();
-  const loginName = 'i:0#.f|membership|' + upn;
-  const url = `${SITE_URL}/_api/web/sitegroups/getbyname('${encodeURIComponent(SHAREPOINT_MINISTERS_GROUP)}')/users/removeByLoginName('${encodeURIComponent(loginName)}')`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Authorization': 'Bearer ' + token,
-      'Accept': 'application/json;odata=verbose',
-      'Content-Type': 'application/json;odata=verbose'
-    }
-  });
-  if(!res.ok){
-    const text = await res.text();
-    throw new Error(`SharePoint group removal failed (${res.status}): ${text.slice(0,300)}`);
-  }
+// Removes a minister from the Entra group when they're deleted from the
+// roster - deliberately does NOT touch their Entra account at all (no
+// disable, no delete). One of the people on this list is a church employee
+// whose actual Microsoft 365 account must never be affected by a roster
+// change here; group membership is the only thing this app should ever
+// revoke. Graph's DELETE .../members/{id}/$ref needs the member's
+// directory object id, not their UPN, so this resolves that first.
+async function removeMinisterFromEntraGroup(upn){
+  const user = await graphFetch(`/users/${encodeURIComponent(upn)}?$select=id`);
+  return graphFetch(`/groups/${ENTRA_MINISTERS_GROUP_ID}/members/${user.id}/$ref`, { method: 'DELETE' });
 }
 // Resets the password on an EXISTING account, addressed by its current
 // sign-in email (Graph accepts a userPrincipalName in place of a user id).
@@ -4107,11 +4026,9 @@ async function onSaveMinister(){
       return;
     }
     try{
-      await addMinisterToSharePointGroup(signInEmail, (attempt, total)=>{
-        acctMsg.innerHTML = `<p class="helptext" style="margin:5px 0 0;">Waiting for SharePoint to recognize the new account (attempt ${attempt} of ${total})…</p>`;
-      });
+      await addMinisterToEntraGroup(signInEmail);
     }catch(e){
-      acctMsg.innerHTML = `<div class="errbox" role="alert">Their sign-in account was created, but adding them to the "${escapeHtml(SHAREPOINT_MINISTERS_GROUP)}" SharePoint group failed: ${escapeHtml(e.message)}. The minister record below was NOT saved — the account now exists in Entra without portal access; add them to the group by hand in SharePoint, then save again (uncheck "Also create their sign-in account" first so it doesn't try to recreate the account).</div>`;
+      acctMsg.innerHTML = `<div class="errbox" role="alert">Their sign-in account was created, but adding them to the Prayer Ministers group failed: ${escapeHtml(e.message)}. The minister record below was NOT saved — the account now exists in Entra without portal access; add them to the group by hand in Entra, then save again (uncheck "Also create their sign-in account" first so it doesn't try to recreate the account).</div>`;
       return;
     }
   } else if(wantsPasswordReset){
@@ -5384,10 +5301,8 @@ const CHANGE_LOG = [
     'Fixed: resetting an existing minister\'s sign-in password works now - it needed one more Graph permission, Directory.AccessAsUser.All, alongside User.ReadWrite.All.',
     'Changed: the password field is simpler now. Both a new minister\'s starting password and a "Reset Password" button on existing ministers use the same shared, year-stamped default (e.g. FPHM2026!) instead of a typed-in value - it\'s always a temporary password Microsoft forces the minister to replace at their first sign-in, so there\'s nothing sensitive to mask or save. It\'s no longer stored anywhere (the PortalPassword SharePoint column is no longer used - safe to remove it if you added it).',
     'New: Add/Edit Minister can now create and manage their actual sign-in account, not just record the roster entry. Check "Also create their sign-in account" (on by default when adding someone new) and it creates their unlicensed Microsoft 365 account for you with this year\'s default temporary password.',
-    'New: creating a minister\'s account now also adds them to the "Prayer Ministers" SharePoint permission group automatically - the one manual step left after account creation is gone. Adding a minister to the team is now just filling out the form.',
-    'Fixed: adding a brand-new minister to the SharePoint group right after their account was created could fail with "The user does not exist or is not unique" - SharePoint hadn\'t recognized the just-created account yet, and can take over a minute to. Save now waits and retries automatically (up to ~2 minutes, with an on-screen "waiting" message) before giving up.',
-    'New: deleting a minister from the roster now also removes them from the "Prayer Ministers" SharePoint group, revoking their portal access. Their Entra sign-in account itself is deliberately left alone either way - useful if that minister is also a staff member whose actual Microsoft 365 account shouldn\'t be touched by a roster change here.',
-    'Setup needed before this works: User.ReadWrite.All AND Directory.AccessAsUser.All (both Graph, delegated), PLUS AllSites.Manage (SharePoint, delegated) all need admin consent on the Scheduler\'s Azure AD app registration. See CLAUDE.md for the exact steps. Until that\'s done, the checkbox will fail with a clear error rather than silently doing nothing.'
+    'New: creating a minister\'s account now also adds them to the "Prayer Ministers" Entra group automatically, and deleting a minister removes them from it - the one manual step left after account creation is gone. Adding someone to the team is now just filling out the form. Their Entra sign-in account itself is never disabled or deleted by a roster change - useful if that minister is also a staff member whose actual Microsoft 365 account needs to stay untouched.',
+    'Setup needed before this works: User.ReadWrite.All, Directory.AccessAsUser.All, AND GroupMember.ReadWrite.All (all Graph, delegated) need admin consent on the Scheduler\'s Azure AD app registration. See CLAUDE.md for the exact steps. Until that\'s done, the checkbox will fail with a clear error rather than silently doing nothing.'
   ]}
 ];
 // Entries already live in production, newest first - moved here from
