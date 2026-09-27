@@ -811,8 +811,12 @@ window.toggleMyConfirmation = async function(sessionId){
   if(!s) return;
   const nowConfirmed = new Set(s.ministers.filter(m=>m.confirmed).map(m=>m.id));
   if(nowConfirmed.has(me.id)) nowConfirmed.delete(me.id); else nowConfirmed.add(me.id);
-  await updateItem('sessions', sessionId, { ConfirmedMinisterIDs: [...nowConfirmed].join(',') });
-  await loadAll();
+  try{
+    await updateItem('sessions', sessionId, { ConfirmedMinisterIDs: [...nowConfirmed].join(',') });
+    await loadAll();
+  }catch(e){
+    alert(`Couldn't save your confirmation: ${e.message}`);
+  }
 };
 function renderSchedule(){
   const q = $('#search').value.trim().toLowerCase();
