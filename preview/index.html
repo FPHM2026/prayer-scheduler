@@ -954,7 +954,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-27.5";
+const APP_VERSION = "2026-09-27.6";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -976,6 +976,15 @@ const MSAL_CONFIG = {
 // normal Graph 403, surfaced in the modal, not a silent failure.
 const GRAPH_SCOPES = ["Sites.ReadWrite.All", "User.Read", "User.ReadWrite.All", "Directory.AccessAsUser.All"];
 const SITE_URL = "https://creeksidechurch.sharepoint.com/sites/FreedomPrayer";
+// Separate delegated scope for the SharePoint REST API (not Graph) - see
+// addMinisterToSharePointGroup() and getSharePointToken() below. Needs its
+// own admin consent on the app registration, same as the Graph scopes.
+const SP_SCOPES = ["https://creeksidechurch.sharepoint.com/AllSites.Manage"];
+// The SharePoint site permission group that actually grants minister
+// portal access - membership in this is what makes the portal usable, not
+// the Entra account by itself. Must match the group's name exactly as
+// shown in Site Permissions > Advanced permissions settings on SITE_URL.
+const SHAREPOINT_MINISTERS_GROUP = "Prayer Ministers";
 // Domain new minister sign-in accounts are created under - see
 // generateSignInEmail() below.
 const PORTAL_ACCOUNT_DOMAIN = "creeksidechurch.ca";
@@ -1059,6 +1068,22 @@ document.getElementById('btnSignIn').addEventListener('click', async ()=>{
 
 async function getToken(){
   const req = { scopes: GRAPH_SCOPES, account };
+  try{
+    const res = await msalInstance.acquireTokenSilent(req);
+    return res.accessToken;
+  }catch(e){
+    const res = await msalInstance.acquireTokenPopup(req);
+    return res.accessToken;
+  }
+}
+// A SharePoint REST token is a SEPARATE token from the Graph one above -
+// different resource (https://creeksidechurch.sharepoint.com vs
+// graph.microsoft.com), so it needs its own scope request and can't reuse
+// getToken()'s result. Only used by addMinisterToSharePointGroup() below -
+// Graph v1.0 has no endpoint for classic SharePoint site-group membership,
+// so that one call goes straight to the SharePoint REST API instead.
+async function getSharePointToken(){
+  const req = { scopes: SP_SCOPES, account };
   try{
     const res = await msalInstance.acquireTokenSilent(req);
     return res.accessToken;
@@ -3871,10 +3896,10 @@ function generateSignInEmail(name){
 // keeps it a no-seat-cost account. forceChangePasswordNextSignIn is true:
 // Graph rejects an admin-set PATCH/POST password with it false (403
 // Authorization_RequestDenied) for the roles this tenant grants, matching
-// what the Entra portal's own "Reset password" does. The admin-typed value
-// is only the TEMPORARY password to hand the minister - they're required to
-// pick their own at first sign-in, so PortalPassword goes stale at that
-// point (see the helptext in the modal).
+// what the Entra portal's own "Reset password" does. The password is
+// always the shared, year-stamped default from defaultTempPassword() -
+// it's never the minister's real, ongoing password (see the helptext in
+// the modal), so there's nothing here worth persisting or masking.
 async function createMinisterAccount(displayName, upn, password){
   const mailNickname = upn.split('@')[0];
   return graphFetch('/users', {
@@ -3887,6 +3912,34 @@ async function createMinisterAccount(displayName, upn, password){
       passwordProfile: { password, forceChangePasswordNextSignIn: true }
     })
   });
+}
+// Adds the minister's new account to the SharePoint site permission group
+// that actually gates minister-portal access (SHAREPOINT_MINISTERS_GROUP) -
+// the Entra account alone doesn't grant that, group membership does.
+// Microsoft Graph v1.0 has no endpoint for classic SharePoint site-group
+// membership, so this goes straight to the SharePoint REST API instead,
+// using its own token (getSharePointToken(), a different resource/scope
+// than every other call in this file). The login name format
+// (i:0#.f|membership|<upn>) is the standard claims-encoded form Microsoft
+// Entra accounts take in modern SharePoint Online - not specific to this
+// tenant.
+async function addMinisterToSharePointGroup(upn){
+  const token = await getSharePointToken();
+  const loginName = 'i:0#.f|membership|' + upn;
+  const url = `${SITE_URL}/_api/web/sitegroups/getbyname('${encodeURIComponent(SHAREPOINT_MINISTERS_GROUP)}')/users`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Accept': 'application/json;odata=verbose',
+      'Content-Type': 'application/json;odata=verbose'
+    },
+    body: JSON.stringify({ '__metadata': { type: 'SP.User' }, LoginName: loginName })
+  });
+  if(!res.ok){
+    const text = await res.text();
+    throw new Error(`SharePoint group add failed (${res.status}): ${text.slice(0,300)}`);
+  }
 }
 // Resets the password on an EXISTING account, addressed by its current
 // sign-in email (Graph accepts a userPrincipalName in place of a user id).
@@ -3971,6 +4024,12 @@ async function onSaveMinister(){
       await createMinisterAccount(name, signInEmail, password);
     }catch(e){
       acctMsg.innerHTML = `<div class="errbox" role="alert">Couldn't create their sign-in account: ${escapeHtml(e.message)}. The minister record below was NOT saved either — fix the issue (e.g. try a different Sign-In Email if it's already taken) and save again, or uncheck "Also create their sign-in account" to save just the roster entry.</div>`;
+      return;
+    }
+    try{
+      await addMinisterToSharePointGroup(signInEmail);
+    }catch(e){
+      acctMsg.innerHTML = `<div class="errbox" role="alert">Their sign-in account was created, but adding them to the "${escapeHtml(SHAREPOINT_MINISTERS_GROUP)}" SharePoint group failed: ${escapeHtml(e.message)}. The minister record below was NOT saved — the account now exists in Entra without portal access; add them to the group by hand in SharePoint, then save again (uncheck "Also create their sign-in account" first so it doesn't try to recreate the account).</div>`;
       return;
     }
   } else if(wantsPasswordReset){
@@ -5243,7 +5302,8 @@ const CHANGE_LOG = [
     'Fixed: resetting an existing minister\'s sign-in password works now - it needed one more Graph permission, Directory.AccessAsUser.All, alongside User.ReadWrite.All.',
     'Changed: the password field is simpler now. Both a new minister\'s starting password and a "Reset Password" button on existing ministers use the same shared, year-stamped default (e.g. FPHM2026!) instead of a typed-in value - it\'s always a temporary password Microsoft forces the minister to replace at their first sign-in, so there\'s nothing sensitive to mask or save. It\'s no longer stored anywhere (the PortalPassword SharePoint column is no longer used - safe to remove it if you added it).',
     'New: Add/Edit Minister can now create and manage their actual sign-in account, not just record the roster entry. Check "Also create their sign-in account" (on by default when adding someone new) and it creates their unlicensed Microsoft 365 account for you with this year\'s default temporary password.',
-    'Setup needed before this works: User.ReadWrite.All AND Directory.AccessAsUser.All (both delegated) need admin consent on the Scheduler\'s Azure AD app registration. See CLAUDE.md for the exact steps. Until that\'s done, the checkbox will fail with a clear error rather than silently doing nothing.'
+    'New: creating a minister\'s account now also adds them to the "Prayer Ministers" SharePoint permission group automatically - the one manual step left after account creation is gone. Adding a minister to the team is now just filling out the form.',
+    'Setup needed before this works: User.ReadWrite.All AND Directory.AccessAsUser.All (both Graph, delegated), PLUS AllSites.Manage (SharePoint, delegated) all need admin consent on the Scheduler\'s Azure AD app registration. See CLAUDE.md for the exact steps. Until that\'s done, the checkbox will fail with a clear error rather than silently doing nothing.'
   ]}
 ];
 // Entries already live in production, newest first - moved here from

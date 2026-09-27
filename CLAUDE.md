@@ -444,15 +444,35 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
       always-editable field, so a save never silently changes an existing
       minister's password by accident — clicking it reveals the field
       prefilled with this year's default and saving commits the reset.
-    - **Account-creation failure blocks the whole save**, not just a
-      warning: if the checkbox is checked and Graph creation fails (a
-      taken UPN, a 403 from a signed-in account that doesn't actually hold
-      User Administrator, etc.), the minister record itself is NOT saved
-      either — the error surfaces in the modal and the admin fixes the
-      issue (adjust the email, uncheck the box to save just the roster
-      entry) and retries, rather than the roster silently ending up with a
-      minister record that has no matching account and no clear sign
-      anything went wrong.
+    - **Account creation also adds the new minister to the SharePoint
+      "Prayer Ministers" permission group** (`SHAREPOINT_MINISTERS_GROUP`
+      constant, added 2026-09-27, same day) — this is the actual access
+      boundary for the minister portal, not the Entra account by itself, so
+      skipping it would leave someone with a working sign-in but a blank
+      portal. Microsoft Graph v1.0 has no endpoint for classic SharePoint
+      site-group membership, so `addMinisterToSharePointGroup()` calls the
+      SharePoint REST API directly (`POST .../_api/web/sitegroups/
+      getbyname('Prayer Ministers')/users`) with a login name of
+      `i:0#.f|membership|<upn>` — the standard claims-encoded form for an
+      Entra account in modern SharePoint Online. That's a different
+      resource than Graph, so it needs its own token: `getSharePointToken()`
+      requests `SP_SCOPES` (`https://creeksidechurch.sharepoint.com/
+      AllSites.Manage`, delegated) separately from `GRAPH_SCOPES` — **its
+      own admin consent step**, same category as the Graph scopes above.
+      With account creation now doing both the Entra account and the
+      SharePoint group membership, adding a minister to the team is just
+      filling out the form — no manual step left afterward.
+    - **Any failure in this chain blocks the whole save**, not just a
+      warning: if the checkbox is checked and either the Entra account
+      creation or the SharePoint group add fails (a taken UPN, a 403 from a
+      signed-in account that doesn't actually hold the right role, a wrong
+      group name, etc.), the minister record itself is NOT saved either —
+      the error surfaces in the modal, distinguishes which step failed (the
+      group-add error explicitly says the Entra account WAS created, so the
+      admin knows to add them to the group by hand rather than retry
+      account creation), and the admin fixes the issue and retries, rather
+      than the roster silently ending up with a minister record that has no
+      matching account/access and no clear sign anything went wrong.
 - Blackout Dates tab: grouped by minister, soonest first, Add/Edit modal with
   a single-date/date-range toggle (writes BlackoutDate + EndDate), edit/delete
   per entry
@@ -627,8 +647,11 @@ M365 seat cost) so they can sign in for real.
   minister account with restricted SharePoint access genuinely can't read or
   write more than it's been granted, even though the app itself still
   requests the same broad `Sites.ReadWrite.All`. The real access boundary is
-  SharePoint's own permissions on a "Ministers" group, granted directly in
-  SharePoint (not in this code, not in Entra):
+  SharePoint's own permissions on the "Prayer Ministers" group (see
+  `SHAREPOINT_MINISTERS_GROUP` and gotcha below — membership itself is
+  automated as of 2026-09-27, but the group's list-level permissions
+  themselves are still configured directly in SharePoint, not in this code
+  or in Entra):
   - PrayerMinisters: Read (lets the portal resolve "which minister is this"
     by matching sign-in email, and show co-minister names on a session)
   - PrayerSessions: Read (SharePoint can't restrict "only sessions you're
@@ -655,27 +678,32 @@ M365 seat cost) so they can sign in for real.
   shows a "couldn't find your profile" message instead of a broken page.
   Set SignInEmail from the main app's Add/Edit Minister form when creating
   a minister's Entra account.
-- **Creating the actual Entra account, and resetting an existing one's
-  password, is now automatable from Add/Edit Minister** (`preview/index.html`
-  only, added 2026-09-27 — see "Add/Edit Minister can create and manage the
-  actual sign-in account" under "Features implemented" above), for
-  whichever admin's own signed-in account holds a role that can manage
-  users. One manual, one-time setup step still has to happen outside this
-  repo before that works at all: **grant admin consent for TWO delegated
-  Graph scopes** on the Scheduler's Azure AD app registration (Client ID
+- **Creating the actual Entra account, adding it to the "Prayer Ministers"
+  SharePoint group, and resetting an existing account's password are all
+  automatable from Add/Edit Minister** (`preview/index.html` only, added
+  2026-09-27 — see "Add/Edit Minister can create and manage the actual
+  sign-in account" under "Features implemented" above), for whichever
+  admin's own signed-in account holds a role that can manage users AND
+  manage that SharePoint site's permissions. One manual, one-time setup
+  step still has to happen outside this repo before that works at all:
+  **grant admin consent for THREE delegated scopes** on the Scheduler's
+  Azure AD app registration (Client ID
   `549f5207-d7f8-4924-9bde-30532d90c1d2`) — Entra admin center → App
-  registrations → this app → API permissions → Add a permission → Microsoft
-  Graph → Delegated → add both `User.ReadWrite.All` and
-  `Directory.AccessAsUser.All` → **Grant admin consent for [tenant]** (same
+  registrations → this app → API permissions → Add a permission:
+  - Microsoft Graph → Delegated → add both `User.ReadWrite.All` and
+    `Directory.AccessAsUser.All` (see "Features implemented" above for why
+    account creation alone doesn't need the second scope but password
+    resets do).
+  - SharePoint → Delegated → add `AllSites.Manage` (needed to add a user to
+    a site permission group via the SharePoint REST API — Graph has no
+    endpoint for this, see `addMinisterToSharePointGroup()`).
+
+  Then **Grant admin consent for [tenant]** once, covering all three (same
   Global-Admin-or-equivalent requirement as the original
-  `Sites.ReadWrite.All` consent, gotcha #7). Both are required — see the
-  "Features implemented" entry above for why account creation alone doesn't
-  need the second scope but password resets do. No SharePoint schema change
-  is needed for this (the password is never stored — see above).
-  The SharePoint "Ministers" group membership/permission setup (below)
-  is still a fully manual step either way — creating the Entra account
-  doesn't put it in that group automatically; Claude has no tenant admin
-  access to do that itself.
+  `Sites.ReadWrite.All` consent, gotcha #7). No SharePoint schema change is
+  needed for any of this (the password is never stored — see above). With
+  all three scopes consented, adding a minister to the team really is just
+  filling out the form — no manual SharePoint group step left afterward.
 - **Sign-in redirect (production, in index.html)**: a minister who signs
   into the *main scheduler* — not the portal — gets redirected straight to
   `/portal/` instead of landing in the admin UI. `afterSignIn()` checks the
