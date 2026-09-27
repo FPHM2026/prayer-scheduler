@@ -465,8 +465,15 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
       unique"` from the group-add call, which is SharePoint not having
       caught up yet, not a real error — so `addMinisterToSharePointGroup()`
       calls `ensureSharePointUser()` (SharePoint's `/_api/web/ensureuser`,
-      which forces that resolution) and retries the whole ensure+add pair
-      up to 4 times, 4 seconds apart, before actually failing.
+      which forces that resolution) and retries the whole ensure+add pair.
+      A first attempt at 4 tries / 4 seconds apart still failed live —
+      manually adding the very same just-failed account via the SharePoint
+      UI moments later worked fine, confirming this is genuinely just slow
+      propagation, sometimes well over a minute — so it now retries up to
+      10 times, 12 seconds apart (~2 minutes worst case), with an
+      `onRetry` callback surfacing "Waiting for SharePoint to recognize the
+      new account (attempt N of 10)…" in the modal so a slow save doesn't
+      look frozen.
       With account creation now doing both the Entra account and the
       SharePoint group membership, adding a minister to the team is just
       filling out the form — no manual step left afterward.

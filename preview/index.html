@@ -954,7 +954,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-27.8";
+const APP_VERSION = "2026-09-27.9";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3958,18 +3958,23 @@ async function ensureSharePointUser(loginName, token){
     throw new Error(`EnsureUser failed (${res.status}): ${text.slice(0,300)}`);
   }
 }
-async function addMinisterToSharePointGroup(upn){
+async function addMinisterToSharePointGroup(upn, onRetry){
   const token = await getSharePointToken();
   const loginName = 'i:0#.f|membership|' + upn;
   const url = `${SITE_URL}/_api/web/sitegroups/getbyname('${encodeURIComponent(SHAREPOINT_MINISTERS_GROUP)}')/users`;
-  // A just-created Entra account can take SharePoint a little while to
-  // recognize at all, so EnsureUser + the add itself both get a few
-  // attempts with a short wait between them rather than failing on the
-  // first try - this is expected propagation lag, not a real error, for
-  // an account created moments ago.
-  const attempts = 4, delayMs = 4000;
+  // A just-created Entra account can take SharePoint well over a minute to
+  // recognize at all (confirmed live 2026-09-27 - a manual add via the
+  // SharePoint UI succeeded on an account that had just failed here
+  // repeatedly), so EnsureUser + the add itself both get a generous number
+  // of attempts with a wait between them rather than failing fast - this
+  // is expected propagation lag, not a real error, for an account created
+  // moments ago. onRetry(attemptNumber, totalAttempts), if given, lets the
+  // caller show progress instead of the save just looking frozen for up to
+  // ~2 minutes.
+  const attempts = 10, delayMs = 12000;
   let lastErr;
   for(let i=0; i<attempts; i++){
+    if(i>0 && onRetry) onRetry(i+1, attempts);
     try{
       await ensureSharePointUser(loginName, token);
       const res = await fetch(url, {
@@ -4102,7 +4107,9 @@ async function onSaveMinister(){
       return;
     }
     try{
-      await addMinisterToSharePointGroup(signInEmail);
+      await addMinisterToSharePointGroup(signInEmail, (attempt, total)=>{
+        acctMsg.innerHTML = `<p class="helptext" style="margin:5px 0 0;">Waiting for SharePoint to recognize the new account (attempt ${attempt} of ${total})…</p>`;
+      });
     }catch(e){
       acctMsg.innerHTML = `<div class="errbox" role="alert">Their sign-in account was created, but adding them to the "${escapeHtml(SHAREPOINT_MINISTERS_GROUP)}" SharePoint group failed: ${escapeHtml(e.message)}. The minister record below was NOT saved — the account now exists in Entra without portal access; add them to the group by hand in SharePoint, then save again (uncheck "Also create their sign-in account" first so it doesn't try to recreate the account).</div>`;
       return;
@@ -5378,7 +5385,7 @@ const CHANGE_LOG = [
     'Changed: the password field is simpler now. Both a new minister\'s starting password and a "Reset Password" button on existing ministers use the same shared, year-stamped default (e.g. FPHM2026!) instead of a typed-in value - it\'s always a temporary password Microsoft forces the minister to replace at their first sign-in, so there\'s nothing sensitive to mask or save. It\'s no longer stored anywhere (the PortalPassword SharePoint column is no longer used - safe to remove it if you added it).',
     'New: Add/Edit Minister can now create and manage their actual sign-in account, not just record the roster entry. Check "Also create their sign-in account" (on by default when adding someone new) and it creates their unlicensed Microsoft 365 account for you with this year\'s default temporary password.',
     'New: creating a minister\'s account now also adds them to the "Prayer Ministers" SharePoint permission group automatically - the one manual step left after account creation is gone. Adding a minister to the team is now just filling out the form.',
-    'Fixed: adding a brand-new minister to the SharePoint group right after their account was created could fail with "The user does not exist or is not unique" - SharePoint hadn\'t recognized the just-created account yet. Save now waits and retries a few times automatically before giving up.',
+    'Fixed: adding a brand-new minister to the SharePoint group right after their account was created could fail with "The user does not exist or is not unique" - SharePoint hadn\'t recognized the just-created account yet, and can take over a minute to. Save now waits and retries automatically (up to ~2 minutes, with an on-screen "waiting" message) before giving up.',
     'New: deleting a minister from the roster now also removes them from the "Prayer Ministers" SharePoint group, revoking their portal access. Their Entra sign-in account itself is deliberately left alone either way - useful if that minister is also a staff member whose actual Microsoft 365 account shouldn\'t be touched by a roster change here.',
     'Setup needed before this works: User.ReadWrite.All AND Directory.AccessAsUser.All (both Graph, delegated), PLUS AllSites.Manage (SharePoint, delegated) all need admin consent on the Scheduler\'s Azure AD app registration. See CLAUDE.md for the exact steps. Until that\'s done, the checkbox will fail with a clear error rather than silently doing nothing.'
   ]}
