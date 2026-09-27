@@ -1038,6 +1038,21 @@ existing session history.
     `changesHelptext`, `switchChangesSub`, `data-changesview`) and confirm
     zero hits — that catches this line and anything else like it in one
     pass, rather than hoping the manual strip got everything.
+    **Hit again on 2026-09-26/27, different bug, same root cause**:
+    `preview/index.html` lives one folder deeper than the repo root, so
+    every path it references to something also at the repo root has to
+    start with `../` — `PORTAL_URL`, `INTAKE_URL`, the `<script
+    src="../js/formConfig.js">`/`formEngine.js` tags, and the "Open
+    Intake Form" link's `href="../intake/"` all correctly say `../` in
+    preview. Every one of them is **wrong** once wholesale-copied into
+    `index.html` at the actual repo root — `../js/formConfig.js` from
+    there resolves one level *above* the repo, a silent 404 (the intake
+    schema/engine just never loads, breaking the Intake Forms tab with no
+    obvious error) rather than a crash. This will keep recurring on every
+    future wholesale promotion for the same reason `PORTAL_URL` does —
+    **after every promotion, grep production `index.html` for `\.\./`**
+    (a literal `../`) and fix every hit *except* the one harmless comment
+    at the top of the file that just mentions `(../js/)` descriptively.
 14. **A literal `</script>` inside a JS string breaks the *enclosing*
     `<script>` tag, even though it's just string content to the JS parser.**
     The Reports feature builds a whole standalone HTML page (with its own

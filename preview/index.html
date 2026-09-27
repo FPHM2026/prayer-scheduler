@@ -5091,14 +5091,14 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
-  { date: 'Sep 26, 2026', version: APP_VERSION, items: [
-    'Changed: on Reports, "Show minister breakdown" is now its own always-visible row directly under each year, instead of being hidden until you expand that year\'s months first - and it\'s now labeled with the year ("Show minister breakdown for 2026") so it\'s unambiguous which year it belongs to, especially with multiple years in the same report.'
-  ]}
 ];
 // Entries already live in production, newest first - moved here from
 // CHANGE_LOG at promotion time rather than deleted. See the block comment
 // above for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Sep 26, 2026', version: '2026-09-26.5', items: [
+    'Changed: on Reports, "Show minister breakdown" is now its own always-visible row directly under each year, instead of being hidden until you expand that year\'s months first - and it\'s now labeled with the year ("Show minister breakdown for 2026") so it\'s unambiguous which year it belongs to, especially with multiple years in the same report.'
+  ]},
   { date: 'Sep 26, 2026', version: '2026-09-26.4', items: [
     'Fixed: adding someone to the Waiting list who already has a record on file (a prior session, or even just a prior Waiting entry) now refills their Contact, Gender, and Team Preference too, not just their name - same as picking an existing recipient already did for a brand-new session.'
   ]},
