@@ -5310,15 +5310,14 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
-  { date: 'Sep 27, 2026', version: APP_VERSION, items: [
-    'New: Ministers can now confirm they\'re actually coming to a scheduled session, from a bright orange "I\'m coming to this session" button on their own portal schedule card. Tapping it again undoes it - plans change. Both the minister and their co-assigned minister(s) see a small checkmark next to a confirmed name in the portal; admins see the same checkmark next to a confirmed minister\'s name anywhere sessions are listed in the main Scheduler.',
-    'Setup needed before this works: a new "ConfirmedMinisterIDs" column (Single line of text, Plain text) needs to be added to the PrayerSessions SharePoint list by hand. See CLAUDE.md for the exact spec. Until it\'s added, the button will still show but confirming won\'t actually save.'
-  ]}
 ];
 // Entries already live in production, newest first - moved here from
 // CHANGE_LOG at promotion time rather than deleted. See the block comment
 // above for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Sep 27, 2026', version: '2026-09-27.11', items: [
+    'New: Ministers can now confirm they\'re actually coming to a scheduled session, from a bright orange "I\'m coming to this session" button on their own portal schedule card. Tapping it again undoes it - plans change. Both the minister and their co-assigned minister(s) see a small checkmark next to a confirmed name in the portal; admins see the same checkmark next to a confirmed minister\'s name anywhere sessions are listed in the main Scheduler. Requires ministers to have Contribute access to PrayerSessions (upgraded from Read) - a manual SharePoint permission change, same category as the BlackoutDates access ministers already have.'
+  ]},
   { date: 'Sep 27, 2026', version: '2026-09-27.10', items: [
     'New: Add/Edit Minister can now create and manage their actual sign-in account, not just record the roster entry. Check "Also create their sign-in account" (on by default when adding someone new) and it creates their unlicensed Microsoft 365 account for you with this year\'s default temporary password. The password field always uses the same shared, year-stamped default (e.g. FPHM2026!) instead of a typed-in value - it\'s always temporary, so there\'s nothing sensitive to mask or save.',
     'New: creating a minister\'s account now also adds them to the "Prayer Ministers" Entra group automatically, and deleting a minister removes them from it - the one manual step left after account creation is gone. Adding someone to the team is now just filling out the form. Their Entra sign-in account itself is never disabled or deleted by a roster change - useful if that minister is also a staff member whose actual Microsoft 365 account needs to stay untouched.'

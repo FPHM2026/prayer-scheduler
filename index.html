@@ -943,7 +943,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-27.10";
+const APP_VERSION = "2026-09-27.11";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1269,6 +1269,10 @@ async function loadAll(){
     const stripHtml = v => String(v||'').replace(/<[^>]*>/g, '');
     const allIds = stripHtml(s.AssignedMinisterIDs).split(',').map(x=>x.trim()).filter(Boolean);
     const leadIds = new Set(stripHtml(s.LeadMinisterIDs).split(',').map(x=>x.trim()).filter(Boolean));
+    // Which assigned ministers have confirmed they're actually coming -
+    // set by the minister themselves from their own portal card
+    // (toggleMyConfirmation() there), never edited directly here.
+    const confirmedIds = new Set(stripHtml(s.ConfirmedMinisterIDs).split(',').map(x=>x.trim()).filter(Boolean));
     return {
       id: s.id,
       recipName: s.RecipientName||'', recipContact: s.RecipientContact||'',
@@ -1284,7 +1288,7 @@ async function loadAll(){
       // existing session already shows.
       locationRawName: s.LocationName||'',
       notes: s.Notes||'',
-      ministers: allIds.map(id=>({ id: parseInt(id,10), role: leadIds.has(id) ? 'Lead' : 'Support' }))
+      ministers: allIds.map(id=>({ id: parseInt(id,10), role: leadIds.has(id) ? 'Lead' : 'Support', confirmed: confirmedIds.has(id) }))
         .filter(m=>!isNaN(m.id) && ministers.some(x=>x.id===m.id)),
       apptType: s.ApptType||'First', status: s.Status||'Scheduled',
       prevId: s.PreviousSessionId||null,
@@ -1355,11 +1359,14 @@ function isoDate(d){ return d.toISOString().slice(0,10); }
 function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function initials(name){ return String(name||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join(''); }
 function ministerIdsOf(s){ return s.ministers.map(m=>m.id); }
+// The trailing ✓ marks a minister who confirmed they're actually coming
+// (from their own portal card) - plain text on purpose, since every caller
+// wraps this in escapeHtml() rather than rendering it as HTML.
 function ministerNamesOf(s){
   const sorted = [...s.ministers].sort((a,b)=> (a.role==='Lead'?0:1) - (b.role==='Lead'?0:1));
   return sorted.map(m=>{
     const min = ministers.find(x=>x.id===m.id);
-    return (min?min.name:'?') + (m.role==='Lead' ? ' (Lead)' : '');
+    return (min?min.name:'?') + (m.role==='Lead' ? ' (Lead)' : '') + (m.confirmed ? ' ✓' : '');
   }).join(', ');
 }
 function locationName(id){ const l = locations.find(x=>x.id===id); return l?l.name:''; }
@@ -5270,9 +5277,13 @@ function generateReport(){
 /* Minister Overview date range defaults to year-to-date, set once at load
    (before the first render) so the very first paint already reflects it. */
 /* =========================================================================
-   CHANGES TAB — preview-only, never promoted to production (strip this
-   whole section, the panel-changes HTML block, and its nav button when
-   copying this file over to index.html). Maintained by hand: add one new
+   CHANGES TAB — originally preview-only, meant to be stripped out on every
+   promotion; that step got missed on the 2026-09-27 promotion, and once
+   live in production the user decided to just keep it there (moved to the
+   END of the tab list in production too, rather than being first/default)
+   instead of having it stripped back out. So as of 2026-09-27: this tab
+   ships in BOTH preview and production, unconditionally, and no longer
+   needs stripping at promotion time. Still maintained by hand: add one new
    dated entry at the top of CHANGE_LOG on each preview publish, in plain
    language a non-technical reviewer can act on - what to actually go
    check, not a commit log.
@@ -5291,6 +5302,9 @@ const CHANGE_LOG = [
 // CHANGE_LOG at promotion time rather than deleted. See the block comment
 // above for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Sep 27, 2026', version: '2026-09-27.11', items: [
+    'New: Ministers can now confirm they\'re actually coming to a scheduled session, from a bright orange "I\'m coming to this session" button on their own portal schedule card. Tapping it again undoes it - plans change. Both the minister and their co-assigned minister(s) see a small checkmark next to a confirmed name in the portal; admins see the same checkmark next to a confirmed minister\'s name anywhere sessions are listed in the main Scheduler. Requires ministers to have Contribute access to PrayerSessions (upgraded from Read) - a manual SharePoint permission change, same category as the BlackoutDates access ministers already have.'
+  ]},
   { date: 'Sep 27, 2026', version: '2026-09-27.10', items: [
     'New: Add/Edit Minister can now create and manage their actual sign-in account, not just record the roster entry. Check "Also create their sign-in account" (on by default when adding someone new) and it creates their unlicensed Microsoft 365 account for you with this year\'s default temporary password. The password field always uses the same shared, year-stamped default (e.g. FPHM2026!) instead of a typed-in value - it\'s always temporary, so there\'s nothing sensitive to mask or save.',
     'New: creating a minister\'s account now also adds them to the "Prayer Ministers" Entra group automatically, and deleting a minister removes them from it - the one manual step left after account creation is gone. Adding someone to the team is now just filling out the form. Their Entra sign-in account itself is never disabled or deleted by a roster change - useful if that minister is also a staff member whose actual Microsoft 365 account needs to stay untouched.'

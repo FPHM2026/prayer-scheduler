@@ -515,9 +515,10 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
       Active/Inactive toggle elsewhere on this tab, which does not touch
       group membership at all — only an actual roster **deletion** revokes
       portal access today.
-- **Minister attendance confirmation** (added 2026-09-27, `portal/index.html`
-  + `preview/index.html`, Test only pending the `ConfirmedMinisterIDs` setup
-  step above): a Scheduled session's card on a minister's own portal
+- **Minister attendance confirmation** (added and promoted to production
+  2026-09-27, `portal/index.html` + `preview/index.html`/`index.html` —
+  see `ConfirmedMinisterIDs` in the schema section above): a Scheduled
+  session's card on a minister's own portal
   schedule shows a bright orange primary "I'm coming to this session"
   button (`.btn`, matching the design system's primary-action color) when
   they haven't confirmed yet, or a secondary "✓ You're confirmed — tap to
@@ -534,10 +535,13 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
   visible in three places at once: their own portal card, their
   co-assigned minister(s)' portal cards (so a team can see who else is
   actually coming, at the user's explicit request), and every session
-  listing in the admin Scheduler. Not yet added to `index.html`
-  (production) — build/test in Test first per the usual promotion process,
-  since this needs the SharePoint column added before it can be verified
-  live.
+  listing in the admin Scheduler. **Also requires ministers to have
+  Contribute access to PrayerSessions** (upgraded from Read — a manual
+  SharePoint permission change, confirmed live 2026-09-27 after the write
+  initially failed 403 with only Read access; same category as the
+  Contribute access ministers already have on BlackoutDates). Promoted to
+  production `index.html` the same day, after live verification with both
+  the new column and the permission change in place.
 - Blackout Dates tab: grouped by minister, soonest first, Add/Edit modal with
   a single-date/date-range toggle (writes BlackoutDate + EndDate), edit/delete
   per entry
