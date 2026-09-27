@@ -641,32 +641,29 @@ function intakeLinkRowFor(name){
 }
 
 // A minister can only see an intake form for a recipient they actually
-// have (or had) a session with - client-side filter only, same accepted
-// tradeoff as everywhere else in this app (see main CLAUDE.md gotcha
-// #11): the "Ministers" SharePoint group has Read on the whole
-// IntakeResponses list, not per-item, so this is a UI-level boundary,
-// not a real security one. Submitted only, deliberately - an in-progress
-// form isn't a finished record yet and a minister has no business
-// (staff's own linking/unlinking above is admin-only too, portal has no
+// have (or had) a session with, AND only once staff has explicitly
+// linked that session to a specific intake form (see preview/index.html's
+// "Intake form linking") - added 2026-09-26 at the user's explicit
+// request. There is deliberately no automatic name-match fallback here
+// any more (an earlier version had one): staff approving the link is now
+// the only path to a minister seeing anything, not just a way to fix a
+// misspelling or a shared-name mixup. Submitted only, regardless - an
+// in-progress form isn't a finished record yet, and a minister has no
+// business (staff's own linking/unlinking is admin-only, portal has no
 // equivalent) seeing a recipient's answers before they've actually
-// finished and signed.
+// finished and signed. Recipient-match check is still client-side filter
+// only, same accepted tradeoff as everywhere else in this app (see main
+// CLAUDE.md gotcha #11): the "Ministers" SharePoint group has Read on
+// the whole IntakeResponses list, not per-item, so this is a UI-level
+// boundary, not a real security one.
 function findMyIntakeForRecipient(name){
   if(!name) return null;
   const myMatching = mySessions().filter(s=>s.recipName.trim().toLowerCase()===name.trim().toLowerCase());
   if(!myMatching.length) return null;
-  // Prefer a staff-confirmed link (see preview/index.html's "Intake form
-  // linking") over the plain name match below - handles a misspelling or
-  // two recipients sharing a name the same way staff already resolved it.
   const linkedId = myMatching.map(s=>s.intakeResponseId).find(id=>id!=null);
-  if(linkedId){
-    const linked = intakeResponses.find(i=>i.id===linkedId);
-    if(linked && linked.status==='Submitted') return linked;
-  }
-  const norm = name.trim().toLowerCase();
-  const matches = intakeResponses.filter(i => i.status==='Submitted' && (i.recipName||'').trim().toLowerCase()===norm);
-  if(!matches.length) return null;
-  matches.sort((a,b)=> new Date(b.submittedAt||b.created||0) - new Date(a.submittedAt||a.created||0));
-  return matches[0];
+  if(!linkedId) return null;
+  const linked = intakeResponses.find(i=>i.id===linkedId);
+  return (linked && linked.status==='Submitted') ? linked : null;
 }
 // Ministers only ever reach this for a Submitted form (see
 // findMyIntakeForRecipient() above) - no in-progress branch needed here.

@@ -802,9 +802,17 @@ existing session history.
   it onto its own full-width line the way `margin-top:6px` alone never
   actually did.
 - **Minister portal** — `portal/index.html` adds a "View intake form" link
-  on a recipient's Schedule/Completed Sessions group. `findMyIntakeForRecipient()`
-  requires the recipient to actually appear in `mySessions()` before it'll
-  match anything — **this is a client-side filter only, not a SharePoint-
+  on a recipient's Schedule/Completed Sessions group, but **only once
+  staff has explicitly linked that session to a specific intake form**
+  (tightened 2026-09-26, at the user's explicit request — an earlier
+  version also fell back to a plain name match when nothing was
+  explicitly linked, which meant a minister could see a matching form
+  before any admin had approved it; there is deliberately no such
+  fallback any more, `findMyIntakeForRecipient()` returns null unless
+  `intakeResponseId` is set on one of that minister's own sessions for
+  that recipient). `findMyIntakeForRecipient()` also still requires the
+  recipient to actually appear in `mySessions()` before it'll match
+  anything — **this is a client-side filter only, not a SharePoint-
   enforced boundary**: the Ministers group has Read on the whole
   IntakeResponses list (Graph doesn't reliably enforce per-item permissions
   even for privileged users — see gotcha #11), so a minister with the portal
@@ -814,14 +822,12 @@ existing session history.
   silently inherited from the BlackoutDates precedent. Revisit if a stronger
   boundary is ever wanted (would mean routing minister reads through a
   server-side check instead of direct Graph access).
-  **Submitted forms only** (tightened 2026-09-26, at the user's explicit
-  request) — `findMyIntakeForRecipient()` now filters out InProgress
-  matches entirely, both in the staff-link lookup and the plain
-  name-match fallback; a minister has no reason to see a recipient's
-  answers before they've actually finished and signed, and staff's own
-  linking/unlinking is admin-only with no equivalent in this app. The
+  **Submitted forms only** (also tightened 2026-09-26) — an in-progress
+  form isn't a finished record yet, and a minister has no business seeing
+  a recipient's answers before they've actually finished and signed. The
   view modal is otherwise unchanged read-only (no edit/link/unlink here,
-  ever) except for a new **"Print / Save as PDF"** button
+  ever - that stays admin-only in `preview/index.html`) except for a new
+  **"Print / Save as PDF"** button
   (`printIntakeView()`) — the modal itself can't reliably print in place
   (a `position:fixed` overlay behaves inconsistently across browsers'
   print engines), so this builds the same document shape as the
