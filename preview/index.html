@@ -868,11 +868,12 @@
     </div>
     <div class="field" id="minPasswordField">
       <label for="minPassword" id="minPasswordLabel">Temporary Portal Password</label>
-      <div style="position:relative;">
-        <input id="minPassword" type="password" autocomplete="new-password" style="padding-right:44px;">
-        <button type="button" id="btnToggleMinPassword" aria-label="Show password" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;padding:6px;cursor:pointer;color:var(--muted);display:flex;"></button>
-      </div>
-      <p class="helptext" id="minPasswordHelp" style="margin:5px 0 0;">At least 8 characters. Give this to the minister to sign in with — Microsoft makes them pick their own new password the first time they use it, so this stored value stops matching their real password after that. Type a new one here anytime to reset it again.</p>
+      <input id="minPassword" type="text" autocomplete="off">
+      <p class="helptext" id="minPasswordHelp" style="margin:5px 0 0;">Give this to the minister to sign in with — Microsoft makes them pick their own new password the first time they use it, so this is never their real, ongoing password. Not sensitive enough to mask or store.</p>
+    </div>
+    <div class="field" id="minResetPasswordField" style="display:none;">
+      <button type="button" class="btn secondary" id="btnMinResetPassword">Reset to a new temporary password</button>
+      <p class="helptext" style="margin:5px 0 0;">Sets their sign-in password to this year's default temporary password and saves it when you click Save below.</p>
     </div>
     <div id="minAccountMsg"></div>
     <div class="field"><label for="minGender">Gender</label><select id="minGender"><option value="">— Not set —</option><option>Female</option><option>Male</option></select><p class="helptext" style="margin:5px 0 0;">Used by the same-sex preference match on the Schedule &amp; Planning tab.</p></div>
@@ -953,7 +954,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-27.4";
+const APP_VERSION = "2026-09-27.5";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1224,7 +1225,7 @@ async function loadAll(){
       signatureDataUrl: i.SignatureDataUrl||'', responses
     };
   });
-  ministers = rawMin.map(m => ({ id: m.id, name: m.Title, email: m.Email||'', phone: m.Phone||'', signInEmail: m.SignInEmail||'', status: m.Status||'Active', gender: m.Gender||'', portalPassword: m.PortalPassword||'' }));
+  ministers = rawMin.map(m => ({ id: m.id, name: m.Title, email: m.Email||'', phone: m.Phone||'', signInEmail: m.SignInEmail||'', status: m.Status||'Active', gender: m.Gender||'' }));
   locations = rawLoc.map(l => ({ id: l.id, name: l.Title }));
   timeWindows = rawTW.map(t => ({
     id: t.id, title: t.Title||'', kind: t.Kind||'',
@@ -1515,7 +1516,7 @@ function wireApp(){
   $('#btnMinCancel').addEventListener('click', ()=>$('#ministerModal').classList.remove('open'));
   $('#btnMinSave').addEventListener('click', ()=>withLoading($('#btnMinSave'), 'Saving…', onSaveMinister));
   $('#minCreateAccount').addEventListener('change', toggleMinPasswordField);
-  $('#btnToggleMinPassword').addEventListener('click', toggleMinPasswordVisibility);
+  $('#btnMinResetPassword').addEventListener('click', resetMinPassword);
   $('#minName').addEventListener('input', suggestMinSignInEmail);
   $('#minSignInEmail').addEventListener('input', ()=>{ $('#minSignInEmail').dataset.touched = '1'; });
   $('#btnAddWaiting').addEventListener('click', ()=>openModal(null, null, {forceKind:'waiting'}));
@@ -3897,6 +3898,12 @@ async function updateMinisterAccountPassword(upn, password){
     body: JSON.stringify({ passwordProfile: { password, forceChangePasswordNextSignIn: true } })
   });
 }
+// A shared, memorable, year-stamped default rather than a per-minister
+// secret - deliberate, since it's always a one-time temporary password
+// Entra forces a real change on at first sign-in (see
+// updateMinisterAccountPassword above), so there's nothing sensitive to
+// protect by randomizing or masking it.
+function defaultTempPassword(){ return 'FPHM' + new Date().getFullYear() + '!'; }
 function openMinisterModal(m){
   editingMinisterId = m ? m.id : null;
   const hasAccount = !!(m && m.signInEmail);
@@ -3905,22 +3912,23 @@ function openMinisterModal(m){
   $('#minPhone').value = m ? m.phone : ''; $('#minSignInEmail').value = m ? (m.signInEmail||'') : '';
   $('#minGender').value = m ? (m.gender||'') : '';
   $('#minStatus').value = m ? m.status : 'Active';
-  $('#minPassword').value = m ? (m.portalPassword||'') : '';
-  $('#minPassword').type = 'password';
+  $('#minPassword').value = defaultTempPassword();
   delete $('#minSignInEmail').dataset.touched;
-  $('#btnToggleMinPassword').innerHTML = ICONS.eye;
-  $('#btnToggleMinPassword').setAttribute('aria-label','Show password');
   // An existing account can only have its password changed here, not be
   // (re)created - so the "also create" checkbox only makes sense for a
   // brand-new minister, or an existing one who was saved without an
   // account yet (SignInEmail still blank).
   $('#minCreateAccountField').style.display = hasAccount ? 'none' : '';
   $('#minCreateAccount').checked = !hasAccount;
-  $('#minPasswordLabel').textContent = hasAccount ? 'Temporary Portal Password' : 'Temporary Portal Password (for the new account)';
-  $('#minPasswordHelp').textContent = hasAccount
-    ? 'Change this and save to reset their sign-in password to a new temporary one. At least 8 characters. Microsoft makes them pick their own password the first time they sign in with it, so this field stops matching their real password after that.'
-    : 'At least 8 characters. Give this to the minister to sign in with — Microsoft makes them pick their own new password the first time they use it, so this stored value stops matching their real password after that. Type a new one here anytime to reset it again.';
-  $('#minPasswordField').style.display = (hasAccount || $('#minCreateAccount').checked) ? '' : 'none';
+  $('#minPasswordLabel').textContent = 'Temporary Portal Password (for the new account)';
+  $('#minPasswordHelp').textContent = 'Give this to the minister to sign in with — Microsoft makes them pick their own new password the first time they use it, so this is never their real, ongoing password. Not sensitive enough to mask or store.';
+  // Editing an existing minister starts with the password field hidden and
+  // the Reset button shown instead - resetMinPassword() reveals the field
+  // (prefilled with this year's default) only once the admin actually asks
+  // for a reset, rather than showing an editable password on every open.
+  $('#minPasswordField').style.display = (!hasAccount && $('#minCreateAccount').checked) ? '' : 'none';
+  $('#minResetPasswordField').style.display = hasAccount ? '' : 'none';
+  delete $('#minPassword').dataset.resetPending;
   $('#minAccountMsg').innerHTML = '';
   $('#minModalMsg').innerHTML = '';
   $('#ministerModal').classList.add('open');
@@ -3930,12 +3938,11 @@ window.toggleMinPasswordField = function(){
   const checked = $('#minCreateAccount').checked;
   $('#minPasswordField').style.display = checked ? '' : 'none';
 };
-window.toggleMinPasswordVisibility = function(){
-  const input = $('#minPassword');
-  const showing = input.type === 'text';
-  input.type = showing ? 'password' : 'text';
-  $('#btnToggleMinPassword').innerHTML = showing ? ICONS.eye : ICONS.eyeOff;
-  $('#btnToggleMinPassword').setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+window.resetMinPassword = function(){
+  $('#minPassword').value = defaultTempPassword();
+  $('#minPassword').dataset.resetPending = 'true';
+  $('#minPasswordField').style.display = '';
+  $('#minResetPasswordField').style.display = 'none';
 };
 // Only suggests a Sign-In Email while adding a brand-new minister with the
 // account checkbox on - never overwrites a value that's already there for
@@ -3955,6 +3962,7 @@ async function onSaveMinister(){
   const existing = editingMinisterId ? ministers.find(x=>x.id===editingMinisterId) : null;
   const hasAccount = !!(existing && existing.signInEmail);
   const wantsNewAccount = !hasAccount && $('#minCreateAccount').checked;
+  const wantsPasswordReset = hasAccount && $('#minPassword').dataset.resetPending === 'true';
 
   if(wantsNewAccount){
     if(!signInEmail){ msg.innerHTML = '<div class="errbox" role="alert">Sign-In Email is required to create their account.</div>'; return; }
@@ -3965,17 +3973,16 @@ async function onSaveMinister(){
       acctMsg.innerHTML = `<div class="errbox" role="alert">Couldn't create their sign-in account: ${escapeHtml(e.message)}. The minister record below was NOT saved either — fix the issue (e.g. try a different Sign-In Email if it's already taken) and save again, or uncheck "Also create their sign-in account" to save just the roster entry.</div>`;
       return;
     }
-  } else if(hasAccount && password && password!==existing.portalPassword){
-    if(password.length<8){ msg.innerHTML = '<div class="errbox" role="alert">Portal Password must be at least 8 characters.</div>'; return; }
+  } else if(wantsPasswordReset){
     try{
       await updateMinisterAccountPassword(existing.signInEmail, password);
     }catch(e){
-      acctMsg.innerHTML = `<div class="errbox" role="alert">Couldn't update their sign-in password: ${escapeHtml(e.message)}. Nothing below was saved — fix the issue and save again.</div>`;
+      acctMsg.innerHTML = `<div class="errbox" role="alert">Couldn't reset their sign-in password: ${escapeHtml(e.message)}. Nothing below was saved — fix the issue and save again.</div>`;
       return;
     }
   }
 
-  const fields = { Title:name, Email:$('#minEmail').value.trim(), Phone:$('#minPhone').value.trim(), SignInEmail:signInEmail, Gender:$('#minGender').value, Status:$('#minStatus').value, PortalPassword:password };
+  const fields = { Title:name, Email:$('#minEmail').value.trim(), Phone:$('#minPhone').value.trim(), SignInEmail:signInEmail, Gender:$('#minGender').value, Status:$('#minStatus').value };
   if(editingMinisterId) await updateItem('ministers', editingMinisterId, fields);
   else await createItem('ministers', fields);
   $('#ministerModal').classList.remove('open');
@@ -5233,9 +5240,10 @@ function generateReport(){
 ========================================================================= */
 const CHANGE_LOG = [
   { date: 'Sep 27, 2026', version: APP_VERSION, items: [
-    'Testing: the Edit Minister password-reset field is back, trying a new Graph scope - Directory.AccessAsUser.All - alongside the existing User.ReadWrite.All, based on a report that password-reset/disable operations need it specifically. Needs a fresh admin consent grant for the new scope, then a full sign-out/sign-in, before testing again. If it still 403s, the field goes back into hiding.',
-    'New: Add/Edit Minister can now create and manage their actual sign-in account, not just record the roster entry. Check "Also create their sign-in account" (on by default when adding someone new) and set a temporary password, and it creates their unlicensed Microsoft 365 account for you.',
-    'Setup needed before this works: (1) User.ReadWrite.All AND Directory.AccessAsUser.All (both delegated) need admin consent on the Scheduler\'s Azure AD app registration, and (2) a new "PortalPassword" column (Single line of text, Plain text) needs to be added to the PrayerMinisters SharePoint list by hand. See CLAUDE.md for the exact steps. Until both are done, the checkbox will fail with a clear error rather than silently doing nothing.'
+    'Fixed: resetting an existing minister\'s sign-in password works now - it needed one more Graph permission, Directory.AccessAsUser.All, alongside User.ReadWrite.All.',
+    'Changed: the password field is simpler now. Both a new minister\'s starting password and a "Reset Password" button on existing ministers use the same shared, year-stamped default (e.g. FPHM2026!) instead of a typed-in value - it\'s always a temporary password Microsoft forces the minister to replace at their first sign-in, so there\'s nothing sensitive to mask or save. It\'s no longer stored anywhere (the PortalPassword SharePoint column is no longer used - safe to remove it if you added it).',
+    'New: Add/Edit Minister can now create and manage their actual sign-in account, not just record the roster entry. Check "Also create their sign-in account" (on by default when adding someone new) and it creates their unlicensed Microsoft 365 account for you with this year\'s default temporary password.',
+    'Setup needed before this works: User.ReadWrite.All AND Directory.AccessAsUser.All (both delegated) need admin consent on the Scheduler\'s Azure AD app registration. See CLAUDE.md for the exact steps. Until that\'s done, the checkbox will fail with a clear error rather than silently doing nothing.'
   ]}
 ];
 // Entries already live in production, newest first - moved here from
