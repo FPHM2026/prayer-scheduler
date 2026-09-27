@@ -954,7 +954,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-27.6";
+const APP_VERSION = "2026-09-27.7";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3872,6 +3872,18 @@ window.editMinister = function(id){ openMinisterModal(ministers.find(m=>m.id===i
 window.deleteMinister = async function(id){
   const m = ministers.find(x=>x.id===id);
   if(!(await askConfirm(`Delete ${m?m.name:'this minister'} from the roster? This can't be undone.`))) return;
+  // Revoke portal access by removing them from the SharePoint group only -
+  // their Entra account (which may belong to a staff member who still
+  // needs it for other things) is never touched. If this fails, the
+  // roster deletion still proceeds rather than trapping the admin - they
+  // just get a clear warning to remove access by hand instead.
+  if(m && m.signInEmail){
+    try{
+      await removeMinisterFromSharePointGroup(m.signInEmail);
+    }catch(e){
+      alert(`Deleted from the roster, but couldn't remove ${m.name} from the "${SHAREPOINT_MINISTERS_GROUP}" SharePoint group: ${e.message}\n\nThey may still have portal access - remove them from that group by hand in SharePoint.`);
+    }
+  }
   await deleteItem('ministers', id);
   await loadAll();
 };
@@ -3939,6 +3951,31 @@ async function addMinisterToSharePointGroup(upn){
   if(!res.ok){
     const text = await res.text();
     throw new Error(`SharePoint group add failed (${res.status}): ${text.slice(0,300)}`);
+  }
+}
+// Removes a minister from the SharePoint permission group when they're
+// deleted from the roster - deliberately does NOT touch their Entra
+// account at all (no disable, no delete). One of the people on this list
+// is a church employee whose actual Microsoft 365 account must never be
+// affected by a roster change here; SharePoint group membership is the
+// only thing this app should ever revoke. removeByLoginName mirrors
+// addMinisterToSharePointGroup()'s getbyname() call/token/login-name
+// format above.
+async function removeMinisterFromSharePointGroup(upn){
+  const token = await getSharePointToken();
+  const loginName = 'i:0#.f|membership|' + upn;
+  const url = `${SITE_URL}/_api/web/sitegroups/getbyname('${encodeURIComponent(SHAREPOINT_MINISTERS_GROUP)}')/users/removeByLoginName('${encodeURIComponent(loginName)}')`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Accept': 'application/json;odata=verbose',
+      'Content-Type': 'application/json;odata=verbose'
+    }
+  });
+  if(!res.ok){
+    const text = await res.text();
+    throw new Error(`SharePoint group removal failed (${res.status}): ${text.slice(0,300)}`);
   }
 }
 // Resets the password on an EXISTING account, addressed by its current
@@ -5303,6 +5340,7 @@ const CHANGE_LOG = [
     'Changed: the password field is simpler now. Both a new minister\'s starting password and a "Reset Password" button on existing ministers use the same shared, year-stamped default (e.g. FPHM2026!) instead of a typed-in value - it\'s always a temporary password Microsoft forces the minister to replace at their first sign-in, so there\'s nothing sensitive to mask or save. It\'s no longer stored anywhere (the PortalPassword SharePoint column is no longer used - safe to remove it if you added it).',
     'New: Add/Edit Minister can now create and manage their actual sign-in account, not just record the roster entry. Check "Also create their sign-in account" (on by default when adding someone new) and it creates their unlicensed Microsoft 365 account for you with this year\'s default temporary password.',
     'New: creating a minister\'s account now also adds them to the "Prayer Ministers" SharePoint permission group automatically - the one manual step left after account creation is gone. Adding a minister to the team is now just filling out the form.',
+    'New: deleting a minister from the roster now also removes them from the "Prayer Ministers" SharePoint group, revoking their portal access. Their Entra sign-in account itself is deliberately left alone either way - useful if that minister is also a staff member whose actual Microsoft 365 account shouldn\'t be touched by a roster change here.',
     'Setup needed before this works: User.ReadWrite.All AND Directory.AccessAsUser.All (both Graph, delegated), PLUS AllSites.Manage (SharePoint, delegated) all need admin consent on the Scheduler\'s Azure AD app registration. See CLAUDE.md for the exact steps. Until that\'s done, the checkbox will fail with a clear error rather than silently doing nothing.'
   ]}
 ];

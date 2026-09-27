@@ -473,6 +473,26 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
       account creation), and the admin fixes the issue and retries, rather
       than the roster silently ending up with a minister record that has no
       matching account/access and no clear sign anything went wrong.
+    - **Deleting a minister removes them from the SharePoint group, but
+      deliberately never touches their Entra account** (`deleteMinister()`,
+      added 2026-09-27, same day) — `removeMinisterFromSharePointGroup()`
+      calls the SharePoint REST API's `removeByLoginName()` (mirroring
+      `addMinisterToSharePointGroup()`'s token/login-name pattern) right
+      before the roster item itself is deleted. This is an explicit choice,
+      not an oversight: at least one person on this roster is also a church
+      employee, so a roster deletion must never disable or delete their
+      actual Microsoft 365 account — revoking SharePoint group membership
+      (their portal access) is the only thing a roster change should ever
+      be able to do to their account. Unlike account creation above, a
+      failed group removal does **not** block the roster deletion — it
+      still proceeds, with an `alert()` telling the admin the person may
+      still have portal access and to remove them from the group by hand.
+      Blocking here would trap the admin unable to remove someone from the
+      roster over a transient API failure, which is worse than the
+      leftover-access edge case it would prevent. Note this is deliberately
+      narrower than the Active/Inactive toggle elsewhere on this tab, which
+      does not touch SharePoint group membership at all — only an actual
+      roster **deletion** revokes portal access today.
 - Blackout Dates tab: grouped by minister, soonest first, Add/Edit modal with
   a single-date/date-range toggle (writes BlackoutDate + EndDate), edit/delete
   per entry
