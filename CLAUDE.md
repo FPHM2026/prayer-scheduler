@@ -267,6 +267,21 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
     admin can catch and override rather than something that quietly becomes
     the new default. Same recipient match as the autocomplete above; zero
     new data — pure client-side logic against sessions already loaded.
+    - **Recipient DETAILS (Contact/Gender/Team Preference) auto-fill for
+      Waiting too** (added 2026-09-26): gated separately from the team
+      auto-apply above (`historyDetailsAutoOk`, not `historyAutoApplyOk`)
+      since these describe the *recipient*, not a team assignment — they're
+      just as useful adding someone to the Waiting list as starting a new
+      session, unlike the minister team (a Waiting entry has no team yet,
+      see the PrayerSessions schema notes above). Sources from the single
+      most recent matching record of *any* status, not just real sessions —
+      a Waiting entry already carries these same three fields from when it
+      was first created, so someone whose only prior record is another
+      Waiting entry still gets their details back. Both the typeahead pick
+      (`pickRecipNameAt`) and the history panel's own auto-apply
+      (`renderRecipientHistory`) share the one `historyAutoName`
+      once-per-distinct-name tracker so neither path re-fires or clobbers a
+      manual edit while the admin keeps typing a still-matching name.
   - **"+ Drop-in" / "+ Training" quick-add buttons**: prefill the form for a
     shared group event — recipient name set to "Sunday Drop-In" / "Training",
     Appointment Type set to match, every Active minister pre-selected as

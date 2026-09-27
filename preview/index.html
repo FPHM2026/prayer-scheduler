@@ -938,7 +938,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-26.3";
+const APP_VERSION = "2026-09-26.4";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3019,6 +3019,12 @@ function openModal(existing, followFrom, opts){
   historyExpanded = false;
   historyAutoName = null;
   historyAutoApplyOk = kind==='session' && !existing && !followFrom && !opts.preset;
+  // Recipient DETAILS (contact/gender/gender preference) auto-fill for a
+  // brand-new entry of EITHER kind - unlike the team auto-apply above,
+  // these describe the recipient themselves, not a team assignment, so
+  // they're just as useful when adding someone to the Waiting list as
+  // when starting a new session.
+  historyDetailsAutoOk = !existing && !followFrom && !opts.preset;
   // "+ Drop-in" / "+ Training" shortcuts: a group session everyone attends,
   // so skip the usual empty-form start and prefill the recipient name,
   // appointment type, and full active roster - only date/time are left for
@@ -3086,6 +3092,7 @@ let recipNameMatches = [];
 let historyExpanded = false;
 let historyAutoName = null;
 let historyAutoApplyOk = false;
+let historyDetailsAutoOk = false;
 function renderRecipNameSuggestions(){
   const q = $('#recipName').value.trim().toLowerCase();
   const box = $('#recipNameResults');
@@ -3098,6 +3105,7 @@ function renderRecipNameSuggestions(){
     const existing = byName.get(key);
     if(!existing || sortKey > existing.sortKey){
       byName.set(key, { name: s.recipName.trim(), contact: s.recipContact||'', sortKey,
+        recipGender: s.recipGender||'', genderPref: s.genderPref||'Mixed',
         sessionId: s.id, ministers: s.ministers.map(m=>({...m})) });
     }
   });
@@ -3112,12 +3120,15 @@ window.pickRecipNameAt = function(i){
   if(!r) return;
   $('#recipName').value = r.name;
   if(r.contact) $('#recipContact').value = r.contact;
+  if(r.recipGender) $('#recipGender').value = r.recipGender;
+  $('#genderPref').value = r.genderPref || 'Mixed';
   // Team pre-fill now lives entirely in renderRecipientHistory (below) -
   // it applies the most recent real session's team the same way this used
   // to do inline, but as part of the visible history panel rather than a
   // silent side effect here, so picking a suggestion doesn't duplicate it.
   $('#recipNameResults').innerHTML = '';
   recipNameMatches = [];
+  renderMinisterList();
   renderRecipientHistory();
   renderConflictCheck();
 };
@@ -3145,11 +3156,28 @@ function renderRecipientHistory(){
   renderIntakeMatchPanel(name);
   const box = $('#historyPanel');
   if(!name){ box.innerHTML=''; historyAutoName=null; return; }
+  const isFirstLookAtThisName = historyAutoName!==name.toLowerCase();
+  // Recipient DETAILS (contact/gender/gender preference) source from the
+  // single most recent matching record of ANY status - a Waiting entry
+  // already carries these same three fields (set when it was first added
+  // to the list), so someone whose only record so far is a prior Waiting
+  // entry still gets their details back, not just people with a real
+  // completed/scheduled session on file.
+  if(historyDetailsAutoOk && isFirstLookAtThisName){
+    const allMatches = sessions.filter(s=> s.recipName.toLowerCase()===name.toLowerCase() && s.id!==editingId)
+      .sort((a,b)=> (b.status==='Waiting'?(b.added||b.date||''):b.date).localeCompare(a.status==='Waiting'?(a.added||a.date||''):a.date));
+    if(allMatches.length){
+      if(allMatches[0].recipContact) $('#recipContact').value = allMatches[0].recipContact;
+      if(allMatches[0].recipGender) $('#recipGender').value = allMatches[0].recipGender;
+      $('#genderPref').value = allMatches[0].genderPref || 'Mixed';
+      renderMinisterList();
+    }
+  }
   const matches = sessions.filter(s=> s.status!=='Waiting' && s.recipName.toLowerCase()===name.toLowerCase() && s.id!==editingId)
     .sort((a,b)=> b.date.localeCompare(a.date));
   if(!matches.length){
     box.innerHTML = '<p class="helptext">No prior sessions found for this name — this would be their 1st.</p>';
-    historyAutoName = null;
+    if(historyDetailsAutoOk) historyAutoName = name.toLowerCase(); else historyAutoName = null;
     return;
   }
   const showActions = sessKind==='session';
@@ -3157,14 +3185,15 @@ function renderRecipientHistory(){
   // genuinely brand-new session (historyAutoApplyOk) and only once per
   // distinct name typed (historyAutoName) - typing more characters that
   // still match the same name must not keep re-overwriting an explicit
-  // "Use this team" choice made on a different row in the meantime.
-  if(showActions && historyAutoApplyOk && historyAutoName!==name.toLowerCase()){
+  // "Use this team" choice made on a different row in the meantime. The
+  // recipient-details fill above shares this same once-per-name tracker.
+  if(showActions && historyAutoApplyOk && isFirstLookAtThisName){
     prevId = matches[0].id;
     selectedMinisters = matches[0].ministers.map(m=>({...m}));
     $('#apptType').value = 'Follow-up';
     renderMinisterList();
   }
-  if(showActions) historyAutoName = name.toLowerCase();
+  if(showActions || historyDetailsAutoOk) historyAutoName = name.toLowerCase();
   const activeId = showActions ? prevId : null;
 
   const summary = `${matches.length} prior session${matches.length===1?'':'s'} with ${escapeHtml(matches[0].recipName)} — last on ${fmtShort(matches[0].date)}. This would be session #${matches.length+1}.`;
@@ -5060,6 +5089,9 @@ function generateReport(){
 ========================================================================= */
 const CHANGE_LOG = [
   { date: 'Sep 26, 2026', version: APP_VERSION, items: [
+    'Fixed: adding someone to the Waiting list who already has a record on file (a prior session, or even just a prior Waiting entry) now refills their Contact, Gender, and Team Preference too, not just their name - same as picking an existing recipient already did for a brand-new session.'
+  ]},
+  { date: 'Sep 26, 2026', version: '2026-09-26.3', items: [
     'New: the Introduction and Liability Release text in "Edit Intake Questions" are now rich text - bold, italic, underline, and bulleted/numbered lists, with a small formatting toolbar, instead of plain text.',
     'New: the public form\'s printed/PDF copy now shows the Liability Release wording the recipient agreed to, not just their answers.',
     'Fixed: various navigation and layout polish on the public intake form - Back/Next now scroll to the top of the new screen, a visitor can delete their own form (in progress or submitted), and the "Other, please specify" box no longer overflows past the edge of the card.'
