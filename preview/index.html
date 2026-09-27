@@ -5314,15 +5314,14 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
-  { date: 'Sep 27, 2026', version: APP_VERSION, items: [
-    'New: Ministers can now also decline a session ("I can\'t make it"), not just confirm it - shows a red ✗ next to their name (portal and Scheduler) the same way confirming shows a green ✓. Confirming and declining are mutually exclusive and both fully reversible - tap the same button again to undo.',
-    'Setup needed before this works: a new "DeclinedMinisterIDs" column (Single line of text, Plain text) needs to be added to the PrayerSessions SharePoint list by hand, same as ConfirmedMinisterIDs. See CLAUDE.md for the exact spec.'
-  ]}
 ];
 // Entries already live in production, newest first - moved here from
 // CHANGE_LOG at promotion time rather than deleted. See the block comment
 // above for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Sep 27, 2026', version: '2026-09-27.12', items: [
+    'New: Ministers can now also decline a session ("I can\'t make it"), not just confirm it - shows a red ✗ next to their name (portal and Scheduler) the same way confirming shows a green ✓. Confirming and declining are mutually exclusive and both fully reversible - tap the same button again to undo.'
+  ]},
   { date: 'Sep 27, 2026', version: '2026-09-27.11', items: [
     'New: Ministers can now confirm they\'re actually coming to a scheduled session, from a bright orange "I\'m coming to this session" button on their own portal schedule card. Tapping it again undoes it - plans change. Both the minister and their co-assigned minister(s) see a small checkmark next to a confirmed name in the portal; admins see the same checkmark next to a confirmed minister\'s name anywhere sessions are listed in the main Scheduler. Requires ministers to have Contribute access to PrayerSessions (upgraded from Read) - a manual SharePoint permission change, same category as the BlackoutDates access ministers already have.'
   ]},
