@@ -544,6 +544,9 @@ async function loadAll(){
     const stripHtml = v => String(v||'').replace(/<[^>]*>/g, '');
     const allIds = stripHtml(s.AssignedMinisterIDs).split(',').map(x=>x.trim()).filter(Boolean);
     const leadIds = new Set(stripHtml(s.LeadMinisterIDs).split(',').map(x=>x.trim()).filter(Boolean));
+    // Which assigned ministers have confirmed they're actually coming - see
+    // toggleMyConfirmation() below, the only thing that ever writes this.
+    const confirmedIds = new Set(stripHtml(s.ConfirmedMinisterIDs).split(',').map(x=>x.trim()).filter(Boolean));
     return {
       id: s.id, recipName: s.RecipientName||'',
       date: (s.SessionDate||'').split('T')[0], time: toHM(s.SessionDate), endTime: toHM(s.SessionEndDate),
@@ -551,7 +554,7 @@ async function loadAll(){
       apptType: s.ApptType||'First',
       waCreated: !!s.WaCreated, waLink: s.WaLink||'',
       added: (s._created||'').split('T')[0],
-      ministers: allIds.map(id=>({ id: parseInt(id,10), role: leadIds.has(id) ? 'Lead' : 'Support' })).filter(m=>!isNaN(m.id)),
+      ministers: allIds.map(id=>({ id: parseInt(id,10), role: leadIds.has(id) ? 'Lead' : 'Support', confirmed: confirmedIds.has(id) })).filter(m=>!isNaN(m.id)),
       // Staff-confirmed intake form link (see preview/index.html's "Intake
       // form linking" section) - findMyIntakeForRecipient() below prefers
       // this over its own name match when it's set.
@@ -596,11 +599,13 @@ function fmtTime(d){ return d.toLocaleTimeString(undefined,{hour:'numeric',minut
 function fmt12(t){ if(!t) return ''; const [h,m]=t.split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); return fmtTime(d); }
 function fmtShort(dateStr){ if(!dateStr) return ''; return new Date(dateStr+'T00:00').toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); }
 function isoDate(d){ return d.toISOString().slice(0,10); }
+// The trailing ✓ marks a minister who confirmed they're actually coming -
+// plain text on purpose, since every caller wraps this in escapeHtml().
 function ministerNamesOf(s){
   const sorted = [...s.ministers].sort((a,b)=> (a.role==='Lead'?0:1) - (b.role==='Lead'?0:1));
   return sorted.map(m=>{
     const min = ministers.find(x=>x.id===m.id);
-    return (min?min.name:'?') + (m.role==='Lead' ? ' (Lead)' : '');
+    return (min?min.name:'?') + (m.role==='Lead' ? ' (Lead)' : '') + (m.confirmed ? ' ✓' : '');
   }).join(', ');
 }
 function sessionSortKey(s){ return (s.status==='Waiting' ? (s.added||s.date||'') : (s.date||'')) + (s.time||''); }
@@ -766,10 +771,18 @@ window.addToCalendar = function(sessionId){
 };
 
 /* =========================================================================
-   SCHEDULE — same card content as the main app's Schedule tab, read-only
-   (a minister views their own schedule, they don't manage it here)
+   SCHEDULE — same card content as the main app's Schedule tab, mostly
+   read-only (a minister views their own schedule, they don't manage it
+   here) except for confirming their own attendance - see
+   toggleMyConfirmation() below.
 ========================================================================= */
 function scheduleSessionRow(s){
+  const myEntry = s.ministers.find(m=>m.id===me.id);
+  const confirmBtn = (s.status==='Scheduled' && myEntry)
+    ? (myEntry.confirmed
+        ? `<button class="btn secondary" onclick="toggleMyConfirmation(${s.id})">✓ You're confirmed — tap to undo</button>`
+        : `<button class="btn" onclick="toggleMyConfirmation(${s.id})">I'm coming to this session</button>`)
+    : '';
   return `<div class="sess-row">
     <div>
       <div>
@@ -781,10 +794,26 @@ function scheduleSessionRow(s){
       ${s.notes ? `<div class="sess-meta">${escapeHtml(s.notes)}</div>` : ''}
       <div class="wa-note ${s.waCreated?'on':''}">${ICONS.chat} ${s.waCreated?'WhatsApp group created':'No WhatsApp group yet'}</div>
       ${s.waCreated && s.waLink ? ` · <a href="${escapeHtml(s.waLink)}" target="_blank" rel="noopener">open chat</a>` : ''}
-      ${s.status==='Scheduled' ? `<div style="margin-top:8px;"><button class="icon-btn" onclick="addToCalendar(${s.id})" title="Add to Calendar" aria-label="Add this session to your calendar">${ICONS.calendarPlus}</button></div>` : ''}
+      <div style="margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        ${s.status==='Scheduled' ? `<button class="icon-btn" onclick="addToCalendar(${s.id})" title="Add to Calendar" aria-label="Add this session to your calendar">${ICONS.calendarPlus}</button>` : ''}
+        ${confirmBtn}
+      </div>
     </div>
   </div>`;
 }
+// Toggles whether the SIGNED-IN minister has confirmed they're coming to
+// this session - never touches other ministers' confirmations, and only
+// ever called against a session that's actually assigned to `me`
+// (scheduleSessionRow() only renders the button when myEntry exists).
+// Reversible by design, per explicit request - plans change.
+window.toggleMyConfirmation = async function(sessionId){
+  const s = sessions.find(x=>x.id===sessionId);
+  if(!s) return;
+  const nowConfirmed = new Set(s.ministers.filter(m=>m.confirmed).map(m=>m.id));
+  if(nowConfirmed.has(me.id)) nowConfirmed.delete(me.id); else nowConfirmed.add(me.id);
+  await updateItem('sessions', sessionId, { ConfirmedMinisterIDs: [...nowConfirmed].join(',') });
+  await loadAll();
+};
 function renderSchedule(){
   const q = $('#search').value.trim().toLowerCase();
   const range = $('#range').value;

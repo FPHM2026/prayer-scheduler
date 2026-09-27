@@ -158,6 +158,14 @@ scheduler's own code.
   IntakeResponses item, overriding the plain name-match
   `findIntakeForRecipient()` otherwise falls back to. See "Intake form
   linking" under "Intake Forms" below.
+  **ConfirmedMinisterIDs (Single line of text, Plain text — MUST be added to
+  SharePoint by hand, not created automatically; added 2026-09-27)** —
+  comma-separated subset of AssignedMinisterIDs who've confirmed from their
+  own portal card that they're actually coming, same shape as
+  LeadMinisterIDs. Only ever written by `toggleMyConfirmation()` in
+  `portal/index.html` — the signed-in minister confirming/un-confirming
+  their own attendance, never anyone else's. See "Minister attendance
+  confirmation" under "Features implemented" below.
 - **BlackoutDates**: Title (minister name), BlackoutDate (Date), **EndDate
   (Date, optional)** — blank/null means a single-day blackout; set means an
   inclusive date range. Notes (Plain text)
@@ -507,6 +515,29 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
       Active/Inactive toggle elsewhere on this tab, which does not touch
       group membership at all — only an actual roster **deletion** revokes
       portal access today.
+- **Minister attendance confirmation** (added 2026-09-27, `portal/index.html`
+  + `preview/index.html`, Test only pending the `ConfirmedMinisterIDs` setup
+  step above): a Scheduled session's card on a minister's own portal
+  schedule shows a bright orange primary "I'm coming to this session"
+  button (`.btn`, matching the design system's primary-action color) when
+  they haven't confirmed yet, or a secondary "✓ You're confirmed — tap to
+  undo" button once they have — `toggleMyConfirmation()` reversible by
+  explicit request (plans change), never a one-way action. Only ever writes
+  the *signed-in* minister's own id into `ConfirmedMinisterIDs`; the button
+  only renders at all when the session is actually assigned to them
+  (`s.ministers.find(m=>m.id===me.id)`).
+  `ministerNamesOf()` — shared logic duplicated in `portal/index.html` and
+  `preview/index.html`, same as everywhere else minister names get
+  rendered — appends a plain-text ` ✓` after a confirmed minister's name.
+  Deliberately plain text, not an HTML/SVG icon: every caller wraps the
+  result in `escapeHtml()`. This makes a confirmed minister's checkmark
+  visible in three places at once: their own portal card, their
+  co-assigned minister(s)' portal cards (so a team can see who else is
+  actually coming, at the user's explicit request), and every session
+  listing in the admin Scheduler. Not yet added to `index.html`
+  (production) — build/test in Test first per the usual promotion process,
+  since this needs the SharePoint column added before it can be verified
+  live.
 - Blackout Dates tab: grouped by minister, soonest first, Add/Edit modal with
   a single-date/date-range toggle (writes BlackoutDate + EndDate), edit/delete
   per entry
