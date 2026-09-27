@@ -449,14 +449,22 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
     haven't happened), each filling in the *same columns* the year row has
     (Sessions, and for Freedom Sessions also Unique Recipients/First-time/
     Follow-up) rather than a separate nested mini-table off to the side.
-    Below the month rows, in the same expanded area, sits that year's own "Show
-    minister breakdown" toggle — deliberately **not** one breakdown merged
-    across the whole selected range; a multi-year range shows each year's
-    numbers and that year's own minister-breakdown toggle together, then
-    the next year below it. All of a year's rows (month rows + the
-    minister-breakdown toggle row) share one `data-group="y-{type}-{year}"`
-    attribute and toggle together via `toggleGroup(id)` (queries
-    `[data-group="id"]`, flips them as a set).
+    Directly underneath the year row — its own `<tr class="detail-row
+    minister-section-row">`, always visible, never hidden behind
+    expanding the year's months first (changed 2026-09-27 at the user's
+    request — it wasn't clear whose minister breakdown you were looking
+    at when you had to open the year to even find the toggle) — sits that
+    year's own "Show minister breakdown for {year}" toggle, explicit year
+    number included in the label for the same reason. Deliberately **not**
+    one breakdown merged across the whole selected range; a multi-year
+    range repeats Year → its Ministers → next Year → its Ministers, a
+    subtle top border on the minister row marking it as belonging to the
+    year above rather than blending into the row below. The year row's
+    own `data-group="y-{type}-{year}"` toggle (`toggleGroup(id)`) now
+    covers *only* the month rows — the minister row isn't in that group
+    and keeps whatever open/closed state the admin left it in regardless
+    of the year being expanded or collapsed (including via the "Expand/
+    Collapse All Years" buttons, which likewise never touch it).
     - **The minister breakdown itself stays a separate nested `<table
       class="minister-table">`** (tried folding it into the year-table's
       own rows on 2026-09-24 — reverted the same day: the user wanted the
