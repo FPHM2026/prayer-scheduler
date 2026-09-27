@@ -738,16 +738,32 @@ M365 seat cost) so they can sign in for real.
   the team really is just filling out the form — no manual group step left
   afterward, and (unlike the classic-SharePoint-group version this
   replaced) no multi-minute wait either.
-- **Sign-in redirect (production, in index.html)**: a minister who signs
-  into the *main scheduler* — not the portal — gets redirected straight to
-  `/portal/` instead of landing in the admin UI. `afterSignIn()` checks the
-  signed-in account's email against every minister's SignInEmail right
-  after resolving the SharePoint site, before ever showing the admin UI; a
-  match redirects via `window.location.href` (relative `portal/` path), no
-  match proceeds into the admin app as normal. This means one URL — the
-  production scheduler link — can be handed out to everyone; SharePoint's
-  own permissions remain the real access boundary, this redirect is a UX
-  nicety on top, not a security control.
+- **Sign-in redirect, both directions**: whichever of the two apps you sign
+  into, a mismatched account gets redirected to the other one instead of
+  landing somewhere with nothing useful for them. Neither check is a
+  security control — SharePoint/Entra group permissions remain the real
+  access boundary — this is purely a UX nicety so one URL can be handed out
+  to everyone and they land in the right place.
+  - **Scheduler → Portal** (production, in `index.html`): a minister who
+    signs into the *main scheduler* gets redirected straight to `/portal/`
+    instead of landing in the admin UI. `afterSignIn()` checks the
+    signed-in account's email against every minister's SignInEmail right
+    after resolving the SharePoint site, before ever showing the admin UI;
+    a match redirects via `window.location.href` (relative `portal/`
+    path), no match proceeds into the admin app as normal.
+  - **Portal → Scheduler** (`portal/index.html`, added 2026-09-27 at the
+    user's request — previously an admin who signed into the portal by
+    mistake had to sign out and separately sign into the Scheduler):
+    mirrors the check above in reverse. The portal's own `afterSignIn()`
+    resolves the site/lists, checks the signed-in account's email against
+    every minister's SignInEmail, and redirects to `../` (the Scheduler)
+    on NO match, before ever showing the portal UI — same
+    resolve-then-check-then-redirect shape as the Scheduler's own version,
+    including its `#loadError` limitation (that element lives inside the
+    still-hidden main UI, so an error from `resolveSiteAndLists()` itself,
+    before the redirect check even runs, is written somewhere not yet
+    visible — a pre-existing quirk in the Scheduler's version too,
+    deliberately mirrored rather than fixed here as an unrelated change).
 
 ### Portal UI (mirrors the main app's component style)
 Three tabs — Schedule, Completed Sessions, Blackout Dates — reusing the main

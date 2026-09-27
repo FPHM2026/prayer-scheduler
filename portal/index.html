@@ -435,6 +435,25 @@ async function getToken(){
   catch(e){ return (await msalInstance.acquireTokenPopup(req)).accessToken; }
 }
 async function afterSignIn(){
+  try{
+    await resolveSiteAndLists();
+    // An admin signing into the PORTAL by mistake (or just navigating here
+    // directly) shouldn't land in a view with nothing for them - mirrors
+    // the Scheduler's own reverse check (its afterSignIn() redirects a
+    // minister's sign-in here). Redirect before ever showing the portal UI
+    // if their sign-in email does NOT match a minister on file.
+    const rawMin = await listItems('ministers');
+    const myEmail = (account.username||'').trim().toLowerCase();
+    const isMinister = rawMin.some(m => (m.SignInEmail||'').trim().toLowerCase() === myEmail);
+    if(!isMinister){
+      document.getElementById('signinMsg').textContent = "You're not signed in as a Prayer Minister — redirecting to the Scheduler…";
+      window.location.href = '../';
+      return;
+    }
+  }catch(e){
+    document.getElementById('loadError').innerHTML = `<div class="errbox" role="alert">Could not load your schedule: ${e.message}. If this keeps happening, check with the scheduling admin that your account has been added to the Ministers group in SharePoint.</div>`;
+    return;
+  }
   document.getElementById('signinScreen').style.display = 'none';
   document.getElementById('appRoot').style.display = 'block';
   document.getElementById('whoami').textContent = account.name || account.username;
@@ -447,7 +466,6 @@ async function afterSignIn(){
     document.getElementById('signinMsg').textContent = 'Signed out.';
   };
   try{
-    await resolveSiteAndLists();
     await loadAll();
     wireApp();
   }catch(e){
