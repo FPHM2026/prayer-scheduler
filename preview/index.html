@@ -5088,7 +5088,12 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
-  { date: 'Sep 26, 2026', version: APP_VERSION, items: [
+];
+// Entries already live in production, newest first - moved here from
+// CHANGE_LOG at promotion time rather than deleted. See the block comment
+// above for the maintenance rule.
+const CHANGE_LOG_ARCHIVE = [
+  { date: 'Sep 26, 2026', version: '2026-09-26.4', items: [
     'Fixed: adding someone to the Waiting list who already has a record on file (a prior session, or even just a prior Waiting entry) now refills their Contact, Gender, and Team Preference too, not just their name - same as picking an existing recipient already did for a brand-new session.'
   ]},
   { date: 'Sep 26, 2026', version: '2026-09-26.3', items: [
@@ -5121,12 +5126,7 @@ const CHANGE_LOG = [
     'New: a "Notify via WhatsApp" button on a session with a WhatsApp group already created — sends each assigned minister a WhatsApp message with the session details and group link, via an external notification service. Currently running in dry-run mode (validates everything but doesn\'t actually send) until the WhatsApp message template is approved by Meta - flip WHATSAPP_NOTIFY.dryRun to false in the code once that happens. Requires a new "WaNotified" (Yes/No) column on PrayerSessions in SharePoint, not yet added.',
     'Fixed: printing a Report no longer force-expands every year and minister breakdown - Print now just prints whatever is currently expanded on screen.',
     'New: "Expand All Years" / "Collapse All Years" buttons on the Report page, both a global pair at the top and one pair per section (Freedom Sessions, Sunday Drop-In, Training). These only expand/collapse the year rows - any "Show minister breakdown" toggle stays exactly as it was.'
-  ]}
-];
-// Entries already live in production, newest first - moved here from
-// CHANGE_LOG at promotion time rather than deleted. See the block comment
-// above for the maintenance rule.
-const CHANGE_LOG_ARCHIVE = [
+  ]},
   { date: 'Sep 24, 2026', version: '2026-09-24.10', items: [
     'Fixed: on Reports, the year/minister tables spilled off the right edge of the card on phone-sized screens instead of staying contained. Each table now scrolls horizontally within its own card instead of overflowing past it, and a proper mobile viewport tag was added so phones render the page at actual screen width instead of a zoomed-out desktop layout.'
   ]},
