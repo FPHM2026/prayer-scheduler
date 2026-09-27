@@ -119,15 +119,18 @@ scheduler's own code.
   the same-sex team-preference matching on the Schedule & Planning tab, see
   "Planning Slots" under "Features implemented" below. **PortalPassword
   (Single line of text, Plain text — MUST be added to SharePoint by hand,
-  not created automatically; added 2026-09-27)** — the minister's current
-  sign-in password for their Entra account, stored so staff can look it up
-  or change it later from the Edit Minister form. **This is a deliberate,
-  known tradeoff, not an oversight**: storing a real password in plain text
-  in a SharePoint column is not normal security practice — see "Add/Edit
-  Minister creates the actual sign-in account" under "Features implemented"
-  below for the full reasoning and the mitigation (restrict this column's
-  view/edit permission to admins only, the same way `Notes` fields elsewhere
-  in this repo get scoped when they're sensitive).
+  not created automatically; added 2026-09-27)** — a **temporary** sign-in
+  password issued for the minister's Entra account, stored so staff can look
+  it up or issue a fresh one from the Edit Minister form. This only matches
+  the minister's *real*, current password until they actually sign in with
+  it — Entra forces them to pick their own password the first time they use
+  it (`forceChangePasswordNextSignIn: true`), same as clicking "Reset
+  password" in the Entra admin center. See "Add/Edit Minister creates the
+  actual sign-in account" under "Features implemented" below for why this
+  changed from the original persistent-password design (Graph rejected it),
+  and restrict this column's view/edit permission to admins only, the same
+  way `Notes` fields elsewhere in this repo get scoped when they're
+  sensitive.
 - **PrayerSessions**: Title, SessionDate, SessionEndDate, RecipientName,
   RecipientContact, AssignedMinisterIDs (comma-separated minister IDs, plain
   text), LeadMinisterIDs (comma-separated subset of the above who are "Lead"
@@ -420,21 +423,24 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
       Never overwrites a value already there (editing an existing minister,
       or a value the admin has already hand-typed — tracked via a
       `dataset.touched` flag on the field, not a second piece of state).
-    - **The password is admin-typed and persisted, not a generated
-      one-time secret** — this was an explicit, deliberate request: a
-      masked "Portal Password" field (show/hide eye-icon toggle,
-      `ICONS.eye`/`ICONS.eyeOff`) that reads from and writes to the new
-      `PortalPassword` SharePoint column (see schema above), so staff can
-      look up or change a minister's password anytime from Edit Minister,
-      not just once at creation. `createMinisterAccount()` sets
-      `forceChangePasswordNextSignIn: false` for exactly this reason — a
-      forced change on first sign-in would immediately break the "this is
-      the current password" guarantee the stored field is supposed to
-      give. **This is less secure than Microsoft's own default pattern**
-      (a one-time temp password, changed and never seen again) — accepted
-      deliberately, the same way the IntakeResponses sensitivity tradeoff
-      was: flag it, document why, respect the explicit choice, don't
-      silently "fix" it into something safer that wasn't asked for.
+    - **The password is admin-typed, but temporary, not a persisted
+      current password** — the original design (2026-09-27, first cut)
+      set `forceChangePasswordNextSignIn: false` so the stored
+      `PortalPassword` column would always reflect the minister's actual
+      current password. Real-world testing that same day showed Graph
+      rejecting that combination with a 403 `Authorization_RequestDenied`
+      for every Entra role this tenant grants (User Administrator
+      included) — the Entra admin center's own "Reset password" button
+      only ever issues a temporary, force-change password, and testing
+      confirmed that's genuinely all the Graph API allows here. So
+      `createMinisterAccount()`/`updateMinisterAccountPassword()` both set
+      `forceChangePasswordNextSignIn: true`: the admin-typed "Temporary
+      Portal Password" (masked field, show/hide eye-icon toggle,
+      `ICONS.eye`/`ICONS.eyeOff`) is what you hand the minister to sign in
+      with, and Entra makes them choose their own password the first time
+      they use it — after that, the stored `PortalPassword` column no
+      longer matches their real password, and typing a new one + saving is
+      how staff issue them a fresh temporary one (e.g. if they forget it).
     - **Editing an existing minister's password** calls
       `updateMinisterAccountPassword()` — a Graph `PATCH` addressed by
       their *current* `signInEmail`, only fired when the password field's

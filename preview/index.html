@@ -867,12 +867,12 @@
       <p class="helptext" style="margin:5px 0 0;">Creates an unlicensed Microsoft 365 account at the Sign-In Email above — no seat cost, just enough to sign into the portal. Requires your own account to have the User Administrator role in Entra.</p>
     </div>
     <div class="field" id="minPasswordField">
-      <label for="minPassword" id="minPasswordLabel">Portal Password</label>
+      <label for="minPassword" id="minPasswordLabel">Temporary Portal Password</label>
       <div style="position:relative;">
         <input id="minPassword" type="password" autocomplete="new-password" style="padding-right:44px;">
         <button type="button" id="btnToggleMinPassword" aria-label="Show password" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;padding:6px;cursor:pointer;color:var(--muted);display:flex;"></button>
       </div>
-      <p class="helptext" id="minPasswordHelp" style="margin:5px 0 0;">At least 8 characters. Stored here so you can look it up or change it later — share it with the minister directly.</p>
+      <p class="helptext" id="minPasswordHelp" style="margin:5px 0 0;">At least 8 characters. Give this to the minister to sign in with — Microsoft makes them pick their own new password the first time they use it, so this stored value stops matching their real password after that. Type a new one here anytime to reset it again.</p>
     </div>
     <div id="minAccountMsg"></div>
     <div class="field"><label for="minGender">Gender</label><select id="minGender"><option value="">— Not set —</option><option>Female</option><option>Male</option></select><p class="helptext" style="margin:5px 0 0;">Used by the same-sex preference match on the Schedule &amp; Planning tab.</p></div>
@@ -953,7 +953,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-27.1";
+const APP_VERSION = "2026-09-27.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3867,9 +3867,13 @@ function generateSignInEmail(name){
 }
 // Creates the actual unlicensed Entra account - no product license is ever
 // assigned (that's a separate Graph call this never makes), which is what
-// keeps it a no-seat-cost account. forceChangePasswordNextSignIn is
-// deliberately false: the admin-typed password is meant to stay the known,
-// stored, editable password shown in the form, not a one-time temp value.
+// keeps it a no-seat-cost account. forceChangePasswordNextSignIn is true:
+// Graph rejects an admin-set PATCH/POST password with it false (403
+// Authorization_RequestDenied) for the roles this tenant grants, matching
+// what the Entra portal's own "Reset password" does. The admin-typed value
+// is only the TEMPORARY password to hand the minister - they're required to
+// pick their own at first sign-in, so PortalPassword goes stale at that
+// point (see the helptext in the modal).
 async function createMinisterAccount(displayName, upn, password){
   const mailNickname = upn.split('@')[0];
   return graphFetch('/users', {
@@ -3879,7 +3883,7 @@ async function createMinisterAccount(displayName, upn, password){
       displayName,
       mailNickname,
       userPrincipalName: upn,
-      passwordProfile: { password, forceChangePasswordNextSignIn: false }
+      passwordProfile: { password, forceChangePasswordNextSignIn: true }
     })
   });
 }
@@ -3890,7 +3894,7 @@ async function createMinisterAccount(displayName, upn, password){
 async function updateMinisterAccountPassword(upn, password){
   return graphFetch(`/users/${encodeURIComponent(upn)}`, {
     method: 'PATCH',
-    body: JSON.stringify({ passwordProfile: { password, forceChangePasswordNextSignIn: false } })
+    body: JSON.stringify({ passwordProfile: { password, forceChangePasswordNextSignIn: true } })
   });
 }
 function openMinisterModal(m){
@@ -3912,10 +3916,10 @@ function openMinisterModal(m){
   // account yet (SignInEmail still blank).
   $('#minCreateAccountField').style.display = hasAccount ? 'none' : '';
   $('#minCreateAccount').checked = !hasAccount;
-  $('#minPasswordLabel').textContent = hasAccount ? 'Portal Password' : 'Portal Password (for the new account)';
+  $('#minPasswordLabel').textContent = hasAccount ? 'Temporary Portal Password' : 'Temporary Portal Password (for the new account)';
   $('#minPasswordHelp').textContent = hasAccount
-    ? 'Change this and save to reset their sign-in password. At least 8 characters.'
-    : 'At least 8 characters. Stored here so you can look it up or change it later — share it with the minister directly.';
+    ? 'Change this and save to reset their sign-in password to a new temporary one. At least 8 characters. Microsoft makes them pick their own password the first time they sign in with it, so this field stops matching their real password after that.'
+    : 'At least 8 characters. Give this to the minister to sign in with — Microsoft makes them pick their own new password the first time they use it, so this stored value stops matching their real password after that. Type a new one here anytime to reset it again.';
   $('#minPasswordField').style.display = (hasAccount || $('#minCreateAccount').checked) ? '' : 'none';
   $('#minAccountMsg').innerHTML = '';
   $('#minModalMsg').innerHTML = '';
@@ -5229,7 +5233,8 @@ function generateReport(){
 ========================================================================= */
 const CHANGE_LOG = [
   { date: 'Sep 27, 2026', version: APP_VERSION, items: [
-    'New: Add/Edit Minister can now create and manage their actual sign-in account, not just record the roster entry. Check "Also create their sign-in account" (on by default when adding someone new) and set a password, and it creates their unlicensed Microsoft 365 account for you. Editing an existing minister shows a masked Portal Password field (with a show/hide toggle) you can look up or change anytime - changing it resets their sign-in password for real.',
+    'Fix: creating/resetting a minister\'s sign-in password now uses a temporary password (Microsoft makes them choose their own on first sign-in) instead of a persistent admin-set one - Graph was rejecting the persistent form with a 403 for every role this tenant grants. The Portal Password field is now labeled "Temporary Portal Password" and only reflects the minister\'s real password until they sign in and change it.',
+    'New: Add/Edit Minister can now create and manage their actual sign-in account, not just record the roster entry. Check "Also create their sign-in account" (on by default when adding someone new) and set a temporary password, and it creates their unlicensed Microsoft 365 account for you. Editing an existing minister shows a masked Temporary Portal Password field (with a show/hide toggle) you can use to issue a fresh one anytime.',
     'Setup needed before this works: (1) User.ReadWrite.All (delegated) needs admin consent on the Scheduler\'s Azure AD app registration, and (2) a new "PortalPassword" column (Single line of text, Plain text) needs to be added to the PrayerMinisters SharePoint list by hand. See CLAUDE.md for the exact steps. Until both are done, the checkbox will fail with a clear error rather than silently doing nothing.'
   ]}
 ];
