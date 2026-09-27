@@ -782,15 +782,18 @@ window.addToCalendar = function(sessionId){
 ========================================================================= */
 function scheduleSessionRow(s){
   const myEntry = s.ministers.find(m=>m.id===me.id);
-  let attendanceBtns = '';
+  // The decline action is always full-width, in both its "offer" and its
+  // active "tap to undo" state - it reads as a bigger, more deliberate
+  // commitment to tap than the inline confirm/calendar row above it.
+  let confirmBtn = '', declineBtn = '';
   if(s.status==='Scheduled' && myEntry){
     if(myEntry.confirmed){
-      attendanceBtns = `<button class="btn secondary" onclick="setMyAttendance(${s.id},'confirmed')">✓ You're confirmed — tap to undo</button>`;
+      confirmBtn = `<button class="btn secondary" onclick="setMyAttendance(${s.id},'confirmed')">✓ You're confirmed — tap to undo</button>`;
     } else if(myEntry.declined){
-      attendanceBtns = `<button class="btn danger" onclick="setMyAttendance(${s.id},'declined')">✗ You declined — tap to undo</button>`;
+      declineBtn = `<button class="btn danger" style="width:100%;" onclick="setMyAttendance(${s.id},'declined')">✗ You declined — tap to undo</button>`;
     } else {
-      attendanceBtns = `<button class="btn" onclick="setMyAttendance(${s.id},'confirmed')">I'm coming to this session</button>
-        <button class="btn secondary" onclick="setMyAttendance(${s.id},'declined')">I can't make it</button>`;
+      confirmBtn = `<button class="btn" onclick="setMyAttendance(${s.id},'confirmed')">I'm coming to this session</button>`;
+      declineBtn = `<button class="btn secondary" style="width:100%;" onclick="setMyAttendance(${s.id},'declined')">I can't make it</button>`;
     }
   }
   return `<div class="sess-row">
@@ -804,9 +807,12 @@ function scheduleSessionRow(s){
       ${s.notes ? `<div class="sess-meta">${escapeHtml(s.notes)}</div>` : ''}
       <div class="wa-note ${s.waCreated?'on':''}">${ICONS.chat} ${s.waCreated?'WhatsApp group created':'No WhatsApp group yet'}</div>
       ${s.waCreated && s.waLink ? ` · <a href="${escapeHtml(s.waLink)}" target="_blank" rel="noopener">open chat</a>` : ''}
-      <div style="margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-        ${s.status==='Scheduled' ? `<button class="icon-btn" onclick="addToCalendar(${s.id})" title="Add to Calendar" aria-label="Add this session to your calendar">${ICONS.calendarPlus}</button>` : ''}
-        ${attendanceBtns}
+      <div style="margin-top:8px;display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          ${s.status==='Scheduled' ? `<button class="btn secondary" style="display:inline-flex;align-items:center;gap:6px;" onclick="addToCalendar(${s.id})">${ICONS.calendarPlus} Add to Calendar</button>` : ''}
+          ${confirmBtn}
+        </div>
+        ${declineBtn}
       </div>
     </div>
   </div>`;
