@@ -5297,18 +5297,15 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
-  { date: 'Sep 27, 2026', version: APP_VERSION, items: [
-    'Fixed: resetting an existing minister\'s sign-in password works now - it needed one more Graph permission, Directory.AccessAsUser.All, alongside User.ReadWrite.All.',
-    'Changed: the password field is simpler now. Both a new minister\'s starting password and a "Reset Password" button on existing ministers use the same shared, year-stamped default (e.g. FPHM2026!) instead of a typed-in value - it\'s always a temporary password Microsoft forces the minister to replace at their first sign-in, so there\'s nothing sensitive to mask or save. It\'s no longer stored anywhere (the PortalPassword SharePoint column is no longer used - safe to remove it if you added it).',
-    'New: Add/Edit Minister can now create and manage their actual sign-in account, not just record the roster entry. Check "Also create their sign-in account" (on by default when adding someone new) and it creates their unlicensed Microsoft 365 account for you with this year\'s default temporary password.',
-    'New: creating a minister\'s account now also adds them to the "Prayer Ministers" Entra group automatically, and deleting a minister removes them from it - the one manual step left after account creation is gone. Adding someone to the team is now just filling out the form. Their Entra sign-in account itself is never disabled or deleted by a roster change - useful if that minister is also a staff member whose actual Microsoft 365 account needs to stay untouched.',
-    'Setup needed before this works: User.ReadWrite.All, Directory.AccessAsUser.All, AND GroupMember.ReadWrite.All (all Graph, delegated) need admin consent on the Scheduler\'s Azure AD app registration. See CLAUDE.md for the exact steps. Until that\'s done, the checkbox will fail with a clear error rather than silently doing nothing.'
-  ]}
 ];
 // Entries already live in production, newest first - moved here from
 // CHANGE_LOG at promotion time rather than deleted. See the block comment
 // above for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Sep 27, 2026', version: '2026-09-27.10', items: [
+    'New: Add/Edit Minister can now create and manage their actual sign-in account, not just record the roster entry. Check "Also create their sign-in account" (on by default when adding someone new) and it creates their unlicensed Microsoft 365 account for you with this year\'s default temporary password. The password field always uses the same shared, year-stamped default (e.g. FPHM2026!) instead of a typed-in value - it\'s always temporary, so there\'s nothing sensitive to mask or save.',
+    'New: creating a minister\'s account now also adds them to the "Prayer Ministers" Entra group automatically, and deleting a minister removes them from it - the one manual step left after account creation is gone. Adding someone to the team is now just filling out the form. Their Entra sign-in account itself is never disabled or deleted by a roster change - useful if that minister is also a staff member whose actual Microsoft 365 account needs to stay untouched.'
+  ]},
   { date: 'Sep 26, 2026', version: '2026-09-26.5', items: [
     'Changed: on Reports, "Show minister breakdown" is now its own always-visible row directly under each year, instead of being hidden until you expand that year\'s months first - and it\'s now labeled with the year ("Show minister breakdown for 2026") so it\'s unambiguous which year it belongs to, especially with multiple years in the same report.'
   ]},

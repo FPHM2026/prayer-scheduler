@@ -12,8 +12,8 @@
      question schema + rendering logic live in ONE place (../js/) so
      editing a question never needs touching more than that file. See
      CLAUDE.md "Intake Forms" section. -->
-<script src="js/formConfig.js"></script>
-<script src="js/formEngine.js"></script>
+<script src="../js/formConfig.js"></script>
+<script src="../js/formEngine.js"></script>
 <style>
   /* Palette sampled from creeksidechurch.ca and the Freedom Prayer Healing Ministry
      page/logo (creeksidechurch.ca/freedom-prayer): --gold is the ministry's terracotta
@@ -530,7 +530,11 @@
        merged Schedule & Planning tab (panel-schedplan) replaces both, per
        the "no duplicated functionality" decision. Re-add these two buttons
        plus data-tab="schedule"/"planning" here to fall back if needed. -->
-  <button data-tab="schedplan" class="active" aria-current="page">Schedule &amp; Planning</button>
+  <!-- Preview-only tab - never promote this one to production. Kept first
+       so a reviewer's very first click lands on "what changed", not
+       buried after everything else. -->
+  <button data-tab="changes" class="active" aria-current="page">Changes</button>
+  <button data-tab="schedplan">Schedule &amp; Planning</button>
   <button data-tab="completed">Completed Sessions</button>
   <button data-tab="overview">Prayer Ministers</button>
   <button data-tab="blackouts">Blackout Dates</button>
@@ -541,7 +545,16 @@
 <main>
 <div id="loadError"></div>
 
-  <section class="panel active" id="panel-schedplan">
+  <section class="panel active" id="panel-changes">
+    <p class="helptext" id="changesHelptext">What's new in this preview build — check these specifically before anything else. Newest first.</p>
+    <nav class="subtabs" aria-label="Changes view" id="changesSubtabs">
+      <button class="active" data-changesview="recent">Recent</button>
+      <button data-changesview="archive">Archive</button>
+    </nav>
+    <div id="changeLog"></div>
+  </section>
+
+  <section class="panel" id="panel-schedplan">
     <p class="helptext">Every state lives here — open slots to fill, tentative claims to review, and booked sessions to look back on.</p>
     <div class="stats-collapse" id="schedPlanStatsCollapse">
       <button class="stats-toggle" onclick="toggleStatsCollapse(this)" aria-expanded="true">
@@ -653,7 +666,7 @@
 
   <section class="panel" id="panel-intake">
     <div class="toolbar no-print" style="margin-bottom:12px;">
-      <a class="btn" id="btnOpenIntakeForm" href="intake/" target="_blank" rel="noopener">Open Intake Form</a>
+      <a class="btn" id="btnOpenIntakeForm" href="../intake/" target="_blank" rel="noopener">Open Intake Form</a>
       <button class="btn secondary" type="button" id="btnCopyIntakeLink">Copy Link to Intake Form</button>
       <span class="helptext" id="intakeLinkCopiedMsg" style="display:none;">Link copied!</span>
     </div>
@@ -834,6 +847,22 @@
     <div class="field"><label for="minEmail">Email</label><input id="minEmail" type="email"></div>
     <div class="field"><label for="minPhone">Phone</label><input id="minPhone" type="tel"></div>
     <div class="field"><label for="minSignInEmail">Sign-In Email (for minister portal)</label><input id="minSignInEmail" type="email" placeholder="Their unlicensed Microsoft 365 sign-in address"><p class="helptext" style="margin:5px 0 0;">Not a real inbox — this is the account they sign into the portal with, separate from their contact Email above.</p></div>
+    <div class="field" id="minCreateAccountField">
+      <label style="display:flex;align-items:center;gap:8px;font-weight:700;">
+        <input type="checkbox" id="minCreateAccount" checked style="width:auto;min-height:auto;"> Also create their sign-in account
+      </label>
+      <p class="helptext" style="margin:5px 0 0;">Creates an unlicensed Microsoft 365 account at the Sign-In Email above — no seat cost, just enough to sign into the portal. Requires your own account to have the User Administrator role in Entra.</p>
+    </div>
+    <div class="field" id="minPasswordField">
+      <label for="minPassword" id="minPasswordLabel">Temporary Portal Password</label>
+      <input id="minPassword" type="text" autocomplete="off">
+      <p class="helptext" id="minPasswordHelp" style="margin:5px 0 0;">Give this to the minister to sign in with — Microsoft makes them pick their own new password the first time they use it, so this is never their real, ongoing password. Not sensitive enough to mask or store.</p>
+    </div>
+    <div class="field" id="minResetPasswordField" style="display:none;">
+      <button type="button" class="btn secondary" id="btnMinResetPassword">Reset to a new temporary password</button>
+      <p class="helptext" style="margin:5px 0 0;">Sets their sign-in password to this year's default temporary password and saves it when you click Save below.</p>
+    </div>
+    <div id="minAccountMsg"></div>
     <div class="field"><label for="minGender">Gender</label><select id="minGender"><option value="">— Not set —</option><option>Female</option><option>Male</option></select><p class="helptext" style="margin:5px 0 0;">Used by the same-sex preference match on the Schedule &amp; Planning tab.</p></div>
     <div class="field"><label for="minStatus">Status</label><select id="minStatus"><option>Active</option><option>Inactive</option></select></div>
     <div class="modal-actions">
@@ -912,7 +941,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-26.5";
+const APP_VERSION = "2026-09-27.10";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -926,8 +955,32 @@ const MSAL_CONFIG = {
   },
   cache: { cacheLocation: "sessionStorage" }
 };
-const GRAPH_SCOPES = ["Sites.ReadWrite.All", "User.Read"];
+// User.ReadWrite.All (delegated) is needed to create/update the unlicensed
+// Entra accounts the Add/Edit Minister form can now create - see
+// createMinisterAccount()/updateMinisterAccountPassword() below. Only works
+// for a signed-in admin who actually holds a role that can manage users
+// (User Administrator or similar) - a signed-in account without it gets a
+// normal Graph 403, surfaced in the modal, not a silent failure.
+// GroupMember.ReadWrite.All (delegated) is needed to add/remove a minister
+// from ENTRA_MINISTERS_GROUP_ID below - see addMinisterToEntraGroup()/
+// removeMinisterFromEntraGroup(). Needs its own admin consent, same as the
+// other scopes here.
+const GRAPH_SCOPES = ["Sites.ReadWrite.All", "User.Read", "User.ReadWrite.All", "Directory.AccessAsUser.All", "GroupMember.ReadWrite.All"];
 const SITE_URL = "https://creeksidechurch.sharepoint.com/sites/FreedomPrayer";
+// The Entra security group that actually grants minister portal access -
+// membership in this is what makes the portal usable, not the Entra
+// account by itself; the site's own SharePoint permissions are granted to
+// this group rather than to individual users. Switched from a classic
+// SharePoint site permission group on 2026-09-27 specifically because
+// SharePoint could take well over a minute to recognize a just-created
+// Entra account when membership went through the SharePoint REST API -
+// Graph's own group-membership endpoints have no such lag. Find/verify
+// this GUID at entra.microsoft.com > Groups > (the group) > Overview >
+// Object Id.
+const ENTRA_MINISTERS_GROUP_ID = "dbee503e-a287-42c8-a4f3-ae67feecdec7";
+// Domain new minister sign-in accounts are created under - see
+// generateSignInEmail() below.
+const PORTAL_ACCOUNT_DOMAIN = "creeksidechurch.ca";
 
 // WhatsApp booking notifications — calls the fphm-whatsapp-notify Cloudflare
 // Worker, which holds the real Meta WhatsApp credentials server-side. This
@@ -961,8 +1014,8 @@ const LIST_NAMES = {
 };
 // Relative to this file's own location (preview/) - portal/ is a sibling of
 // the repo root, one level up from here.
-const PORTAL_URL = "portal/";
-const INTAKE_URL = "intake/";
+const PORTAL_URL = "../portal/";
+const INTAKE_URL = "../intake/";
 
 const msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
 const msalReady = msalInstance.initialize();
@@ -1288,7 +1341,9 @@ const ICONS = {
   flag: (filled) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="${filled?'currentColor':'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22V4a1 1 0 0 1 1-1h13.5a.5.5 0 0 1 .4.8l-3.6 4.7 3.6 4.7a.5.5 0 0 1-.4.8H5"/></svg>`,
   calendarPlus: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 14v6M9 17h6"/></svg>',
   power: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>',
-  phone: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>'
+  phone: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>',
+  eye: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
+  eyeOff: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.6 18.6 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
 };
 function fmtDate(d){ return d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'}); }
 function fmtTime(d){ return d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit',hour12:true}); }
@@ -1446,6 +1501,7 @@ function wireApp(){
   $('#btnSaveDropInSettings').addEventListener('click', ()=>withLoading($('#btnSaveDropInSettings'), 'Saving…', saveDropInSettings));
   $('#btnSaveDefaultLocationSetting').addEventListener('click', ()=>withLoading($('#btnSaveDefaultLocationSetting'), 'Saving…', saveDefaultLocationSetting));
   $('#settingsSubtabs').querySelectorAll('button[data-settingsview]').forEach(b=>b.addEventListener('click', ()=>switchSettingsSub(b.dataset.settingsview)));
+  $('#changesSubtabs').querySelectorAll('button[data-changesview]').forEach(b=>b.addEventListener('click', ()=>switchChangesSub(b.dataset.changesview)));
   $('#intakeSubtabs').querySelectorAll('button[data-intakestatus]').forEach(b=>b.addEventListener('click', ()=>{
     intakeSubStatus = b.dataset.intakestatus;
     $('#intakeSubtabs').querySelectorAll('button').forEach(x=>x.classList.toggle('active', x===b));
@@ -1461,6 +1517,10 @@ function wireApp(){
   $('#btnAddMinister').addEventListener('click', ()=>openMinisterModal());
   $('#btnMinCancel').addEventListener('click', ()=>$('#ministerModal').classList.remove('open'));
   $('#btnMinSave').addEventListener('click', ()=>withLoading($('#btnMinSave'), 'Saving…', onSaveMinister));
+  $('#minCreateAccount').addEventListener('change', toggleMinPasswordField);
+  $('#btnMinResetPassword').addEventListener('click', resetMinPassword);
+  $('#minName').addEventListener('input', suggestMinSignInEmail);
+  $('#minSignInEmail').addEventListener('input', ()=>{ $('#minSignInEmail').dataset.touched = '1'; });
   $('#btnAddWaiting').addEventListener('click', ()=>openModal(null, null, {forceKind:'waiting'}));
   $('#btnAddWaiting2').addEventListener('click', ()=>openModal(null, null, {forceKind:'waiting'}));
   $('#btnQuickAddSlots').addEventListener('click', ()=>openQuickAddModal());
@@ -3789,25 +3849,185 @@ window.editMinister = function(id){ openMinisterModal(ministers.find(m=>m.id===i
 window.deleteMinister = async function(id){
   const m = ministers.find(x=>x.id===id);
   if(!(await askConfirm(`Delete ${m?m.name:'this minister'} from the roster? This can't be undone.`))) return;
+  // Revoke portal access by removing them from the SharePoint group only -
+  // their Entra account (which may belong to a staff member who still
+  // needs it for other things) is never touched. If this fails, the
+  // roster deletion still proceeds rather than trapping the admin - they
+  // just get a clear warning to remove access by hand instead.
+  if(m && m.signInEmail){
+    try{
+      await removeMinisterFromEntraGroup(m.signInEmail);
+    }catch(e){
+      alert(`Deleted from the roster, but couldn't remove ${m.name} from the Prayer Ministers group: ${e.message}\n\nThey may still have portal access - remove them from that group by hand in Entra.`);
+    }
+  }
   await deleteItem('ministers', id);
   await loadAll();
 };
+// Turns a display name into a sign-in address under PORTAL_ACCOUNT_DOMAIN -
+// "Jane Q. Doe" -> "jane.doe@creeksidechurch.ca" (first word + last word,
+// a middle name is dropped from the address though it stays in the saved
+// display name). Purely a starting suggestion shown in an editable field -
+// the admin can hand-adjust it before saving if it collides with someone
+// already in the tenant; Graph's own error surfaces clearly if it does and
+// wasn't caught here.
+function generateSignInEmail(name){
+  const words = String(name||'').trim().split(/\s+/).filter(Boolean);
+  if(!words.length) return '';
+  const clean = w => w.toLowerCase().replace(/[^a-z0-9]/g,'');
+  const first = clean(words[0]);
+  const last = words.length>1 ? clean(words[words.length-1]) : '';
+  const local = [first,last].filter(Boolean).join('.');
+  return local ? `${local}@${PORTAL_ACCOUNT_DOMAIN}` : '';
+}
+// Creates the actual unlicensed Entra account - no product license is ever
+// assigned (that's a separate Graph call this never makes), which is what
+// keeps it a no-seat-cost account. forceChangePasswordNextSignIn is true:
+// Graph rejects an admin-set PATCH/POST password with it false (403
+// Authorization_RequestDenied) for the roles this tenant grants, matching
+// what the Entra portal's own "Reset password" does. The password is
+// always the shared, year-stamped default from defaultTempPassword() -
+// it's never the minister's real, ongoing password (see the helptext in
+// the modal), so there's nothing here worth persisting or masking.
+async function createMinisterAccount(displayName, upn, password){
+  const mailNickname = upn.split('@')[0];
+  return graphFetch('/users', {
+    method: 'POST',
+    body: JSON.stringify({
+      accountEnabled: true,
+      displayName,
+      mailNickname,
+      userPrincipalName: upn,
+      passwordProfile: { password, forceChangePasswordNextSignIn: true }
+    })
+  });
+}
+// Adds the minister's new account to ENTRA_MINISTERS_GROUP_ID, the Entra
+// security group that actually gates minister-portal access (the site's
+// SharePoint permissions are granted to this group, not to individuals) -
+// the Entra account alone doesn't grant that, group membership does. Plain
+// Graph delegated call, same token/pattern as everything else in this
+// file - no separate resource, no propagation-lag retry loop needed, which
+// is exactly why this replaced the original SharePoint-REST-API version
+// (see CLAUDE.md for that history).
+async function addMinisterToEntraGroup(upn){
+  return graphFetch(`/groups/${ENTRA_MINISTERS_GROUP_ID}/members/$ref`, {
+    method: 'POST',
+    body: JSON.stringify({ '@odata.id': `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(upn)}` })
+  });
+}
+// Removes a minister from the Entra group when they're deleted from the
+// roster - deliberately does NOT touch their Entra account at all (no
+// disable, no delete). One of the people on this list is a church employee
+// whose actual Microsoft 365 account must never be affected by a roster
+// change here; group membership is the only thing this app should ever
+// revoke. Graph's DELETE .../members/{id}/$ref needs the member's
+// directory object id, not their UPN, so this resolves that first.
+async function removeMinisterFromEntraGroup(upn){
+  const user = await graphFetch(`/users/${encodeURIComponent(upn)}?$select=id`);
+  return graphFetch(`/groups/${ENTRA_MINISTERS_GROUP_ID}/members/${user.id}/$ref`, { method: 'DELETE' });
+}
+// Resets the password on an EXISTING account, addressed by its current
+// sign-in email (Graph accepts a userPrincipalName in place of a user id).
+// Changing the Sign-In Email field itself on an existing minister does NOT
+// rename their Entra account - see the helptext in the modal.
+async function updateMinisterAccountPassword(upn, password){
+  return graphFetch(`/users/${encodeURIComponent(upn)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ passwordProfile: { password, forceChangePasswordNextSignIn: true } })
+  });
+}
+// A shared, memorable, year-stamped default rather than a per-minister
+// secret - deliberate, since it's always a one-time temporary password
+// Entra forces a real change on at first sign-in (see
+// updateMinisterAccountPassword above), so there's nothing sensitive to
+// protect by randomizing or masking it.
+function defaultTempPassword(){ return 'FPHM' + new Date().getFullYear() + '!'; }
 function openMinisterModal(m){
   editingMinisterId = m ? m.id : null;
+  const hasAccount = !!(m && m.signInEmail);
   $('#minModalTitle').textContent = m ? 'Edit Minister' : 'Add Minister';
   $('#minName').value = m ? m.name : ''; $('#minEmail').value = m ? m.email : '';
   $('#minPhone').value = m ? m.phone : ''; $('#minSignInEmail').value = m ? (m.signInEmail||'') : '';
   $('#minGender').value = m ? (m.gender||'') : '';
   $('#minStatus').value = m ? m.status : 'Active';
+  $('#minPassword').value = defaultTempPassword();
+  delete $('#minSignInEmail').dataset.touched;
+  // An existing account can only have its password changed here, not be
+  // (re)created - so the "also create" checkbox only makes sense for a
+  // brand-new minister, or an existing one who was saved without an
+  // account yet (SignInEmail still blank).
+  $('#minCreateAccountField').style.display = hasAccount ? 'none' : '';
+  $('#minCreateAccount').checked = !hasAccount;
+  $('#minPasswordLabel').textContent = 'Temporary Portal Password (for the new account)';
+  $('#minPasswordHelp').textContent = 'Give this to the minister to sign in with — Microsoft makes them pick their own new password the first time they use it, so this is never their real, ongoing password. Not sensitive enough to mask or store.';
+  // Editing an existing minister starts with the password field hidden and
+  // the Reset button shown instead - resetMinPassword() reveals the field
+  // (prefilled with this year's default) only once the admin actually asks
+  // for a reset, rather than showing an editable password on every open.
+  $('#minPasswordField').style.display = (!hasAccount && $('#minCreateAccount').checked) ? '' : 'none';
+  $('#minResetPasswordField').style.display = hasAccount ? '' : 'none';
+  delete $('#minPassword').dataset.resetPending;
+  $('#minAccountMsg').innerHTML = '';
   $('#minModalMsg').innerHTML = '';
   $('#ministerModal').classList.add('open');
   $('#minName').focus();
 }
+window.toggleMinPasswordField = function(){
+  const checked = $('#minCreateAccount').checked;
+  $('#minPasswordField').style.display = checked ? '' : 'none';
+};
+window.resetMinPassword = function(){
+  $('#minPassword').value = defaultTempPassword();
+  $('#minPassword').dataset.resetPending = 'true';
+  $('#minPasswordField').style.display = '';
+  $('#minResetPasswordField').style.display = 'none';
+};
+// Only suggests a Sign-In Email while adding a brand-new minister with the
+// account checkbox on - never overwrites a value that's already there for
+// an edit, and never fights a value the admin has already hand-typed.
+window.suggestMinSignInEmail = function(){
+  if(editingMinisterId || !$('#minCreateAccount').checked) return;
+  if($('#minSignInEmail').dataset.touched) return;
+  $('#minSignInEmail').value = generateSignInEmail($('#minName').value);
+};
 async function onSaveMinister(){
   const name = $('#minName').value.trim();
-  $('#minModalMsg').innerHTML = '';
-  if(!name){ $('#minModalMsg').innerHTML = '<div class="errbox" role="alert">Name is required.</div>'; return; }
-  const fields = { Title:name, Email:$('#minEmail').value.trim(), Phone:$('#minPhone').value.trim(), SignInEmail:$('#minSignInEmail').value.trim(), Gender:$('#minGender').value, Status:$('#minStatus').value };
+  const msg = $('#minModalMsg'); msg.innerHTML = '';
+  const acctMsg = $('#minAccountMsg'); acctMsg.innerHTML = '';
+  if(!name){ msg.innerHTML = '<div class="errbox" role="alert">Name is required.</div>'; return; }
+  const signInEmail = $('#minSignInEmail').value.trim();
+  const password = $('#minPassword').value;
+  const existing = editingMinisterId ? ministers.find(x=>x.id===editingMinisterId) : null;
+  const hasAccount = !!(existing && existing.signInEmail);
+  const wantsNewAccount = !hasAccount && $('#minCreateAccount').checked;
+  const wantsPasswordReset = hasAccount && $('#minPassword').dataset.resetPending === 'true';
+
+  if(wantsNewAccount){
+    if(!signInEmail){ msg.innerHTML = '<div class="errbox" role="alert">Sign-In Email is required to create their account.</div>'; return; }
+    if(!password || password.length<8){ msg.innerHTML = '<div class="errbox" role="alert">Portal Password must be at least 8 characters to create their account.</div>'; return; }
+    try{
+      await createMinisterAccount(name, signInEmail, password);
+    }catch(e){
+      acctMsg.innerHTML = `<div class="errbox" role="alert">Couldn't create their sign-in account: ${escapeHtml(e.message)}. The minister record below was NOT saved either — fix the issue (e.g. try a different Sign-In Email if it's already taken) and save again, or uncheck "Also create their sign-in account" to save just the roster entry.</div>`;
+      return;
+    }
+    try{
+      await addMinisterToEntraGroup(signInEmail);
+    }catch(e){
+      acctMsg.innerHTML = `<div class="errbox" role="alert">Their sign-in account was created, but adding them to the Prayer Ministers group failed: ${escapeHtml(e.message)}. The minister record below was NOT saved — the account now exists in Entra without portal access; add them to the group by hand in Entra, then save again (uncheck "Also create their sign-in account" first so it doesn't try to recreate the account).</div>`;
+      return;
+    }
+  } else if(wantsPasswordReset){
+    try{
+      await updateMinisterAccountPassword(existing.signInEmail, password);
+    }catch(e){
+      acctMsg.innerHTML = `<div class="errbox" role="alert">Couldn't reset their sign-in password: ${escapeHtml(e.message)}. Nothing below was saved — fix the issue and save again.</div>`;
+      return;
+    }
+  }
+
+  const fields = { Title:name, Email:$('#minEmail').value.trim(), Phone:$('#minPhone').value.trim(), SignInEmail:signInEmail, Gender:$('#minGender').value, Status:$('#minStatus').value };
   if(editingMinisterId) await updateItem('ministers', editingMinisterId, fields);
   else await createItem('ministers', fields);
   $('#ministerModal').classList.remove('open');
@@ -5047,6 +5267,165 @@ function generateReport(){
 
 /* Minister Overview date range defaults to year-to-date, set once at load
    (before the first render) so the very first paint already reflects it. */
+/* =========================================================================
+   CHANGES TAB — preview-only, never promoted to production (strip this
+   whole section, the panel-changes HTML block, and its nav button when
+   copying this file over to index.html). Maintained by hand: add one new
+   dated entry at the top of CHANGE_LOG on each preview publish, in plain
+   language a non-technical reviewer can act on - what to actually go
+   check, not a commit log.
+
+   CHANGE_LOG holds only what's live in preview but NOT YET in production.
+   As part of every promotion (preview -> production, gotcha #13), move
+   whichever entries just went live out of CHANGE_LOG and onto the TOP of
+   CHANGE_LOG_ARCHIVE instead of deleting them - that's the "Archive" tab's
+   history of what's already shipped. CHANGE_LOG itself should end up
+   empty right after a full promotion, since preview and production are
+   back in sync at that point.
+========================================================================= */
+const CHANGE_LOG = [
+];
+// Entries already live in production, newest first - moved here from
+// CHANGE_LOG at promotion time rather than deleted. See the block comment
+// above for the maintenance rule.
+const CHANGE_LOG_ARCHIVE = [
+  { date: 'Sep 27, 2026', version: '2026-09-27.10', items: [
+    'New: Add/Edit Minister can now create and manage their actual sign-in account, not just record the roster entry. Check "Also create their sign-in account" (on by default when adding someone new) and it creates their unlicensed Microsoft 365 account for you with this year\'s default temporary password. The password field always uses the same shared, year-stamped default (e.g. FPHM2026!) instead of a typed-in value - it\'s always temporary, so there\'s nothing sensitive to mask or save.',
+    'New: creating a minister\'s account now also adds them to the "Prayer Ministers" Entra group automatically, and deleting a minister removes them from it - the one manual step left after account creation is gone. Adding someone to the team is now just filling out the form. Their Entra sign-in account itself is never disabled or deleted by a roster change - useful if that minister is also a staff member whose actual Microsoft 365 account needs to stay untouched.'
+  ]},
+  { date: 'Sep 26, 2026', version: '2026-09-26.5', items: [
+    'Changed: on Reports, "Show minister breakdown" is now its own always-visible row directly under each year, instead of being hidden until you expand that year\'s months first - and it\'s now labeled with the year ("Show minister breakdown for 2026") so it\'s unambiguous which year it belongs to, especially with multiple years in the same report.'
+  ]},
+  { date: 'Sep 26, 2026', version: '2026-09-26.4', items: [
+    'Fixed: adding someone to the Waiting list who already has a record on file (a prior session, or even just a prior Waiting entry) now refills their Contact, Gender, and Team Preference too, not just their name - same as picking an existing recipient already did for a brand-new session.'
+  ]},
+  { date: 'Sep 26, 2026', version: '2026-09-26.3', items: [
+    'New: the Introduction and Liability Release text in "Edit Intake Questions" are now rich text - bold, italic, underline, and bulleted/numbered lists, with a small formatting toolbar, instead of plain text.',
+    'New: the public form\'s printed/PDF copy now shows the Liability Release wording the recipient agreed to, not just their answers.',
+    'Fixed: various navigation and layout polish on the public intake form - Back/Next now scroll to the top of the new screen, a visitor can delete their own form (in progress or submitted), and the "Other, please specify" box no longer overflows past the edge of the card.'
+  ]},
+  { date: 'Sep 26, 2026', version: '2026-09-26.2', items: [
+    'New: staff can now link an intake form directly to a specific recipient on their Booked or Waiting-list card ("Intake Forms" panel), instead of relying only on an automatic name match - handles a misspelled name or two recipients sharing a name.',
+    'New: the public intake form now warns and offers to resume when the same person (matched on name, email, and country of birth together) already has one in progress, instead of silently letting a second copy pile up from someone starting over on another device.',
+    'New: staff can delete an abandoned/duplicate in-progress intake form from the Intake Forms tab\'s In-progress list.',
+    'New: the intake form\'s progress bar and Back/Next buttons are now sticky at the top and bottom of the screen while scrolling through questions, and Next is disabled until every required question on the page is answered.'
+  ]},
+  { date: 'Sep 26, 2026', version: '2026-09-26.1', items: [
+    'New: "Edit Intake Questions" can now edit the Liability Release wording (title and body) shown on the public form\'s final signature screen, same as it already could for the intro screen text.',
+    'New: on the public form\'s signature step, a visitor can now type their name instead of drawing with a mouse or finger - it renders in a cursive script font on the same signature pad, so submissions still save the same way.'
+  ]},
+  { date: 'Sep 25, 2026', version: '2026-09-25.1', items: [
+    'WhatsApp booking notifications are now live (no longer dry-run) — the "Notify via WhatsApp" button on a session with a WhatsApp group created sends a real WhatsApp message to each assigned minister with a phone number on file.'
+  ]},
+  { date: 'Sep 24, 2026', version: '2026-09-25.1', items: [
+    'New: the public Intake Form is fully live - submissions really do save to SharePoint now, via a Cloudflare Worker (not the originally-planned Azure Function, switched after finding no Azure subscription was available and the team didn\'t want to open one).',
+    'New: "Edit Intake Questions" tab - add, remove, reorder and reword sections and questions, including the "show this only if" branching logic, without any code change or deploy. Saves to a new IntakeFormSchema SharePoint list; the public form and this app both pick up a saved change immediately.',
+    'Fixed: the "Freedom Intake" account needed a SharePoint Administrator role and a fresh Sites.Selected grant before the Worker could actually write to SharePoint - the original grant attempt had silently never taken effect.'
+  ]},
+  { date: 'Sep 24, 2026', version: '2026-09-24.11', items: [
+    'New: a public digital Intake Form (at /intake/) recipients fill out before their first session - 88 questions, save-and-resume via a link, signature pad.',
+    'New: a staff "Intake Forms" tab here to review submitted/in-progress forms, search, and print/PDF a recipient\'s answers.',
+    'New: the minister portal has a "View intake form" link on a recipient\'s session card, for ministers assigned to that recipient.',
+    'New: a "Notify via WhatsApp" button on a session with a WhatsApp group already created — sends each assigned minister a WhatsApp message with the session details and group link, via an external notification service. Currently running in dry-run mode (validates everything but doesn\'t actually send) until the WhatsApp message template is approved by Meta - flip WHATSAPP_NOTIFY.dryRun to false in the code once that happens. Requires a new "WaNotified" (Yes/No) column on PrayerSessions in SharePoint, not yet added.',
+    'Fixed: printing a Report no longer force-expands every year and minister breakdown - Print now just prints whatever is currently expanded on screen.',
+    'New: "Expand All Years" / "Collapse All Years" buttons on the Report page, both a global pair at the top and one pair per section (Freedom Sessions, Sunday Drop-In, Training). These only expand/collapse the year rows - any "Show minister breakdown" toggle stays exactly as it was.'
+  ]},
+  { date: 'Sep 24, 2026', version: '2026-09-24.10', items: [
+    'Fixed: on Reports, the year/minister tables spilled off the right edge of the card on phone-sized screens instead of staying contained. Each table now scrolls horizontally within its own card instead of overflowing past it, and a proper mobile viewport tag was added so phones render the page at actual screen width instead of a zoomed-out desktop layout.'
+  ]},
+  { date: 'Sep 24, 2026', version: '2026-09-24.9', items: [
+    'Changed: the year-level monthly breakdown on Reports now shows in the same table as the year row, one row per month with every column (Sessions, Unique Recipients, First-time, Follow-up) filled in - not a separate mini-table off to the side.',
+    'New: on Reports, click any year to expand its monthly numbers (through the current month, even if it\'s still partial) plus that year\'s own minister breakdown toggle, grouped together right below it - not one breakdown merged across every year.',
+    'New: the minister breakdown - still its own table, now restyled to match the year table\'s look - shows Hours and As Lead alongside Sessions, and each minister can be expanded to see their own month-by-month sessions, as-lead count, and hours for that year.',
+    'New: the year and month rows on Reports now show an Hours column too (total session hours for that year/month, not per-minister).',
+    'New: for Freedom Sessions, the minister breakdown (and each minister\'s own monthly drill-down) now shows Unique Recipients/First-time/Follow-up too, the same stats the year/month rows show - still alongside As Lead and Hours, not replacing them.',
+    'Changed: removed the shaded Running Total column from Reports. When the picked date range spans more than one year, a Total row now appears at the bottom of each table instead, with its own Sessions/recipient-split/Hours figures for the whole range.',
+    'Changed: the "Last 3 Years" quick-range button on Reports is now "Last Year + This Year" - Jan 1 of last year through today, so it covers all of last year plus this year to date in one range instead of the prior 3 full calendar years.'
+  ]},
+  { date: 'Sep 21, 2026', version: '2026-09-21.3', items: [
+    'Changed: Reports now matches the actual spec - one Generate shows Freedom Sessions, Sunday Drop-In, and Training as three separate sections (not picked one at a time), each a year-by-year table with a shaded Running Total column instead of the previous summary tiles and chart. The minister breakdown now tags anyone no longer active. Date presets changed to This Year, Last Year, Last 3 Years, and All Time.'
+  ]},
+  { date: 'Sep 21, 2026', version: '2026-09-21.2', items: [
+    'New: Session, Training, and Drop-in Statistics are real reports now, not placeholders - session counts, a first-time vs. follow-up split (Freedom Sessions only), a month-by-month chart, and a minister breakdown you can expand. Print now force-expands the minister breakdown first, so it actually shows up on the printed page.'
+  ]},
+  { date: 'Sep 21, 2026', version: '2026-09-21.1', items: [
+    'New: the Reports tab has quick date-range buttons (Year to Date, Last Year, This Month, Last Month, Last 90 Days) so common ranges don\'t need typing.'
+  ]},
+  { date: 'Sep 20, 2026', version: '2026-09-20.12', items: [
+    'New: session cards on Schedule & Planning now show the "Session #N" chip (first-time vs follow-up) next to the recipient\'s name, same as Completed Sessions already had.'
+  ]},
+  { date: 'Sep 20, 2026', version: '2026-09-20.11', items: [
+    'Changed: on phones, the Unplaced Candidates buttons (Contacted, Flag Priority, Edit, Delete) now show text next to the icon, same as the booked-session buttons already did.'
+  ]},
+  { date: 'Sep 20, 2026', version: '2026-09-20.10', items: [
+    'Changed: renamed the "Default Location" tab in Settings to "Sessions".'
+  ]},
+  { date: 'Sep 20, 2026', version: '2026-09-20.9', items: [
+    'Changed: in Settings, Quick Slots now shows Default Days and Sunday Drop-In as two separate cards, so it\'s clear they\'re related but independent settings.'
+  ]},
+  { date: 'Sep 20, 2026', version: '2026-09-20.8', items: [
+    'Fixed: card, row, and field borders were nearly invisible against their backgrounds - darkened to a warm tan that actually shows up while still fitting the palette. Same fix applied to the minister portal.'
+  ]},
+  { date: 'Sep 20, 2026', version: '2026-09-20.7', items: [
+    'Fixed: a few low-contrast text colors (the header title, the version number under it, and muted helper text throughout) were hard to read against their backgrounds - darkened them to pass accessibility contrast guidelines. Same fix applied to the minister portal.'
+  ]},
+  { date: 'Sep 20, 2026', version: '2026-09-20.6', items: [
+    'Reverted: Start/End time fields are back to the phone/computer\'s own native time picker (like Sunday Drop-In always had), not the dropdown-of-times style from the last update. Note this can show 24-hour time again on a device set that way - that tradeoff was a deliberate choice, not a bug.'
+  ]},
+  { date: 'Sep 20, 2026', version: '2026-09-20.5', items: [
+    'Changed: every Start/End time field (session times, Quick Slots, Sunday Drop-In, "+ Add custom slot") is now one dropdown of times like "6:30 PM" - always AM/PM, same style everywhere, instead of the browser\'s own time picker.'
+  ]},
+  { date: 'Sep 20, 2026', version: '2026-09-20.4', items: [
+    'Changed: "Default Location for New Sessions" moved out of Quick Slots into its own tab in Settings.'
+  ]},
+  { date: 'Sep 20, 2026', version: '2026-09-20.3', items: [
+    'Fixed: the Start/End time pickers on the "+ Add custom slot" form now always show AM/PM (e.g. "6:30 PM") instead of sometimes showing 24-hour time.'
+  ]},
+  { date: 'Sep 20, 2026', version: '2026-09-20.2', items: [
+    'New: the Changes tab now has a Recent/Archive switch, so past entries that already made it to production have somewhere to go instead of just being deleted.'
+  ]},
+  { date: 'Sep 20, 2026', version: '2026-09-20.1', items: [
+    'Fixed: times now always show as "6:00 PM" style (AM/PM), even on a phone or computer set to 24-hour time. Applies everywhere in both the admin app and the minister portal.'
+  ]},
+  { date: 'Sep 19, 2026', version: '2026-09-19.13', items: [
+    'New: a Settings tab (admin-only) with a "Quick Slots" section - the days and times the "+ Quick Add Slots" button offers for a Freedom Session are now editable there instead of fixed to Tuesday/Sunday.',
+    'New: also in Settings - the Sunday Drop-In defaults and the default location for new sessions are now editable, no code changes needed anymore.',
+    'New: Locations can now be added or deleted from Settings - a deleted location still shows correctly on any session that already used it.',
+    'New: "+ Add custom slot" on the Schedule & Planning tab can now create a Drop-In slot or a Training session, not just a regular one.'
+  ]},
+  { date: 'Sep 19, 2026', version: '2026-09-19.11', items: [
+    'New: tap the calendar icon on a booked session to add it to your phone’s calendar app - includes the room and the prayer team.',
+    'New: a Reports tab (placeholder for now - date range and report picker work, the real reports come later).',
+    'Fixed: deleting a booked session now puts the person back on the waiting list instead of removing them completely.'
+  ]}
+];
+let changesSubView = 'recent';
+function switchChangesSub(view){
+  changesSubView = view;
+  $('#changesSubtabs').querySelectorAll('button[data-changesview]').forEach(b=>b.classList.toggle('active', b.dataset.changesview===view));
+  $('#changesHelptext').textContent = view==='archive'
+    ? 'Already live in production — kept here for reference. Newest first.'
+    : "What's new in this preview build — check these specifically before anything else. Newest first.";
+  renderChangeLog();
+}
+function renderChangeLog(){
+  const box = $('#changeLog');
+  if(!box) return;
+  const list = changesSubView==='archive' ? CHANGE_LOG_ARCHIVE : CHANGE_LOG;
+  if(!list.length){
+    box.innerHTML = `<div class="no-results">${changesSubView==='archive' ? 'Nothing archived yet.' : 'Nothing new since the last production push.'}</div>`;
+    return;
+  }
+  box.innerHTML = list.map(entry => `
+    <div style="margin-bottom:22px;">
+      <div style="font-weight:700;color:var(--gold);font-size:var(--fs-sm);margin-bottom:8px;">${escapeHtml(entry.date)}${entry.version ? ' · v'+escapeHtml(entry.version) : ''}</div>
+      <ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;">
+        ${entry.items.map(i=>`<li>${i}</li>`).join('')}
+      </ul>
+    </div>`).join('');
+}
+renderChangeLog();
+
 (function setDefaultStatsRange(){
   const now = new Date();
   $('#statsFrom').value = isoDate(new Date(now.getFullYear(),0,1));

@@ -393,7 +393,7 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
   minister), a sort toggle cycling Next Appointment ⇄ A→Z, per-minister
   upcoming sessions, activate/deactivate/edit/delete actions per minister
   - **Add/Edit Minister can create and manage the actual sign-in account**
-    (added 2026-09-27, `preview/index.html` only, live end-to-end same day):
+    (added 2026-09-27, promoted to production the same day):
     previously, creating a minister's unlicensed Entra account was entirely
     a manual step in the Microsoft 365 admin center (still documented under
     "Minister portal" below) — this makes the app itself do it via Graph,
@@ -709,7 +709,7 @@ M365 seat cost) so they can sign in for real.
   a minister's Entra account.
 - **Creating the actual Entra account, adding it to the "Prayer Ministers"
   Entra group, and resetting an existing account's password are all
-  automatable from Add/Edit Minister** (`preview/index.html` only, added
+  automatable from Add/Edit Minister** (added and promoted to production
   2026-09-27 — see "Add/Edit Minister can create and manage the actual
   sign-in account" under "Features implemented" above), for whichever
   admin's own signed-in account holds a role that can manage users AND
