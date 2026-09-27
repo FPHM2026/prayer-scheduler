@@ -48,23 +48,28 @@ of completed forms built into this same app; see "Intake Forms" below.
 ## Deployment workflow (preview → production)
 For anything bigger than a trivial/safe fix, build and test in
 `preview/index.html` first, never `index.html` directly:
-1. Edit `preview/index.html`. It carries blocks production doesn't have —
-   a `#previewModeBanner` (HTML near the top of `<body>`, CSS a few lines
-   above it), and a **Changes tab** (`panel-changes`, its nav button, the
-   `CHANGE_LOG`/`CHANGE_LOG_ARCHIVE` arrays + `renderChangeLog()`) — strip
-   all of this back out if copying preview's content wholesale into
-   production. The Changes tab is the first tab and the default-active one
-   specifically so a non-technical reviewer's first click lands on "what
-   changed," not buried after everything else — add one new dated entry to
-   `CHANGE_LOG` (newest at the top) on every preview publish, written in
-   plain language describing what to actually go check, not a commit log.
-   The tab has a Recent/Archive switch: `CHANGE_LOG` is "Recent" (only what's
-   live in preview but not yet in production); `CHANGE_LOG_ARCHIVE` is
-   "Archive" (already shipped, kept for reference). As step 6 below
-   promotes entries to production, move those same `CHANGE_LOG` entries
-   onto the *top* of `CHANGE_LOG_ARCHIVE` instead of deleting them —
-   `CHANGE_LOG` should end up empty right after a full promotion, since
-   preview and production are back in sync at that point.
+1. Edit `preview/index.html`. It carries one block production doesn't have
+   — a `#previewModeBanner` (HTML near the top of `<body>`, CSS a few lines
+   above it) — strip that back out if copying preview's content wholesale
+   into production. The **Changes tab** (`panel-changes`, its nav button,
+   the `CHANGE_LOG`/`CHANGE_LOG_ARCHIVE` arrays + `renderChangeLog()`) is
+   NOT preview-only, unlike the banner: it originally was meant to be
+   stripped at promotion too, but that step got missed on the 2026-09-27
+   promotion, and the user decided to just keep it in production rather
+   than have it stripped back out — so as of that date it ships in both,
+   unconditionally, moved to the *end* of the tab list in both (it was
+   previously first and default-active specifically so a reviewer's first
+   click landed on "what changed" — no longer the case now that it's
+   permanent in both builds). Still add one new dated entry to `CHANGE_LOG`
+   (newest at the top) on every preview publish, written in plain language
+   describing what to actually go check, not a commit log. The tab has a
+   Recent/Archive switch: `CHANGE_LOG` is "Recent" (only what's live in
+   preview but not yet in production); `CHANGE_LOG_ARCHIVE` is "Archive"
+   (already shipped, kept for reference). As step 6 below promotes entries
+   to production, move those same `CHANGE_LOG` entries onto the *top* of
+   `CHANGE_LOG_ARCHIVE` instead of deleting them — `CHANGE_LOG` should end
+   up empty right after a full promotion, since preview and production are
+   back in sync at that point.
 2. Bump `const APP_VERSION = "..."` in preview/index.html (date + counter,
    e.g. `"2026-09-15.1"`). Two independent checks read this: each page polls
    its own deployed copy's APP_VERSION and prompts a reload if what's loaded
@@ -1178,27 +1183,21 @@ existing session history.
     production's minister sign-in redirect one level too high. Also strip
     the `#previewModeBanner` CSS/markup block AND the comment that explains
     it (the comment sits just above the CSS rule it describes, easy to
-    leave orphaned if only the rule itself gets removed), and the entire
-    **Changes tab** (`panel-changes` section, its nav button, `CHANGE_LOG`/
-    `renderChangeLog()`) — production never had any of these. Check all of
-    it by hand after every promotion; nothing catches this automatically.
-    **Hit for real on 2026-09-24/25**: stripping the Changes tab's HTML and
-    the `CHANGE_LOG`/`renderChangeLog()` block is not the whole surface —
-    `wireApp()` (way up near the top of the script, nowhere near either of
-    those) also has its own line binding the Recent/Archive subtabs:
-    `$('#changesSubtabs').querySelectorAll('button[data-changesview]')
-    .forEach(...)`. Left in place after `#changesSubtabs` itself is gone,
-    `$('#changesSubtabs')` returns `null` and `.querySelectorAll` on it
-    throws `TypeError: Cannot read properties of null (reading
-    'querySelectorAll')` — caught by `afterSignIn()`'s try/catch and shown
-    to every signed-in user as "Could not load data: ... Check the
-    SharePoint site URL in setup..." which reads exactly like a real Graph/
-    permissions failure and sent troubleshooting in the wrong direction
-    entirely. **After every promotion, grep production `index.html` for
-    "changes" case-insensitively** (`changesSubtabs`, `changesSubView`,
-    `changesHelptext`, `switchChangesSub`, `data-changesview`) and confirm
-    zero hits — that catches this line and anything else like it in one
-    pass, rather than hoping the manual strip got everything.
+    leave orphaned if only the rule itself gets removed) — production never
+    had this one. Check it by hand after every promotion; nothing catches
+    this automatically.
+    **Historical note, no longer applicable as of 2026-09-27**: this gotcha
+    used to also cover stripping the **Changes tab** (`panel-changes`
+    section, its nav button, `CHANGE_LOG`/`renderChangeLog()`,
+    `wireApp()`'s `$('#changesSubtabs')` binding) out of every promotion —
+    missing any one piece of that surface threw `TypeError: Cannot read
+    properties of null (reading 'querySelectorAll')`, caught by
+    `afterSignIn()`'s try/catch and shown to every signed-in user as a
+    misleading "Could not load data... Check the SharePoint site URL"
+    error. That whole strip step is now **moot**: the Changes tab ships in
+    both preview and production unconditionally as of the 2026-09-27
+    promotion (see step 1 of the promotion process above) — there is
+    nothing left to strip or grep for on this front.
     **Hit again on 2026-09-26/27, different bug, same root cause**:
     `preview/index.html` lives one folder deeper than the repo root, so
     every path it references to something also at the repo root has to

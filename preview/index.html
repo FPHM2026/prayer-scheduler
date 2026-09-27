@@ -543,22 +543,24 @@
        merged Schedule & Planning tab (panel-schedplan) replaces both, per
        the "no duplicated functionality" decision. Re-add these two buttons
        plus data-tab="schedule"/"planning" here to fall back if needed. -->
-  <!-- Preview-only tab - never promote this one to production. Kept first
-       so a reviewer's very first click lands on "what changed", not
-       buried after everything else. -->
-  <button data-tab="changes" class="active" aria-current="page">Changes</button>
-  <button data-tab="schedplan">Schedule &amp; Planning</button>
+  <button data-tab="schedplan" class="active" aria-current="page">Schedule &amp; Planning</button>
   <button data-tab="completed">Completed Sessions</button>
   <button data-tab="overview">Prayer Ministers</button>
   <button data-tab="blackouts">Blackout Dates</button>
   <button data-tab="intake">Intake Forms</button>
   <button data-tab="reports">Reports</button>
   <button data-tab="settings">Settings</button>
+  <!-- Moved to the end of the tab list 2026-09-27, at the user's request -
+       previously kept first (and the default-active tab) specifically so
+       a reviewer's first click landed on "what changed." Now appears in
+       both preview and production (see the promotion this same day), so
+       being first-and-default no longer made sense for regular use. -->
+  <button data-tab="changes">Changes</button>
 </nav>
 <main>
 <div id="loadError"></div>
 
-  <section class="panel active" id="panel-changes">
+  <section class="panel" id="panel-changes">
     <p class="helptext" id="changesHelptext">What's new in this preview build — check these specifically before anything else. Newest first.</p>
     <nav class="subtabs" aria-label="Changes view" id="changesSubtabs">
       <button class="active" data-changesview="recent">Recent</button>
@@ -567,7 +569,7 @@
     <div id="changeLog"></div>
   </section>
 
-  <section class="panel" id="panel-schedplan">
+  <section class="panel active" id="panel-schedplan">
     <p class="helptext">Every state lives here — open slots to fill, tentative claims to review, and booked sessions to look back on.</p>
     <div class="stats-collapse" id="schedPlanStatsCollapse">
       <button class="stats-toggle" onclick="toggleStatsCollapse(this)" aria-expanded="true">
@@ -5281,9 +5283,13 @@ function generateReport(){
 /* Minister Overview date range defaults to year-to-date, set once at load
    (before the first render) so the very first paint already reflects it. */
 /* =========================================================================
-   CHANGES TAB — preview-only, never promoted to production (strip this
-   whole section, the panel-changes HTML block, and its nav button when
-   copying this file over to index.html). Maintained by hand: add one new
+   CHANGES TAB — originally preview-only, meant to be stripped out on every
+   promotion; that step got missed on the 2026-09-27 promotion, and once
+   live in production the user decided to just keep it there (moved to the
+   END of the tab list in production too, rather than being first/default)
+   instead of having it stripped back out. So as of 2026-09-27: this tab
+   ships in BOTH preview and production, unconditionally, and no longer
+   needs stripping at promotion time. Still maintained by hand: add one new
    dated entry at the top of CHANGE_LOG on each preview publish, in plain
    language a non-technical reviewer can act on - what to actually go
    check, not a commit log.
