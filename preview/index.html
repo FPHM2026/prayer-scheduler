@@ -956,7 +956,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-27.11";
+const APP_VERSION = "2026-09-27.12";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1282,10 +1282,12 @@ async function loadAll(){
     const stripHtml = v => String(v||'').replace(/<[^>]*>/g, '');
     const allIds = stripHtml(s.AssignedMinisterIDs).split(',').map(x=>x.trim()).filter(Boolean);
     const leadIds = new Set(stripHtml(s.LeadMinisterIDs).split(',').map(x=>x.trim()).filter(Boolean));
-    // Which assigned ministers have confirmed they're actually coming -
-    // set by the minister themselves from their own portal card
-    // (toggleMyConfirmation() there), never edited directly here.
+    // Which assigned ministers have confirmed or declined they're actually
+    // coming - mutually exclusive, set by the minister themselves from
+    // their own portal card (setMyAttendance() there), never edited
+    // directly here.
     const confirmedIds = new Set(stripHtml(s.ConfirmedMinisterIDs).split(',').map(x=>x.trim()).filter(Boolean));
+    const declinedIds = new Set(stripHtml(s.DeclinedMinisterIDs).split(',').map(x=>x.trim()).filter(Boolean));
     return {
       id: s.id,
       recipName: s.RecipientName||'', recipContact: s.RecipientContact||'',
@@ -1301,7 +1303,7 @@ async function loadAll(){
       // existing session already shows.
       locationRawName: s.LocationName||'',
       notes: s.Notes||'',
-      ministers: allIds.map(id=>({ id: parseInt(id,10), role: leadIds.has(id) ? 'Lead' : 'Support', confirmed: confirmedIds.has(id) }))
+      ministers: allIds.map(id=>({ id: parseInt(id,10), role: leadIds.has(id) ? 'Lead' : 'Support', confirmed: confirmedIds.has(id), declined: declinedIds.has(id) }))
         .filter(m=>!isNaN(m.id) && ministers.some(x=>x.id===m.id)),
       apptType: s.ApptType||'First', status: s.Status||'Scheduled',
       prevId: s.PreviousSessionId||null,
@@ -1372,14 +1374,16 @@ function isoDate(d){ return d.toISOString().slice(0,10); }
 function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function initials(name){ return String(name||'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join(''); }
 function ministerIdsOf(s){ return s.ministers.map(m=>m.id); }
-// The trailing ✓ marks a minister who confirmed they're actually coming
-// (from their own portal card) - plain text on purpose, since every caller
-// wraps this in escapeHtml() rather than rendering it as HTML.
+// A trailing ✓ marks a minister who confirmed they're coming, ✗ marks one
+// who declined (mutually exclusive, both set from their own portal card) -
+// plain text on purpose, since every caller wraps this in escapeHtml()
+// rather than rendering it as HTML.
 function ministerNamesOf(s){
   const sorted = [...s.ministers].sort((a,b)=> (a.role==='Lead'?0:1) - (b.role==='Lead'?0:1));
   return sorted.map(m=>{
     const min = ministers.find(x=>x.id===m.id);
-    return (min?min.name:'?') + (m.role==='Lead' ? ' (Lead)' : '') + (m.confirmed ? ' ✓' : '');
+    const mark = m.confirmed ? ' ✓' : (m.declined ? ' ✗' : '');
+    return (min?min.name:'?') + (m.role==='Lead' ? ' (Lead)' : '') + mark;
   }).join(', ');
 }
 function locationName(id){ const l = locations.find(x=>x.id===id); return l?l.name:''; }
@@ -5310,6 +5314,10 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Sep 27, 2026', version: APP_VERSION, items: [
+    'New: Ministers can now also decline a session ("I can\'t make it"), not just confirm it - shows a red ✗ next to their name (portal and Scheduler) the same way confirming shows a green ✓. Confirming and declining are mutually exclusive and both fully reversible - tap the same button again to undo.',
+    'Setup needed before this works: a new "DeclinedMinisterIDs" column (Single line of text, Plain text) needs to be added to the PrayerSessions SharePoint list by hand, same as ConfirmedMinisterIDs. See CLAUDE.md for the exact spec.'
+  ]}
 ];
 // Entries already live in production, newest first - moved here from
 // CHANGE_LOG at promotion time rather than deleted. See the block comment

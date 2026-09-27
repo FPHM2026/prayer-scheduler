@@ -158,13 +158,15 @@ scheduler's own code.
   IntakeResponses item, overriding the plain name-match
   `findIntakeForRecipient()` otherwise falls back to. See "Intake form
   linking" under "Intake Forms" below.
-  **ConfirmedMinisterIDs (Single line of text, Plain text — MUST be added to
-  SharePoint by hand, not created automatically; added 2026-09-27)** —
-  comma-separated subset of AssignedMinisterIDs who've confirmed from their
-  own portal card that they're actually coming, same shape as
-  LeadMinisterIDs. Only ever written by `toggleMyConfirmation()` in
-  `portal/index.html` — the signed-in minister confirming/un-confirming
-  their own attendance, never anyone else's. See "Minister attendance
+  **ConfirmedMinisterIDs and DeclinedMinisterIDs (both Single line of text,
+  Plain text — MUST be added to SharePoint by hand, not created
+  automatically; ConfirmedMinisterIDs added 2026-09-27, DeclinedMinisterIDs
+  added the same day right after)** — mutually exclusive comma-separated
+  subsets of AssignedMinisterIDs: who's confirmed, and who's declined, from
+  their own portal card, that they're actually coming — same shape as
+  LeadMinisterIDs. Both only ever written by `setMyAttendance()` in
+  `portal/index.html` — the signed-in minister setting/clearing their own
+  attendance response, never anyone else's. See "Minister attendance
   confirmation" under "Features implemented" below.
 - **BlackoutDates**: Title (minister name), BlackoutDate (Date), **EndDate
   (Date, optional)** — blank/null means a single-day blackout; set means an
@@ -515,33 +517,39 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
       Active/Inactive toggle elsewhere on this tab, which does not touch
       group membership at all — only an actual roster **deletion** revokes
       portal access today.
-- **Minister attendance confirmation** (added and promoted to production
-  2026-09-27, `portal/index.html` + `preview/index.html`/`index.html` —
-  see `ConfirmedMinisterIDs` in the schema section above): a Scheduled
-  session's card on a minister's own portal
-  schedule shows a bright orange primary "I'm coming to this session"
-  button (`.btn`, matching the design system's primary-action color) when
-  they haven't confirmed yet, or a secondary "✓ You're confirmed — tap to
-  undo" button once they have — `toggleMyConfirmation()` reversible by
-  explicit request (plans change), never a one-way action. Only ever writes
-  the *signed-in* minister's own id into `ConfirmedMinisterIDs`; the button
-  only renders at all when the session is actually assigned to them
-  (`s.ministers.find(m=>m.id===me.id)`).
+- **Minister attendance confirmation/decline** (added and promoted to
+  production 2026-09-27, `portal/index.html` + `preview/index.html`/
+  `index.html` — see `ConfirmedMinisterIDs`/`DeclinedMinisterIDs` in the
+  schema section above): a Scheduled session's card on a minister's own
+  portal schedule shows a bright orange primary "I'm coming to this
+  session" button and a secondary "I can't make it" button (`.btn`
+  matching the design system's primary-action color) when they haven't
+  responded yet. Once they pick one, that button becomes its own
+  undo-labeled state — "✓ You're confirmed — tap to undo" (secondary) or
+  "✗ You declined — tap to undo" (`.btn.danger`) — and the other option
+  disappears; `setMyAttendance(sessionId, 'confirmed'|'declined')` fully
+  reversible either way, per explicit request (plans change, in either
+  direction). Confirmed and declined are mutually exclusive — setting one
+  always clears the other — and only ever write the *signed-in* minister's
+  own id; the buttons only render at all when the session is actually
+  assigned to them (`s.ministers.find(m=>m.id===me.id)`). Decline
+  (`DeclinedMinisterIDs`) was added as a follow-up the same day, right
+  after confirm shipped, at the user's request.
   `ministerNamesOf()` — shared logic duplicated in `portal/index.html` and
   `preview/index.html`, same as everywhere else minister names get
-  rendered — appends a plain-text ` ✓` after a confirmed minister's name.
-  Deliberately plain text, not an HTML/SVG icon: every caller wraps the
-  result in `escapeHtml()`. This makes a confirmed minister's checkmark
-  visible in three places at once: their own portal card, their
-  co-assigned minister(s)' portal cards (so a team can see who else is
-  actually coming, at the user's explicit request), and every session
-  listing in the admin Scheduler. **Also requires ministers to have
-  Contribute access to PrayerSessions** (upgraded from Read — a manual
-  SharePoint permission change, confirmed live 2026-09-27 after the write
-  initially failed 403 with only Read access; same category as the
+  rendered — appends a plain-text ` ✓` after a confirmed minister's name,
+  or ` ✗` after a declined one. Deliberately plain text, not an HTML/SVG
+  icon: every caller wraps the result in `escapeHtml()`. This makes a
+  minister's response visible in three places at once: their own portal
+  card, their co-assigned minister(s)' portal cards (so a team can see who
+  else is actually coming, at the user's explicit request), and every
+  session listing in the admin Scheduler. **Also requires ministers to
+  have Contribute access to PrayerSessions** (upgraded from Read — a
+  manual SharePoint permission change, confirmed live 2026-09-27 after the
+  write initially failed 403 with only Read access; same category as the
   Contribute access ministers already have on BlackoutDates). Promoted to
-  production `index.html` the same day, after live verification with both
-  the new column and the permission change in place.
+  production `index.html` the same day, after live verification with the
+  new column(s) and the permission change in place.
 - Blackout Dates tab: grouped by minister, soonest first, Add/Edit modal with
   a single-date/date-range toggle (writes BlackoutDate + EndDate), edit/delete
   per entry
