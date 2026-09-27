@@ -860,6 +860,21 @@
     <div class="field"><label for="minEmail">Email</label><input id="minEmail" type="email"></div>
     <div class="field"><label for="minPhone">Phone</label><input id="minPhone" type="tel"></div>
     <div class="field"><label for="minSignInEmail">Sign-In Email (for minister portal)</label><input id="minSignInEmail" type="email" placeholder="Their unlicensed Microsoft 365 sign-in address"><p class="helptext" style="margin:5px 0 0;">Not a real inbox — this is the account they sign into the portal with, separate from their contact Email above.</p></div>
+    <div class="field" id="minCreateAccountField">
+      <label style="display:flex;align-items:center;gap:8px;font-weight:700;">
+        <input type="checkbox" id="minCreateAccount" checked style="width:auto;min-height:auto;"> Also create their sign-in account
+      </label>
+      <p class="helptext" style="margin:5px 0 0;">Creates an unlicensed Microsoft 365 account at the Sign-In Email above — no seat cost, just enough to sign into the portal. Requires your own account to have the User Administrator role in Entra.</p>
+    </div>
+    <div class="field" id="minPasswordField">
+      <label for="minPassword" id="minPasswordLabel">Portal Password</label>
+      <div style="position:relative;">
+        <input id="minPassword" type="password" autocomplete="new-password" style="padding-right:44px;">
+        <button type="button" id="btnToggleMinPassword" aria-label="Show password" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;padding:6px;cursor:pointer;color:var(--muted);display:flex;"></button>
+      </div>
+      <p class="helptext" id="minPasswordHelp" style="margin:5px 0 0;">At least 8 characters. Stored here so you can look it up or change it later — share it with the minister directly.</p>
+    </div>
+    <div id="minAccountMsg"></div>
     <div class="field"><label for="minGender">Gender</label><select id="minGender"><option value="">— Not set —</option><option>Female</option><option>Male</option></select><p class="helptext" style="margin:5px 0 0;">Used by the same-sex preference match on the Schedule &amp; Planning tab.</p></div>
     <div class="field"><label for="minStatus">Status</label><select id="minStatus"><option>Active</option><option>Inactive</option></select></div>
     <div class="modal-actions">
@@ -938,7 +953,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-26.5";
+const APP_VERSION = "2026-09-27.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -952,8 +967,17 @@ const MSAL_CONFIG = {
   },
   cache: { cacheLocation: "sessionStorage" }
 };
-const GRAPH_SCOPES = ["Sites.ReadWrite.All", "User.Read"];
+// User.ReadWrite.All (delegated) is needed to create/update the unlicensed
+// Entra accounts the Add/Edit Minister form can now create - see
+// createMinisterAccount()/updateMinisterAccountPassword() below. Only works
+// for a signed-in admin who actually holds a role that can manage users
+// (User Administrator or similar) - a signed-in account without it gets a
+// normal Graph 403, surfaced in the modal, not a silent failure.
+const GRAPH_SCOPES = ["Sites.ReadWrite.All", "User.Read", "User.ReadWrite.All"];
 const SITE_URL = "https://creeksidechurch.sharepoint.com/sites/FreedomPrayer";
+// Domain new minister sign-in accounts are created under - see
+// generateSignInEmail() below.
+const PORTAL_ACCOUNT_DOMAIN = "creeksidechurch.ca";
 
 // WhatsApp booking notifications — calls the fphm-whatsapp-notify Cloudflare
 // Worker, which holds the real Meta WhatsApp credentials server-side. This
@@ -1200,7 +1224,7 @@ async function loadAll(){
       signatureDataUrl: i.SignatureDataUrl||'', responses
     };
   });
-  ministers = rawMin.map(m => ({ id: m.id, name: m.Title, email: m.Email||'', phone: m.Phone||'', signInEmail: m.SignInEmail||'', status: m.Status||'Active', gender: m.Gender||'' }));
+  ministers = rawMin.map(m => ({ id: m.id, name: m.Title, email: m.Email||'', phone: m.Phone||'', signInEmail: m.SignInEmail||'', status: m.Status||'Active', gender: m.Gender||'', portalPassword: m.PortalPassword||'' }));
   locations = rawLoc.map(l => ({ id: l.id, name: l.Title }));
   timeWindows = rawTW.map(t => ({
     id: t.id, title: t.Title||'', kind: t.Kind||'',
@@ -1314,7 +1338,9 @@ const ICONS = {
   flag: (filled) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="${filled?'currentColor':'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22V4a1 1 0 0 1 1-1h13.5a.5.5 0 0 1 .4.8l-3.6 4.7 3.6 4.7a.5.5 0 0 1-.4.8H5"/></svg>`,
   calendarPlus: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 14v6M9 17h6"/></svg>',
   power: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>',
-  phone: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>'
+  phone: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>',
+  eye: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
+  eyeOff: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.6 18.6 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
 };
 function fmtDate(d){ return d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'}); }
 function fmtTime(d){ return d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit',hour12:true}); }
@@ -1488,6 +1514,10 @@ function wireApp(){
   $('#btnAddMinister').addEventListener('click', ()=>openMinisterModal());
   $('#btnMinCancel').addEventListener('click', ()=>$('#ministerModal').classList.remove('open'));
   $('#btnMinSave').addEventListener('click', ()=>withLoading($('#btnMinSave'), 'Saving…', onSaveMinister));
+  $('#minCreateAccount').addEventListener('change', toggleMinPasswordField);
+  $('#btnToggleMinPassword').addEventListener('click', toggleMinPasswordVisibility);
+  $('#minName').addEventListener('input', suggestMinSignInEmail);
+  $('#minSignInEmail').addEventListener('input', ()=>{ $('#minSignInEmail').dataset.touched = '1'; });
   $('#btnAddWaiting').addEventListener('click', ()=>openModal(null, null, {forceKind:'waiting'}));
   $('#btnAddWaiting2').addEventListener('click', ()=>openModal(null, null, {forceKind:'waiting'}));
   $('#btnQuickAddSlots').addEventListener('click', ()=>openQuickAddModal());
@@ -3819,22 +3849,129 @@ window.deleteMinister = async function(id){
   await deleteItem('ministers', id);
   await loadAll();
 };
+// Turns a display name into a sign-in address under PORTAL_ACCOUNT_DOMAIN -
+// "Jane Q. Doe" -> "jane.doe@creeksidechurch.ca" (first word + last word,
+// a middle name is dropped from the address though it stays in the saved
+// display name). Purely a starting suggestion shown in an editable field -
+// the admin can hand-adjust it before saving if it collides with someone
+// already in the tenant; Graph's own error surfaces clearly if it does and
+// wasn't caught here.
+function generateSignInEmail(name){
+  const words = String(name||'').trim().split(/\s+/).filter(Boolean);
+  if(!words.length) return '';
+  const clean = w => w.toLowerCase().replace(/[^a-z0-9]/g,'');
+  const first = clean(words[0]);
+  const last = words.length>1 ? clean(words[words.length-1]) : '';
+  const local = [first,last].filter(Boolean).join('.');
+  return local ? `${local}@${PORTAL_ACCOUNT_DOMAIN}` : '';
+}
+// Creates the actual unlicensed Entra account - no product license is ever
+// assigned (that's a separate Graph call this never makes), which is what
+// keeps it a no-seat-cost account. forceChangePasswordNextSignIn is
+// deliberately false: the admin-typed password is meant to stay the known,
+// stored, editable password shown in the form, not a one-time temp value.
+async function createMinisterAccount(displayName, upn, password){
+  const mailNickname = upn.split('@')[0];
+  return graphFetch('/users', {
+    method: 'POST',
+    body: JSON.stringify({
+      accountEnabled: true,
+      displayName,
+      mailNickname,
+      userPrincipalName: upn,
+      passwordProfile: { password, forceChangePasswordNextSignIn: false }
+    })
+  });
+}
+// Resets the password on an EXISTING account, addressed by its current
+// sign-in email (Graph accepts a userPrincipalName in place of a user id).
+// Changing the Sign-In Email field itself on an existing minister does NOT
+// rename their Entra account - see the helptext in the modal.
+async function updateMinisterAccountPassword(upn, password){
+  return graphFetch(`/users/${encodeURIComponent(upn)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ passwordProfile: { password, forceChangePasswordNextSignIn: false } })
+  });
+}
 function openMinisterModal(m){
   editingMinisterId = m ? m.id : null;
+  const hasAccount = !!(m && m.signInEmail);
   $('#minModalTitle').textContent = m ? 'Edit Minister' : 'Add Minister';
   $('#minName').value = m ? m.name : ''; $('#minEmail').value = m ? m.email : '';
   $('#minPhone').value = m ? m.phone : ''; $('#minSignInEmail').value = m ? (m.signInEmail||'') : '';
   $('#minGender').value = m ? (m.gender||'') : '';
   $('#minStatus').value = m ? m.status : 'Active';
+  $('#minPassword').value = m ? (m.portalPassword||'') : '';
+  $('#minPassword').type = 'password';
+  delete $('#minSignInEmail').dataset.touched;
+  $('#btnToggleMinPassword').innerHTML = ICONS.eye;
+  $('#btnToggleMinPassword').setAttribute('aria-label','Show password');
+  // An existing account can only have its password changed here, not be
+  // (re)created - so the "also create" checkbox only makes sense for a
+  // brand-new minister, or an existing one who was saved without an
+  // account yet (SignInEmail still blank).
+  $('#minCreateAccountField').style.display = hasAccount ? 'none' : '';
+  $('#minCreateAccount').checked = !hasAccount;
+  $('#minPasswordLabel').textContent = hasAccount ? 'Portal Password' : 'Portal Password (for the new account)';
+  $('#minPasswordHelp').textContent = hasAccount
+    ? 'Change this and save to reset their sign-in password. At least 8 characters.'
+    : 'At least 8 characters. Stored here so you can look it up or change it later — share it with the minister directly.';
+  $('#minPasswordField').style.display = (hasAccount || $('#minCreateAccount').checked) ? '' : 'none';
+  $('#minAccountMsg').innerHTML = '';
   $('#minModalMsg').innerHTML = '';
   $('#ministerModal').classList.add('open');
   $('#minName').focus();
 }
+window.toggleMinPasswordField = function(){
+  const checked = $('#minCreateAccount').checked;
+  $('#minPasswordField').style.display = checked ? '' : 'none';
+};
+window.toggleMinPasswordVisibility = function(){
+  const input = $('#minPassword');
+  const showing = input.type === 'text';
+  input.type = showing ? 'password' : 'text';
+  $('#btnToggleMinPassword').innerHTML = showing ? ICONS.eye : ICONS.eyeOff;
+  $('#btnToggleMinPassword').setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+};
+// Only suggests a Sign-In Email while adding a brand-new minister with the
+// account checkbox on - never overwrites a value that's already there for
+// an edit, and never fights a value the admin has already hand-typed.
+window.suggestMinSignInEmail = function(){
+  if(editingMinisterId || !$('#minCreateAccount').checked) return;
+  if($('#minSignInEmail').dataset.touched) return;
+  $('#minSignInEmail').value = generateSignInEmail($('#minName').value);
+};
 async function onSaveMinister(){
   const name = $('#minName').value.trim();
-  $('#minModalMsg').innerHTML = '';
-  if(!name){ $('#minModalMsg').innerHTML = '<div class="errbox" role="alert">Name is required.</div>'; return; }
-  const fields = { Title:name, Email:$('#minEmail').value.trim(), Phone:$('#minPhone').value.trim(), SignInEmail:$('#minSignInEmail').value.trim(), Gender:$('#minGender').value, Status:$('#minStatus').value };
+  const msg = $('#minModalMsg'); msg.innerHTML = '';
+  const acctMsg = $('#minAccountMsg'); acctMsg.innerHTML = '';
+  if(!name){ msg.innerHTML = '<div class="errbox" role="alert">Name is required.</div>'; return; }
+  const signInEmail = $('#minSignInEmail').value.trim();
+  const password = $('#minPassword').value;
+  const existing = editingMinisterId ? ministers.find(x=>x.id===editingMinisterId) : null;
+  const hasAccount = !!(existing && existing.signInEmail);
+  const wantsNewAccount = !hasAccount && $('#minCreateAccount').checked;
+
+  if(wantsNewAccount){
+    if(!signInEmail){ msg.innerHTML = '<div class="errbox" role="alert">Sign-In Email is required to create their account.</div>'; return; }
+    if(!password || password.length<8){ msg.innerHTML = '<div class="errbox" role="alert">Portal Password must be at least 8 characters to create their account.</div>'; return; }
+    try{
+      await createMinisterAccount(name, signInEmail, password);
+    }catch(e){
+      acctMsg.innerHTML = `<div class="errbox" role="alert">Couldn't create their sign-in account: ${escapeHtml(e.message)}. The minister record below was NOT saved either — fix the issue (e.g. try a different Sign-In Email if it's already taken) and save again, or uncheck "Also create their sign-in account" to save just the roster entry.</div>`;
+      return;
+    }
+  } else if(hasAccount && password && password!==existing.portalPassword){
+    if(password.length<8){ msg.innerHTML = '<div class="errbox" role="alert">Portal Password must be at least 8 characters.</div>'; return; }
+    try{
+      await updateMinisterAccountPassword(existing.signInEmail, password);
+    }catch(e){
+      acctMsg.innerHTML = `<div class="errbox" role="alert">Couldn't update their sign-in password: ${escapeHtml(e.message)}. Nothing below was saved — fix the issue and save again.</div>`;
+      return;
+    }
+  }
+
+  const fields = { Title:name, Email:$('#minEmail').value.trim(), Phone:$('#minPhone').value.trim(), SignInEmail:signInEmail, Gender:$('#minGender').value, Status:$('#minStatus').value, PortalPassword:password };
   if(editingMinisterId) await updateItem('ministers', editingMinisterId, fields);
   else await createItem('ministers', fields);
   $('#ministerModal').classList.remove('open');
@@ -5091,6 +5228,10 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Sep 27, 2026', version: APP_VERSION, items: [
+    'New: Add/Edit Minister can now create and manage their actual sign-in account, not just record the roster entry. Check "Also create their sign-in account" (on by default when adding someone new) and set a password, and it creates their unlicensed Microsoft 365 account for you. Editing an existing minister shows a masked Portal Password field (with a show/hide toggle) you can look up or change anytime - changing it resets their sign-in password for real.',
+    'Setup needed before this works: (1) User.ReadWrite.All (delegated) needs admin consent on the Scheduler\'s Azure AD app registration, and (2) a new "PortalPassword" column (Single line of text, Plain text) needs to be added to the PrayerMinisters SharePoint list by hand. See CLAUDE.md for the exact steps. Until both are done, the checkbox will fail with a clear error rather than silently doing nothing.'
+  ]}
 ];
 // Entries already live in production, newest first - moved here from
 // CHANGE_LOG at promotion time rather than deleted. See the block comment

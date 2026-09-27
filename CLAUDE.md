@@ -117,7 +117,17 @@ scheduler's own code.
   access never overwrites how you actually contact them), Status (Choice:
   Active/Inactive), **Gender (Choice: Male/Female, added 2026-09-17)** — feeds
   the same-sex team-preference matching on the Schedule & Planning tab, see
-  "Planning Slots" under "Features implemented" below.
+  "Planning Slots" under "Features implemented" below. **PortalPassword
+  (Single line of text, Plain text — MUST be added to SharePoint by hand,
+  not created automatically; added 2026-09-27)** — the minister's current
+  sign-in password for their Entra account, stored so staff can look it up
+  or change it later from the Edit Minister form. **This is a deliberate,
+  known tradeoff, not an oversight**: storing a real password in plain text
+  in a SharePoint column is not normal security practice — see "Add/Edit
+  Minister creates the actual sign-in account" under "Features implemented"
+  below for the full reasoning and the mitigation (restrict this column's
+  view/edit permission to admins only, the same way `Notes` fields elsewhere
+  in this repo get scoped when they're sensitive).
 - **PrayerSessions**: Title, SessionDate, SessionEndDate, RecipientName,
   RecipientContact, AssignedMinisterIDs (comma-separated minister IDs, plain
   text), LeadMinisterIDs (comma-separated subset of the above who are "Lead"
@@ -387,6 +397,61 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
   the same calendar range last year, active ministers serving, avg hours per
   minister), a sort toggle cycling Next Appointment ⇄ A→Z, per-minister
   upcoming sessions, activate/deactivate/edit/delete actions per minister
+  - **Add/Edit Minister can create and manage the actual sign-in account**
+    (added 2026-09-27, `preview/index.html` only): previously, creating a
+    minister's unlicensed Entra account was entirely a manual step in the
+    Microsoft 365 admin center (still documented under "Minister portal"
+    below) — this makes the app itself do it via Graph, gated behind a new
+    `User.ReadWrite.All` delegated scope (added to `GRAPH_SCOPES`) that only
+    works for a signed-in admin who actually holds a role that can manage
+    users (User Administrator or similar — **needs its own admin consent in
+    Entra, a manual step, before this works at all**, same category as the
+    original `Sites.ReadWrite.All` consent in gotcha #7).
+    - **"Also create their sign-in account"** — a checkbox on Add Minister,
+      checked by default (unchecking it just saves the roster entry, same
+      as before this feature existed). Only shown when the minister doesn't
+      already have one (`signInEmail` blank) — an existing account can only
+      have its password changed here, not be recreated.
+    - **`generateSignInEmail()`** suggests `firstname.lastname@` +
+      `PORTAL_ACCOUNT_DOMAIN` (`creeksidechurch.ca`) into the Sign-In Email
+      field as the admin types the name — a starting point, not a hard
+      rule; it's an ordinary editable field, so a collision with an
+      existing tenant account just needs a hand-adjustment before saving.
+      Never overwrites a value already there (editing an existing minister,
+      or a value the admin has already hand-typed — tracked via a
+      `dataset.touched` flag on the field, not a second piece of state).
+    - **The password is admin-typed and persisted, not a generated
+      one-time secret** — this was an explicit, deliberate request: a
+      masked "Portal Password" field (show/hide eye-icon toggle,
+      `ICONS.eye`/`ICONS.eyeOff`) that reads from and writes to the new
+      `PortalPassword` SharePoint column (see schema above), so staff can
+      look up or change a minister's password anytime from Edit Minister,
+      not just once at creation. `createMinisterAccount()` sets
+      `forceChangePasswordNextSignIn: false` for exactly this reason — a
+      forced change on first sign-in would immediately break the "this is
+      the current password" guarantee the stored field is supposed to
+      give. **This is less secure than Microsoft's own default pattern**
+      (a one-time temp password, changed and never seen again) — accepted
+      deliberately, the same way the IntakeResponses sensitivity tradeoff
+      was: flag it, document why, respect the explicit choice, don't
+      silently "fix" it into something safer that wasn't asked for.
+    - **Editing an existing minister's password** calls
+      `updateMinisterAccountPassword()` — a Graph `PATCH` addressed by
+      their *current* `signInEmail`, only fired when the password field's
+      value actually differs from the stored one (so re-saving the form
+      without touching the password never makes a needless Graph call).
+      Changing the Sign-In Email field itself on an existing minister does
+      **not** rename or move their Entra account — deliberately out of
+      scope for this pass, noted in the field's own helptext.
+    - **Account-creation failure blocks the whole save**, not just a
+      warning: if the checkbox is checked and Graph creation fails (a
+      taken UPN, a 403 from a signed-in account that doesn't actually hold
+      User Administrator, etc.), the minister record itself is NOT saved
+      either — the error surfaces in the modal and the admin fixes the
+      issue (adjust the email, uncheck the box to save just the roster
+      entry) and retries, rather than the roster silently ending up with a
+      minister record that has no matching account and no clear sign
+      anything went wrong.
 - Blackout Dates tab: grouped by minister, soonest first, Add/Edit modal with
   a single-date/date-range toggle (writes BlackoutDate + EndDate), edit/delete
   per entry
@@ -589,10 +654,26 @@ M365 seat cost) so they can sign in for real.
   shows a "couldn't find your profile" message instead of a broken page.
   Set SignInEmail from the main app's Add/Edit Minister form when creating
   a minister's Entra account.
-- Creating the actual Entra accounts (Microsoft 365 admin center → Add a
-  user → "Create user without product license") and the SharePoint group/
-  permission setup above are manual admin steps outside this repo — Claude
-  has no tenant admin access to do them.
+- **Creating the actual Entra account is now automatable from Add/Edit
+  Minister** (`preview/index.html` only, added 2026-09-27 — see "Add/Edit
+  Minister can create and manage the actual sign-in account" under
+  "Features implemented" above), for whichever admin's own signed-in
+  account holds a role that can manage users. Two manual, one-time setup
+  steps still have to happen outside this repo before that works at all:
+  1. **Grant `User.ReadWrite.All` (delegated) admin consent** on the
+     Scheduler's Azure AD app registration (Client ID
+     `549f5207-d7f8-4924-9bde-30532d90c1d2`) — Entra admin center → App
+     registrations → this app → API permissions → Add a permission →
+     Microsoft Graph → Delegated → `User.ReadWrite.All` → Add, then
+     **Grant admin consent for [tenant]** (same Global-Admin-or-equivalent
+     requirement as the original `Sites.ReadWrite.All` consent, gotcha #7).
+  2. **Add the `PortalPassword` column to PrayerMinisters** by hand in
+     SharePoint (Single line of text, Plain text — see the schema entry
+     above) — the app has no ability to alter SharePoint's own schema.
+  The SharePoint "Ministers" group membership/permission setup (below)
+  is still a fully manual step either way — creating the Entra account
+  doesn't put it in that group automatically; Claude has no tenant admin
+  access to do either of these two setup steps itself.
 - **Sign-in redirect (production, in index.html)**: a minister who signs
   into the *main scheduler* — not the portal — gets redirected straight to
   `/portal/` instead of landing in the admin UI. `afterSignIn()` checks the
