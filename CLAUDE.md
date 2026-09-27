@@ -441,14 +441,29 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
       they use it — after that, the stored `PortalPassword` column no
       longer matches their real password, and typing a new one + saving is
       how staff issue them a fresh temporary one (e.g. if they forget it).
-    - **Editing an existing minister's password** calls
-      `updateMinisterAccountPassword()` — a Graph `PATCH` addressed by
-      their *current* `signInEmail`, only fired when the password field's
-      value actually differs from the stored one (so re-saving the form
-      without touching the password never makes a needless Graph call).
-      Changing the Sign-In Email field itself on an existing minister does
-      **not** rename or move their Entra account — deliberately out of
-      scope for this pass, noted in the field's own helptext.
+    - **Editing an existing minister's password is temporarily disabled**
+      (2026-09-27, same day) — the Temporary Portal Password field is
+      hidden entirely on Edit Minister, with a note pointing at the cause.
+      `updateMinisterAccountPassword()` (the Graph `PATCH` this would call)
+      still exists in the code and works structurally, but real-world
+      testing showed Graph rejecting it with a 403 `Authorization_
+      RequestDenied` tenant-wide — reproduced even via Microsoft's own
+      Graph Explorer tool, same account, same confirmed-correct role and
+      consent, against both Andrew Moore's account and a brand-new test
+      minister's. Ruled out along the way: stale token, missing role,
+      missing consent, wrong app registration, wrong tenant, guest-type
+      target, hybrid/synced target, a Continuous-Access-Evaluation claims
+      challenge (no `WWW-Authenticate` header on the response). This is a
+      genuine tenant-side restriction outside what the app, this repo, or
+      the admin center UI (User Administrator can't view Conditional
+      Access) can diagnose further — parked pending a Microsoft support
+      ticket, with work continuing in the `minister-password-reset` git
+      worktree rather than on `main`. Account **creation** is unaffected
+      and still fully works — only resetting an *existing* account's
+      password is pulled. Changing the Sign-In Email field itself on an
+      existing minister does **not** rename or move their Entra account —
+      deliberately out of scope for this pass, noted in the field's own
+      helptext.
     - **Account-creation failure blocks the whole save**, not just a
       warning: if the checkbox is checked and Graph creation fails (a
       taken UPN, a 403 from a signed-in account that doesn't actually hold

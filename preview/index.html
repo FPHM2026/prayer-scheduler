@@ -953,7 +953,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-27.2";
+const APP_VERSION = "2026-09-27.3";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3916,12 +3916,16 @@ function openMinisterModal(m){
   // account yet (SignInEmail still blank).
   $('#minCreateAccountField').style.display = hasAccount ? 'none' : '';
   $('#minCreateAccount').checked = !hasAccount;
-  $('#minPasswordLabel').textContent = hasAccount ? 'Temporary Portal Password' : 'Temporary Portal Password (for the new account)';
-  $('#minPasswordHelp').textContent = hasAccount
-    ? 'Change this and save to reset their sign-in password to a new temporary one. At least 8 characters. Microsoft makes them pick their own password the first time they sign in with it, so this field stops matching their real password after that.'
-    : 'At least 8 characters. Give this to the minister to sign in with — Microsoft makes them pick their own new password the first time they use it, so this stored value stops matching their real password after that. Type a new one here anytime to reset it again.';
-  $('#minPasswordField').style.display = (hasAccount || $('#minCreateAccount').checked) ? '' : 'none';
-  $('#minAccountMsg').innerHTML = '';
+  $('#minPasswordLabel').textContent = 'Temporary Portal Password (for the new account)';
+  $('#minPasswordHelp').textContent = 'At least 8 characters. Give this to the minister to sign in with — Microsoft makes them pick their own new password the first time they use it, so this stored value stops matching their real password after that.';
+  // Resetting an EXISTING account's password via Graph is 403ing tenant-wide
+  // right now (confirmed even through Microsoft's own Graph Explorer, same
+  // account, same role - see the parked "minister-password-reset" worktree),
+  // so the field is hidden here rather than offering a control that just
+  // fails. Account CREATION still works fine and keeps its password field.
+  $('#minPasswordField').style.display = (!hasAccount && $('#minCreateAccount').checked) ? '' : 'none';
+  if(hasAccount) $('#minAccountMsg').innerHTML = '<p class="helptext" style="margin:5px 0 0;">Resetting an existing minister\'s sign-in password isn\'t available right now — Microsoft is blocking it tenant-wide even through their own admin tools. Contact them directly if they need it changed.</p>';
+  else $('#minAccountMsg').innerHTML = '';
   $('#minModalMsg').innerHTML = '';
   $('#ministerModal').classList.add('open');
   $('#minName').focus();
@@ -5233,8 +5237,8 @@ function generateReport(){
 ========================================================================= */
 const CHANGE_LOG = [
   { date: 'Sep 27, 2026', version: APP_VERSION, items: [
-    'Fix: creating/resetting a minister\'s sign-in password now uses a temporary password (Microsoft makes them choose their own on first sign-in) instead of a persistent admin-set one - Graph was rejecting the persistent form with a 403 for every role this tenant grants. The Portal Password field is now labeled "Temporary Portal Password" and only reflects the minister\'s real password until they sign in and change it.',
-    'New: Add/Edit Minister can now create and manage their actual sign-in account, not just record the roster entry. Check "Also create their sign-in account" (on by default when adding someone new) and set a temporary password, and it creates their unlicensed Microsoft 365 account for you. Editing an existing minister shows a masked Temporary Portal Password field (with a show/hide toggle) you can use to issue a fresh one anytime.',
+    'Change: resetting an EXISTING minister\'s sign-in password is temporarily removed from Edit Minister. Real-world testing showed Microsoft Graph rejecting it tenant-wide with a 403 - confirmed even through Microsoft\'s own Graph Explorer tool, with the correct role and consent in place - so the control was pulled rather than leave one that just fails. That work is parked in its own worktree pending Microsoft support. Creating a NEW minister\'s account (and its initial password) is unaffected and still works.',
+    'New: Add/Edit Minister can now create and manage their actual sign-in account, not just record the roster entry. Check "Also create their sign-in account" (on by default when adding someone new) and set a temporary password, and it creates their unlicensed Microsoft 365 account for you.',
     'Setup needed before this works: (1) User.ReadWrite.All (delegated) needs admin consent on the Scheduler\'s Azure AD app registration, and (2) a new "PortalPassword" column (Single line of text, Plain text) needs to be added to the PrayerMinisters SharePoint list by hand. See CLAUDE.md for the exact steps. Until both are done, the checkbox will fail with a clear error rather than silently doing nothing.'
   ]}
 ];
