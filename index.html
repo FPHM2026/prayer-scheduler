@@ -128,15 +128,18 @@
   button.icon-btn.danger:hover{background:var(--danger-bg);color:var(--danger);}
   button.icon-btn.success{color:var(--ok);}
   button.icon-btn.success:hover{background:var(--ok-bg);color:var(--ok);}
-  /* Icon-only is fine with a mouse and a title tooltip, but on a touch
-     screen there's no hover to reveal what an icon means - on the session
-     cards specifically (Add to Calendar/Edit/Mark Completed/Delete), show
-     the label text too below 640px rather than making someone guess or
-     long-press for a tooltip that may not even appear on touch. */
-  .toolbar .icon-btn .btn-label{display:none;}
+  /* Standing rule (2026-09-28, at the user's explicit request): an
+     icon-only control is never acceptable, on any viewport - a title
+     tooltip only works with a mouse hovering, and touch has no hover at
+     all, so a phone user is left guessing. Desktop has the room for a
+     label anyway, so there's no viewport where icon-only is actually
+     justified. .btn-label is always visible; the 640px breakpoint below
+     only changes LAYOUT (stacks to full-width, roomier padding), never
+     whether the label itself shows. */
+  .toolbar .icon-btn .btn-label{display:inline;}
   @media (max-width:640px){
     .toolbar .icon-btn{width:100%;justify-content:flex-start;gap:8px;padding:10px 14px;}
-    .toolbar .icon-btn .btn-label{display:inline;font-size:var(--fs-sm);font-weight:600;}
+    .toolbar .icon-btn .btn-label{font-size:var(--fs-sm);font-weight:600;}
   }
 
   .tag{display:inline-block;background:#f2ece1;color:var(--navy);border-radius:10px;padding:2px 9px;font-size:var(--fs-2xs);font-weight:700;margin-right:6px;}
@@ -877,7 +880,7 @@
 <div class="modal-bg sheet" id="blackoutModal">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="blackoutModalTitle">
     <h2 id="blackoutModalTitle">Add Blackout Date</h2>
-    <div class="field"><label for="boMinister">Prayer Minister *</label><select id="boMinister"></select></div>
+    <div class="field"><label for="boMinister">Prayer Minister *</label><select id="boMinister"></select><p class="helptext" style="margin:5px 0 0;">Choose "All Ministers" to block the whole date - Quick Add Slots won't create any slots on a date where everyone's blacked out.</p></div>
     <div class="toggle-pair" role="group" aria-label="Single date or date range">
       <button type="button" id="boModeSingle" class="active" onclick="setBlackoutMode('single')">Single date</button>
       <button type="button" id="boModeRange" onclick="setBlackoutMode('range')">Date range</button>
@@ -943,7 +946,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-27.12";
+const APP_VERSION = "2026-09-28.5";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -2533,19 +2536,32 @@ function renderSlotCard(sl){
   // exclusion Completed Sessions already applies.
   const showSessionNum = sessionForHeader && sessionForHeader.apptType!=='Drop-in' && sessionForHeader.apptType!=='Training';
   const teamForHeader = teamLabel(sl.team);
+  // The Contacted toggle sits in the summary row so it's usable without
+  // expanding the accordion - it's a sibling of the toggle button, not
+  // nested inside it (a button can't nest inside another button), placed
+  // in a flex row wrapper so both sit side by side visually.
+  // Text label always shown, never icon-only - a title tooltip only works
+  // with a mouse hovering, and touch (this is used on phones) has no
+  // hover at all, so an icon alone leaves a phone user guessing.
+  const contactedBtn = (sl.status==='Tentative' && cand)
+    ? `<button type="button" class="icon-btn${cand.contacted?' success':''}" style="flex-shrink:0;display:inline-flex;align-items:center;gap:6px;" onclick="event.stopPropagation();toggleContacted(${cand.id})" title="${cand.contacted?'Mark as not yet contacted':'Mark as contacted'}" aria-pressed="${cand.contacted}" aria-label="${cand.contacted?'Mark as not yet contacted':'Mark as contacted'}: ${escapeHtml(cand.recipName)}">${ICONS.phone}<span>${cand.contacted?'Contacted':'Mark Contacted'}</span></button>`
+    : '';
   return `<div class="slot ${cls}${isOpen?' expanded':''}">
-    <button type="button" class="slot-header" onclick="toggleSlotOpen(${sl.id})" aria-expanded="${isOpen}">
-      <span class="slot-header-top">
-        <span class="slot-time">${fmt12(sl.start)}–${fmt12(sl.end)}</span>
-        <span class="slot-status ${cls}">${escapeHtml(sl.status)}</span>
-      </span>
-      <span class="slot-header-detail">
-        ${nameForHeader ? `<span class="slot-header-name">${escapeHtml(nameForHeader)}</span>` : ''}
-        ${showSessionNum ? `<span class="tag ${sessionNumberOf(sessionForHeader)===1?'first':''}">Session #${sessionNumberOf(sessionForHeader)}</span>` : ''}
-        ${teamForHeader ? `<span class="slot-header-team">${escapeHtml(teamForHeader)}</span>` : (sl.status==='Open' ? renderOpenAvailNow(sl) : '')}
-      </span>
-      <span class="slot-chevron">${ICONS.chevron}</span>
-    </button>
+    <div style="display:flex;align-items:center;">
+      <button type="button" class="slot-header" style="flex:1;width:auto;" onclick="toggleSlotOpen(${sl.id})" aria-expanded="${isOpen}">
+        <span class="slot-header-top">
+          <span class="slot-time">${fmt12(sl.start)}–${fmt12(sl.end)}</span>
+          <span class="slot-status ${cls}">${escapeHtml(sl.status)}</span>
+        </span>
+        <span class="slot-header-detail">
+          ${nameForHeader ? `<span class="slot-header-name">${escapeHtml(nameForHeader)}</span>` : ''}
+          ${showSessionNum ? `<span class="tag ${sessionNumberOf(sessionForHeader)===1?'first':''}">Session #${sessionNumberOf(sessionForHeader)}</span>` : ''}
+          ${teamForHeader ? `<span class="slot-header-team">${escapeHtml(teamForHeader)}</span>` : (sl.status==='Open' ? renderOpenAvailNow(sl) : '')}
+        </span>
+        <span class="slot-chevron">${ICONS.chevron}</span>
+      </button>
+      ${contactedBtn}
+    </div>
     ${isOpen ? `<div class="slot-body">${renderSlotBody(sl)}</div>` : ''}
   </div>`;
 }
@@ -2677,7 +2693,7 @@ function renderTentativeBody(sl){
   if(!c) return `<div class="picker-empty">This slot's claimed candidate is no longer on the waiting list.</div>`;
   const matches = teamMatchesGenderPref(sl.team, c.genderPref, c.recipGender);
   return `
-    <div class="slot-detail-row"><strong>${escapeHtml(c.recipName)}</strong> <span class="helptext">Session #${sessionNumberOf(c)}</span></div>
+    <div class="slot-detail-row"><strong>${escapeHtml(c.recipName)}</strong> <span class="helptext">Session #${sessionNumberOf(c)}</span>${c.contacted?' <span class="tag contacted">Contacted</span>':''}</div>
     <div class="slot-detail-row">Team: ${teamLabel(sl.team)||'<span class="helptext">None proposed</span>'}
       ${!matches ? `<div class="gender-warn-inline">⚠ doesn't match ${escapeHtml(c.recipGender||'')} same-sex preference</div>` : ''}
     </div>
@@ -2944,7 +2960,7 @@ function renderQuickAddModal(){
       ${plans.length ? plans.map(p=>`
         <div class="qa-breakdown-row${p.toAdd===0?' zero':''}">
           <span>${escapeHtml(fmtShort(p.dateIso))}${p.isDropIn?' · Sunday Drop-In':''}</span>
-          <span>${p.toAdd>0 ? `<span class="add-line">+${p.toAdd}</span>` : `<span class="clean-line">already covered</span>`} <span class="helptext">(${p.existing} of ${p.capacity})</span></span>
+          <span>${p.toAdd>0 ? `<span class="add-line">+${p.toAdd}</span>` : (p.capacity===0 && p.existing===0 ? `<span class="clean-line">blacked out</span>` : `<span class="clean-line">already covered</span>`)} <span class="helptext">(${p.existing} of ${p.capacity})</span></span>
         </div>`).join('') : '<div class="helptext">No dates in range.</div>'}
     </div>
     <div class="qa-preview-box">
@@ -4050,8 +4066,15 @@ async function onSaveMinister(){
 /* ---- BLACKOUT DATES ---- */
 function fmtBlackoutRange(d){ if(!d.endDate || d.endDate===d.date) return fmtDate(new Date(d.date+'T00:00')); return `${fmtDate(new Date(d.date+'T00:00'))} – ${fmtDate(new Date(d.endDate+'T00:00'))}`; }
 function fmtBlackoutRangeShort(d){ if(!d.endDate || d.endDate===d.date) return fmtShort(d.date); return `${fmtShort(d.date)} – ${fmtShort(d.endDate)}`; }
-function populateBlackoutMinisterSelect(){
-  $('#boMinister').innerHTML = ministers.filter(m=>m.status==='Active').map(m=>`<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+// "All Ministers" is only offered when adding a brand-new blackout, not
+// editing an existing one - it's a creation-time convenience (see
+// saveBlackout()) that writes one ordinary per-minister BlackoutDates row
+// per Active minister, not a special record type, so there's nothing
+// coherent to "switch" an existing single-minister row to on edit.
+function populateBlackoutMinisterSelect(isNew){
+  const options = ministers.filter(m=>m.status==='Active').map(m=>`<option value="${m.id}">${escapeHtml(m.name)}</option>`);
+  if(isNew) options.unshift(`<option value="ALL">— All Ministers (blocks this date entirely) —</option>`);
+  $('#boMinister').innerHTML = options.join('');
 }
 window.setBlackoutMode = function(mode){
   $('#boModeSingle').classList.toggle('active', mode==='single');
@@ -4064,9 +4087,11 @@ window.openBlackoutModal = function(id){
   blackoutEditId = b ? b.id : null;
   $('#blackoutModalTitle').textContent = b ? 'Edit Blackout Date' : 'Add Blackout Date';
   $('#blackoutModalMsg').textContent = '';
-  populateBlackoutMinisterSelect();
-  const minId = b ? (ministers.find(m=>m.name===b.ministerName)||{}).id : (ministers.find(m=>m.status==='Active')||{}).id;
-  $('#boMinister').value = minId||'';
+  populateBlackoutMinisterSelect(!b);
+  // Defaults to "All Ministers" on Add - whole-date blackouts (holidays,
+  // building closures) are the common case this is reached for; picking a
+  // single minister is still one click away via the dropdown.
+  $('#boMinister').value = b ? (ministers.find(m=>m.name===b.ministerName)||{}).id||'' : 'ALL';
   $('#boDate').value = b ? b.date : '';
   $('#boEndDate').value = b ? (b.endDate||'') : '';
   $('#boNotes').value = b ? b.notes : '';
@@ -4076,22 +4101,37 @@ window.openBlackoutModal = function(id){
 };
 async function saveBlackout(){
   const msg = $('#blackoutModalMsg'); msg.innerHTML='';
-  const minId = parseInt($('#boMinister').value,10);
-  const min = ministers.find(m=>m.id===minId);
+  const selected = $('#boMinister').value;
+  const isAll = selected === 'ALL';
+  const minId = parseInt(selected,10);
+  const min = isAll ? null : ministers.find(m=>m.id===minId);
   const date = $('#boDate').value;
   const isRange = $('#boModeRange').classList.contains('active');
   const endDate = isRange ? $('#boEndDate').value : null;
   const notes = $('#boNotes').value.trim();
-  if(!min || !date || (isRange && !endDate)){
+  if((!isAll && !min) || !date || (isRange && !endDate)){
     msg.innerHTML = `<div class="errbox" role="alert">Please choose a minister and fill in the date${isRange?' range.':'.'}</div>`; return;
   }
   if(isRange && endDate < date){
     msg.innerHTML = '<div class="errbox" role="alert">End date must be on or after the start date.</div>'; return;
   }
-  const fields = { Title: min.name, BlackoutDate: new Date(date+'T00:00').toISOString(), EndDate: endDate ? new Date(endDate+'T00:00').toISOString() : null, Notes: notes };
+  const baseFields = { BlackoutDate: new Date(date+'T00:00').toISOString(), EndDate: endDate ? new Date(endDate+'T00:00').toISOString() : null, Notes: notes };
   try{
-    if(blackoutEditId) await updateItem('blackouts', blackoutEditId, fields);
-    else await createItem('blackouts', fields);
+    if(isAll){
+      // Not a special record type - just one ordinary per-minister
+      // BlackoutDates row per Active minister, same date/range/notes.
+      // Once every active minister is blacked out on a date,
+      // capacityForDate() already naturally computes 0 capacity for it,
+      // so Quick Add Slots adds nothing there - no other code needed.
+      const active = ministers.filter(m=>m.status==='Active');
+      for(const m of active){
+        await createItem('blackouts', { ...baseFields, Title: m.name });
+      }
+    } else if(blackoutEditId){
+      await updateItem('blackouts', blackoutEditId, { ...baseFields, Title: min.name });
+    } else {
+      await createItem('blackouts', { ...baseFields, Title: min.name });
+    }
     $('#blackoutModal').classList.remove('open');
     await loadAll();
   }catch(e){
@@ -5306,6 +5346,11 @@ const CHANGE_LOG = [
 // CHANGE_LOG at promotion time rather than deleted. See the block comment
 // above for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Sep 28, 2026', version: '2026-09-28.5', items: [
+    'Changed: the Contacted button (mark whether you\'ve reached out to a waiting recipient) now sits right in a slot\'s summary row, usable without expanding the slot - it briefly lived in the expanded detail only. It also now always shows "Contacted"/"Mark Contacted" as text, not just an icon.',
+    'Changed: icon buttons with a hidden text label (Contacted, Flag Priority, Edit, Delete on Unplaced Candidates and similar) now show that label on every screen size, not just phones - a hover tooltip only works with a mouse, so icon-only was never actually clear on touch, and desktop has the room for a label anyway. Standing rule going forward: no icon-only controls.',
+    'New: Add Blackout Date has an "All Ministers" option that blocks a date entirely - Quick Add Slots won\'t create any slots there. Only available when adding a new blackout, not editing an existing one. Now the default selection, since blocking a whole date is the more common reason to open this form.'
+  ]},
   { date: 'Sep 27, 2026', version: '2026-09-27.12', items: [
     'New: Ministers can now also decline a session ("I can\'t make it"), not just confirm it - shows a red ✗ next to their name (portal and Scheduler) the same way confirming shows a green ✓. Confirming and declining are mutually exclusive and both fully reversible - tap the same button again to undo.'
   ]},
