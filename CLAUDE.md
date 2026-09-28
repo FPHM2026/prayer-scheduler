@@ -1331,6 +1331,17 @@ existing session history.
    accounts with real sign-in.
 
 ## Style/tone notes
+**No icon-only controls, ever, on any viewport** (standing rule, stated
+explicitly 2026-09-28): a title tooltip only works with a mouse hovering,
+and touch has no hover state at all, so an icon alone leaves a phone user
+guessing what it does — and desktop has the screen room for a label
+anyway, so there's no viewport where omitting one is actually justified.
+Every icon button needs a visible text label next to the icon, not just
+an `aria-label`/`title`. `.toolbar .icon-btn .btn-label` used to be
+hidden above 640px (label only on phones) — fixed 2026-09-28 to always
+show. Any icon-only button found anywhere in this app is a bug to fix,
+not an accepted style choice.
+
 Now being built via Claude Code, not just chat. The person building this
 prefers granular step-by-step instructions and iterative debugging —
 screenshot the exact error, fix one thing, retest — and for SharePoint/Entra

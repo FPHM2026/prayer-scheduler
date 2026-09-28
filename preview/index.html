@@ -128,15 +128,18 @@
   button.icon-btn.danger:hover{background:var(--danger-bg);color:var(--danger);}
   button.icon-btn.success{color:var(--ok);}
   button.icon-btn.success:hover{background:var(--ok-bg);color:var(--ok);}
-  /* Icon-only is fine with a mouse and a title tooltip, but on a touch
-     screen there's no hover to reveal what an icon means - on the session
-     cards specifically (Add to Calendar/Edit/Mark Completed/Delete), show
-     the label text too below 640px rather than making someone guess or
-     long-press for a tooltip that may not even appear on touch. */
-  .toolbar .icon-btn .btn-label{display:none;}
+  /* Standing rule (2026-09-28, at the user's explicit request): an
+     icon-only control is never acceptable, on any viewport - a title
+     tooltip only works with a mouse hovering, and touch has no hover at
+     all, so a phone user is left guessing. Desktop has the room for a
+     label anyway, so there's no viewport where icon-only is actually
+     justified. .btn-label is always visible; the 640px breakpoint below
+     only changes LAYOUT (stacks to full-width, roomier padding), never
+     whether the label itself shows. */
+  .toolbar .icon-btn .btn-label{display:inline;}
   @media (max-width:640px){
     .toolbar .icon-btn{width:100%;justify-content:flex-start;gap:8px;padding:10px 14px;}
-    .toolbar .icon-btn .btn-label{display:inline;font-size:var(--fs-sm);font-weight:600;}
+    .toolbar .icon-btn .btn-label{font-size:var(--fs-sm);font-weight:600;}
   }
 
   .tag{display:inline-block;background:#f2ece1;color:var(--navy);border-radius:10px;padding:2px 9px;font-size:var(--fs-2xs);font-weight:700;margin-right:6px;}
@@ -956,7 +959,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-28.4";
+const APP_VERSION = "2026-09-28.5";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -2550,8 +2553,11 @@ function renderSlotCard(sl){
   // expanding the accordion - it's a sibling of the toggle button, not
   // nested inside it (a button can't nest inside another button), placed
   // in a flex row wrapper so both sit side by side visually.
+  // Text label always shown, never icon-only - a title tooltip only works
+  // with a mouse hovering, and touch (this is used on phones) has no
+  // hover at all, so an icon alone leaves a phone user guessing.
   const contactedBtn = (sl.status==='Tentative' && cand)
-    ? `<button type="button" class="icon-btn${cand.contacted?' success':''}" style="flex-shrink:0;" onclick="event.stopPropagation();toggleContacted(${cand.id})" title="${cand.contacted?'Mark as not yet contacted':'Mark as contacted'}" aria-pressed="${cand.contacted}" aria-label="${cand.contacted?'Mark as not yet contacted':'Mark as contacted'}: ${escapeHtml(cand.recipName)}">${ICONS.phone}</button>`
+    ? `<button type="button" class="icon-btn${cand.contacted?' success':''}" style="flex-shrink:0;display:inline-flex;align-items:center;gap:6px;" onclick="event.stopPropagation();toggleContacted(${cand.id})" title="${cand.contacted?'Mark as not yet contacted':'Mark as contacted'}" aria-pressed="${cand.contacted}" aria-label="${cand.contacted?'Mark as not yet contacted':'Mark as contacted'}: ${escapeHtml(cand.recipName)}">${ICONS.phone}<span>${cand.contacted?'Contacted':'Mark Contacted'}</span></button>`
     : '';
   return `<div class="slot ${cls}${isOpen?' expanded':''}">
     <div style="display:flex;align-items:center;">
@@ -5349,7 +5355,8 @@ function generateReport(){
 ========================================================================= */
 const CHANGE_LOG = [
   { date: 'Sep 28, 2026', version: APP_VERSION, items: [
-    'Changed: the Contacted button (mark whether you\'ve reached out to a waiting recipient) now sits right in a slot\'s summary row, usable without expanding the slot - it briefly lived in the expanded detail only.',
+    'Changed: the Contacted button (mark whether you\'ve reached out to a waiting recipient) now sits right in a slot\'s summary row, usable without expanding the slot - it briefly lived in the expanded detail only. It also now always shows "Contacted"/"Mark Contacted" as text, not just an icon.',
+    'Changed: icon buttons with a hidden text label (Contacted, Flag Priority, Edit, Delete on Unplaced Candidates and similar) now show that label on every screen size, not just phones - a hover tooltip only works with a mouse, so icon-only was never actually clear on touch, and desktop has the room for a label anyway. Standing rule going forward: no icon-only controls.',
     'New: Add Blackout Date has an "All Ministers" option that blocks a date entirely - Quick Add Slots won\'t create any slots there. Only available when adding a new blackout, not editing an existing one. Now the default selection, since blocking a whole date is the more common reason to open this form.'
   ]}
 ];
