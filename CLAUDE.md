@@ -560,6 +560,28 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
 - Blackout Dates tab: grouped by minister, soonest first, Add/Edit modal with
   a single-date/date-range toggle (writes BlackoutDate + EndDate), edit/delete
   per entry
+  - **"All Ministers" bulk option on Add (not Edit)** (`populateBlackoutMinisterSelect()`/
+    `saveBlackout()`, added 2026-09-28, at the user's request: "if I blackout
+    Tuesday Sept 29 and add Quick Slots, no quick slots would be created"):
+    picking "— All Ministers (blocks this date entirely) —" writes one
+    ordinary per-minister BlackoutDates row for every currently-Active
+    minister, same date/range/notes — **not** a special record type or a
+    new SharePoint column. This works because `capacityForDate()` (used by
+    Quick Add Slots) already computed `Math.floor(available.length/2)` off
+    "every Active minister not blacked out that day" — once that set is
+    empty, capacity was already 0, Quick Add Slots already added nothing.
+    The only gap being closed here is the one-click UX; the actual
+    blackout-awareness in slot generation already existed and needed no
+    code change. Only offered when adding a brand-new blackout — there's
+    no coherent "switch to All Ministers" action on an existing
+    single-minister row, so it's not in the dropdown when editing one.
+    **Known tradeoff**: since these are N ordinary rows, not one shared
+    flag, a minister added or reactivated *after* an "All Ministers"
+    blackout was created won't automatically be covered by it — that date
+    would show capacity again once the new/returning minister is counted
+    as available. Acceptable for a one-time event (holiday, building
+    closure) decided close to the date; if this becomes a real problem,
+    revisit as a genuine shared/global blackout concept instead.
 - **Reports tab** (added 2026-09-19; real report content added 2026-09-21,
   corrected the same day against the actual punch-list spec — see
   "Style/tone notes" below on checking the punch-list artifact first): a

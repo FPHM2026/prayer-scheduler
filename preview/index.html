@@ -890,7 +890,7 @@
 <div class="modal-bg sheet" id="blackoutModal">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="blackoutModalTitle">
     <h2 id="blackoutModalTitle">Add Blackout Date</h2>
-    <div class="field"><label for="boMinister">Prayer Minister *</label><select id="boMinister"></select></div>
+    <div class="field"><label for="boMinister">Prayer Minister *</label><select id="boMinister"></select><p class="helptext" style="margin:5px 0 0;">Choose "All Ministers" to block the whole date - Quick Add Slots won't create any slots on a date where everyone's blacked out.</p></div>
     <div class="toggle-pair" role="group" aria-label="Single date or date range">
       <button type="button" id="boModeSingle" class="active" onclick="setBlackoutMode('single')">Single date</button>
       <button type="button" id="boModeRange" onclick="setBlackoutMode('range')">Date range</button>
@@ -956,7 +956,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-28.1";
+const APP_VERSION = "2026-09-28.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -2958,7 +2958,7 @@ function renderQuickAddModal(){
       ${plans.length ? plans.map(p=>`
         <div class="qa-breakdown-row${p.toAdd===0?' zero':''}">
           <span>${escapeHtml(fmtShort(p.dateIso))}${p.isDropIn?' · Sunday Drop-In':''}</span>
-          <span>${p.toAdd>0 ? `<span class="add-line">+${p.toAdd}</span>` : `<span class="clean-line">already covered</span>`} <span class="helptext">(${p.existing} of ${p.capacity})</span></span>
+          <span>${p.toAdd>0 ? `<span class="add-line">+${p.toAdd}</span>` : (p.capacity===0 && p.existing===0 ? `<span class="clean-line">blacked out</span>` : `<span class="clean-line">already covered</span>`)} <span class="helptext">(${p.existing} of ${p.capacity})</span></span>
         </div>`).join('') : '<div class="helptext">No dates in range.</div>'}
     </div>
     <div class="qa-preview-box">
@@ -4064,8 +4064,15 @@ async function onSaveMinister(){
 /* ---- BLACKOUT DATES ---- */
 function fmtBlackoutRange(d){ if(!d.endDate || d.endDate===d.date) return fmtDate(new Date(d.date+'T00:00')); return `${fmtDate(new Date(d.date+'T00:00'))} – ${fmtDate(new Date(d.endDate+'T00:00'))}`; }
 function fmtBlackoutRangeShort(d){ if(!d.endDate || d.endDate===d.date) return fmtShort(d.date); return `${fmtShort(d.date)} – ${fmtShort(d.endDate)}`; }
-function populateBlackoutMinisterSelect(){
-  $('#boMinister').innerHTML = ministers.filter(m=>m.status==='Active').map(m=>`<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+// "All Ministers" is only offered when adding a brand-new blackout, not
+// editing an existing one - it's a creation-time convenience (see
+// saveBlackout()) that writes one ordinary per-minister BlackoutDates row
+// per Active minister, not a special record type, so there's nothing
+// coherent to "switch" an existing single-minister row to on edit.
+function populateBlackoutMinisterSelect(isNew){
+  const options = ministers.filter(m=>m.status==='Active').map(m=>`<option value="${m.id}">${escapeHtml(m.name)}</option>`);
+  if(isNew) options.unshift(`<option value="ALL">— All Ministers (blocks this date entirely) —</option>`);
+  $('#boMinister').innerHTML = options.join('');
 }
 window.setBlackoutMode = function(mode){
   $('#boModeSingle').classList.toggle('active', mode==='single');
@@ -4078,7 +4085,7 @@ window.openBlackoutModal = function(id){
   blackoutEditId = b ? b.id : null;
   $('#blackoutModalTitle').textContent = b ? 'Edit Blackout Date' : 'Add Blackout Date';
   $('#blackoutModalMsg').textContent = '';
-  populateBlackoutMinisterSelect();
+  populateBlackoutMinisterSelect(!b);
   const minId = b ? (ministers.find(m=>m.name===b.ministerName)||{}).id : (ministers.find(m=>m.status==='Active')||{}).id;
   $('#boMinister').value = minId||'';
   $('#boDate').value = b ? b.date : '';
@@ -4090,22 +4097,37 @@ window.openBlackoutModal = function(id){
 };
 async function saveBlackout(){
   const msg = $('#blackoutModalMsg'); msg.innerHTML='';
-  const minId = parseInt($('#boMinister').value,10);
-  const min = ministers.find(m=>m.id===minId);
+  const selected = $('#boMinister').value;
+  const isAll = selected === 'ALL';
+  const minId = parseInt(selected,10);
+  const min = isAll ? null : ministers.find(m=>m.id===minId);
   const date = $('#boDate').value;
   const isRange = $('#boModeRange').classList.contains('active');
   const endDate = isRange ? $('#boEndDate').value : null;
   const notes = $('#boNotes').value.trim();
-  if(!min || !date || (isRange && !endDate)){
+  if((!isAll && !min) || !date || (isRange && !endDate)){
     msg.innerHTML = `<div class="errbox" role="alert">Please choose a minister and fill in the date${isRange?' range.':'.'}</div>`; return;
   }
   if(isRange && endDate < date){
     msg.innerHTML = '<div class="errbox" role="alert">End date must be on or after the start date.</div>'; return;
   }
-  const fields = { Title: min.name, BlackoutDate: new Date(date+'T00:00').toISOString(), EndDate: endDate ? new Date(endDate+'T00:00').toISOString() : null, Notes: notes };
+  const baseFields = { BlackoutDate: new Date(date+'T00:00').toISOString(), EndDate: endDate ? new Date(endDate+'T00:00').toISOString() : null, Notes: notes };
   try{
-    if(blackoutEditId) await updateItem('blackouts', blackoutEditId, fields);
-    else await createItem('blackouts', fields);
+    if(isAll){
+      // Not a special record type - just one ordinary per-minister
+      // BlackoutDates row per Active minister, same date/range/notes.
+      // Once every active minister is blacked out on a date,
+      // capacityForDate() already naturally computes 0 capacity for it,
+      // so Quick Add Slots adds nothing there - no other code needed.
+      const active = ministers.filter(m=>m.status==='Active');
+      for(const m of active){
+        await createItem('blackouts', { ...baseFields, Title: m.name });
+      }
+    } else if(blackoutEditId){
+      await updateItem('blackouts', blackoutEditId, { ...baseFields, Title: min.name });
+    } else {
+      await createItem('blackouts', { ...baseFields, Title: min.name });
+    }
     $('#blackoutModal').classList.remove('open');
     await loadAll();
   }catch(e){
@@ -5316,7 +5338,8 @@ function generateReport(){
 ========================================================================= */
 const CHANGE_LOG = [
   { date: 'Sep 28, 2026', version: APP_VERSION, items: [
-    'Changed: the Contacted button (mark whether you\'ve reached out to a waiting recipient) is now also available on a slot\'s card once that person has been claimed onto it - previously it disappeared as soon as they were assigned to a slot, only showing on the Unplaced Candidates list.'
+    'Changed: the Contacted button (mark whether you\'ve reached out to a waiting recipient) is now also available on a slot\'s card once that person has been claimed onto it - previously it disappeared as soon as they were assigned to a slot, only showing on the Unplaced Candidates list.',
+    'New: Add Blackout Date has an "All Ministers" option that blocks a date entirely - Quick Add Slots won\'t create any slots there. Only available when adding a new blackout, not editing an existing one.'
   ]}
 ];
 // Entries already live in production, newest first - moved here from
