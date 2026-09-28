@@ -392,6 +392,13 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
     it doesn't match, just flagged with a non-blocking "⚠ doesn't match…"
     warning instead (mirrors the existing Blackout Dates soft-override
     pattern) — a deliberate, visible admin choice is never second-guessed.
+  - **Contacted stays available after claiming** (`renderTentativeBody()`,
+    added 2026-09-28, at the user's request): the same Contacted
+    toggle/tag the Unplaced Candidates card shows now also appears on a
+    Tentative slot's card, next to "Book This Session"/"Release Back to
+    Open" — previously it disappeared the moment a waiting candidate was
+    claimed onto a slot, since only the Unplaced Candidates view rendered
+    it. Same `toggleContacted()` call either way.
   - **Booking**: "Book This Session" on a Tentative slot opens the normal
     session modal pre-filled from the slot (date/time/team), converting the
     claimed Waiting record in place into a real session on save — same

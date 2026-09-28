@@ -956,7 +956,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-27.12";
+const APP_VERSION = "2026-09-28.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -2690,7 +2690,7 @@ function renderTentativeBody(sl){
   if(!c) return `<div class="picker-empty">This slot's claimed candidate is no longer on the waiting list.</div>`;
   const matches = teamMatchesGenderPref(sl.team, c.genderPref, c.recipGender);
   return `
-    <div class="slot-detail-row"><strong>${escapeHtml(c.recipName)}</strong> <span class="helptext">Session #${sessionNumberOf(c)}</span></div>
+    <div class="slot-detail-row"><strong>${escapeHtml(c.recipName)}</strong> <span class="helptext">Session #${sessionNumberOf(c)}</span>${c.contacted?' <span class="tag contacted">Contacted</span>':''}</div>
     <div class="slot-detail-row">Team: ${teamLabel(sl.team)||'<span class="helptext">None proposed</span>'}
       ${!matches ? `<div class="gender-warn-inline">⚠ doesn't match ${escapeHtml(c.recipGender||'')} same-sex preference</div>` : ''}
     </div>
@@ -2699,6 +2699,7 @@ function renderTentativeBody(sl){
     <div class="toolbar" style="margin-top:10px;">
       <button class="btn" onclick="bookSlot(${sl.id})">Book This Session</button>
       <button class="btn secondary" onclick="releaseSlot(${sl.id})">Release Back to Open</button>
+      <button class="icon-btn${c.contacted?' success':''}" onclick="toggleContacted(${c.id})" title="${c.contacted?'Mark as not yet contacted':'Mark as contacted'}" aria-pressed="${c.contacted}" aria-label="${c.contacted?'Mark as not yet contacted':'Mark as contacted'}: ${escapeHtml(c.recipName)}">${ICONS.phone}<span class="btn-label">${c.contacted?'Not Contacted':'Contacted'}</span></button>
     </div>`;
 }
 function renderTentativeHistoryReal(sl, hist){
@@ -5314,6 +5315,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Sep 28, 2026', version: APP_VERSION, items: [
+    'Changed: the Contacted button (mark whether you\'ve reached out to a waiting recipient) is now also available on a slot\'s card once that person has been claimed onto it - previously it disappeared as soon as they were assigned to a slot, only showing on the Unplaced Candidates list.'
+  ]}
 ];
 // Entries already live in production, newest first - moved here from
 // CHANGE_LOG at promotion time rather than deleted. See the block comment
