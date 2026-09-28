@@ -956,7 +956,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-28.2";
+const APP_VERSION = "2026-09-28.3";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -4086,8 +4086,10 @@ window.openBlackoutModal = function(id){
   $('#blackoutModalTitle').textContent = b ? 'Edit Blackout Date' : 'Add Blackout Date';
   $('#blackoutModalMsg').textContent = '';
   populateBlackoutMinisterSelect(!b);
-  const minId = b ? (ministers.find(m=>m.name===b.ministerName)||{}).id : (ministers.find(m=>m.status==='Active')||{}).id;
-  $('#boMinister').value = minId||'';
+  // Defaults to "All Ministers" on Add - whole-date blackouts (holidays,
+  // building closures) are the common case this is reached for; picking a
+  // single minister is still one click away via the dropdown.
+  $('#boMinister').value = b ? (ministers.find(m=>m.name===b.ministerName)||{}).id||'' : 'ALL';
   $('#boDate').value = b ? b.date : '';
   $('#boEndDate').value = b ? (b.endDate||'') : '';
   $('#boNotes').value = b ? b.notes : '';
@@ -5339,7 +5341,7 @@ function generateReport(){
 const CHANGE_LOG = [
   { date: 'Sep 28, 2026', version: APP_VERSION, items: [
     'Changed: the Contacted button (mark whether you\'ve reached out to a waiting recipient) is now also available on a slot\'s card once that person has been claimed onto it - previously it disappeared as soon as they were assigned to a slot, only showing on the Unplaced Candidates list.',
-    'New: Add Blackout Date has an "All Ministers" option that blocks a date entirely - Quick Add Slots won\'t create any slots there. Only available when adding a new blackout, not editing an existing one.'
+    'New: Add Blackout Date has an "All Ministers" option that blocks a date entirely - Quick Add Slots won\'t create any slots there. Only available when adding a new blackout, not editing an existing one. Now the default selection, since blocking a whole date is the more common reason to open this form.'
   ]}
 ];
 // Entries already live in production, newest first - moved here from
