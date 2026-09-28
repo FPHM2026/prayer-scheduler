@@ -392,13 +392,23 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
     it doesn't match, just flagged with a non-blocking "⚠ doesn't match…"
     warning instead (mirrors the existing Blackout Dates soft-override
     pattern) — a deliberate, visible admin choice is never second-guessed.
-  - **Contacted stays available after claiming** (`renderTentativeBody()`,
-    added 2026-09-28, at the user's request): the same Contacted
-    toggle/tag the Unplaced Candidates card shows now also appears on a
-    Tentative slot's card, next to "Book This Session"/"Release Back to
-    Open" — previously it disappeared the moment a waiting candidate was
-    claimed onto a slot, since only the Unplaced Candidates view rendered
-    it. Same `toggleContacted()` call either way.
+  - **Contacted stays available after claiming, right in the slot's
+    summary row** (`renderSlotCard()`, added 2026-09-28, at the user's
+    request — moved from the expanded body to the summary the same day,
+    also at the user's request, so it's usable without expanding the
+    accordion): a Tentative slot's collapsed header row shows the same
+    Contacted icon-button the Unplaced Candidates card shows, next to the
+    toggle button — previously it disappeared the moment a waiting
+    candidate was claimed onto a slot, since only the Unplaced Candidates
+    view rendered it, and the first fix only added it back inside the
+    expanded `renderTentativeBody()`, not the summary. Structurally it's a
+    **sibling** of the `.slot-header` toggle button, not nested inside it —
+    a `<button>` can't nest inside another `<button>` — wrapped together in
+    a flex row, with `event.stopPropagation()` on the Contacted button so
+    clicking it doesn't also toggle the accordion open/closed. Same
+    `toggleContacted()` call either way; the expanded body still shows a
+    small "Contacted" tag next to the name for context, just not a second
+    copy of the button.
   - **Booking**: "Book This Session" on a Tentative slot opens the normal
     session modal pre-filled from the slot (date/time/team), converting the
     claimed Waiting record in place into a real session on save — same

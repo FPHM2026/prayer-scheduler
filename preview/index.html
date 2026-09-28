@@ -956,7 +956,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-28.3";
+const APP_VERSION = "2026-09-28.4";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -2546,19 +2546,29 @@ function renderSlotCard(sl){
   // exclusion Completed Sessions already applies.
   const showSessionNum = sessionForHeader && sessionForHeader.apptType!=='Drop-in' && sessionForHeader.apptType!=='Training';
   const teamForHeader = teamLabel(sl.team);
+  // The Contacted toggle sits in the summary row so it's usable without
+  // expanding the accordion - it's a sibling of the toggle button, not
+  // nested inside it (a button can't nest inside another button), placed
+  // in a flex row wrapper so both sit side by side visually.
+  const contactedBtn = (sl.status==='Tentative' && cand)
+    ? `<button type="button" class="icon-btn${cand.contacted?' success':''}" style="flex-shrink:0;" onclick="event.stopPropagation();toggleContacted(${cand.id})" title="${cand.contacted?'Mark as not yet contacted':'Mark as contacted'}" aria-pressed="${cand.contacted}" aria-label="${cand.contacted?'Mark as not yet contacted':'Mark as contacted'}: ${escapeHtml(cand.recipName)}">${ICONS.phone}</button>`
+    : '';
   return `<div class="slot ${cls}${isOpen?' expanded':''}">
-    <button type="button" class="slot-header" onclick="toggleSlotOpen(${sl.id})" aria-expanded="${isOpen}">
-      <span class="slot-header-top">
-        <span class="slot-time">${fmt12(sl.start)}–${fmt12(sl.end)}</span>
-        <span class="slot-status ${cls}">${escapeHtml(sl.status)}</span>
-      </span>
-      <span class="slot-header-detail">
-        ${nameForHeader ? `<span class="slot-header-name">${escapeHtml(nameForHeader)}</span>` : ''}
-        ${showSessionNum ? `<span class="tag ${sessionNumberOf(sessionForHeader)===1?'first':''}">Session #${sessionNumberOf(sessionForHeader)}</span>` : ''}
-        ${teamForHeader ? `<span class="slot-header-team">${escapeHtml(teamForHeader)}</span>` : (sl.status==='Open' ? renderOpenAvailNow(sl) : '')}
-      </span>
-      <span class="slot-chevron">${ICONS.chevron}</span>
-    </button>
+    <div style="display:flex;align-items:center;">
+      <button type="button" class="slot-header" style="flex:1;width:auto;" onclick="toggleSlotOpen(${sl.id})" aria-expanded="${isOpen}">
+        <span class="slot-header-top">
+          <span class="slot-time">${fmt12(sl.start)}–${fmt12(sl.end)}</span>
+          <span class="slot-status ${cls}">${escapeHtml(sl.status)}</span>
+        </span>
+        <span class="slot-header-detail">
+          ${nameForHeader ? `<span class="slot-header-name">${escapeHtml(nameForHeader)}</span>` : ''}
+          ${showSessionNum ? `<span class="tag ${sessionNumberOf(sessionForHeader)===1?'first':''}">Session #${sessionNumberOf(sessionForHeader)}</span>` : ''}
+          ${teamForHeader ? `<span class="slot-header-team">${escapeHtml(teamForHeader)}</span>` : (sl.status==='Open' ? renderOpenAvailNow(sl) : '')}
+        </span>
+        <span class="slot-chevron">${ICONS.chevron}</span>
+      </button>
+      ${contactedBtn}
+    </div>
     ${isOpen ? `<div class="slot-body">${renderSlotBody(sl)}</div>` : ''}
   </div>`;
 }
@@ -2699,7 +2709,6 @@ function renderTentativeBody(sl){
     <div class="toolbar" style="margin-top:10px;">
       <button class="btn" onclick="bookSlot(${sl.id})">Book This Session</button>
       <button class="btn secondary" onclick="releaseSlot(${sl.id})">Release Back to Open</button>
-      <button class="icon-btn${c.contacted?' success':''}" onclick="toggleContacted(${c.id})" title="${c.contacted?'Mark as not yet contacted':'Mark as contacted'}" aria-pressed="${c.contacted}" aria-label="${c.contacted?'Mark as not yet contacted':'Mark as contacted'}: ${escapeHtml(c.recipName)}">${ICONS.phone}<span class="btn-label">${c.contacted?'Not Contacted':'Contacted'}</span></button>
     </div>`;
 }
 function renderTentativeHistoryReal(sl, hist){
@@ -5340,7 +5349,7 @@ function generateReport(){
 ========================================================================= */
 const CHANGE_LOG = [
   { date: 'Sep 28, 2026', version: APP_VERSION, items: [
-    'Changed: the Contacted button (mark whether you\'ve reached out to a waiting recipient) is now also available on a slot\'s card once that person has been claimed onto it - previously it disappeared as soon as they were assigned to a slot, only showing on the Unplaced Candidates list.',
+    'Changed: the Contacted button (mark whether you\'ve reached out to a waiting recipient) now sits right in a slot\'s summary row, usable without expanding the slot - it briefly lived in the expanded detail only.',
     'New: Add Blackout Date has an "All Ministers" option that blocks a date entirely - Quick Add Slots won\'t create any slots there. Only available when adding a new blackout, not editing an existing one. Now the default selection, since blocking a whole date is the more common reason to open this form.'
   ]}
 ];
