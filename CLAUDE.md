@@ -1022,6 +1022,15 @@ existing session history.
   `intake/index.html` are read via `introText()`/`liabilityText()`
   functions rather than a destructured constant, for the same
   live-override reason as `formEngine.js`'s `SECTIONS`.
+- **Location note (2026-09-29, at the user's request): the questions
+  editor is now the "Edit Questions" sub-tab of Intake Forms**
+  (`data-intakestatus="Questions"`), moved out of a Settings sub-tab
+  (`settingsIntakeQuestionsView`/`intakequestions` are gone). It reuses
+  the identical element ids (`formEditorSections`, `btnFormEditorSave`,
+  …) so the editor JS is untouched; `renderIntake()` treats "Questions" as
+  a fifth sub-tab rather than a status — it shows `#intakeQuestionsView`
+  and hides the search box/help text/list. Everywhere below that says
+  "Edit Intake Questions tab" now means that sub-tab.
 - **"Edit Intake Questions" tab** (`preview/index.html`, staff-facing,
   not yet promoted to production `index.html`) — add/remove/reorder
   sections and questions, edit labels/type/required/options/min-max, and a
