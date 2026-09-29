@@ -1010,7 +1010,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-29.14";
+const APP_VERSION = "2026-09-29.15";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1216,7 +1216,8 @@ async function resolveSiteAndLists(){
 
 async function listItems(key){
   const resp = await graphFetch(`/sites/${siteId}/lists/${listIds[key]}/items?$expand=fields&$top=999`);
-  return resp.value.map(i => ({ ...i.fields, id: parseInt(i.id, 10), _created: i.createdDateTime }));
+  return resp.value.map(i => ({ ...i.fields, id: parseInt(i.id, 10), _created: i.createdDateTime,
+    _createdByEmail: ((i.createdBy && i.createdBy.user && i.createdBy.user.email) || '').trim().toLowerCase() }));
 }
 async function createItem(key, fields){
   const resp = await graphFetch(`/sites/${siteId}/lists/${listIds[key]}/items`, {
@@ -1303,7 +1304,7 @@ async function loadAll(){
     dayOfWeek: (t.DayOfWeek!=null && t.DayOfWeek!=='') ? parseInt(t.DayOfWeek,10) : null,
     start: t.StartTime||'', end: t.EndTime||'', locationName: t.LocationName||''
   }));
-  blackouts = rawBlack.map(b => ({ id: b.id, ministerName: b.Title, date: (b.BlackoutDate||'').split('T')[0], endDate: b.EndDate ? b.EndDate.split('T')[0] : null, notes: b.Notes||'' }));
+  blackouts = rawBlack.map(b => ({ id: b.id, ministerName: b.Title, date: (b.BlackoutDate||'').split('T')[0], endDate: b.EndDate ? b.EndDate.split('T')[0] : null, notes: b.Notes||'', createdByEmail: b._createdByEmail||'' }));
   slots = rawSlots.map(sl => {
     const stripHtml = v => String(v||'').replace(/<[^>]*>/g, '');
     const proposedIds = stripHtml(sl.ProposedMinisterIDs).split(',').map(x=>x.trim()).filter(Boolean);
@@ -4244,6 +4245,19 @@ window.deleteBlackoutDate = async function(id){
   await deleteItem('blackouts', id);
   await loadAll();
 };
+// Admin-added = SharePoint's own "Created By" on the blackout row is someone
+// other than the minister it belongs to (ministers add their own from the
+// portal, signed in as themselves). A minister with no portal sign-in can't
+// have added their own, so any known creator counts as admin. Unknown
+// creator (blank email) is never labeled - better to miss a label than to
+// wrongly claim an admin added something. Labels only; Edit/Delete are
+// deliberately unchanged (the user chose that over locking them).
+function blackoutAddedByAdmin(d){
+  if(!d.createdByEmail) return false;
+  const m = ministers.find(x=>x.name.trim().toLowerCase()===d.ministerName.trim().toLowerCase());
+  const own = (m && m.signInEmail || '').trim().toLowerCase();
+  return d.createdByEmail !== own;
+}
 function renderBlackouts(){
   const box = $('#blackoutGroups'); const noResults = $('#blackoutNoResults');
   const opened = openState(box);
@@ -4288,7 +4302,7 @@ function renderBlackouts(){
       summary,
       g.shown.map(d=>`<div class="sess-row">
         <div>
-          <div style="font-weight:600;">${fmtBlackoutRange(d)}</div>
+          <div style="font-weight:600;">${fmtBlackoutRange(d)}${blackoutAddedByAdmin(d) ? ' <span class="tag">Added by admin</span>' : ''}</div>
           ${d.notes?`<div class="sess-meta">${escapeHtml(d.notes)}</div>`:''}
         </div>
         <div class="sess-actions">
@@ -5513,6 +5527,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Sep 29, 2026', version: '2026-09-29.15', items: [
+    'New: a blackout date now shows a small "Added by admin" label when an admin (not the minister themselves) created it - visible to the minister on their portal\'s time-off list, and on the Blackout Dates tab here. Edit and Delete are unchanged.'
+  ]},
   { date: 'Sep 29, 2026', version: '2026-09-29.14', items: [
     'Moved: the intake questions editor is now a sub-tab of Intake Forms ("Edit Questions"), next to Unlinked, Linked, In progress and Archived, instead of living under Settings. Nothing about how it works changed.'
   ]},
@@ -5530,11 +5547,6 @@ const CHANGE_LOG = [
   { date: 'Sep 28, 2026', version: '2026-09-28.6', items: [
     'New: Intake Forms has an "Archived" tab now, alongside Submitted and In progress. Every form gets an Archive button (reversible - Unarchive puts it right back) and a Delete button (permanent). Delete used to only be offered for in-progress forms; now that Archive exists as the safer option first, Delete works on any form.',
     'Setup needed for this to show cleanly in SharePoint\'s own list view: add "Archived" as a Choice option on the IntakeResponses list\'s Status column. The app works either way, but SharePoint\'s own UI won\'t display it properly until that option exists there too.'
-  ]},
-  { date: 'Sep 28, 2026', version: '2026-09-28.5', items: [
-    'Changed: the Contacted button (mark whether you\'ve reached out to a waiting recipient) now sits right in a slot\'s summary row, usable without expanding the slot - it briefly lived in the expanded detail only. It also now always shows "Contacted"/"Mark Contacted" as text, not just an icon.',
-    'Changed: icon buttons with a hidden text label (Contacted, Flag Priority, Edit, Delete on Unplaced Candidates and similar) now show that label on every screen size, not just phones - a hover tooltip only works with a mouse, so icon-only was never actually clear on touch, and desktop has the room for a label anyway. Standing rule going forward: no icon-only controls.',
-    'New: Add Blackout Date has an "All Ministers" option that blocks a date entirely - Quick Add Slots won\'t create any slots there. Only available when adding a new blackout, not editing an existing one. Now the default selection, since blocking a whole date is the more common reason to open this form.'
   ]}
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
@@ -5542,6 +5554,11 @@ const CHANGE_LOG = [
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Sep 28, 2026', version: '2026-09-28.5', items: [
+    'Changed: the Contacted button (mark whether you\'ve reached out to a waiting recipient) now sits right in a slot\'s summary row, usable without expanding the slot - it briefly lived in the expanded detail only. It also now always shows "Contacted"/"Mark Contacted" as text, not just an icon.',
+    'Changed: icon buttons with a hidden text label (Contacted, Flag Priority, Edit, Delete on Unplaced Candidates and similar) now show that label on every screen size, not just phones - a hover tooltip only works with a mouse, so icon-only was never actually clear on touch, and desktop has the room for a label anyway. Standing rule going forward: no icon-only controls.',
+    'New: Add Blackout Date has an "All Ministers" option that blocks a date entirely - Quick Add Slots won\'t create any slots there. Only available when adding a new blackout, not editing an existing one. Now the default selection, since blocking a whole date is the more common reason to open this form.'
+  ]},
   { date: 'Sep 27, 2026', version: '2026-09-27.12', items: [
     'New: Ministers can now also decline a session ("I can\'t make it"), not just confirm it - shows a red ✗ next to their name (portal and Scheduler) the same way confirming shows a green ✓. Confirming and declining are mutually exclusive and both fully reversible - tap the same button again to undo.'
   ]},
