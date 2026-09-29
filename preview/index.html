@@ -688,10 +688,11 @@
       <button class="btn secondary" type="button" id="btnCopyIntakeLink">Copy Link to Intake Form</button>
       <span class="helptext" id="intakeLinkCopiedMsg" style="display:none;">Link copied!</span>
     </div>
-    <p class="helptext" id="intakeHelptext">Recipients' completed (and in-progress) intake questionnaires. Grouped by status, newest first.</p>
+    <p class="helptext" id="intakeHelptext">Recipients' completed (and in-progress) intake questionnaires. Grouped by status, newest first. Archive a form to get it out of the way without deleting it - Delete is permanent.</p>
     <nav class="subtabs" aria-label="Intake status" id="intakeSubtabs">
       <button class="active" data-intakestatus="Submitted">Submitted</button>
       <button data-intakestatus="InProgress">In progress</button>
+      <button data-intakestatus="Archived">Archived</button>
     </nav>
     <div class="search-wrap" style="margin:12px 0;"><input id="intakeSearch" placeholder="Search by name or email" aria-label="Search intake forms"><button type="button" class="search-clear" aria-label="Clear search" hidden>&times;</button></div>
     <div id="intakeGroups"></div>
@@ -959,7 +960,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-28.5";
+const APP_VERSION = "2026-09-28.6";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -4241,44 +4242,75 @@ function renderIntake(){
   const opened = openState(box);
   const q = $('#intakeSearch').value.trim().toLowerCase();
   const filtered = intakeResponses
-    .filter(i => intakeSubStatus==='Submitted' ? i.status==='Submitted' : i.status!=='Submitted')
+    .filter(i => i.status===intakeSubStatus)
     .filter(i => !q || i.recipName.toLowerCase().includes(q) || i.recipEmail.toLowerCase().includes(q))
     .sort((a,b) => new Date(b.submittedAt||b.created||0) - new Date(a.submittedAt||a.created||0));
 
   if(!filtered.length){
     box.innerHTML = '';
     noResults.hidden = false;
-    noResults.textContent = intakeSubStatus==='Submitted' ? 'No submitted intake forms yet.' : 'No in-progress intake forms right now.';
+    noResults.textContent = intakeSubStatus==='Submitted' ? 'No submitted intake forms yet.'
+      : intakeSubStatus==='InProgress' ? 'No in-progress intake forms right now.'
+      : 'No archived intake forms.';
     return;
   }
   noResults.hidden = true;
   box.innerHTML = filtered.map(i=>{
     const wasOpen = opened.get(String(i.id)) || false;
     const initials = (i.recipName||'?').trim().split(/\s+/).map(p=>p[0]).slice(0,2).join('').toUpperCase() || '?';
-    const countLabel = i.status==='Submitted' ? 'Submitted' : 'In progress';
+    const countLabel = i.status==='Submitted' ? 'Submitted' : i.status==='InProgress' ? 'In progress' : 'Archived';
     const summary = i.status==='Submitted'
       ? 'Submitted ' + fmtShort((i.submittedAt||'').split('T')[0])
-      : 'Last saved ' + fmtShort((i.created||'').split('T')[0]);
-    const deleteBtn = i.status!=='Submitted'
-      ? `<button type="button" class="btn danger" onclick="deleteIntakeForm(${i.id})">Delete this in-progress form</button>`
-      : '';
+      : i.status==='InProgress' ? 'Last saved ' + fmtShort((i.created||'').split('T')[0])
+      : 'Archived';
+    // Archive is the reversible, softer action (Unarchive puts it right
+    // back); Delete is permanent and offered everywhere now, not just
+    // InProgress - Archive existing as the safer default path is what
+    // makes broadening Delete to Submitted/Archived forms reasonable.
+    const archiveBtn = i.status!=='Archived'
+      ? `<button type="button" class="btn secondary" onclick="archiveIntakeForm(${i.id})">Archive</button>`
+      : `<button type="button" class="btn secondary" onclick="unarchiveIntakeForm(${i.id})">Unarchive</button>`;
     const body = `<p class="helptext">${escapeHtml(i.recipEmail||'No email given yet')}</p>
       <button type="button" class="btn" onclick="openIntakeDetail(${i.id})">View full intake form</button>
-      ${deleteBtn}`;
+      ${archiveBtn}
+      <button type="button" class="btn danger" onclick="deleteIntakeForm(${i.id})">Delete</button>`;
     return groupRow(String(i.id), initials, i.recipName||'(name not yet entered)', countLabel, escapeHtml(summary), body, wasOpen);
   }).join('');
 }
-// Cleans up an abandoned/duplicate in-progress form - e.g. one half of a
-// pair created when the same recipient started the form on two devices
-// without using their saved resume link (see intake/index.html's
-// find-duplicate check, which now offers to prevent this going forward,
-// but doesn't touch forms already sitting here from before that existed).
-// Deliberately only offered for InProgress forms, never Submitted ones -
-// a submitted form is a real record, not an orphan.
+// Archive is reversible - moves Status to 'Archived', out of the
+// Submitted/In-progress lists and into its own tab, without losing the
+// record. Not a SharePoint schema change: Status is a Choice column
+// (InProgress/Submitted) - Graph writes 'Archived' as plain text
+// regardless, but add it as a real Choice option too so it shows properly
+// in SharePoint's own UI (see CLAUDE.md).
+window.archiveIntakeForm = async function(id){
+  const i = intakeResponses.find(x=>x.id===id);
+  if(!i) return;
+  if(!(await askConfirm(`Archive this intake form${i.recipName ? ' for '+i.recipName : ''}? You can still view it later under the Archived tab, or unarchive it.`, {confirmLabel:'Archive', danger:false}))) return;
+  await updateItem('intake', id, { Status: 'Archived' });
+  await loadAll();
+};
+// Puts an archived form back where it came from - Submitted if it was
+// ever submitted (submittedAt is set), InProgress otherwise. Doesn't ask
+// for confirmation - unlike Delete, this has no destructive consequence.
+window.unarchiveIntakeForm = async function(id){
+  const i = intakeResponses.find(x=>x.id===id);
+  if(!i) return;
+  await updateItem('intake', id, { Status: i.submittedAt ? 'Submitted' : 'InProgress' });
+  await loadAll();
+};
+// Permanently removes an intake form's record. Originally only offered
+// for InProgress forms (cleaning up an abandoned/duplicate one - e.g. one
+// half of a pair created when the same recipient started the form on two
+// devices without using their saved resume link); broadened 2026-09-28,
+// at the user's explicit request, to every status - Archive now exists as
+// the softer, reversible action, so Delete being permanent everywhere is
+// a deliberate choice, not an oversight of the earlier Submitted-record
+// protection.
 window.deleteIntakeForm = async function(id){
   const i = intakeResponses.find(x=>x.id===id);
-  if(!i || i.status==='Submitted') return;
-  if(!(await askConfirm(`Delete this in-progress intake form${i.recipName ? ' for '+i.recipName : ''}? This can't be undone.`))) return;
+  if(!i) return;
+  if(!(await askConfirm(`Permanently delete this intake form${i.recipName ? ' for '+i.recipName : ''}? This can't be undone.`))) return;
   await deleteItem('intake', id);
   await loadAll();
 };
@@ -4295,7 +4327,7 @@ window.openIntakeDetail = function(id){
       <button type="button" class="btn" onclick="window.print()">Print / Save as PDF</button>
     </div>
     <h2>${escapeHtml(i.recipName||'(name not yet entered)')}</h2>
-    <p class="helptext">${escapeHtml(i.recipEmail||'')} — ${i.status==='Submitted' ? 'Submitted '+fmtShort((i.submittedAt||'').split('T')[0]) : 'In progress'}</p>
+    <p class="helptext">${escapeHtml(i.recipEmail||'')} — ${i.status==='Submitted' ? 'Submitted '+fmtShort((i.submittedAt||'').split('T')[0]) : i.status==='InProgress' ? 'In progress' : 'Archived'}</p>
     ${FPHM.renderResponsesHtml(i.responses)}
     ${i.signatureDataUrl ? `<h3>Signature</h3><img src="${i.signatureDataUrl}" alt="Signature" style="max-width:300px;border:1px solid var(--border);border-radius:8px;background:#fff;">` : ''}
   `;
@@ -4379,7 +4411,7 @@ function intakeLinkPickerResultsHtml(sessionId, query){
     .slice(0, 8);
   if(!matches.length) return '<p class="helptext">No matching intake forms.</p>';
   return matches.map(i=>`<div class="intake-link-result">
-    <span>${escapeHtml(i.recipName||'(name not yet entered)')} <span class="helptext">${i.status==='Submitted'?'Submitted':'In progress'}${i.recipEmail?' · '+escapeHtml(i.recipEmail):''}</span></span>
+    <span>${escapeHtml(i.recipName||'(name not yet entered)')} <span class="helptext">${i.status==='Submitted'?'Submitted':i.status==='InProgress'?'In progress':'Archived'}${i.recipEmail?' · '+escapeHtml(i.recipEmail):''}</span></span>
     <button type="button" class="btn secondary" onclick="linkIntakeForm(${sessionId},${i.id})">Link</button>
   </div>`).join('');
 }
@@ -5354,6 +5386,10 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Sep 28, 2026', version: APP_VERSION, items: [
+    'New: Intake Forms has an "Archived" tab now, alongside Submitted and In progress. Every form gets an Archive button (reversible - Unarchive puts it right back) and a Delete button (permanent). Delete used to only be offered for in-progress forms; now that Archive exists as the safer option first, Delete works on any form.',
+    'Setup needed for this to show cleanly in SharePoint\'s own list view: add "Archived" as a Choice option on the IntakeResponses list\'s Status column. The app works either way, but SharePoint\'s own UI won\'t display it properly until that option exists there too.'
+  ]}
 ];
 // Entries already live in production, newest first - moved here from
 // CHANGE_LOG at promotion time rather than deleted. See the block comment

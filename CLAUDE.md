@@ -203,7 +203,12 @@ scheduler's own code.
   Token (Text, a random UUID — the anonymous recipient's resume secret,
   never shown to staff/ministers), RecipientName / RecipientEmail (Text,
   mirrored from the `name`/`email` answer keys on every save),
-  Status (Choice: InProgress/Submitted), ResponsesJSON (Multiple lines of
+  **Status (Choice: InProgress/Submitted/Archived — "Archived" added
+  2026-09-28; add it as a real Choice option in SharePoint too, not just
+  here, so it displays correctly in SharePoint's own UI — Graph writes it
+  as plain text regardless of the Choice column's defined options, so the
+  app works either way, but the list view in SharePoint itself would show
+  it oddly without the option added)**, ResponsesJSON (Multiple lines of
   text, **Plain text**, "Allow unlimited length" enabled — the entire
   answers object as JSON, keyed by question id from `js/formConfig.js`;
   this is *why* adding/removing a question never needs a SharePoint schema
@@ -989,6 +994,24 @@ existing session history.
   delegated Graph session as every other tab (`Sites.ReadWrite.All`,
   already consented) — no Worker involved for reads, staff already have
   real permissions.
+  - **Archive and permanently delete any intake form** (added 2026-09-28,
+    at the user's request — "I want a way to archive and delete intake
+    forms"): a third "Archived" sub-tab sits alongside Submitted/In
+    progress. Every form card, in any of the three sub-tabs, gets an
+    **Archive** button (`archiveIntakeForm()`, PATCHes `Status: 'Archived'`
+    — reversible, confirmed but not styled as dangerous) that becomes an
+    **Unarchive** button once archived (`unarchiveIntakeForm()`, no
+    confirmation needed since nothing destructive happens — puts it back
+    to `'Submitted'` if it was ever submitted, `'InProgress'` otherwise),
+    and a **Delete** button (`deleteIntakeForm()`) that's now offered for
+    every status, not just InProgress — see the note on that function
+    above for why broadening it was reasonable once Archive existed as the
+    softer path first. `renderIntake()`'s filter changed from a binary
+    Submitted/not-Submitted split to matching `i.status` against the
+    active sub-tab directly, now that there are three real states instead
+    of two. Every new button here is a labeled text button (`.btn`
+    variants) per the no-icon-only-controls standing rule in Style/tone
+    notes — none of this needed an icon in the first place.
 - **Recipient matching** — same convention as the existing "recipient
   session history" panel in the session modal: matched by name only (no
   persistent recipient record to join on). `findIntakeForRecipient()` in
@@ -1028,9 +1051,11 @@ existing session history.
   guesses a name pull up a stranger's in-progress form and its answers,
   which this data's sensitivity can't take on. Staff can clean up
   whatever's left from before this existed (or the rare case someone
-  declines to resume) via the "Delete this in-progress form" action on
-  the Intake Forms tab's In-progress list (`deleteIntakeForm()`) — offered
-  only for InProgress forms, never Submitted ones. That delete action
+  declines to resume) via the Delete action on the Intake Forms tab
+  (`deleteIntakeForm()`) — **originally offered only for InProgress forms,
+  broadened 2026-09-28 (see "Archive and permanently delete any intake
+  form" below) to every status**, now that Archive exists as the safer,
+  reversible action a form graduates through first. That delete action
   surfaced a real bug the same day: a visitor whose token got deleted
   this way came back to a 404 on load, which the code treated exactly
   like a network failure - it fell into "offline" mode and just stayed
