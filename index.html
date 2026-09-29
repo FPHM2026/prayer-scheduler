@@ -59,7 +59,22 @@
   header h1,#signinScreen h1{margin:0;font-size:17px;font-family:'Playfair Display',Georgia,serif;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:var(--gold-dark);}
   #signinScreen h1{font-size:var(--fs-xl);letter-spacing:.03em;}
   .version-tag{display:block;margin:2px 0 0;font-size:var(--fs-2xs);font-family:'Jost','Segoe UI',Arial,sans-serif;font-weight:400;text-transform:none;color:var(--muted);}
-  header .who{display:none;font-size:var(--fs-xs);color:var(--navy);}
+  /* Each header button + its caption ("Data as of…", "Signed in as…") is
+     its own vertical container that shrink-wraps its contents: the caption
+     is white-space:nowrap, so a long sign-in name makes the container (and
+     the button above it, via align-items:stretch) wider rather than
+     wrapping or pushing onto another line. If the whole row runs out of
+     room, whole containers wrap to the next row, never the caption text.
+     Same at every viewport width. */
+  .hdr-actions{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;justify-content:flex-end;margin-left:auto;}
+  .hdr-action{display:inline-flex;flex-direction:column;align-items:stretch;gap:4px;}
+  .hdr-caption{font-size:var(--fs-2xs);color:var(--muted);white-space:nowrap;text-align:center;min-height:1.2em;}
+  /* Mobile only: version number shares the title's row, right-justified.
+     At 640px and up it stays where it always was (under the title). */
+  @media (max-width:639px){
+    .hdr-title{display:flex;align-items:baseline;justify-content:space-between;gap:8px;width:100%;}
+    .hdr-title .version-tag{margin:0;}
+  }
   #btnSignOut{background:var(--navy);color:#fff;border-color:var(--navy);}
   #btnSignOut:hover:not(:disabled){background:var(--navy-dark);border-color:var(--navy-dark);}
 
@@ -71,7 +86,6 @@
   @media (min-width:1024px){
     header{padding:16px 24px;}
     header h1{font-size:var(--fs-xl);letter-spacing:.03em;}
-    header .who{display:inline;}
     nav[aria-label="Primary"]{padding:8px 16px 0;}
     nav[aria-label="Primary"] button{padding:12px 18px;font-size:var(--fs-sm);min-height:44px;}
   }
@@ -542,16 +556,20 @@
 
 <div id="appRoot">
 <header>
-  <div>
+  <div class="hdr-title">
     <h1>FPHM Scheduler</h1>
     <span class="version-tag" id="versionTagHeader"></span>
   </div>
-  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end;margin-left:auto;">
+  <div class="hdr-actions">
     <a href="./preview/" class="preview-badge" id="previewBadge" hidden>🧪 Preview build available</a>
-    <span class="who" id="whoami"></span>
-    <span class="version-tag" id="lastRefreshed" style="margin:0;"></span>
-    <button class="btn secondary" id="btnRefreshData" style="padding:8px 14px;min-height:36px;display:inline-flex;align-items:center;gap:4px;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg><span>Refresh Data</span></button>
-    <button class="btn secondary" id="btnSignOut" style="padding:8px 14px;min-height:36px;">Sign Out</button>
+    <div class="hdr-action">
+      <button class="btn secondary" id="btnRefreshData" style="padding:8px 14px;min-height:36px;display:inline-flex;align-items:center;justify-content:center;gap:4px;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg><span>Refresh Data</span></button>
+      <span class="hdr-caption" id="lastRefreshed"></span>
+    </div>
+    <div class="hdr-action">
+      <button class="btn secondary" id="btnSignOut" style="padding:8px 14px;min-height:36px;">Sign Out</button>
+      <span class="hdr-caption" id="whoami"></span>
+    </div>
   </div>
 </header>
 <nav aria-label="Primary">
@@ -992,7 +1010,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-29.12";
+const APP_VERSION = "2026-09-29.13";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
