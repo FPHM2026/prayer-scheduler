@@ -539,16 +539,19 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
       Active/Inactive toggle elsewhere on this tab, which does not touch
       group membership at all — only an actual roster **deletion** revokes
       portal access today.
-- **Changes tab drops Recent/Archive when nothing is pending** (2026-09-29,
-  at the user's request — "production doesn't really need an archive and
-  recent sub tab"): `renderChangeLog()` hides the sub-tab switch whenever
-  `CHANGE_LOG` is empty and shows the full history (`CHANGE_LOG_ARCHIVE`)
-  as one list. `CHANGE_LOG` is empty right after every promotion by
-  design, so production always lands in single-list mode, while Test shows
-  the Recent/Archive switch again as soon as there are entries awaiting
-  promotion. Implemented as runtime behavior, not a preview/production
-  code fork, since `index.html` is a wholesale copy of `preview/index.html`
-  and forking would be one more thing to remember to strip on promotion.
+- **Changes tab: Recent = roughly the last two days, Archive = older**
+  (2026-09-29, at the user's request; **supersedes** the earlier rule that
+  `CHANGE_LOG` is emptied on every promotion and holds only unpromoted
+  work). The user first said production didn't need Recent/Archive, then
+  asked to keep the past two days on Recent and archive the rest. So at
+  each promotion, move entries older than ~2 days from `CHANGE_LOG` to the
+  top of `CHANGE_LOG_ARCHIVE`, and leave the newer ones (including the new
+  release's own entry) in `CHANGE_LOG`. The help text is neutral wording
+  now ("What's changed over the last couple of days") because production
+  shows it too. `renderChangeLog()` still hides the sub-tab switch and
+  shows one full list whenever `CHANGE_LOG` is empty, as a fallback.
+  Runtime behavior, not a preview/production code fork, since `index.html`
+  is a wholesale copy of `preview/index.html`.
 - **Header "Refresh Data" button** (`#btnRefreshData`,
   `refreshDataKeepingPlace()`, added 2026-09-29, at the user's request —
   data that ministers submit (availability, blackouts, confirmations,

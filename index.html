@@ -578,7 +578,7 @@
 <div id="loadError"></div>
 
   <section class="panel" id="panel-changes">
-    <p class="helptext" id="changesHelptext">What's new in this preview build — check these specifically before anything else. Newest first.</p>
+    <p class="helptext" id="changesHelptext">What's changed over the last couple of days. Newest first.</p>
     <nav class="subtabs" aria-label="Changes view" id="changesSubtabs">
       <button class="active" data-changesview="recent">Recent</button>
       <button data-changesview="archive">Archive</button>
@@ -992,7 +992,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-29.10";
+const APP_VERSION = "2026-09-29.11";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -5483,11 +5483,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
-];
-// Entries already live in production, newest first - moved here from
-// CHANGE_LOG at promotion time rather than deleted. See the block comment
-// above for the maintenance rule.
-const CHANGE_LOG_ARCHIVE = [
+  { date: 'Sep 29, 2026', version: '2026-09-29.11', items: [
+    'Changed: the Changes tab keeps the last couple of days of changes on "Recent" and everything older on "Archive". If nothing is listed as recent, the tab shows one plain list instead.'
+  ]},
   { date: 'Sep 29, 2026', version: '2026-09-29.10', items: [
     'Fixed: the Contacted button on a waiting recipient\'s card used to say "Contacted" by default (looked like a status, not a call to action) and flipped to "Not Contacted" right after you actually marked them contacted (looked like it hadn\'t worked). Now says "Contact" until you\'ve reached out, then "Contacted" once you have - matching the "Contacted" tag chip that appears next to their name.',
     'Fixed: icon buttons (Contact, Add to Calendar, Refresh, Next Appointment, and others) had zero space between the icon and its label on desktop, now that labels always show - a standing 8px spacing scale (4px as the icon-to-label exception) is now the standard for spacing here going forward.',
@@ -5504,7 +5502,12 @@ const CHANGE_LOG_ARCHIVE = [
     'Changed: the Contacted button (mark whether you\'ve reached out to a waiting recipient) now sits right in a slot\'s summary row, usable without expanding the slot - it briefly lived in the expanded detail only. It also now always shows "Contacted"/"Mark Contacted" as text, not just an icon.',
     'Changed: icon buttons with a hidden text label (Contacted, Flag Priority, Edit, Delete on Unplaced Candidates and similar) now show that label on every screen size, not just phones - a hover tooltip only works with a mouse, so icon-only was never actually clear on touch, and desktop has the room for a label anyway. Standing rule going forward: no icon-only controls.',
     'New: Add Blackout Date has an "All Ministers" option that blocks a date entirely - Quick Add Slots won\'t create any slots there. Only available when adding a new blackout, not editing an existing one. Now the default selection, since blocking a whole date is the more common reason to open this form.'
-  ]},
+  ]}
+];
+// Older entries, newest first. At each promotion, entries older than about
+// two days move here from CHANGE_LOG (the Recent tab) rather than being
+// deleted - see the block comment above for the maintenance rule.
+const CHANGE_LOG_ARCHIVE = [
   { date: 'Sep 27, 2026', version: '2026-09-27.12', items: [
     'New: Ministers can now also decline a session ("I can\'t make it"), not just confirm it - shows a red ✗ next to their name (portal and Scheduler) the same way confirming shows a green ✓. Confirming and declining are mutually exclusive and both fully reversible - tap the same button again to undo.'
   ]},
@@ -5626,13 +5629,27 @@ function switchChangesSub(view){
   changesSubView = view;
   $('#changesSubtabs').querySelectorAll('button[data-changesview]').forEach(b=>b.classList.toggle('active', b.dataset.changesview===view));
   $('#changesHelptext').textContent = view==='archive'
-    ? 'Already live in production — kept here for reference. Newest first.'
-    : "What's new in this preview build — check these specifically before anything else. Newest first.";
+    ? 'Older changes, kept here for reference. Newest first.'
+    : "What's changed over the last couple of days. Newest first.";
   renderChangeLog();
 }
 function renderChangeLog(){
   const box = $('#changeLog');
   if(!box) return;
+  // Recent/Archive only means something while there's pending (not yet
+  // promoted) work - i.e. in Test. Right after a promotion CHANGE_LOG is
+  // empty by design, which is production's permanent state, where a
+  // permanently-empty "Recent" tab is just noise. So with nothing pending,
+  // drop the sub-tab switch and show the full history as one list; the
+  // switch comes back on its own the moment CHANGE_LOG has entries. No
+  // preview/production fork in the code (the file is copied wholesale).
+  const pending = CHANGE_LOG.length > 0;
+  const subtabs = $('#changesSubtabs');
+  if(subtabs) subtabs.style.display = pending ? '' : 'none';
+  if(!pending){
+    changesSubView = 'archive';
+    $('#changesHelptext').textContent = "A running list of what's changed in the app, newest first.";
+  }
   const list = changesSubView==='archive' ? CHANGE_LOG_ARCHIVE : CHANGE_LOG;
   if(!list.length){
     box.innerHTML = `<div class="no-results">${changesSubView==='archive' ? 'Nothing archived yet.' : 'Nothing new since the last production push.'}</div>`;
