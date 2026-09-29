@@ -402,14 +402,10 @@ async function confirmAndDeleteForm() {
 
 // ---- rendering ------------------------------------------------------
 function render() {
-  if (state.step === STEP.INTRO) renderIntro();
-  else if (state.step === STEP.SECTION) renderSection();
-  else if (state.step === STEP.FINAL) renderFinal();
-  else if (state.step === STEP.DONE) renderDone();
-  // A re-render replaces the bar with a fresh, expanded one - re-sync it
-  // to the current scroll position (matters for in-place re-renders while
-  // already scrolled down).
-  syncTopBarCollapse();
+  if (state.step === STEP.INTRO) return renderIntro();
+  if (state.step === STEP.SECTION) return renderSection();
+  if (state.step === STEP.FINAL) return renderFinal();
+  if (state.step === STEP.DONE) return renderDone();
 }
 
 function renderIntro() {
@@ -426,26 +422,18 @@ function renderIntro() {
   document.getElementById("btnBegin").onclick = beginIntake;
 }
 
-// The top bar has two states (see styles.css ".top-bar-sticky.collapsed"):
-// expanded at the top of the page (full ministry name above the buttons),
-// collapsed once scrolled (short "FPHM Intake Form" title sharing one row
-// with the buttons, to give the form back the vertical space - matters
-// most on phones). Both title variants are always in the markup; CSS shows
-// one. Hysteresis (collapse past 80px, expand back under 20px) so the bar
-// changing height can't flip-flop right at a single threshold.
+// The ministry title sits OUTSIDE the sticky bar, in normal flow, so it
+// scrolls off the page with the content; only the buttons, progress bar
+// and section indicator stay pinned (user's design, 2026-09-29 - replaced
+// an earlier collapse-to-"FPHM Intake Form" attempt).
 function renderTopBar(sectionsCount, currentIdx, title) {
   const pct = sectionsCount ? Math.round(((currentIdx) / sectionsCount) * 100) : 0;
   return `
-    <div class="top-bar-sticky" id="topBar">
-      <div class="top-row">
-        <h1 class="intake-top-title">
-          <span class="title-full">Freedom Prayer Healing Ministry Intake Form</span>
-          <span class="title-short"><span class="t-fphm">FPHM</span> <span class="t-form">Intake Form</span></span>
-        </h1>
-        <div class="top-actions no-print">
-          <button class="btn-link" id="btnDeleteForm">Reset Form</button>
-          <button class="btn-link" id="btnSaveExit">Save &amp; continue later</button>
-        </div>
+    <h1 class="intake-top-title">Freedom Prayer Healing Ministry Intake Form</h1>
+    <div class="top-bar-sticky">
+      <div class="top-actions no-print">
+        <button class="btn-link" id="btnDeleteForm">Reset Form</button>
+        <button class="btn-link" id="btnSaveExit">Save &amp; continue later</button>
       </div>
       <div class="progress-outer"><div class="progress-inner" style="width:${pct}%"></div></div>
       <div class="progress-label">Section ${currentIdx + 1} of ${sectionsCount + 1}${title ? " — " + FPHM.escapeHtml(title) : ""}</div>
@@ -453,14 +441,6 @@ function renderTopBar(sectionsCount, currentIdx, title) {
     <div id="offlineBanner"></div>
   `;
 }
-function syncTopBarCollapse() {
-  const bar = document.getElementById("topBar");
-  if (!bar) return;
-  const y = window.scrollY || document.documentElement.scrollTop || 0;
-  if (y > 80) bar.classList.add("collapsed");
-  else if (y < 20) bar.classList.remove("collapsed");
-}
-window.addEventListener("scroll", syncTopBarCollapse, { passive: true });
 
 function renderOfflineBanner() {
   if (state.online) return "";
