@@ -960,7 +960,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-29.1";
+const APP_VERSION = "2026-09-29.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -2179,7 +2179,7 @@ function renderUnplacedCandidates(){
       ${s.notes?`<div class="notes">${escapeHtml(s.notes)}</div>`:''}
       ${renderIntakeLinkBlock(s)}
       <div class="toolbar" style="margin-top:10px;">
-        <button class="icon-btn${s.contacted?' success':''}" onclick="toggleContacted(${s.id})" title="${s.contacted?'Mark as not yet contacted':'Mark as contacted'}" aria-pressed="${s.contacted}" aria-label="${s.contacted?'Mark as not yet contacted':'Mark as contacted'}: ${escapeHtml(s.recipName)}">${ICONS.phone}<span class="btn-label">${s.contacted?'Contacted':'Mark Contacted'}</span></button>
+        <button class="icon-btn${s.contacted?' success':''}" onclick="toggleContacted(${s.id})" title="${s.contacted?'Mark as not yet contacted':'Mark as contacted'}" aria-pressed="${s.contacted}" aria-label="${s.contacted?'Mark as not yet contacted':'Mark as contacted'}: ${escapeHtml(s.recipName)}">${ICONS.phone}<span class="btn-label">${s.contacted?'Contacted':'Contact'}</span></button>
         <button class="icon-btn flag-btn${s.priority?' active':''}" onclick="togglePriority(${s.id})" title="${s.priority?'Remove priority':'Flag as priority'}" aria-pressed="${s.priority}" aria-label="${s.priority?'Remove priority from':'Flag as priority'} ${escapeHtml(s.recipName)}">${ICONS.flag(s.priority)}<span class="btn-label">${s.priority?'Remove Priority':'Flag Priority'}</span></button>
         <button class="icon-btn" onclick="editSession(${s.id})" title="Edit" aria-label="Edit ${escapeHtml(s.recipName)}">${ICONS.pencil}<span class="btn-label">Edit</span></button>
         <button class="icon-btn danger" onclick="deleteSession(${s.id})" title="Delete" aria-label="Remove ${escapeHtml(s.recipName)} from the waiting list">${ICONS.trash}<span class="btn-label">Delete</span></button>
@@ -2558,7 +2558,7 @@ function renderSlotCard(sl){
   // with a mouse hovering, and touch (this is used on phones) has no
   // hover at all, so an icon alone leaves a phone user guessing.
   const contactedBtn = (sl.status==='Tentative' && cand)
-    ? `<button type="button" class="icon-btn${cand.contacted?' success':''}" style="flex-shrink:0;display:inline-flex;align-items:center;gap:6px;" onclick="event.stopPropagation();toggleContacted(${cand.id})" title="${cand.contacted?'Mark as not yet contacted':'Mark as contacted'}" aria-pressed="${cand.contacted}" aria-label="${cand.contacted?'Mark as not yet contacted':'Mark as contacted'}: ${escapeHtml(cand.recipName)}">${ICONS.phone}<span>${cand.contacted?'Contacted':'Mark Contacted'}</span></button>`
+    ? `<button type="button" class="icon-btn${cand.contacted?' success':''}" style="flex-shrink:0;display:inline-flex;align-items:center;gap:6px;" onclick="event.stopPropagation();toggleContacted(${cand.id})" title="${cand.contacted?'Mark as not yet contacted':'Mark as contacted'}" aria-pressed="${cand.contacted}" aria-label="${cand.contacted?'Mark as not yet contacted':'Mark as contacted'}: ${escapeHtml(cand.recipName)}">${ICONS.phone}<span>${cand.contacted?'Contacted':'Contact'}</span></button>`
     : '';
   return `<div class="slot ${cls}${isOpen?' expanded':''}">
     <div style="display:flex;align-items:center;">
@@ -5387,7 +5387,7 @@ function generateReport(){
 ========================================================================= */
 const CHANGE_LOG = [
   { date: 'Sep 29, 2026', version: APP_VERSION, items: [
-    'Fixed: the Contacted button on a waiting recipient\'s card used to say "Contacted" by default (looked like a status, not a call to action) and flipped to "Not Contacted" right after you actually marked them contacted (looked like it hadn\'t worked). Now says "Mark Contacted" until you\'ve reached out, then just "Contacted" once you have - matching the "Contacted" tag chip that appears next to their name.'
+    'Fixed: the Contacted button on a waiting recipient\'s card used to say "Contacted" by default (looked like a status, not a call to action) and flipped to "Not Contacted" right after you actually marked them contacted (looked like it hadn\'t worked). Now says "Contact" until you\'ve reached out, then "Contacted" once you have - matching the "Contacted" tag chip that appears next to their name.'
   ]},
   { date: 'Sep 28, 2026', version: '2026-09-28.6', items: [
     'New: Intake Forms has an "Archived" tab now, alongside Submitted and In progress. Every form gets an Archive button (reversible - Unarchive puts it right back) and a Delete button (permanent). Delete used to only be offered for in-progress forms; now that Archive exists as the safer option first, Delete works on any form.',
