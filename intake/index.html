@@ -349,8 +349,11 @@ async function beginIntake() {
   scrollToTop();
 }
 
-// Lets the visitor delete their own in-progress form and start clean -
-// offered next to "Save & continue later" while filling it out. Not
+// Lets the visitor reset their own in-progress form and start clean -
+// labeled "Reset Form" (the button used to say "Delete my answers", but
+// that's what it does under the hood, not what it's *for* - renamed
+// 2026-09-29 at the user's request to describe the actual action).
+// Offered next to "Save & continue later" while filling it out. Not
 // offered once a form is Submitted (deliberately, per the user - once
 // staff/ministers may already be relying on it for a scheduled session,
 // the recipient shouldn't be able to pull it out from under them; the
@@ -361,7 +364,7 @@ async function beginIntake() {
 // one-off destructive action gated behind an explicit click.
 async function confirmAndDeleteForm() {
   if (!state.token) return;
-  if (!window.confirm("Delete your answers and start over? This can't be undone.")) return;
+  if (!window.confirm("Reset this form and start over? All your answers will be cleared. This can't be undone.")) return;
   try {
     await FPHM_API.deleteForm(state.token);
   } catch (e) {
@@ -423,8 +426,9 @@ function renderTopBar(sectionsCount, currentIdx, title) {
   const pct = sectionsCount ? Math.round(((currentIdx) / sectionsCount) * 100) : 0;
   return `
     <div class="top-bar-sticky">
+      <h1 class="intake-top-title">Freedom Prayer Healing Ministry Intake Form</h1>
       <div class="top-actions no-print">
-        <button class="btn-link" id="btnDeleteForm">Delete my answers</button>
+        <button class="btn-link" id="btnDeleteForm">Reset Form</button>
         <button class="btn-link" id="btnSaveExit">Save &amp; continue later</button>
       </div>
       <div class="progress-outer"><div class="progress-inner" style="width:${pct}%"></div></div>

@@ -1130,14 +1130,20 @@ existing session history.
   token and re-adopts whatever's saved locally under the old one (or
   lands on a clean Intro screen if there's nothing local), instead of
   leaving the visitor stuck.
-- **Visitor can delete their own in-progress form** (added 2026-09-26) —
-  a "Delete my answers" link sits next to "Save & continue later" in the
-  sticky top bar while filling the form out, calling
-  `confirmAndDeleteForm()`, which hits the Worker's new `POST
-  /api/intake/delete { token }` (`handleDelete()`) and then resets to a
-  clean Intro screen. Trust boundary is the same one load/save/submit
-  already use: knowing the token (a random UUID) is proof enough, no
-  separate check. **InProgress only, not Submitted** - originally also
+- **Visitor can reset their own in-progress form** (added 2026-09-26,
+  relabeled "Reset Form" 2026-09-29 at the user's request — the button
+  said "Delete my answers," describing the mechanism rather than what
+  it's actually for) — a "Reset Form" link sits next to "Save & continue
+  later" in the sticky top bar while filling the form out, calling
+  `confirmAndDeleteForm()` (function name unchanged — still literally a
+  delete under the hood, just relabeled/reworded at the UI level), with
+  its `window.confirm()` prompt reworded to match ("Reset this form and
+  start over? All your answers will be cleared. This can't be undone.").
+  Hits the Worker's `POST /api/intake/delete { token }` (`handleDelete()`)
+  and then resets to a clean Intro screen. Trust boundary is the same one
+  load/save/submit already use: knowing the token (a random UUID) is
+  proof enough, no separate check. **InProgress only, not Submitted** -
+  originally also
   offered on the thank-you screen after submitting, removed the same day
   at the user's explicit request: once a form is Submitted, staff/
   ministers may already be relying on it for a scheduled session, so the
@@ -1145,6 +1151,19 @@ existing session history.
   both places, not just by hiding the button - `handleDelete()` itself
   returns 403 for a Submitted item, so it can't be bypassed by calling
   the endpoint directly.
+- **Ministry name shown on every section, not just the intro screen**
+  (`.intake-top-title`, added 2026-09-29, at the user's request):
+  `renderTopBar()` now includes an `<h1>` reading "Freedom Prayer Healing
+  Ministry Intake Form" above the Reset Form/Save & continue later
+  buttons, on every section and the final step — previously the ministry
+  name only appeared once, on the intro screen's own `<h1>` (sourced from
+  the staff-editable `INTRO_TEXT.title` in `js/formConfig.js`, which
+  currently reads "...Intake Questionnaire", a slightly different wording
+  left as-is — this new heading is a separate, fixed string, not tied to
+  that editable config). Sized smaller than the intro's own h1 (1.05rem
+  vs 1.6rem) since this one stays pinned on screen the whole time via
+  `position:sticky`, and a full-size heading would eat too much of that
+  bar on every scroll.
 - **Long free-text answers auto-grow instead of clipping/scrolling**
   (added 2026-09-26) — every `<textarea>` (the "please explain"
   questions, and the checkboxes "Other, please specify" box) grows to

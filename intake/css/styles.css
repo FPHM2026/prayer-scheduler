@@ -190,6 +190,13 @@ button {
   margin-bottom: 10px;
 }
 
+/* Smaller than the intro screen's own h1 (1.6rem) - this one stays
+   pinned on screen the whole time you're filling out the form, so a
+   full-size heading would eat too much of the sticky bar on every
+   scroll. Added 2026-09-29 at the user's request, so the ministry name
+   is visible on every section, not just the intro screen. */
+.intake-top-title { font-size: 1.05rem; margin: 0 0 10px; }
+
 .top-bar-sticky {
   position: sticky;
   top: 0;
