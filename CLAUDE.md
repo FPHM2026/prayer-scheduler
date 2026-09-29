@@ -539,22 +539,36 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
       Active/Inactive toggle elsewhere on this tab, which does not touch
       group membership at all — only an actual roster **deletion** revokes
       portal access today.
-- **Info tip on buttons with non-obvious behavior** (`.info-tip`/
-  `.info-btn`/`.info-tip-box`, `toggleInfoTip()`, added 2026-09-29, at the
-  user's request — "it would be nice for me not to have to remember what
-  it actually does," starting with "+ Quick Add Slots"): a small "What's
-  this?" text button (with an (i) icon — labeled per the no-icon-only
-  rule) sits next to a button whose behavior isn't obvious from its label
-  alone. Tapping it reveals a small explanation box; tapping it again, or
-  anywhere else on the page, closes it. **Deliberately tap-to-toggle, not
-  a hover/title tooltip** — same reasoning as the no-icon-only-controls
-  rule: a hover tooltip is invisible on touch, and this app is used on
-  phones. Only applied to Quick Add Slots so far — the user asked to
-  identify buttons with "complex logic" generally; rather than guess the
-  full list unprompted, more candidates (Remove Unused Slots, the "All
-  Ministers" blackout option, Archive vs. Delete on Intake Forms, Reports'
-  Generate, the Drop-in/Training quick-add buttons) are pending the user's
-  own list of what actually needs explaining, not a blanket sweep.
+- **Info button on controls with non-obvious behavior** (`.info-tip`/
+  `.info-btn`, `#infoModal`, `openInfoModal()`/`closeInfoModal()`, added
+  2026-09-29, at the user's request — "it would be nice for me not to
+  have to remember what it actually does," starting with "+ Quick Add
+  Slots"): a small "What's this?" text button (with an (i) icon — labeled
+  per the no-icon-only rule) sits on its own line directly **under** the
+  main button it explains (`.info-tip{display:block;margin-top:6px;}` —
+  the main button and the info button share one wrapping `<div>`, which is
+  what keeps the info button under just that one control while sibling
+  toolbar buttons stay on the same row). Clicking it opens `#infoModal`, a
+  centered, **full-viewport-width** modal (`style="max-width:none"`
+  overrides the shared `.modal` class's 560px cap — every *other* modal in
+  the app keeps that cap; this is the one deliberate exception) showing a
+  plain-language explanation, closed via its own Close button, clicking
+  the backdrop, or Escape — all for free, since it reuses the exact same
+  `.modal-bg`/`.open` convention every other modal here already uses.
+  **Design history**: this went through two earlier shapes the same day
+  before landing here — first a hover/title-tooltip-style approach was
+  rejected in favor of tap-to-toggle (hover doesn't work on touch, same
+  reasoning as the no-icon-only-controls rule), then a tap-to-toggle
+  *inline* popover box (`.info-tip-box`) had its own mobile bug (floated
+  over the next toolbar button instead of pushing it down) and was
+  ultimately replaced entirely by the current modal approach, which sidesteps
+  that whole class of positioning problem by not being inline at all.
+  Only applied to Quick Add Slots so far — the user asked to identify
+  buttons with "complex logic" generally; rather than guess the full list
+  unprompted, more candidates (Remove Unused Slots, the "All Ministers"
+  blackout option, Archive vs. Delete on Intake Forms, Reports' Generate,
+  the Drop-in/Training quick-add buttons) are pending the user's own list
+  of what actually needs explaining, not a blanket sweep.
 - **Minister attendance confirmation/decline** (added and promoted to
   production 2026-09-27, `portal/index.html` + `preview/index.html`/
   `index.html` — see `ConfirmedMinisterIDs`/`DeclinedMinisterIDs` in the

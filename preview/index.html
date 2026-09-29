@@ -128,28 +128,19 @@
   button.icon-btn.danger:hover{background:var(--danger-bg);color:var(--danger);}
   button.icon-btn.success{color:var(--ok);}
   button.icon-btn.success:hover{background:var(--ok-bg);color:var(--ok);}
-  /* Info tip - a small "what does this do?" disclosure next to a button
-     whose behavior isn't obvious from its label alone (added 2026-09-29,
-     at the user's request, starting with Quick Add Slots). Tap-to-toggle,
-     not hover-only - a hover tooltip is invisible on touch, same reason
-     the no-icon-only-controls rule above exists, so this needs its own
-     click handling (toggleInfoTip()) rather than a plain title attribute.
-     Text label included even on an auxiliary control like this, per the
-     same standing rule - "What's this?" next to the (i) icon. */
-  .info-tip{position:relative;display:inline-flex;}
+  /* Info button - a small "what does this do?" trigger sitting on its own
+     line directly under a button whose behavior isn't obvious from its
+     label alone (added 2026-09-29, at the user's request, starting with
+     Quick Add Slots). Opens #infoModal (see its HTML/JS) rather than a
+     hover tooltip or an inline popover - a hover tooltip is invisible on
+     touch (same reasoning as the no-icon-only-controls rule above), and
+     an earlier inline-popover version had its own mobile overlap bugs a
+     real centered modal doesn't have. Text label included even on an
+     auxiliary control like this, per the same standing rule - "What's
+     this?" next to the (i) icon. */
+  .info-tip{display:block;margin-top:6px;}
   button.info-btn{background:none;border:none;cursor:pointer;color:var(--muted);display:inline-flex;align-items:center;gap:4px;font-size:var(--fs-xs);font-weight:600;padding:4px 8px;border-radius:6px;min-height:32px;}
   button.info-btn:hover{background:var(--bg);color:var(--gold);}
-  .info-tip-box{position:absolute;z-index:50;top:100%;left:0;margin-top:4px;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-md);padding:10px 12px;font-size:var(--fs-xs);line-height:1.45;color:var(--text);width:260px;max-width:80vw;}
-  /* Below 640px, .toolbar stacks to a single full-width column (see the
-     Tablet-and-up override further down) - an absolutely-positioned box
-     there floats out of flow and overlaps whatever toolbar button comes
-     next, instead of pushing it down. Fixed by dropping out of absolute
-     positioning on mobile: the box becomes a normal, full-width, in-flow
-     block directly under the buttons, same as the user asked for. */
-  @media (max-width:640px){
-    .info-tip{flex-wrap:wrap;width:100%;}
-    .info-tip-box{position:static;flex:0 0 100%;width:auto;max-width:none;margin-top:8px;}
-  }
   /* Standing rule (2026-09-28, at the user's explicit request): an
      icon-only control is never acceptable, on any viewport - a title
      tooltip only works with a mouse hovering, and touch has no hover at
@@ -607,11 +598,12 @@
       <div class="stats-body"><div class="stats-body-inner" id="schedPlanStats"></div></div>
     </div>
     <div class="toolbar">
-      <span class="info-tip">
+      <div>
         <button class="btn" id="btnQuickAddSlots">+ Quick Add Slots</button>
-        <button type="button" class="info-btn" onclick="toggleInfoTip(this)" aria-expanded="false"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="8" r=".5" fill="currentColor" stroke="none"/></svg><span>What's this?</span></button>
-        <span class="info-tip-box" hidden>Fills in open slots for a date range and set of weekdays, based on the Quick Slots defaults in Settings (how many Freedom Session slots per day, which weekdays, the times) and who's actually free - minus anyone blacked out, minus slots that already exist. Never touches a slot someone's already claimed or booked. Sunday Drop-In gets one slot automatically on the 4th Sunday of the month. Also sweeps up any never-claimed Open slots dated before the range you pick, since moving to a new range is treated as "done with the old one."</span>
-      </span>
+        <span class="info-tip">
+          <button type="button" class="info-btn" onclick="showQuickAddInfo()"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="8" r=".5" fill="currentColor" stroke="none"/></svg><span>What's this?</span></button>
+        </span>
+      </div>
       <button class="btn secondary" id="btnAddWaiting2">+ Add to Waiting List</button>
       <button class="btn secondary" id="btnRemoveUnusedSlots">Remove Unused Slots</button>
     </div>
@@ -986,10 +978,24 @@
   </div>
 </div>
 
+<!-- Centered, full-viewport-width "what does this do?" modal (added
+     2026-09-29, at the user's request) - style="max-width:none" overrides
+     the shared .modal class's 560px cap just for this one, since every
+     other modal in the app should keep that cap. -->
+<div class="modal-bg" id="infoModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="infoModalTitle" style="max-width:none;">
+    <h2 id="infoModalTitle"></h2>
+    <p id="infoModalMsg" style="margin:0 0 18px;white-space:pre-line;"></p>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeInfoModal()">Close</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-29.5";
+const APP_VERSION = "2026-09-29.6";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1490,18 +1496,18 @@ async function withLoading(btn, loadingText, fn){
 // comment above for why this can't just be a title tooltip. Opening one
 // closes any other that's open; clicking anywhere outside an open one
 // closes it too.
-window.toggleInfoTip = function(btn){
-  const box = btn.parentElement.querySelector('.info-tip-box');
-  const willOpen = box.hidden;
-  document.querySelectorAll('.info-tip-box').forEach(b=>{ b.hidden = true; });
-  document.querySelectorAll('.info-btn').forEach(b=>b.setAttribute('aria-expanded','false'));
-  if(willOpen){ box.hidden = false; btn.setAttribute('aria-expanded','true'); }
+// Centered, full-width "what does this do?" modal - see #infoModal above.
+// Reuses the same .modal-bg.open show/hide convention every other modal
+// here uses (closeAllModals()/Escape handling picks it up automatically).
+window.openInfoModal = function(title, text){
+  $('#infoModalTitle').textContent = title;
+  $('#infoModalMsg').textContent = text;
+  $('#infoModal').classList.add('open');
 };
-document.addEventListener('click', (e)=>{
-  if(e.target.closest('.info-tip')) return;
-  document.querySelectorAll('.info-tip-box').forEach(b=>{ b.hidden = true; });
-  document.querySelectorAll('.info-btn').forEach(b=>b.setAttribute('aria-expanded','false'));
-});
+window.closeInfoModal = function(){ $('#infoModal').classList.remove('open'); };
+window.showQuickAddInfo = function(){
+  openInfoModal('Quick Add Slots', "Fills in open slots for a date range and set of weekdays, based on the Quick Slots defaults in Settings (how many Freedom Session slots per day, which weekdays, the times) and who's actually free - minus anyone blacked out, minus slots that already exist. Never touches a slot someone's already claimed or booked.\n\nSunday Drop-In gets one slot automatically on the 4th Sunday of the month.\n\nAlso sweeps up any never-claimed Open slots dated before the range you pick, since moving to a new range is treated as \"done with the old one.\"");
+};
 
 let confirmResolver = null;
 function closeConfirm(result){
@@ -5436,8 +5442,7 @@ const CHANGE_LOG = [
   { date: 'Sep 29, 2026', version: APP_VERSION, items: [
     'Fixed: the Contacted button on a waiting recipient\'s card used to say "Contacted" by default (looked like a status, not a call to action) and flipped to "Not Contacted" right after you actually marked them contacted (looked like it hadn\'t worked). Now says "Contact" until you\'ve reached out, then "Contacted" once you have - matching the "Contacted" tag chip that appears next to their name.',
     'Fixed: icon buttons (Contact, Add to Calendar, Refresh, Next Appointment, and others) had zero space between the icon and its label on desktop, now that labels always show - a standing 8px spacing scale (4px as the icon-to-label exception) is now the standard for spacing here going forward.',
-    'New: a "What\'s this?" info button next to "+ Quick Add Slots" explains exactly what it does before you click it - tap it to see, tap again (or elsewhere) to dismiss. Same treatment coming to other buttons with non-obvious behavior.',
-    'Fixed: on phones, that explanation box could float over the next toolbar button instead of pushing it down. It now sits in normal flow, full width, directly under the buttons.'
+    'New: a "What\'s this?" info button sits right under "+ Quick Add Slots" and explains exactly what it does before you click it - opens a centered, full-width popup, tap Close (or tap outside, or press Escape) to dismiss. Same treatment coming to other buttons with non-obvious behavior.'
   ]},
   { date: 'Sep 28, 2026', version: '2026-09-28.6', items: [
     'New: Intake Forms has an "Archived" tab now, alongside Submitted and In progress. Every form gets an Archive button (reversible - Unarchive puts it right back) and a Delete button (permanent). Delete used to only be offered for in-progress forms; now that Archive exists as the safer option first, Delete works on any form.',
