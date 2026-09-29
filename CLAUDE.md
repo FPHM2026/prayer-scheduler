@@ -1074,6 +1074,19 @@ existing session history.
   manually by the user (same as Priority/Contacted before it, see history
   above), not by this app; the mapping code reads it safely as null if the
   column isn't there yet, same convention as those two.
+  **An intake form already linked to one session is excluded everywhere
+  else a form gets suggested or picked** (`linkedIntakeResponseIds()`,
+  added 2026-09-29, at the user's request — "any linked intake form should
+  not be available in the list of forms to link for other people"):
+  both `findIntakeForRecipient()` (the auto-suggested match banner) and
+  `intakeLinkPickerResultsHtml()` (the manual search picker) now filter
+  out any intake response id already present on some *other* session's
+  `IntakeResponseId`, so the same recipient's answers can't end up linked
+  to two sessions at once, whether by an accidental duplicate-name
+  auto-match or a manual pick. Harmless for a session's own current
+  link — reopening "Change" on a session that already has one just won't
+  offer to re-link the same form to itself, which was never a meaningful
+  action anyway.
 - **Preventing accidental duplicate in-progress forms (added
   2026-09-26)** — the two-device case (someone starts the form, doesn't
   save/use their resume link, then opens it fresh on another device) used

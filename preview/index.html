@@ -1001,7 +1001,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-29.7";
+const APP_VERSION = "2026-09-29.8";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -4399,10 +4399,18 @@ window.closeIntakeDetail = function(){
 // given recipient name, used by renderRecipientHistory() below - name
 // match only (same convention as prior-session matching elsewhere in this
 // app; recipients aren't persistent records with a stable id to join on).
+// Every intake form id already linked to SOME session - an already-linked
+// form shouldn't be offered again, whether as an auto-suggested match or
+// in the manual picker, so one recipient's intake answers can't end up
+// attached to two different sessions by accident.
+function linkedIntakeResponseIds(){
+  return new Set(sessions.filter(s=>s.intakeResponseId!=null).map(s=>s.intakeResponseId));
+}
 function findIntakeForRecipient(name){
   if(!name) return null;
   const norm = name.trim().toLowerCase();
-  const matches = intakeResponses.filter(i => (i.recipName||'').trim().toLowerCase()===norm);
+  const linkedIds = linkedIntakeResponseIds();
+  const matches = intakeResponses.filter(i => (i.recipName||'').trim().toLowerCase()===norm && !linkedIds.has(i.id));
   if(!matches.length) return null;
   // Prefer a Submitted one; among ties, the most recently touched.
   matches.sort((a,b)=>{
@@ -4461,7 +4469,9 @@ window.filterIntakeLinkResults = function(sessionId){
 };
 function intakeLinkPickerResultsHtml(sessionId, query){
   const q = (query||'').trim().toLowerCase();
+  const linkedIds = linkedIntakeResponseIds();
   const matches = intakeResponses
+    .filter(i => !linkedIds.has(i.id))
     .filter(i => !q || (i.recipName||'').toLowerCase().includes(q) || (i.recipEmail||'').toLowerCase().includes(q))
     .slice(0, 8);
   if(!matches.length) return '<p class="helptext">No matching intake forms.</p>';
@@ -5444,7 +5454,8 @@ const CHANGE_LOG = [
   { date: 'Sep 29, 2026', version: APP_VERSION, items: [
     'Fixed: the Contacted button on a waiting recipient\'s card used to say "Contacted" by default (looked like a status, not a call to action) and flipped to "Not Contacted" right after you actually marked them contacted (looked like it hadn\'t worked). Now says "Contact" until you\'ve reached out, then "Contacted" once you have - matching the "Contacted" tag chip that appears next to their name.',
     'Fixed: icon buttons (Contact, Add to Calendar, Refresh, Next Appointment, and others) had zero space between the icon and its label on desktop, now that labels always show - a standing 8px spacing scale (4px as the icon-to-label exception) is now the standard for spacing here going forward.',
-    'New: "+ Quick Add Slots" now has a small (i) icon fused onto its right edge - looks like one button, but tapping just that icon explains exactly what the button does (opens a centered popup) without triggering it, while tapping the rest of the button still runs it normally. Same treatment coming to other buttons with non-obvious behavior.'
+    'New: "+ Quick Add Slots" now has a small (i) icon fused onto its right edge - looks like one button, but tapping just that icon explains exactly what the button does (opens a centered popup) without triggering it, while tapping the rest of the button still runs it normally. Same treatment coming to other buttons with non-obvious behavior.',
+    'Fixed: an intake form already linked to one session could still show up as a match (or in the manual picker) for a different session, risking the same intake answers getting linked to two sessions at once. Already-linked forms are now excluded everywhere a form gets suggested or picked.'
   ]},
   { date: 'Sep 28, 2026', version: '2026-09-28.6', items: [
     'New: Intake Forms has an "Archived" tab now, alongside Submitted and In progress. Every form gets an Archive button (reversible - Unarchive puts it right back) and a Delete button (permanent). Delete used to only be offered for in-progress forms; now that Archive exists as the safer option first, Delete works on any form.',
