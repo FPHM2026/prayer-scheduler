@@ -561,6 +561,8 @@
   <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end;margin-left:auto;">
     <a href="./preview/" class="preview-badge" id="previewBadge" hidden>🧪 Preview build available</a>
     <span class="who" id="whoami"></span>
+    <span class="version-tag" id="lastRefreshed" style="margin:0;"></span>
+    <button class="btn secondary" id="btnRefreshData" style="padding:8px 14px;min-height:36px;display:inline-flex;align-items:center;gap:4px;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg><span>Refresh Data</span></button>
     <button class="btn secondary" id="btnSignOut" style="padding:8px 14px;min-height:36px;">Sign Out</button>
   </div>
 </header>
@@ -1002,7 +1004,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-29.9";
+const APP_VERSION = "2026-09-29.10";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1382,6 +1384,27 @@ async function loadAll(){
   });
   computeSessionNumbers();
   renderAll();
+  const stamp = document.getElementById('lastRefreshed');
+  if(stamp) stamp.textContent = 'Data as of ' + fmtTime(new Date());
+}
+// Header "Refresh Data" - re-runs loadAll() in place. renderAll() only
+// re-renders each tab's own lists; it never calls switchTab(), so whichever
+// tab you're on stays put (unlike a browser reload, which resets to the
+// default tab). Deliberately manual, not a background timer: an
+// auto-refresh re-rendering under an admin mid-planning is exactly the
+// interruption to avoid. Refuses while any modal is open, so a refresh
+// can't shift things under an in-progress edit (the Form Editor's unsaved
+// draft is already protected separately by schemaDirty in loadAll()).
+async function refreshDataKeepingPlace(){
+  if(document.querySelector('.modal-bg.open')){
+    showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Finish or close the open window first</div><div>Refreshing while a form is open could disturb what you're working on.</div>`);
+    return;
+  }
+  try{
+    await withLoading($('#btnRefreshData'), 'Refreshing…', loadAll);
+  }catch(e){
+    showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Couldn't refresh</div><div>${escapeHtml(e.message||'Unknown error')}</div>`);
+  }
 }
 function toHM(iso){
   if(!iso) return '';
@@ -1561,6 +1584,7 @@ function wireApp(){
   appWired = true;
   document.querySelectorAll('nav[aria-label="Primary"] button').forEach(b=>b.addEventListener('click', ()=>switchTab(b.dataset.tab)));
   $('#btnRefresh').addEventListener('click', ()=>withLoading($('#btnRefresh'), 'Refreshing…', loadAll));
+  $('#btnRefreshData').addEventListener('click', refreshDataKeepingPlace);
   $('#search').addEventListener('input', renderSchedule);
   wireSearchClear('search');
   $('#range').addEventListener('change', renderSchedule);
@@ -5476,6 +5500,7 @@ const CHANGE_LOG = [
     'Fixed: icon buttons (Contact, Add to Calendar, Refresh, Next Appointment, and others) had zero space between the icon and its label on desktop, now that labels always show - a standing 8px spacing scale (4px as the icon-to-label exception) is now the standard for spacing here going forward.',
     'New: "+ Quick Add Slots" now has a small (i) icon fused onto its right edge - looks like one button, but tapping just that icon explains exactly what the button does (opens a centered popup) without triggering it, while tapping the rest of the button still runs it normally. Same treatment coming to other buttons with non-obvious behavior.',
     'Fixed: an intake form already linked to one session could still show up as a match (or in the manual picker) for a different session, risking the same intake answers getting linked to two sessions at once. Already-linked forms are now excluded everywhere a form gets suggested or picked.',
+    'New: a "Refresh Data" button in the header reloads the latest data (new availability, blackout dates, intake forms, confirmations) without leaving the tab you\'re on - no more full browser reload back to the default tab. It\'s manual on purpose so nothing changes under you mid-planning, it won\'t run while a form/window is open, and the header shows "Data as of" the time of the last load.',
     'Changed: Intake Forms\' "Submitted" tab is now split into "Unlinked" and "Linked" - a submitted form shows up under Linked as soon as it\'s attached to a session, Unlinked otherwise, so you can see at a glance which submitted forms still need to be connected to a session.'
   ]},
   { date: 'Sep 28, 2026', version: '2026-09-28.6', items: [

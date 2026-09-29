@@ -539,6 +539,23 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
       Active/Inactive toggle elsewhere on this tab, which does not touch
       group membership at all — only an actual roster **deletion** revokes
       portal access today.
+- **Header "Refresh Data" button** (`#btnRefreshData`,
+  `refreshDataKeepingPlace()`, added 2026-09-29, at the user's request —
+  data that ministers submit (availability, blackouts, confirmations,
+  intake forms) only appeared after a full browser reload, which also
+  dumped the admin back on the default tab): re-runs `loadAll()` in
+  place. `renderAll()` re-renders each tab's lists but never calls
+  `switchTab()`, so the current tab is kept. **Manual, deliberately not an
+  auto-refresh timer** — the user's explicit concern was not interrupting
+  an admin mid-planning. It refuses to run while any `.modal-bg.open` is
+  showing (toast explains why), so a refresh can't shift things under an
+  in-progress edit; the Form Editor's unsaved draft is separately
+  protected by `schemaDirty` in `loadAll()`. `loadAll()` also stamps
+  `#lastRefreshed` ("Data as of 2:41 PM") on every load, including
+  post-save reloads, so the header always shows how fresh the data is.
+  The older "Refresh" button inside the unlinked legacy Schedule panel
+  (`#btnRefresh`) is untouched. Labeled text button per the
+  no-icon-only rule. Test only until promoted.
 - **Info icon fused onto controls with non-obvious behavior** (`.split-btn`/
   `.split-btn-main`/`.split-btn-info`, `#infoModal`,
   `openInfoModal()`/`closeInfoModal()`, added 2026-09-29, at the user's
