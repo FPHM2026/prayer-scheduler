@@ -1192,6 +1192,19 @@ existing session history.
     `#e8e0d3`, and gave `.progress-inner` a `min-width:8px` so even the
     very first section shows a visible sliver of fill rather than nothing
     at 0% — both the user's own suggested fixes.
+  - **Top bar collapses on scroll** (added 2026-09-29, at the user's
+    request): at the top of the page the bar shows the full ministry name
+    above the Reset Form / Save & continue later buttons; once scrolled it
+    collapses to a short "FPHM Intake Form" on the *left of the same row*
+    as the buttons, returning vertical space to the form (mainly for
+    phones). `renderTopBar()` always emits both title variants
+    (`.title-full`/`.title-short`) and CSS picks one via the `.collapsed`
+    class, which `syncTopBarCollapse()` toggles from a passive scroll
+    listener — collapse past 80px, expand back under 20px (hysteresis, so
+    the bar changing height can't flip-flop at one threshold). `render()`
+    re-syncs after every render since a fresh bar starts expanded. Short
+    title is one line on wide screens; at ≤520px it stacks "FPHM" over
+    "Intake Form" so the buttons keep their room, as asked.
   - **Sticky top bar's section-indicator spacing** (added 2026-09-29,
     same request; reworked the same day after a screenshot): first
     attempt bumped `.progress-label`'s `margin-bottom` 10px→14px, but a
