@@ -555,7 +555,8 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
   post-save reloads, so the header always shows how fresh the data is.
   The older "Refresh" button inside the unlinked legacy Schedule panel
   (`#btnRefresh`) is untouched. Labeled text button per the
-  no-icon-only rule. Test only until promoted.
+  no-icon-only rule. Promoted to production 2026-09-29 (version
+  2026-09-29.10) along with that day's other Test work.
 - **Info icon fused onto controls with non-obvious behavior** (`.split-btn`/
   `.split-btn-main`/`.split-btn-info`, `#infoModal`,
   `openInfoModal()`/`closeInfoModal()`, added 2026-09-29, at the user's

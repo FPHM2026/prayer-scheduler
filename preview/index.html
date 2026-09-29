@@ -5495,7 +5495,12 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
-  { date: 'Sep 29, 2026', version: APP_VERSION, items: [
+];
+// Entries already live in production, newest first - moved here from
+// CHANGE_LOG at promotion time rather than deleted. See the block comment
+// above for the maintenance rule.
+const CHANGE_LOG_ARCHIVE = [
+  { date: 'Sep 29, 2026', version: '2026-09-29.10', items: [
     'Fixed: the Contacted button on a waiting recipient\'s card used to say "Contacted" by default (looked like a status, not a call to action) and flipped to "Not Contacted" right after you actually marked them contacted (looked like it hadn\'t worked). Now says "Contact" until you\'ve reached out, then "Contacted" once you have - matching the "Contacted" tag chip that appears next to their name.',
     'Fixed: icon buttons (Contact, Add to Calendar, Refresh, Next Appointment, and others) had zero space between the icon and its label on desktop, now that labels always show - a standing 8px spacing scale (4px as the icon-to-label exception) is now the standard for spacing here going forward.',
     'New: "+ Quick Add Slots" now has a small (i) icon fused onto its right edge - looks like one button, but tapping just that icon explains exactly what the button does (opens a centered popup) without triggering it, while tapping the rest of the button still runs it normally. Same treatment coming to other buttons with non-obvious behavior.',
@@ -5506,12 +5511,7 @@ const CHANGE_LOG = [
   { date: 'Sep 28, 2026', version: '2026-09-28.6', items: [
     'New: Intake Forms has an "Archived" tab now, alongside Submitted and In progress. Every form gets an Archive button (reversible - Unarchive puts it right back) and a Delete button (permanent). Delete used to only be offered for in-progress forms; now that Archive exists as the safer option first, Delete works on any form.',
     'Setup needed for this to show cleanly in SharePoint\'s own list view: add "Archived" as a Choice option on the IntakeResponses list\'s Status column. The app works either way, but SharePoint\'s own UI won\'t display it properly until that option exists there too.'
-  ]}
-];
-// Entries already live in production, newest first - moved here from
-// CHANGE_LOG at promotion time rather than deleted. See the block comment
-// above for the maintenance rule.
-const CHANGE_LOG_ARCHIVE = [
+  ]},
   { date: 'Sep 28, 2026', version: '2026-09-28.5', items: [
     'Changed: the Contacted button (mark whether you\'ve reached out to a waiting recipient) now sits right in a slot\'s summary row, usable without expanding the slot - it briefly lived in the expanded detail only. It also now always shows "Contacted"/"Mark Contacted" as text, not just an icon.',
     'Changed: icon buttons with a hidden text label (Contacted, Flag Priority, Edit, Delete on Unplaced Candidates and similar) now show that label on every screen size, not just phones - a hover tooltip only works with a mouse, so icon-only was never actually clear on touch, and desktop has the room for a label anyway. Standing rule going forward: no icon-only controls.',

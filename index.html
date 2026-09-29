@@ -116,7 +116,7 @@
   button.btn.success{background:var(--ok);color:#fff;}
   button.btn.success:hover:not(:disabled){background:#245f28;}
   button.btn:disabled{opacity:.5;cursor:not-allowed;}
-  button.icon-btn{background:none;border:none;cursor:pointer;padding:8px 10px;color:var(--navy);min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;}
+  button.icon-btn{background:none;border:none;cursor:pointer;padding:8px 10px;color:var(--navy);min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:4px;border-radius:6px;}
   /* Larger variant for the Form Editor's move/delete row - the plain
      up/down text arrows read as noticeably smaller/thinner than an SVG
      icon like trash sitting right next to them, and felt cramped next to
@@ -128,6 +128,27 @@
   button.icon-btn.danger:hover{background:var(--danger-bg);color:var(--danger);}
   button.icon-btn.success{color:var(--ok);}
   button.icon-btn.success:hover{background:var(--ok-bg);color:var(--ok);}
+  /* Split button - a "what does this do?" (i) icon fused onto the right
+     edge of a button whose behavior isn't obvious from its label alone
+     (added 2026-09-29, at the user's explicit design direction, starting
+     with Quick Add Slots), so the pair reads as ONE button with an info
+     corner rather than two separate controls. Two real <button>s share
+     one visual shell (background/radius live on the shell, not either
+     button) with a subtle divider between them - the left button fires
+     the normal action, the right one (16x16 icon, event.stopPropagation()
+     so the click doesn't also reach anything listening on the shell)
+     opens #infoModal. This is a deliberate, explicit exception to the
+     no-icon-only-controls rule above: the icon has no text label of its
+     own (just aria-label/title) because it's a secondary hit-target
+     fused into an already-labeled control, not a standalone button - the
+     user asked for exactly this shape after an earlier labeled-button
+     version ("What's this?" on its own line) didn't read as one button. */
+  .split-btn{display:inline-flex;border-radius:6px;overflow:hidden;}
+  .split-btn .split-btn-main{border-radius:0;}
+  .split-btn-info{background:var(--primary);color:var(--on-primary);border:none;border-left:1px solid rgba(0,0,0,.18);width:36px;min-width:36px;min-height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;}
+  .split-btn-info:hover{background:var(--primary-dark);}
+  .split-btn.secondary .split-btn-info,.split-btn-info.secondary{background:var(--card);color:var(--navy);border-left-color:var(--border);}
+  .split-btn.secondary .split-btn-info:hover{background:#f1ede4;}
   /* Standing rule (2026-09-28, at the user's explicit request): an
      icon-only control is never acceptable, on any viewport - a title
      tooltip only works with a mouse hovering, and touch has no hover at
@@ -135,10 +156,13 @@
      label anyway, so there's no viewport where icon-only is actually
      justified. .btn-label is always visible; the 640px breakpoint below
      only changes LAYOUT (stacks to full-width, roomier padding), never
-     whether the label itself shows. */
+     whether the label itself shows. Icon-to-label gap is the spacing
+     scale's 4px half-step everywhere (base .icon-btn rule above and the
+     mobile override below both use it) - see the 8px spacing scale note
+     in Style/tone notes. */
   .toolbar .icon-btn .btn-label{display:inline;}
   @media (max-width:640px){
-    .toolbar .icon-btn{width:100%;justify-content:flex-start;gap:8px;padding:10px 14px;}
+    .toolbar .icon-btn{width:100%;justify-content:flex-start;gap:4px;padding:10px 14px;}
     .toolbar .icon-btn .btn-label{font-size:var(--fs-sm);font-weight:600;}
   }
 
@@ -279,7 +303,7 @@
   .sess-row>*:first-child{min-width:0;}
   .sess-meta{color:var(--muted);font-size:var(--fs-sm);margin-top:3px;}
   .sess-actions{display:flex;gap:2px;flex-shrink:0;}
-  .wa-note{display:inline-flex;align-items:center;gap:5px;color:var(--muted);font-size:var(--fs-sm);margin-top:4px;}
+  .wa-note{display:inline-flex;align-items:center;gap:4px;color:var(--muted);font-size:var(--fs-sm);margin-top:4px;}
   .wa-note.on{color:var(--ok);font-weight:600;}
 
   .stat-line{display:flex;gap:16px;flex-wrap:wrap;padding:12px 4px;font-size:var(--fs-sm);color:var(--text);border-bottom:1px solid #f1ede4;}
@@ -328,7 +352,7 @@
   .trend-chart{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:18px;box-shadow:var(--shadow-sm);}
   .trend-title-row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
   .trend-title{font-size:var(--fs-2xs);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;}
-  .trend-legend{display:flex;align-items:center;gap:5px;font-size:var(--fs-2xs);color:var(--muted);font-weight:600;white-space:nowrap;}
+  .trend-legend{display:flex;align-items:center;gap:4px;font-size:var(--fs-2xs);color:var(--muted);font-weight:600;white-space:nowrap;}
   .trend-legend .legend-dot{width:9px;height:9px;border-radius:2px;display:inline-block;}
   .trend-legend .legend-dot.this{background:var(--primary);}
   .trend-legend .legend-dot.last{background:var(--muted-bar);margin-left:10px;}
@@ -508,6 +532,7 @@
 </head>
 <body>
 
+
 <div id="signinScreen">
   <h1>FPHM Scheduler</h1>
   <p class="version-tag" id="versionTagSignin" style="display:block;"></p>
@@ -524,6 +549,8 @@
   <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end;margin-left:auto;">
     <a href="./preview/" class="preview-badge" id="previewBadge" hidden>🧪 Preview build available</a>
     <span class="who" id="whoami"></span>
+    <span class="version-tag" id="lastRefreshed" style="margin:0;"></span>
+    <button class="btn secondary" id="btnRefreshData" style="padding:8px 14px;min-height:36px;display:inline-flex;align-items:center;gap:4px;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg><span>Refresh Data</span></button>
     <button class="btn secondary" id="btnSignOut" style="padding:8px 14px;min-height:36px;">Sign Out</button>
   </div>
 </header>
@@ -569,7 +596,10 @@
       <div class="stats-body"><div class="stats-body-inner" id="schedPlanStats"></div></div>
     </div>
     <div class="toolbar">
-      <button class="btn" id="btnQuickAddSlots">+ Quick Add Slots</button>
+      <span class="split-btn">
+        <button class="btn split-btn-main" id="btnQuickAddSlots">+ Quick Add Slots</button>
+        <button type="button" class="split-btn-info" onclick="event.stopPropagation();showQuickAddInfo()" aria-label="What does Quick Add Slots do?" title="What does this do?"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="8" r=".5" fill="currentColor" stroke="none"/></svg></button>
+      </span>
       <button class="btn secondary" id="btnAddWaiting2">+ Add to Waiting List</button>
       <button class="btn secondary" id="btnRemoveUnusedSlots">Remove Unused Slots</button>
     </div>
@@ -587,7 +617,7 @@
       <button class="btn secondary" id="btnTraining">+ Training</button>
       <div class="search-wrap"><input id="search" placeholder="Search by minister or recipient..." aria-label="Search sessions by minister or recipient"><button type="button" class="search-clear" aria-label="Clear search" hidden>&times;</button></div>
       <select id="range" aria-label="Filter sessions by date range"><option>Upcoming</option><option>All</option><option>Past</option></select>
-      <button class="btn secondary" id="btnRefresh" style="display:inline-flex;align-items:center;gap:7px;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Refresh</button>
+      <button class="btn secondary" id="btnRefresh" style="display:inline-flex;align-items:center;gap:4px;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Refresh</button>
     </div>
     <p class="helptext">Grouped by recipient — tap a name to see their full history, soonest first.</p>
     <div id="scheduleGroups"></div>
@@ -634,7 +664,7 @@
   <section class="panel" id="panel-overview">
     <div class="toolbar" style="margin-bottom:10px;">
       <button class="btn" id="btnAddMinister">+ Add Minister</button>
-      <button class="btn secondary" id="rosterSortBtn" onclick="toggleRosterSort()" style="display:inline-flex;align-items:center;gap:7px;" aria-label="Toggle sort order, currently by next appointment"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h11M3 12h7M3 17h4"/><path d="M17 5v14M17 5l-4 4M17 5l4 4"/></svg> Next Appointment</button>
+      <button class="btn secondary" id="rosterSortBtn" onclick="toggleRosterSort()" style="display:inline-flex;align-items:center;gap:4px;" aria-label="Toggle sort order, currently by next appointment"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h11M3 12h7M3 17h4"/><path d="M17 5v14M17 5l-4 4M17 5l4 4"/></svg> Next Appointment</button>
     </div>
     <p class="helptext">Grouped by minister — tap a name for their stats and upcoming sessions, or use the icons to manage them.</p>
     <div class="stats-collapse" id="overviewStatsCollapse">
@@ -675,10 +705,12 @@
       <button class="btn secondary" type="button" id="btnCopyIntakeLink">Copy Link to Intake Form</button>
       <span class="helptext" id="intakeLinkCopiedMsg" style="display:none;">Link copied!</span>
     </div>
-    <p class="helptext" id="intakeHelptext">Recipients' completed (and in-progress) intake questionnaires. Grouped by status, newest first.</p>
+    <p class="helptext" id="intakeHelptext">Recipients' completed (and in-progress) intake questionnaires. Unlinked/Linked splits submitted forms by whether they're attached to a session yet. Archive a form to get it out of the way without deleting it - Delete is permanent.</p>
     <nav class="subtabs" aria-label="Intake status" id="intakeSubtabs">
-      <button class="active" data-intakestatus="Submitted">Submitted</button>
+      <button class="active" data-intakestatus="Unlinked">Unlinked</button>
+      <button data-intakestatus="Linked">Linked</button>
       <button data-intakestatus="InProgress">In progress</button>
+      <button data-intakestatus="Archived">Archived</button>
     </nav>
     <div class="search-wrap" style="margin:12px 0;"><input id="intakeSearch" placeholder="Search by name or email" aria-label="Search intake forms"><button type="button" class="search-clear" aria-label="Clear search" hidden>&times;</button></div>
     <div id="intakeGroups"></div>
@@ -943,10 +975,24 @@
   </div>
 </div>
 
+<!-- Centered, full-viewport-width "what does this do?" modal (added
+     2026-09-29, at the user's request) - style="max-width:none" overrides
+     the shared .modal class's 560px cap just for this one, since every
+     other modal in the app should keep that cap. -->
+<div class="modal-bg" id="infoModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="infoModalTitle" style="max-width:none;">
+    <h2 id="infoModalTitle"></h2>
+    <p id="infoModalMsg" style="margin:0 0 18px;white-space:pre-line;"></p>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeInfoModal()">Close</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-28.5";
+const APP_VERSION = "2026-09-29.10";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1179,7 +1225,7 @@ async function deleteItem(key, itemId){
    DATA CACHE (refreshed from Graph after loads/writes)
 ========================================================================= */
 let ministers=[], sessions=[], blackouts=[], locations=[], slots=[], timeWindows=[], intakeResponses=[];
-let intakeSubStatus='Submitted', intakeDetailId=null;
+let intakeSubStatus='Unlinked', intakeDetailId=null;
 // The staff-editable question schema - schemaItemId/schemaVersion identify
 // the single IntakeFormSchema list item to PATCH back on save;
 // schemaDraft is a mutable working copy the Form Editor tab edits freely
@@ -1326,6 +1372,27 @@ async function loadAll(){
   });
   computeSessionNumbers();
   renderAll();
+  const stamp = document.getElementById('lastRefreshed');
+  if(stamp) stamp.textContent = 'Data as of ' + fmtTime(new Date());
+}
+// Header "Refresh Data" - re-runs loadAll() in place. renderAll() only
+// re-renders each tab's own lists; it never calls switchTab(), so whichever
+// tab you're on stays put (unlike a browser reload, which resets to the
+// default tab). Deliberately manual, not a background timer: an
+// auto-refresh re-rendering under an admin mid-planning is exactly the
+// interruption to avoid. Refuses while any modal is open, so a refresh
+// can't shift things under an in-progress edit (the Form Editor's unsaved
+// draft is already protected separately by schemaDirty in loadAll()).
+async function refreshDataKeepingPlace(){
+  if(document.querySelector('.modal-bg.open')){
+    showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Finish or close the open window first</div><div>Refreshing while a form is open could disturb what you're working on.</div>`);
+    return;
+  }
+  try{
+    await withLoading($('#btnRefreshData'), 'Refreshing…', loadAll);
+  }catch(e){
+    showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Couldn't refresh</div><div>${escapeHtml(e.message||'Unknown error')}</div>`);
+  }
 }
 function toHM(iso){
   if(!iso) return '';
@@ -1345,6 +1412,7 @@ const ICONS = {
   refresh: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>',
   chat: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>',
   check: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>',
+  info: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="8" r=".5" fill="currentColor" stroke="none"/></svg>',
   checkCircle: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
   chevron: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>',
   arrowUp: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>',
@@ -1442,6 +1510,19 @@ async function withLoading(btn, loadingText, fn){
   finally{ btn.disabled = false; btn.innerHTML = orig; }
 }
 
+// Centered, full-width "what does this do?" modal - see #infoModal above.
+// Reuses the same .modal-bg.open show/hide convention every other modal
+// here uses (closeAllModals()/Escape handling picks it up automatically).
+window.openInfoModal = function(title, text){
+  $('#infoModalTitle').textContent = title;
+  $('#infoModalMsg').textContent = text;
+  $('#infoModal').classList.add('open');
+};
+window.closeInfoModal = function(){ $('#infoModal').classList.remove('open'); };
+window.showQuickAddInfo = function(){
+  openInfoModal('Quick Add Slots', "Fills in open slots for a date range and set of weekdays, based on the Quick Slots defaults in Settings (how many Freedom Session slots per day, which weekdays, the times) and who's actually free - minus anyone blacked out, minus slots that already exist. Never touches a slot someone's already claimed or booked.\n\nSunday Drop-In gets one slot automatically on the 4th Sunday of the month.\n\nAlso sweeps up any never-claimed Open slots dated before the range you pick, since moving to a new range is treated as \"done with the old one.\"");
+};
+
 let confirmResolver = null;
 function closeConfirm(result){
   $('#confirmModal').classList.remove('open');
@@ -1491,6 +1572,7 @@ function wireApp(){
   appWired = true;
   document.querySelectorAll('nav[aria-label="Primary"] button').forEach(b=>b.addEventListener('click', ()=>switchTab(b.dataset.tab)));
   $('#btnRefresh').addEventListener('click', ()=>withLoading($('#btnRefresh'), 'Refreshing…', loadAll));
+  $('#btnRefreshData').addEventListener('click', refreshDataKeepingPlace);
   $('#search').addEventListener('input', renderSchedule);
   wireSearchClear('search');
   $('#range').addEventListener('change', renderSchedule);
@@ -2165,7 +2247,7 @@ function renderUnplacedCandidates(){
       ${s.notes?`<div class="notes">${escapeHtml(s.notes)}</div>`:''}
       ${renderIntakeLinkBlock(s)}
       <div class="toolbar" style="margin-top:10px;">
-        <button class="icon-btn${s.contacted?' success':''}" onclick="toggleContacted(${s.id})" title="${s.contacted?'Mark as not yet contacted':'Mark as contacted'}" aria-pressed="${s.contacted}" aria-label="${s.contacted?'Mark as not yet contacted':'Mark as contacted'}: ${escapeHtml(s.recipName)}">${ICONS.phone}<span class="btn-label">${s.contacted?'Not Contacted':'Contacted'}</span></button>
+        <button class="icon-btn${s.contacted?' success':''}" onclick="toggleContacted(${s.id})" title="${s.contacted?'Mark as not yet contacted':'Mark as contacted'}" aria-pressed="${s.contacted}" aria-label="${s.contacted?'Mark as not yet contacted':'Mark as contacted'}: ${escapeHtml(s.recipName)}">${ICONS.phone}<span class="btn-label">${s.contacted?'Contacted':'Contact'}</span></button>
         <button class="icon-btn flag-btn${s.priority?' active':''}" onclick="togglePriority(${s.id})" title="${s.priority?'Remove priority':'Flag as priority'}" aria-pressed="${s.priority}" aria-label="${s.priority?'Remove priority from':'Flag as priority'} ${escapeHtml(s.recipName)}">${ICONS.flag(s.priority)}<span class="btn-label">${s.priority?'Remove Priority':'Flag Priority'}</span></button>
         <button class="icon-btn" onclick="editSession(${s.id})" title="Edit" aria-label="Edit ${escapeHtml(s.recipName)}">${ICONS.pencil}<span class="btn-label">Edit</span></button>
         <button class="icon-btn danger" onclick="deleteSession(${s.id})" title="Delete" aria-label="Remove ${escapeHtml(s.recipName)} from the waiting list">${ICONS.trash}<span class="btn-label">Delete</span></button>
@@ -2544,7 +2626,7 @@ function renderSlotCard(sl){
   // with a mouse hovering, and touch (this is used on phones) has no
   // hover at all, so an icon alone leaves a phone user guessing.
   const contactedBtn = (sl.status==='Tentative' && cand)
-    ? `<button type="button" class="icon-btn${cand.contacted?' success':''}" style="flex-shrink:0;display:inline-flex;align-items:center;gap:6px;" onclick="event.stopPropagation();toggleContacted(${cand.id})" title="${cand.contacted?'Mark as not yet contacted':'Mark as contacted'}" aria-pressed="${cand.contacted}" aria-label="${cand.contacted?'Mark as not yet contacted':'Mark as contacted'}: ${escapeHtml(cand.recipName)}">${ICONS.phone}<span>${cand.contacted?'Contacted':'Mark Contacted'}</span></button>`
+    ? `<button type="button" class="icon-btn${cand.contacted?' success':''}" style="flex-shrink:0;display:inline-flex;align-items:center;gap:4px;" onclick="event.stopPropagation();toggleContacted(${cand.id})" title="${cand.contacted?'Mark as not yet contacted':'Mark as contacted'}" aria-pressed="${cand.contacted}" aria-label="${cand.contacted?'Mark as not yet contacted':'Mark as contacted'}: ${escapeHtml(cand.recipName)}">${ICONS.phone}<span>${cand.contacted?'Contacted':'Contact'}</span></button>`
     : '';
   return `<div class="slot ${cls}${isOpen?' expanded':''}">
     <div style="display:flex;align-items:center;">
@@ -4223,49 +4305,99 @@ async function copyIntakeLink(){
   clearTimeout(copyIntakeLink._t);
   copyIntakeLink._t = setTimeout(()=>{ msg.style.display = 'none'; }, 2500);
 }
+// Unlinked/Linked are both Submitted forms - split by whether some
+// session's IntakeResponseId points at them (see linkedIntakeResponseIds()
+// under "Intake form linking" below), at the user's explicit request:
+// "submitted would become unlinked and any intake that has been linked
+// would be under the linked [tab]". In-progress and Archived are
+// unaffected - linking only ever applies to Submitted forms in practice.
 function renderIntake(){
   const box = $('#intakeGroups'); const noResults = $('#intakeNoResults');
   const opened = openState(box);
   const q = $('#intakeSearch').value.trim().toLowerCase();
+  const linkedIds = linkedIntakeResponseIds();
   const filtered = intakeResponses
-    .filter(i => intakeSubStatus==='Submitted' ? i.status==='Submitted' : i.status!=='Submitted')
+    .filter(i => {
+      if(intakeSubStatus==='Unlinked') return i.status==='Submitted' && !linkedIds.has(i.id);
+      if(intakeSubStatus==='Linked') return i.status==='Submitted' && linkedIds.has(i.id);
+      return i.status===intakeSubStatus;
+    })
     .filter(i => !q || i.recipName.toLowerCase().includes(q) || i.recipEmail.toLowerCase().includes(q))
     .sort((a,b) => new Date(b.submittedAt||b.created||0) - new Date(a.submittedAt||a.created||0));
 
   if(!filtered.length){
     box.innerHTML = '';
     noResults.hidden = false;
-    noResults.textContent = intakeSubStatus==='Submitted' ? 'No submitted intake forms yet.' : 'No in-progress intake forms right now.';
+    noResults.textContent = intakeSubStatus==='Unlinked' ? 'No unlinked submitted intake forms right now.'
+      : intakeSubStatus==='Linked' ? 'No intake forms linked to a session yet.'
+      : intakeSubStatus==='InProgress' ? 'No in-progress intake forms right now.'
+      : 'No archived intake forms.';
     return;
   }
   noResults.hidden = true;
   box.innerHTML = filtered.map(i=>{
     const wasOpen = opened.get(String(i.id)) || false;
     const initials = (i.recipName||'?').trim().split(/\s+/).map(p=>p[0]).slice(0,2).join('').toUpperCase() || '?';
-    const countLabel = i.status==='Submitted' ? 'Submitted' : 'In progress';
-    const summary = i.status==='Submitted'
-      ? 'Submitted ' + fmtShort((i.submittedAt||'').split('T')[0])
-      : 'Last saved ' + fmtShort((i.created||'').split('T')[0]);
-    const deleteBtn = i.status!=='Submitted'
-      ? `<button type="button" class="btn danger" onclick="deleteIntakeForm(${i.id})">Delete this in-progress form</button>`
-      : '';
+    const countLabel = i.status==='Submitted' ? (linkedIds.has(i.id) ? 'Linked' : 'Unlinked') : i.status==='InProgress' ? 'In progress' : 'Archived';
+    let summary;
+    if(i.status==='Submitted' && linkedIds.has(i.id)){
+      const linkedSession = sessions.find(s=>s.intakeResponseId===i.id);
+      summary = 'Linked to ' + (linkedSession ? escapeHtml(linkedSession.recipName) + '’s session' : 'a session');
+    } else if(i.status==='Submitted'){
+      summary = 'Submitted ' + fmtShort((i.submittedAt||'').split('T')[0]);
+    } else if(i.status==='InProgress'){
+      summary = 'Last saved ' + fmtShort((i.created||'').split('T')[0]);
+    } else {
+      summary = 'Archived';
+    }
+    // Archive is the reversible, softer action (Unarchive puts it right
+    // back); Delete is permanent and offered everywhere now, not just
+    // InProgress - Archive existing as the safer default path is what
+    // makes broadening Delete to Submitted/Archived forms reasonable.
+    const archiveBtn = i.status!=='Archived'
+      ? `<button type="button" class="btn secondary" onclick="archiveIntakeForm(${i.id})">Archive</button>`
+      : `<button type="button" class="btn secondary" onclick="unarchiveIntakeForm(${i.id})">Unarchive</button>`;
     const body = `<p class="helptext">${escapeHtml(i.recipEmail||'No email given yet')}</p>
       <button type="button" class="btn" onclick="openIntakeDetail(${i.id})">View full intake form</button>
-      ${deleteBtn}`;
-    return groupRow(String(i.id), initials, i.recipName||'(name not yet entered)', countLabel, escapeHtml(summary), body, wasOpen);
+      ${archiveBtn}
+      <button type="button" class="btn danger" onclick="deleteIntakeForm(${i.id})">Delete</button>`;
+    return groupRow(String(i.id), initials, i.recipName||'(name not yet entered)', countLabel, summary, body, wasOpen);
   }).join('');
 }
-// Cleans up an abandoned/duplicate in-progress form - e.g. one half of a
-// pair created when the same recipient started the form on two devices
-// without using their saved resume link (see intake/index.html's
-// find-duplicate check, which now offers to prevent this going forward,
-// but doesn't touch forms already sitting here from before that existed).
-// Deliberately only offered for InProgress forms, never Submitted ones -
-// a submitted form is a real record, not an orphan.
+// Archive is reversible - moves Status to 'Archived', out of the
+// Submitted/In-progress lists and into its own tab, without losing the
+// record. Not a SharePoint schema change: Status is a Choice column
+// (InProgress/Submitted) - Graph writes 'Archived' as plain text
+// regardless, but add it as a real Choice option too so it shows properly
+// in SharePoint's own UI (see CLAUDE.md).
+window.archiveIntakeForm = async function(id){
+  const i = intakeResponses.find(x=>x.id===id);
+  if(!i) return;
+  if(!(await askConfirm(`Archive this intake form${i.recipName ? ' for '+i.recipName : ''}? You can still view it later under the Archived tab, or unarchive it.`, {confirmLabel:'Archive', danger:false}))) return;
+  await updateItem('intake', id, { Status: 'Archived' });
+  await loadAll();
+};
+// Puts an archived form back where it came from - Submitted if it was
+// ever submitted (submittedAt is set), InProgress otherwise. Doesn't ask
+// for confirmation - unlike Delete, this has no destructive consequence.
+window.unarchiveIntakeForm = async function(id){
+  const i = intakeResponses.find(x=>x.id===id);
+  if(!i) return;
+  await updateItem('intake', id, { Status: i.submittedAt ? 'Submitted' : 'InProgress' });
+  await loadAll();
+};
+// Permanently removes an intake form's record. Originally only offered
+// for InProgress forms (cleaning up an abandoned/duplicate one - e.g. one
+// half of a pair created when the same recipient started the form on two
+// devices without using their saved resume link); broadened 2026-09-28,
+// at the user's explicit request, to every status - Archive now exists as
+// the softer, reversible action, so Delete being permanent everywhere is
+// a deliberate choice, not an oversight of the earlier Submitted-record
+// protection.
 window.deleteIntakeForm = async function(id){
   const i = intakeResponses.find(x=>x.id===id);
-  if(!i || i.status==='Submitted') return;
-  if(!(await askConfirm(`Delete this in-progress intake form${i.recipName ? ' for '+i.recipName : ''}? This can't be undone.`))) return;
+  if(!i) return;
+  if(!(await askConfirm(`Permanently delete this intake form${i.recipName ? ' for '+i.recipName : ''}? This can't be undone.`))) return;
   await deleteItem('intake', id);
   await loadAll();
 };
@@ -4282,7 +4414,7 @@ window.openIntakeDetail = function(id){
       <button type="button" class="btn" onclick="window.print()">Print / Save as PDF</button>
     </div>
     <h2>${escapeHtml(i.recipName||'(name not yet entered)')}</h2>
-    <p class="helptext">${escapeHtml(i.recipEmail||'')} — ${i.status==='Submitted' ? 'Submitted '+fmtShort((i.submittedAt||'').split('T')[0]) : 'In progress'}</p>
+    <p class="helptext">${escapeHtml(i.recipEmail||'')} — ${i.status==='Submitted' ? 'Submitted '+fmtShort((i.submittedAt||'').split('T')[0]) : i.status==='InProgress' ? 'In progress' : 'Archived'}</p>
     ${FPHM.renderResponsesHtml(i.responses)}
     ${i.signatureDataUrl ? `<h3>Signature</h3><img src="${i.signatureDataUrl}" alt="Signature" style="max-width:300px;border:1px solid var(--border);border-radius:8px;background:#fff;">` : ''}
   `;
@@ -4299,10 +4431,18 @@ window.closeIntakeDetail = function(){
 // given recipient name, used by renderRecipientHistory() below - name
 // match only (same convention as prior-session matching elsewhere in this
 // app; recipients aren't persistent records with a stable id to join on).
+// Every intake form id already linked to SOME session - an already-linked
+// form shouldn't be offered again, whether as an auto-suggested match or
+// in the manual picker, so one recipient's intake answers can't end up
+// attached to two different sessions by accident.
+function linkedIntakeResponseIds(){
+  return new Set(sessions.filter(s=>s.intakeResponseId!=null).map(s=>s.intakeResponseId));
+}
 function findIntakeForRecipient(name){
   if(!name) return null;
   const norm = name.trim().toLowerCase();
-  const matches = intakeResponses.filter(i => (i.recipName||'').trim().toLowerCase()===norm);
+  const linkedIds = linkedIntakeResponseIds();
+  const matches = intakeResponses.filter(i => (i.recipName||'').trim().toLowerCase()===norm && !linkedIds.has(i.id));
   if(!matches.length) return null;
   // Prefer a Submitted one; among ties, the most recently touched.
   matches.sort((a,b)=>{
@@ -4361,12 +4501,14 @@ window.filterIntakeLinkResults = function(sessionId){
 };
 function intakeLinkPickerResultsHtml(sessionId, query){
   const q = (query||'').trim().toLowerCase();
+  const linkedIds = linkedIntakeResponseIds();
   const matches = intakeResponses
+    .filter(i => !linkedIds.has(i.id))
     .filter(i => !q || (i.recipName||'').toLowerCase().includes(q) || (i.recipEmail||'').toLowerCase().includes(q))
     .slice(0, 8);
   if(!matches.length) return '<p class="helptext">No matching intake forms.</p>';
   return matches.map(i=>`<div class="intake-link-result">
-    <span>${escapeHtml(i.recipName||'(name not yet entered)')} <span class="helptext">${i.status==='Submitted'?'Submitted':'In progress'}${i.recipEmail?' · '+escapeHtml(i.recipEmail):''}</span></span>
+    <span>${escapeHtml(i.recipName||'(name not yet entered)')} <span class="helptext">${i.status==='Submitted'?'Submitted':i.status==='InProgress'?'In progress':'Archived'}${i.recipEmail?' · '+escapeHtml(i.recipEmail):''}</span></span>
     <button type="button" class="btn secondary" onclick="linkIntakeForm(${sessionId},${i.id})">Link</button>
   </div>`).join('');
 }
@@ -5346,6 +5488,18 @@ const CHANGE_LOG = [
 // CHANGE_LOG at promotion time rather than deleted. See the block comment
 // above for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Sep 29, 2026', version: '2026-09-29.10', items: [
+    'Fixed: the Contacted button on a waiting recipient\'s card used to say "Contacted" by default (looked like a status, not a call to action) and flipped to "Not Contacted" right after you actually marked them contacted (looked like it hadn\'t worked). Now says "Contact" until you\'ve reached out, then "Contacted" once you have - matching the "Contacted" tag chip that appears next to their name.',
+    'Fixed: icon buttons (Contact, Add to Calendar, Refresh, Next Appointment, and others) had zero space between the icon and its label on desktop, now that labels always show - a standing 8px spacing scale (4px as the icon-to-label exception) is now the standard for spacing here going forward.',
+    'New: "+ Quick Add Slots" now has a small (i) icon fused onto its right edge - looks like one button, but tapping just that icon explains exactly what the button does (opens a centered popup) without triggering it, while tapping the rest of the button still runs it normally. Same treatment coming to other buttons with non-obvious behavior.',
+    'Fixed: an intake form already linked to one session could still show up as a match (or in the manual picker) for a different session, risking the same intake answers getting linked to two sessions at once. Already-linked forms are now excluded everywhere a form gets suggested or picked.',
+    'New: a "Refresh Data" button in the header reloads the latest data (new availability, blackout dates, intake forms, confirmations) without leaving the tab you\'re on - no more full browser reload back to the default tab. It\'s manual on purpose so nothing changes under you mid-planning, it won\'t run while a form/window is open, and the header shows "Data as of" the time of the last load.',
+    'Changed: Intake Forms\' "Submitted" tab is now split into "Unlinked" and "Linked" - a submitted form shows up under Linked as soon as it\'s attached to a session, Unlinked otherwise, so you can see at a glance which submitted forms still need to be connected to a session.'
+  ]},
+  { date: 'Sep 28, 2026', version: '2026-09-28.6', items: [
+    'New: Intake Forms has an "Archived" tab now, alongside Submitted and In progress. Every form gets an Archive button (reversible - Unarchive puts it right back) and a Delete button (permanent). Delete used to only be offered for in-progress forms; now that Archive exists as the safer option first, Delete works on any form.',
+    'Setup needed for this to show cleanly in SharePoint\'s own list view: add "Archived" as a Choice option on the IntakeResponses list\'s Status column. The app works either way, but SharePoint\'s own UI won\'t display it properly until that option exists there too.'
+  ]},
   { date: 'Sep 28, 2026', version: '2026-09-28.5', items: [
     'Changed: the Contacted button (mark whether you\'ve reached out to a waiting recipient) now sits right in a slot\'s summary row, usable without expanding the slot - it briefly lived in the expanded detail only. It also now always shows "Contacted"/"Mark Contacted" as text, not just an icon.',
     'Changed: icon buttons with a hidden text label (Contacted, Flag Priority, Edit, Delete on Unplaced Candidates and similar) now show that label on every screen size, not just phones - a hover tooltip only works with a mouse, so icon-only was never actually clear on touch, and desktop has the room for a label anyway. Standing rule going forward: no icon-only controls.',
