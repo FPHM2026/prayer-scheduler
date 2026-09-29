@@ -539,6 +539,16 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
       Active/Inactive toggle elsewhere on this tab, which does not touch
       group membership at all — only an actual roster **deletion** revokes
       portal access today.
+- **Changes tab drops Recent/Archive when nothing is pending** (2026-09-29,
+  at the user's request — "production doesn't really need an archive and
+  recent sub tab"): `renderChangeLog()` hides the sub-tab switch whenever
+  `CHANGE_LOG` is empty and shows the full history (`CHANGE_LOG_ARCHIVE`)
+  as one list. `CHANGE_LOG` is empty right after every promotion by
+  design, so production always lands in single-list mode, while Test shows
+  the Recent/Archive switch again as soon as there are entries awaiting
+  promotion. Implemented as runtime behavior, not a preview/production
+  code fork, since `index.html` is a wholesale copy of `preview/index.html`
+  and forking would be one more thing to remember to strip on promotion.
 - **Header "Refresh Data" button** (`#btnRefreshData`,
   `refreshDataKeepingPlace()`, added 2026-09-29, at the user's request —
   data that ministers submit (availability, blackouts, confirmations,

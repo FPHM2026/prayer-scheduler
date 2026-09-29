@@ -1004,7 +1004,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-29.10";
+const APP_VERSION = "2026-09-29.11";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -5495,6 +5495,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Sep 29, 2026', version: APP_VERSION, items: [
+    'Changed: the Changes tab no longer shows Recent/Archive switches when there\'s nothing waiting to be promoted - it just shows one running list of everything, newest first. (In Test, the Recent/Archive switch still appears whenever there are changes pending a production push.)'
+  ]}
 ];
 // Entries already live in production, newest first - moved here from
 // CHANGE_LOG at promotion time rather than deleted. See the block comment
@@ -5645,6 +5648,20 @@ function switchChangesSub(view){
 function renderChangeLog(){
   const box = $('#changeLog');
   if(!box) return;
+  // Recent/Archive only means something while there's pending (not yet
+  // promoted) work - i.e. in Test. Right after a promotion CHANGE_LOG is
+  // empty by design, which is production's permanent state, where a
+  // permanently-empty "Recent" tab is just noise. So with nothing pending,
+  // drop the sub-tab switch and show the full history as one list; the
+  // switch comes back on its own the moment CHANGE_LOG has entries. No
+  // preview/production fork in the code (the file is copied wholesale).
+  const pending = CHANGE_LOG.length > 0;
+  const subtabs = $('#changesSubtabs');
+  if(subtabs) subtabs.style.display = pending ? '' : 'none';
+  if(!pending){
+    changesSubView = 'archive';
+    $('#changesHelptext').textContent = "A running list of what's changed in the app, newest first.";
+  }
   const list = changesSubView==='archive' ? CHANGE_LOG_ARCHIVE : CHANGE_LOG;
   if(!list.length){
     box.innerHTML = `<div class="no-results">${changesSubView==='archive' ? 'Nothing archived yet.' : 'Nothing new since the last production push.'}</div>`;
