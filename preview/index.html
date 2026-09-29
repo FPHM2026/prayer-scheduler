@@ -128,6 +128,18 @@
   button.icon-btn.danger:hover{background:var(--danger-bg);color:var(--danger);}
   button.icon-btn.success{color:var(--ok);}
   button.icon-btn.success:hover{background:var(--ok-bg);color:var(--ok);}
+  /* Info tip - a small "what does this do?" disclosure next to a button
+     whose behavior isn't obvious from its label alone (added 2026-09-29,
+     at the user's request, starting with Quick Add Slots). Tap-to-toggle,
+     not hover-only - a hover tooltip is invisible on touch, same reason
+     the no-icon-only-controls rule above exists, so this needs its own
+     click handling (toggleInfoTip()) rather than a plain title attribute.
+     Text label included even on an auxiliary control like this, per the
+     same standing rule - "What's this?" next to the (i) icon. */
+  .info-tip{position:relative;display:inline-flex;}
+  button.info-btn{background:none;border:none;cursor:pointer;color:var(--muted);display:inline-flex;align-items:center;gap:4px;font-size:var(--fs-xs);font-weight:600;padding:4px 8px;border-radius:6px;min-height:32px;}
+  button.info-btn:hover{background:var(--bg);color:var(--gold);}
+  .info-tip-box{position:absolute;z-index:50;top:100%;left:0;margin-top:4px;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-md);padding:10px 12px;font-size:var(--fs-xs);line-height:1.45;color:var(--text);width:260px;max-width:80vw;}
   /* Standing rule (2026-09-28, at the user's explicit request): an
      icon-only control is never acceptable, on any viewport - a title
      tooltip only works with a mouse hovering, and touch has no hover at
@@ -585,7 +597,11 @@
       <div class="stats-body"><div class="stats-body-inner" id="schedPlanStats"></div></div>
     </div>
     <div class="toolbar">
-      <button class="btn" id="btnQuickAddSlots">+ Quick Add Slots</button>
+      <span class="info-tip">
+        <button class="btn" id="btnQuickAddSlots">+ Quick Add Slots</button>
+        <button type="button" class="info-btn" onclick="toggleInfoTip(this)" aria-expanded="false"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="8" r=".5" fill="currentColor" stroke="none"/></svg><span>What's this?</span></button>
+        <span class="info-tip-box" hidden>Fills in open slots for a date range and set of weekdays, based on the Quick Slots defaults in Settings (how many Freedom Session slots per day, which weekdays, the times) and who's actually free - minus anyone blacked out, minus slots that already exist. Never touches a slot someone's already claimed or booked. Sunday Drop-In gets one slot automatically on the 4th Sunday of the month. Also sweeps up any never-claimed Open slots dated before the range you pick, since moving to a new range is treated as "done with the old one."</span>
+      </span>
       <button class="btn secondary" id="btnAddWaiting2">+ Add to Waiting List</button>
       <button class="btn secondary" id="btnRemoveUnusedSlots">Remove Unused Slots</button>
     </div>
@@ -963,7 +979,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-29.3";
+const APP_VERSION = "2026-09-29.4";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1362,6 +1378,7 @@ const ICONS = {
   refresh: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>',
   chat: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>',
   check: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>',
+  info: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="8" r=".5" fill="currentColor" stroke="none"/></svg>',
   checkCircle: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
   chevron: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>',
   arrowUp: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>',
@@ -1458,6 +1475,23 @@ async function withLoading(btn, loadingText, fn){
   try{ await fn(); }
   finally{ btn.disabled = false; btn.innerHTML = orig; }
 }
+
+// Tap-to-toggle "what does this do?" disclosure - see the .info-tip CSS
+// comment above for why this can't just be a title tooltip. Opening one
+// closes any other that's open; clicking anywhere outside an open one
+// closes it too.
+window.toggleInfoTip = function(btn){
+  const box = btn.parentElement.querySelector('.info-tip-box');
+  const willOpen = box.hidden;
+  document.querySelectorAll('.info-tip-box').forEach(b=>{ b.hidden = true; });
+  document.querySelectorAll('.info-btn').forEach(b=>b.setAttribute('aria-expanded','false'));
+  if(willOpen){ box.hidden = false; btn.setAttribute('aria-expanded','true'); }
+};
+document.addEventListener('click', (e)=>{
+  if(e.target.closest('.info-tip')) return;
+  document.querySelectorAll('.info-tip-box').forEach(b=>{ b.hidden = true; });
+  document.querySelectorAll('.info-btn').forEach(b=>b.setAttribute('aria-expanded','false'));
+});
 
 let confirmResolver = null;
 function closeConfirm(result){
@@ -5391,7 +5425,8 @@ function generateReport(){
 const CHANGE_LOG = [
   { date: 'Sep 29, 2026', version: APP_VERSION, items: [
     'Fixed: the Contacted button on a waiting recipient\'s card used to say "Contacted" by default (looked like a status, not a call to action) and flipped to "Not Contacted" right after you actually marked them contacted (looked like it hadn\'t worked). Now says "Contact" until you\'ve reached out, then "Contacted" once you have - matching the "Contacted" tag chip that appears next to their name.',
-    'Fixed: icon buttons (Contact, Add to Calendar, Refresh, Next Appointment, and others) had zero space between the icon and its label on desktop, now that labels always show - a standing 8px spacing scale (4px as the icon-to-label exception) is now the standard for spacing here going forward.'
+    'Fixed: icon buttons (Contact, Add to Calendar, Refresh, Next Appointment, and others) had zero space between the icon and its label on desktop, now that labels always show - a standing 8px spacing scale (4px as the icon-to-label exception) is now the standard for spacing here going forward.',
+    'New: a "What\'s this?" info button next to "+ Quick Add Slots" explains exactly what it does before you click it - tap it to see, tap again (or elsewhere) to dismiss. Same treatment coming to other buttons with non-obvious behavior.'
   ]},
   { date: 'Sep 28, 2026', version: '2026-09-28.6', items: [
     'New: Intake Forms has an "Archived" tab now, alongside Submitted and In progress. Every form gets an Archive button (reversible - Unarchive puts it right back) and a Delete button (permanent). Delete used to only be offered for in-progress forms; now that Archive exists as the safer option first, Delete works on any form.',

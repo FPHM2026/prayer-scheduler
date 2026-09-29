@@ -539,6 +539,22 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
       Active/Inactive toggle elsewhere on this tab, which does not touch
       group membership at all — only an actual roster **deletion** revokes
       portal access today.
+- **Info tip on buttons with non-obvious behavior** (`.info-tip`/
+  `.info-btn`/`.info-tip-box`, `toggleInfoTip()`, added 2026-09-29, at the
+  user's request — "it would be nice for me not to have to remember what
+  it actually does," starting with "+ Quick Add Slots"): a small "What's
+  this?" text button (with an (i) icon — labeled per the no-icon-only
+  rule) sits next to a button whose behavior isn't obvious from its label
+  alone. Tapping it reveals a small explanation box; tapping it again, or
+  anywhere else on the page, closes it. **Deliberately tap-to-toggle, not
+  a hover/title tooltip** — same reasoning as the no-icon-only-controls
+  rule: a hover tooltip is invisible on touch, and this app is used on
+  phones. Only applied to Quick Add Slots so far — the user asked to
+  identify buttons with "complex logic" generally; rather than guess the
+  full list unprompted, more candidates (Remove Unused Slots, the "All
+  Ministers" blackout option, Archive vs. Delete on Intake Forms, Reports'
+  Generate, the Drop-in/Training quick-add buttons) are pending the user's
+  own list of what actually needs explaining, not a blanket sweep.
 - **Minister attendance confirmation/decline** (added and promoted to
   production 2026-09-27, `portal/index.html` + `preview/index.html`/
   `index.html` — see `ConfirmedMinisterIDs`/`DeclinedMinisterIDs` in the
