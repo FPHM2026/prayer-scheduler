@@ -539,16 +539,17 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
       Active/Inactive toggle elsewhere on this tab, which does not touch
       group membership at all — only an actual roster **deletion** revokes
       portal access today.
-- **Changes tab: Recent = roughly the last two days, Archive = older**
-  (2026-09-29, at the user's request; **supersedes** the earlier rule that
-  `CHANGE_LOG` is emptied on every promotion and holds only unpromoted
-  work). The user first said production didn't need Recent/Archive, then
-  asked to keep the past two days on Recent and archive the rest. So at
-  each promotion, move entries older than ~2 days from `CHANGE_LOG` to the
-  top of `CHANGE_LOG_ARCHIVE`, and leave the newer ones (including the new
-  release's own entry) in `CHANGE_LOG`. The help text is neutral wording
-  now ("What's changed over the last couple of days") because production
-  shows it too. `renderChangeLog()` still hides the sub-tab switch and
+- **Changes tab: Recent = the five most recent versions, Archive =
+  everything older** (2026-09-29, at the user's request; **supersedes**
+  the earlier rule that `CHANGE_LOG` is emptied on every promotion and
+  holds only unpromoted work). The user's rule went through three steps
+  in one day: production doesn't need Recent/Archive → keep the past two
+  days on Recent → "going forward, the five most recent versions." So at
+  each promotion, add the new release's entry to the top of `CHANGE_LOG`,
+  then move anything beyond the newest **five** entries to the top of
+  `CHANGE_LOG_ARCHIVE`. Count entries (one per version), not days. The
+  help text is neutral wording ("The five most recent versions") because
+  production shows it too. `renderChangeLog()` still hides the sub-tab switch and
   shows one full list whenever `CHANGE_LOG` is empty, as a fallback.
   Runtime behavior, not a preview/production code fork, since `index.html`
   is a wholesale copy of `preview/index.html`.
