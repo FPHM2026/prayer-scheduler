@@ -92,7 +92,7 @@
   button.btn.danger{background:var(--danger);color:#fff;}
   button.btn.danger:hover:not(:disabled){background:#a5311f;}
   button.btn:disabled{opacity:.5;cursor:not-allowed;}
-  button.icon-btn{background:none;border:none;cursor:pointer;padding:8px 10px;color:var(--navy);min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;}
+  button.icon-btn{background:none;border:none;cursor:pointer;padding:8px 10px;color:var(--navy);min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:4px;border-radius:6px;}
   button.icon-btn:hover{background:#f1ede4;color:var(--gold);}
   button.icon-btn.danger{color:var(--danger);}
   button.icon-btn.danger:hover{background:var(--danger-bg);color:var(--danger);}
@@ -185,7 +185,7 @@
   .sess-row>*:first-child{min-width:0;}
   .sess-meta{color:var(--muted);font-size:var(--fs-sm);margin-top:3px;}
   .sess-actions{display:flex;gap:2px;flex-shrink:0;}
-  .wa-note{display:inline-flex;align-items:center;gap:5px;color:var(--muted);font-size:var(--fs-sm);margin-top:4px;}
+  .wa-note{display:inline-flex;align-items:center;gap:4px;color:var(--muted);font-size:var(--fs-sm);margin-top:4px;}
   .wa-note.on{color:var(--ok);font-weight:600;}
 
   .stat-line{display:flex;gap:16px;flex-wrap:wrap;padding:12px 4px;font-size:var(--fs-sm);color:var(--text);border-bottom:1px solid #f1ede4;}
@@ -226,7 +226,7 @@
   .trend-chart{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:18px;box-shadow:var(--shadow-sm);}
   .trend-title-row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
   .trend-title{font-size:var(--fs-2xs);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;}
-  .trend-legend{display:flex;align-items:center;gap:5px;font-size:var(--fs-2xs);color:var(--muted);font-weight:600;white-space:nowrap;}
+  .trend-legend{display:flex;align-items:center;gap:4px;font-size:var(--fs-2xs);color:var(--muted);font-weight:600;white-space:nowrap;}
   .trend-legend .legend-dot{width:9px;height:9px;border-radius:2px;display:inline-block;}
   .trend-legend .legend-dot.this{background:var(--primary);}
   .trend-legend .legend-dot.last{background:var(--muted-bar);margin-left:10px;}
@@ -808,7 +808,7 @@ function scheduleSessionRow(s){
       <div class="wa-note ${s.waCreated?'on':''}">${ICONS.chat} ${s.waCreated?'WhatsApp group created':'No WhatsApp group yet'}</div>
       ${s.waCreated && s.waLink ? ` · <a href="${escapeHtml(s.waLink)}" target="_blank" rel="noopener">open chat</a>` : ''}
       <div style="margin-top:8px;display:flex;flex-direction:column;gap:8px;">
-        ${s.status==='Scheduled' ? `<button class="btn secondary" style="display:inline-flex;align-items:center;justify-content:center;gap:6px;width:100%;" onclick="addToCalendar(${s.id})">${ICONS.calendarPlus} Add to Calendar</button>` : ''}
+        ${s.status==='Scheduled' ? `<button class="btn secondary" style="display:inline-flex;align-items:center;justify-content:center;gap:4px;width:100%;" onclick="addToCalendar(${s.id})">${ICONS.calendarPlus} Add to Calendar</button>` : ''}
         ${confirmBtn}
         ${declineBtn}
       </div>

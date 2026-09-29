@@ -1367,6 +1367,27 @@ hidden above 640px (label only on phones) — fixed 2026-09-28 to always
 show. Any icon-only button found anywhere in this app is a bug to fix,
 not an accepted style choice.
 
+**8px spacing scale** (standing rule, stated explicitly 2026-09-29): new
+spacing — margin, padding, gap — should be a multiple of 8px (8, 16, 24,
+32…), with **4px as the one permitted half-step**, reserved for tight
+inline pairings like the gap between an icon and its label. This was
+prompted by a real bug: `button.icon-btn` had no `gap` at all, so once
+the no-icon-only-controls fix above made every label visible, the icon
+and its text sat flush against each other on desktop with zero space
+between them (mobile had an inconsistent 8px via a `.toolbar .icon-btn`
+media-query override). Fixed by adding `gap:4px` to the base `.icon-btn`
+rule (both `preview/index.html` and `portal/index.html`) and normalizing
+every other hand-picked icon-to-label gap found nearby (`.wa-note`,
+`.trend-legend`, the Refresh/Next Appointment header buttons, the
+Contact/Contacted buttons) from their previous 5–7px odd values down to
+the same 4px. **This was a targeted fix for icon-to-label gaps
+specifically, not a retroactive audit of every margin/padding/gap value
+in this ~5,500-line file** — plenty of pre-existing spacing (10px,
+12px, 14px…) is still off the 8px grid and hasn't been touched. Apply
+the 8px scale (with the 4px icon-label exception) to any spacing you add
+or touch going forward; a wholesale retrofit of existing values is a
+separate, larger task, not implied by this rule.
+
 Now being built via Claude Code, not just chat. The person building this
 prefers granular step-by-step instructions and iterative debugging —
 screenshot the exact error, fix one thing, retest — and for SharePoint/Entra
