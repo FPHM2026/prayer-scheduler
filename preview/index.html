@@ -579,7 +579,7 @@
       <span class="hdr-caption" id="lastRefreshed"></span>
     </div>
     <div class="hdr-action">
-      <button class="btn secondary" id="btnSignOut" style="padding:8px 14px;min-height:36px;">Sign Out</button>
+      <button class="btn secondary" id="btnSignOut" style="padding:8px 14px;min-height:36px;">Sign Out / Switch User</button>
       <span class="hdr-caption" id="whoami"></span>
     </div>
   </div>
@@ -1022,7 +1022,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-29.15";
+const APP_VERSION = "2026-09-30.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1101,6 +1101,7 @@ const INTAKE_URL = "../intake/";
 const msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
 const msalReady = msalInstance.initialize();
 let account = null;
+let forceAccountPicker = false; // set by Sign Out / Switch User, consumed by the next loginPopup
 let siteId = null;
 let listIds = {};
 
@@ -1124,7 +1125,12 @@ document.getElementById('btnSignIn').addEventListener('click', async ()=>{
   btn.disabled = true;
   btn.textContent = 'Signing in…';
   try{
-    const result = await msalInstance.loginPopup({ scopes: GRAPH_SCOPES });
+    // After an explicit Sign Out / Switch User, always show Microsoft's
+    // account picker - otherwise Microsoft's own single sign-on quietly
+    // signs the same person straight back in, which makes "switch user"
+    // impossible. A normal first visit keeps the default (no extra click).
+    const result = await msalInstance.loginPopup({ scopes: GRAPH_SCOPES, ...(forceAccountPicker ? { prompt: 'select_account' } : {}) });
+    forceAccountPicker = false;
     account = result.account;
     await afterSignIn();
   }catch(e){
@@ -1178,10 +1184,11 @@ async function afterSignIn(){
   document.getElementById('btnSignOut').onclick = async ()=>{
     await msalInstance.logoutPopup({ account });
     account = null;
+    forceAccountPicker = true;
     clearStuckMsalState();
     document.getElementById('appRoot').style.display = 'none';
     document.getElementById('signinScreen').style.display = 'flex';
-    document.getElementById('signinMsg').textContent = 'Signed out. Sign in with your Microsoft 365 account to continue.';
+    document.getElementById('signinMsg').textContent = 'Signed out. Sign in again as the same person or choose a different account.';
   };
   try{
     await loadAll();
@@ -5539,6 +5546,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Sep 30, 2026', version: '2026-09-30.1', items: [
+    'Changed: "Sign Out" is now "Sign Out / Switch User". After signing out, the next sign-in always shows Microsoft\'s account picker, so you can pick a different account instead of being signed straight back in as the same person. Same on the minister portal.'
+  ]},
   { date: 'Sep 29, 2026', version: '2026-09-29.15', items: [
     'New: a blackout date now shows a small "Added by admin" label when an admin (not the minister themselves) created it - visible to the minister on their portal\'s time-off list, and on the Blackout Dates tab here. Edit and Delete are unchanged.'
   ]},
@@ -5555,10 +5565,6 @@ const CHANGE_LOG = [
     'Fixed: an intake form already linked to one session could still show up as a match (or in the manual picker) for a different session, risking the same intake answers getting linked to two sessions at once. Already-linked forms are now excluded everywhere a form gets suggested or picked.',
     'New: a "Refresh Data" button in the header reloads the latest data (new availability, blackout dates, intake forms, confirmations) without leaving the tab you\'re on - no more full browser reload back to the default tab. It\'s manual on purpose so nothing changes under you mid-planning, it won\'t run while a form/window is open, and the header shows "Data as of" the time of the last load.',
     'Changed: Intake Forms\' "Submitted" tab is now split into "Unlinked" and "Linked" - a submitted form shows up under Linked as soon as it\'s attached to a session, Unlinked otherwise, so you can see at a glance which submitted forms still need to be connected to a session.'
-  ]},
-  { date: 'Sep 28, 2026', version: '2026-09-28.6', items: [
-    'New: Intake Forms has an "Archived" tab now, alongside Submitted and In progress. Every form gets an Archive button (reversible - Unarchive puts it right back) and a Delete button (permanent). Delete used to only be offered for in-progress forms; now that Archive exists as the safer option first, Delete works on any form.',
-    'Setup needed for this to show cleanly in SharePoint\'s own list view: add "Archived" as a Choice option on the IntakeResponses list\'s Status column. The app works either way, but SharePoint\'s own UI won\'t display it properly until that option exists there too.'
   ]}
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
@@ -5566,6 +5572,10 @@ const CHANGE_LOG = [
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Sep 28, 2026', version: '2026-09-28.6', items: [
+    'New: Intake Forms has an "Archived" tab now, alongside Submitted and In progress. Every form gets an Archive button (reversible - Unarchive puts it right back) and a Delete button (permanent). Delete used to only be offered for in-progress forms; now that Archive exists as the safer option first, Delete works on any form.',
+    'Setup needed for this to show cleanly in SharePoint\'s own list view: add "Archived" as a Choice option on the IntakeResponses list\'s Status column. The app works either way, but SharePoint\'s own UI won\'t display it properly until that option exists there too.'
+  ]},
   { date: 'Sep 28, 2026', version: '2026-09-28.5', items: [
     'Changed: the Contacted button (mark whether you\'ve reached out to a waiting recipient) now sits right in a slot\'s summary row, usable without expanding the slot - it briefly lived in the expanded detail only. It also now always shows "Contacted"/"Mark Contacted" as text, not just an icon.',
     'Changed: icon buttons with a hidden text label (Contacted, Flag Priority, Edit, Delete on Unplaced Candidates and similar) now show that label on every screen size, not just phones - a hover tooltip only works with a mouse, so icon-only was never actually clear on touch, and desktop has the room for a label anyway. Standing rule going forward: no icon-only controls.',

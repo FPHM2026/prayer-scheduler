@@ -564,6 +564,14 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
   shows one full list whenever `CHANGE_LOG` is empty, as a fallback.
   Runtime behavior, not a preview/production code fork, since `index.html`
   is a wholesale copy of `preview/index.html`.
+- **"Sign Out / Switch User"** (2026-09-30, at the user's request, both
+  `preview/index.html` and `portal/index.html`): the header button is
+  relabeled, and Sign Out now sets `forceAccountPicker = true`, so the
+  *next* `loginPopup()` passes `prompt:'select_account'`. Without that,
+  Microsoft's single sign-on can silently sign the same person straight
+  back in, making "switch user" impossible. The flag is one-shot (cleared
+  after that sign-in), so a normal first visit is unchanged — no extra
+  click. Test only for the admin app; the portal deploys live.
 - **"Added by admin" label on blackout dates** (2026-09-29, at the user's
   request so a minister can tell an admin created an entry): both
   `listItems()` copies now carry `_createdByEmail` from Graph's

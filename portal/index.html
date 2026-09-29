@@ -277,7 +277,7 @@
   <h1>My FPHM Schedule</h1>
   <div style="display:flex;align-items:center;gap:12px;">
     <span class="who" id="whoami"></span>
-    <button class="btn secondary" id="btnSignOut" style="padding:8px 14px;min-height:36px;">Sign Out</button>
+    <button class="btn secondary" id="btnSignOut" style="padding:8px 14px;min-height:36px;">Sign Out / Switch User</button>
   </div>
 </header>
 <nav aria-label="Primary">
@@ -394,6 +394,7 @@ const LIST_NAMES = { ministers: "PrayerMinisters", sessions: "PrayerSessions", b
 const msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
 const msalReady = msalInstance.initialize();
 let account = null;
+let forceAccountPicker = false; // set by Sign Out / Switch User, consumed by the next loginPopup
 let siteId = null;
 let listIds = {};
 
@@ -414,7 +415,10 @@ document.getElementById('btnSignIn').addEventListener('click', async ()=>{
   btn.disabled = true;
   btn.textContent = 'Signing in…';
   try{
-    const result = await msalInstance.loginPopup({ scopes: GRAPH_SCOPES });
+    // After Sign Out / Switch User, always show Microsoft's account picker so a
+    // different account can be chosen (see the same note in the admin app).
+    const result = await msalInstance.loginPopup({ scopes: GRAPH_SCOPES, ...(forceAccountPicker ? { prompt: 'select_account' } : {}) });
+    forceAccountPicker = false;
     account = result.account;
     await afterSignIn();
   }catch(e){
@@ -460,10 +464,11 @@ async function afterSignIn(){
   document.getElementById('btnSignOut').onclick = async ()=>{
     await msalInstance.logoutPopup({ account });
     account = null;
+    forceAccountPicker = true;
     clearStuckMsalState();
     document.getElementById('appRoot').style.display = 'none';
     document.getElementById('signinScreen').style.display = 'flex';
-    document.getElementById('signinMsg').textContent = 'Signed out.';
+    document.getElementById('signinMsg').textContent = 'Signed out. Sign in again as the same person or choose a different account.';
   };
   try{
     await loadAll();
