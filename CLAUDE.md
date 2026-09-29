@@ -553,6 +553,22 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
   shows one full list whenever `CHANGE_LOG` is empty, as a fallback.
   Runtime behavior, not a preview/production code fork, since `index.html`
   is a wholesale copy of `preview/index.html`.
+- **"Added by admin" label on blackout dates** (2026-09-29, at the user's
+  request so a minister can tell an admin created an entry): both
+  `listItems()` copies now carry `_createdByEmail` from Graph's
+  `createdBy.user.email` (no SharePoint schema change — it's item
+  metadata). `blackoutAddedByAdmin(d)` (in `portal/index.html` and
+  `preview/index.html`) says admin-added when that creator differs from
+  the minister's own sign-in email; a blank creator email is **never**
+  labeled, since a missed label is better than falsely telling someone an
+  admin made their entry. Label shows in the portal's time-off list and on
+  the admin Blackout Dates tab. **Edit/Delete were deliberately left
+  alone**: the user first asked to lock them for admin-added blackouts,
+  then agreed that would make a mistaken "All Ministers" blackout
+  impossible to remove in-app, and chose label-only. Untested against real
+  data: if `createdBy.user.email` differs from a minister's UPN
+  (e.g. alias/mailbox address), their own entries could be wrongly
+  labeled — check with a real minister account.
 - **Header layout: button + caption containers** (2026-09-29, at the
   user's request; deliberately **not** in the Changes tab, per the user):
   "Data as of …" now sits *under* Refresh Data and "Signed in as …" under

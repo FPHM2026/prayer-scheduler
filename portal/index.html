@@ -499,7 +499,8 @@ async function resolveSiteAndLists(){
 }
 async function listItems(key){
   const resp = await graphFetch(`/sites/${siteId}/lists/${listIds[key]}/items?$expand=fields&$top=999`);
-  return resp.value.map(i => ({ ...i.fields, id: parseInt(i.id, 10), _created: i.createdDateTime }));
+  return resp.value.map(i => ({ ...i.fields, id: parseInt(i.id, 10), _created: i.createdDateTime,
+    _createdByEmail: ((i.createdBy && i.createdBy.user && i.createdBy.user.email) || '').trim().toLowerCase() }));
 }
 async function createItem(key, fields){
   return graphFetch(`/sites/${siteId}/lists/${listIds[key]}/items`, { method:'POST', body: JSON.stringify({ fields }) });
@@ -563,7 +564,7 @@ async function loadAll(){
       intakeResponseId: (s.IntakeResponseId!=null && s.IntakeResponseId!=='') ? parseInt(s.IntakeResponseId,10) : null
     };
   });
-  blackouts = rawBlack.map(b => ({ id: b.id, ministerName: b.Title, date: (b.BlackoutDate||'').split('T')[0], endDate: b.EndDate ? b.EndDate.split('T')[0] : null, notes: b.Notes||'' }));
+  blackouts = rawBlack.map(b => ({ id: b.id, ministerName: b.Title, date: (b.BlackoutDate||'').split('T')[0], endDate: b.EndDate ? b.EndDate.split('T')[0] : null, notes: b.Notes||'', createdByEmail: b._createdByEmail||'' }));
 
   const myEmail = (account.username||'').trim().toLowerCase();
   me = ministers.find(m => m.signInEmail.trim().toLowerCase() === myEmail) || null;
@@ -1046,6 +1047,15 @@ function fmtBlackoutRangeShort(d){
   if(!d.endDate || d.endDate===d.date) return fmtShort(d.date);
   return `${fmtShort(d.date)} – ${fmtShort(d.endDate)}`;
 }
+// A blackout counts as admin-added when SharePoint's own "Created By" on the
+// item is someone other than this minister (they add their own here, signed
+// in as themselves). Unknown creator (blank email) is never labeled - better
+// to miss a label than to wrongly tell someone an admin added their entry.
+function blackoutAddedByAdmin(d){
+  if(!d.createdByEmail) return false;
+  const mine = [me.signInEmail, account.username].map(x=>(x||'').trim().toLowerCase()).filter(Boolean);
+  return !mine.includes(d.createdByEmail);
+}
 function renderBlackouts(){
   const box = $('#blackoutGroups'); const noResults = $('#blackoutNoResults');
   const opened = openState(box);
@@ -1079,7 +1089,7 @@ function renderBlackouts(){
     summary,
     mine.map(d=>`<div class="sess-row">
       <div>
-        <div style="font-weight:600;">${fmtBlackoutRange(d)}</div>
+        <div style="font-weight:600;">${fmtBlackoutRange(d)}${blackoutAddedByAdmin(d) ? ' <span class="tag">Added by admin</span>' : ''}</div>
         ${d.notes?`<div class="sess-meta">${escapeHtml(d.notes)}</div>`:''}
       </div>
       <div class="sess-actions">
