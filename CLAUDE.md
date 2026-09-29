@@ -86,7 +86,18 @@ For anything bigger than a trivial/safe fix, build and test in
 4. Commit + push preview/index.html straight to `main` — GitHub Pages serves
    both files from the same branch root, so `/preview/` is just a URL path.
 5. Have the user test against real data at the live preview URL.
-6. To promote: either copy preview/index.html over index.html wholesale and
+6. **MANDATORY promotion checklist (missing item 3 broke production from
+   2026-09-27 until it was caught on 2026-09-29 — Intake Forms tab, the
+   questions editor showing "Loading…", and the minister→portal redirect
+   all silently failed):** (1) strip the `#previewModeBanner` CSS + div;
+   (2) **fix the preview-only relative paths**: grep production
+   `index.html` for `"\.\./` and change `../js/formConfig.js`,
+   `../js/formEngine.js`, `../intake/` (both the Open Intake Form link and
+   `INTAKE_URL`) and `../portal/` (`PORTAL_URL`) to `js/…`, `intake/`,
+   `portal/` — gotcha #13; (3) diff `index.html` against
+   `preview/index.html` — the differences should be exactly the banner
+   plus those five path lines, nothing else; (4) only then commit/push.
+   To promote: either copy preview/index.html over index.html wholesale and
    strip the preview-banner block back out (when *all* of preview's changes
    are ready), or cherry-pick specific edits into index.html directly (when
    preview has multiple features in flight and only some are ready). Bump

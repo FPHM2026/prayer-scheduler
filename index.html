@@ -12,8 +12,8 @@
      question schema + rendering logic live in ONE place (../js/) so
      editing a question never needs touching more than that file. See
      CLAUDE.md "Intake Forms" section. -->
-<script src="../js/formConfig.js"></script>
-<script src="../js/formEngine.js"></script>
+<script src="js/formConfig.js"></script>
+<script src="js/formEngine.js"></script>
 <style>
   /* Palette sampled from creeksidechurch.ca and the Freedom Prayer Healing Ministry
      page/logo (creeksidechurch.ca/freedom-prayer): --gold is the ministry's terracotta
@@ -719,7 +719,7 @@
 
   <section class="panel" id="panel-intake">
     <div class="toolbar no-print" style="margin-bottom:12px;">
-      <a class="btn" id="btnOpenIntakeForm" href="../intake/" target="_blank" rel="noopener">Open Intake Form</a>
+      <a class="btn" id="btnOpenIntakeForm" href="intake/" target="_blank" rel="noopener">Open Intake Form</a>
       <button class="btn secondary" type="button" id="btnCopyIntakeLink">Copy Link to Intake Form</button>
       <span class="helptext" id="intakeLinkCopiedMsg" style="display:none;">Link copied!</span>
     </div>
@@ -1083,8 +1083,8 @@ const LIST_NAMES = {
 };
 // Relative to this file's own location (preview/) - portal/ is a sibling of
 // the repo root, one level up from here.
-const PORTAL_URL = "../portal/";
-const INTAKE_URL = "../intake/";
+const PORTAL_URL = "portal/";
+const INTAKE_URL = "intake/";
 
 const msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
 const msalReady = msalInstance.initialize();
