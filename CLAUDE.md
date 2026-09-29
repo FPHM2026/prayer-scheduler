@@ -1160,10 +1160,10 @@ existing session history.
   the staff-editable `INTRO_TEXT.title` in `js/formConfig.js`, which
   currently reads "...Intake Questionnaire", a slightly different wording
   left as-is — this new heading is a separate, fixed string, not tied to
-  that editable config). Sized smaller than the intro's own h1 (1.05rem
-  vs 1.6rem) since this one stays pinned on screen the whole time via
-  `position:sticky`, and a full-size heading would eat too much of that
-  bar on every scroll.
+  that editable config). Started smaller than the intro's own h1 (1.05rem
+  vs 1.6rem, since this one stays pinned on screen the whole time via
+  `position:sticky`), then sized up to 1.35rem the same day after the
+  user saw it live and asked for it larger.
 - **Branded to match the main app** (`intake/css/styles.css`, added
   2026-09-29, at the user's request): the public form used to run its own
   unrelated teal palette (`--accent:#3b5f5a`) and system-font stack,
@@ -1183,6 +1183,15 @@ existing session history.
   banner and a selected choice option) were swapped for a matching light
   terracotta tint (`#f3e7e0`); everything else already used the CSS
   variables and updated automatically.
+  - **Progress bar looked pre-filled** (fixed 2026-09-29, same
+    request — "it looks like it's full... could be that the incomplete
+    color needs to change"): `.progress-outer`'s track color used to be
+    `var(--border)` (`#9d8b67`), close enough in tone to `--accent`
+    (`#aa5a3c`, both warm mid-browns) that an empty or barely-started bar
+    read as already complete. Lightened the track to a clearly-neutral
+    `#e8e0d3`, and gave `.progress-inner` a `min-width:8px` so even the
+    very first section shows a visible sliver of fill rather than nothing
+    at 0% — both the user's own suggested fixes.
   - **Sticky top bar's section-indicator spacing** (added 2026-09-29,
     same request): `.top-bar-sticky .progress-label`'s `margin-bottom`
     went from 10px to 14px, at the user's specific request for "maybe

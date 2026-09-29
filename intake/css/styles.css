@@ -57,15 +57,23 @@ p { margin: 0 0 14px; }
   margin-bottom: 18px;
 }
 
+/* The track (unfilled) color used to be var(--border) - close enough in
+   tone to --accent (both warm mid-brown) that an empty or near-empty bar
+   read as already full. Lightened to a clearly-neutral tan so filled vs.
+   unfilled is obvious at any percentage - min-width on .progress-inner
+   below also guarantees a visible sliver of fill even at 0%, so the very
+   first section doesn't look like the bar hasn't started at all. Both
+   changed 2026-09-29 at the user's request. */
 .progress-outer {
   height: 6px;
-  background: var(--border);
+  background: #e8e0d3;
   border-radius: 4px;
   overflow: hidden;
   margin-bottom: 6px;
 }
 .progress-inner {
   height: 100%;
+  min-width: 8px;
   background: var(--accent);
   transition: width .3s ease;
 }
@@ -200,12 +208,13 @@ button {
   margin-bottom: 10px;
 }
 
-/* Smaller than the intro screen's own h1 (1.6rem) - this one stays
-   pinned on screen the whole time you're filling out the form, so a
-   full-size heading would eat too much of the sticky bar on every
-   scroll. Added 2026-09-29 at the user's request, so the ministry name
-   is visible on every section, not just the intro screen. */
-.intake-top-title { font-size: 1.05rem; margin: 0 0 10px; }
+/* Started smaller than the intro screen's own h1 (1.6rem), since this one
+   stays pinned on screen the whole time you're filling out the form - but
+   the user asked for it larger after seeing it live, so it's now close to
+   full h1 size. Added 2026-09-29 at the user's request, so the ministry
+   name is visible on every section, not just the intro screen; sized up
+   the same day per follow-up feedback. */
+.intake-top-title { font-size: 1.35rem; margin: 0 0 10px; }
 
 .top-bar-sticky {
   position: sticky;
