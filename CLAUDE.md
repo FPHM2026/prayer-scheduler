@@ -1049,6 +1049,19 @@ existing session history.
     of two. Every new button here is a labeled text button (`.btn`
     variants) per the no-icon-only-controls standing rule in Style/tone
     notes — none of this needed an icon in the first place.
+  - **"Submitted" split into "Unlinked"/"Linked"** (added 2026-09-29, at
+    the user's request — "submitted would become unlinked and any intake
+    that has been linked would be under the linked [tab]"): the sub-tabs
+    are now Unlinked / Linked / In progress / Archived. Both Unlinked and
+    Linked are `status==='Submitted'` forms — split by whether
+    `linkedIntakeResponseIds()` (see "Intake form linking" below) contains
+    that form's id. In-progress and Archived are unaffected; linking only
+    ever applies to Submitted forms in practice. A Linked card's summary
+    line names which recipient's session it's linked to
+    (`sessions.find(s=>s.intakeResponseId===i.id)`) instead of the
+    submitted date, so staff can see the connection without opening the
+    form. Default landing sub-tab changed from `'Submitted'` to
+    `'Unlinked'` — the new "needs attention" view.
 - **Recipient matching** — same convention as the existing "recipient
   session history" panel in the session modal: matched by name only (no
   persistent recipient record to join on). `findIntakeForRecipient()` in
