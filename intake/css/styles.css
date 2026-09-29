@@ -214,21 +214,30 @@ button {
    full h1 size. Added 2026-09-29 at the user's request, so the ministry
    name is visible on every section, not just the intro screen; sized up
    the same day per follow-up feedback. */
-.intake-top-title { font-size: 1.35rem; margin: 0 0 10px; }
+.intake-top-title { font-size: 1.75rem; margin: 0 0 10px; }
 
+/* padding-bottom (not the label's margin-bottom) is what actually creates
+   the gap under "Section X of Y": a margin on the last child collapses
+   out through the parent, so the bar's painted background ended right at
+   the label text and scrolling form cards butted up against it, reading
+   as joined to it. Real padding is painted by the bar's own background,
+   and the shadow makes it read as a separate layer floating above the
+   form. Fixed 2026-09-29 per the user's screenshot feedback. */
 .top-bar-sticky {
   position: sticky;
   top: 0;
   z-index: 20;
   background: var(--bg);
   padding-top: 12px;
+  padding-bottom: 16px;
   margin: -12px -18px 0;
   padding-left: 18px;
   padding-right: 18px;
+  box-shadow: 0 8px 12px -8px rgba(0,0,0,.18);
 }
-.top-bar-sticky .progress-label { margin-bottom: 14px; }
+.top-bar-sticky .progress-label { margin-bottom: 0; }
 @media print {
-  .top-bar-sticky { position: static; margin: 0; padding: 0; }
+  .top-bar-sticky { position: static; margin: 0; padding: 0; box-shadow: none; }
 }
 
 .save-status {

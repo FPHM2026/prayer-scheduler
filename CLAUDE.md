@@ -1193,9 +1193,15 @@ existing session history.
     very first section shows a visible sliver of fill rather than nothing
     at 0% — both the user's own suggested fixes.
   - **Sticky top bar's section-indicator spacing** (added 2026-09-29,
-    same request): `.top-bar-sticky .progress-label`'s `margin-bottom`
-    went from 10px to 14px, at the user's specific request for "maybe
-    four more pixels" of breathing room under the "Section X of Y" line.
+    same request; reworked the same day after a screenshot): first
+    attempt bumped `.progress-label`'s `margin-bottom` 10px→14px, but a
+    margin on the sticky bar's last child collapses out through the
+    parent, so the bar's painted background still ended right at the
+    label text and form cards scrolling underneath looked joined to it.
+    Real fix: `padding-bottom:16px` on `.top-bar-sticky` itself (painted by
+    its own background), label margin set to 0, plus a soft bottom
+    `box-shadow` so the bar reads as a separate floating layer. Title
+    (`.intake-top-title`) also sized up again, 1.35rem→1.75rem.
   - **No trailing gap under the sticky bottom nav buttons** (added
     2026-09-29, same request — "when I scroll all the way down... there
     is space underneath the navigation buttons... There should be no
