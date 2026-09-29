@@ -1164,6 +1164,42 @@ existing session history.
   vs 1.6rem) since this one stays pinned on screen the whole time via
   `position:sticky`, and a full-size heading would eat too much of that
   bar on every scroll.
+- **Branded to match the main app** (`intake/css/styles.css`, added
+  2026-09-29, at the user's request): the public form used to run its own
+  unrelated teal palette (`--accent:#3b5f5a`) and system-font stack,
+  disconnected from the rest of the app. Its `:root` variables now carry
+  the exact same values as the Scheduler's own palette (`--bg`, `--card`,
+  `--ink`→`--text`, `--ink-soft`→`--muted`, `--border` all identical),
+  with `--accent`/`--accent-dark` set to the ministry's gold/terracotta
+  (`#aa5a3c`/`#8a4a30`) rather than the Scheduler's brighter
+  `--primary` orange — that orange needs dark text for contrast (see the
+  Scheduler's `--on-primary`), while gold reads fine with the white button
+  text this form already used, so gold was the better single-accent
+  choice here. Fonts switched to the same Google Fonts pair as the main
+  app (Jost for body text, Playfair Display for headings), loaded from
+  the same `<link>` this page already had for Dancing Script (the
+  signature font) — one combined font request, not a second `<link>` tag.
+  A couple of leftover hardcoded teal tints (`#eef3f1` on the resume
+  banner and a selected choice option) were swapped for a matching light
+  terracotta tint (`#f3e7e0`); everything else already used the CSS
+  variables and updated automatically.
+  - **Sticky top bar's section-indicator spacing** (added 2026-09-29,
+    same request): `.top-bar-sticky .progress-label`'s `margin-bottom`
+    went from 10px to 14px, at the user's specific request for "maybe
+    four more pixels" of breathing room under the "Section X of Y" line.
+  - **No trailing gap under the sticky bottom nav buttons** (added
+    2026-09-29, same request — "when I scroll all the way down... there
+    is space underneath the navigation buttons... There should be no
+    extra space"): `.nav-row-sticky` (Back/Next, Save/Submit) is always
+    the last element rendered inside `.wrap`, and `.wrap` had `padding:
+    24px 18px 80px` — that trailing 80px sat *after* the sticky nav in
+    document flow, so once a visitor scrolled to the true end of the
+    page, the nav (which can only stay pinned to the viewport bottom
+    while there's more content below to scroll past) settled at its
+    natural in-flow position above that 80px gap, visibly detaching from
+    the bottom edge. Fixed by dropping `.wrap`'s bottom padding to `0` —
+    `.nav-row-sticky` already has its own `16px` bottom padding, which is
+    what now provides the only breathing room below the buttons.
 - **Long free-text answers auto-grow instead of clipping/scrolling**
   (added 2026-09-26) — every `<textarea>` (the "please explain"
   questions, and the checkboxes "Other, please specify" box) grows to

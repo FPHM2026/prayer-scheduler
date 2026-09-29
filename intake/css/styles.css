@@ -1,12 +1,21 @@
+/* Palette matches the main Scheduler app's brand exactly (see its own
+   ":root" comment) - sampled from creeksidechurch.ca and the Freedom
+   Prayer Healing Ministry page/logo. --accent is the ministry's own
+   terracotta/gold, not the Scheduler's brighter orange --primary: that
+   orange needs dark text for contrast (see the Scheduler's --on-primary),
+   while this gold reads fine with the white button text already used
+   here, so gold is the better single-accent choice for this simpler
+   public-facing form. Updated 2026-09-29 at the user's request - this
+   form used to run its own unrelated teal palette. */
 :root {
-  --bg: #f7f5f1;
+  --bg: #faf8f4;
   --card: #ffffff;
-  --ink: #2a2823;
-  --ink-soft: #5b584f;
-  --accent: #3b5f5a;
-  --accent-dark: #2a4440;
-  --border: #e2ddd2;
-  --error: #b3441e;
+  --ink: #565656;
+  --ink-soft: #636363;
+  --accent: #aa5a3c;
+  --accent-dark: #8a4a30;
+  --border: #9d8b67;
+  --error: #c0392b;
   --radius: 12px;
   --maxw: 720px;
   font-size: 17px;
@@ -18,18 +27,19 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'Jost', -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   line-height: 1.55;
 }
 
 .wrap {
   max-width: var(--maxw);
   margin: 0 auto;
-  padding: 24px 18px 80px;
+  padding: 24px 18px 0;
 }
 
 h1, h2, h3 {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: 'Playfair Display', Georgia, "Times New Roman", serif;
+  font-weight: 700;
   color: var(--accent-dark);
   line-height: 1.25;
 }
@@ -114,7 +124,7 @@ input:focus, textarea:focus, select:focus {
 }
 .choice-option:has(input:checked) {
   border-color: var(--accent);
-  background: #eef3f1;
+  background: #f3e7e0;
 }
 .choice-option input { width: 18px; height: 18px; flex-shrink: 0; }
 .choice-option .other-text {
@@ -173,7 +183,7 @@ button {
 }
 .btn-primary { background: var(--accent); color: #fff; }
 .btn-primary:hover { background: var(--accent-dark); }
-.btn-primary:disabled { background: #a9b8b5; cursor: not-allowed; }
+.btn-primary:disabled { background: #c9b9a8; cursor: not-allowed; }
 .btn-secondary { background: #fff; color: var(--accent-dark); border: 1px solid var(--border); }
 .btn-secondary:hover { background: #f0ede4; }
 .btn-link {
@@ -207,7 +217,7 @@ button {
   padding-left: 18px;
   padding-right: 18px;
 }
-.top-bar-sticky .progress-label { margin-bottom: 10px; }
+.top-bar-sticky .progress-label { margin-bottom: 14px; }
 @media print {
   .top-bar-sticky { position: static; margin: 0; padding: 0; }
 }
@@ -220,7 +230,7 @@ button {
 }
 
 .resume-banner {
-  background: #eef3f1;
+  background: #f3e7e0;
   border: 1px solid var(--accent);
   border-radius: var(--radius);
   padding: 16px;
