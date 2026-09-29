@@ -553,6 +553,18 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
   shows one full list whenever `CHANGE_LOG` is empty, as a fallback.
   Runtime behavior, not a preview/production code fork, since `index.html`
   is a wholesale copy of `preview/index.html`.
+- **Header layout: button + caption containers** (2026-09-29, at the
+  user's request; deliberately **not** in the Changes tab, per the user):
+  "Data as of …" now sits *under* Refresh Data and "Signed in as …" under
+  Sign Out, at every viewport (the old `header .who` desktop-only rule is
+  gone). Each button and its caption share a `.hdr-action` container —
+  `inline-flex` column, `align-items:stretch`, caption `white-space:nowrap`
+  — so the container shrink-wraps its contents: a long sign-in name widens
+  the container (and the button above it) instead of wrapping or pushing
+  onto a new line; only whole containers wrap if the row runs out of room.
+  On mobile (<640px) the version number moves into the title's row,
+  right-justified (`.hdr-title` flex row); at 640px+ it stays under the
+  title as before.
 - **Header "Refresh Data" button** (`#btnRefreshData`,
   `refreshDataKeepingPlace()`, added 2026-09-29, at the user's request —
   data that ministers submit (availability, blackouts, confirmations,
