@@ -140,6 +140,16 @@
   button.info-btn{background:none;border:none;cursor:pointer;color:var(--muted);display:inline-flex;align-items:center;gap:4px;font-size:var(--fs-xs);font-weight:600;padding:4px 8px;border-radius:6px;min-height:32px;}
   button.info-btn:hover{background:var(--bg);color:var(--gold);}
   .info-tip-box{position:absolute;z-index:50;top:100%;left:0;margin-top:4px;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-md);padding:10px 12px;font-size:var(--fs-xs);line-height:1.45;color:var(--text);width:260px;max-width:80vw;}
+  /* Below 640px, .toolbar stacks to a single full-width column (see the
+     Tablet-and-up override further down) - an absolutely-positioned box
+     there floats out of flow and overlaps whatever toolbar button comes
+     next, instead of pushing it down. Fixed by dropping out of absolute
+     positioning on mobile: the box becomes a normal, full-width, in-flow
+     block directly under the buttons, same as the user asked for. */
+  @media (max-width:640px){
+    .info-tip{flex-wrap:wrap;width:100%;}
+    .info-tip-box{position:static;flex:0 0 100%;width:auto;max-width:none;margin-top:8px;}
+  }
   /* Standing rule (2026-09-28, at the user's explicit request): an
      icon-only control is never acceptable, on any viewport - a title
      tooltip only works with a mouse hovering, and touch has no hover at
@@ -979,7 +989,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-29.4";
+const APP_VERSION = "2026-09-29.5";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -5426,7 +5436,8 @@ const CHANGE_LOG = [
   { date: 'Sep 29, 2026', version: APP_VERSION, items: [
     'Fixed: the Contacted button on a waiting recipient\'s card used to say "Contacted" by default (looked like a status, not a call to action) and flipped to "Not Contacted" right after you actually marked them contacted (looked like it hadn\'t worked). Now says "Contact" until you\'ve reached out, then "Contacted" once you have - matching the "Contacted" tag chip that appears next to their name.',
     'Fixed: icon buttons (Contact, Add to Calendar, Refresh, Next Appointment, and others) had zero space between the icon and its label on desktop, now that labels always show - a standing 8px spacing scale (4px as the icon-to-label exception) is now the standard for spacing here going forward.',
-    'New: a "What\'s this?" info button next to "+ Quick Add Slots" explains exactly what it does before you click it - tap it to see, tap again (or elsewhere) to dismiss. Same treatment coming to other buttons with non-obvious behavior.'
+    'New: a "What\'s this?" info button next to "+ Quick Add Slots" explains exactly what it does before you click it - tap it to see, tap again (or elsewhere) to dismiss. Same treatment coming to other buttons with non-obvious behavior.',
+    'Fixed: on phones, that explanation box could float over the next toolbar button instead of pushing it down. It now sits in normal flow, full width, directly under the buttons.'
   ]},
   { date: 'Sep 28, 2026', version: '2026-09-28.6', items: [
     'New: Intake Forms has an "Archived" tab now, alongside Submitted and In progress. Every form gets an Archive button (reversible - Unarchive puts it right back) and a Delete button (permanent). Delete used to only be offered for in-progress forms; now that Archive exists as the safer option first, Delete works on any form.',
