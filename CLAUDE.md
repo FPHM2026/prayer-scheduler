@@ -574,6 +574,18 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
   open state survives re-renders. Priority keeps its orange left edge via
   `.group.wl-priority`. The legacy unlinked Planning tab still uses
   `.prospect-card` (dead code, untouched).
+- **Reports: monthly Unique Recipients are a first-session cohort**
+  (2026-09-30, at the user's request): in the year row's monthly
+  breakdown, a recipient is counted once, in the month of their *first*
+  Completed session within that year's range, so the months sum to the
+  year's Unique Recipients (user's real data: 43 for 2026). Previously each
+  month counted its own distinct recipients, overshooting the year.
+  `reportCohortSplitByMonth()` builds this; first-time/follow-up use the
+  year row's rule (any Follow-up session in the year ⇒ Follow-up), so those
+  columns sum to the year's too. Sessions and Hours stay genuinely
+  per-month. Applied to both `reportMonthRows()` and each minister's own
+  drill-down (`reportMinisterMonthRows()`, cohort scoped to that
+  minister's sessions). Test only until promoted.
 - **Sign Out asks "Sign out or switch user?"** (2026-09-30, at the user's
   request, both `preview/index.html` and `portal/index.html`): the header
   button still just says "Sign Out" (the user briefly had it relabeled
