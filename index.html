@@ -218,6 +218,13 @@
      centered treatment via .small rather than becoming a sheet. ---- */
   .modal-bg{display:none;position:fixed;inset:0;background:rgba(35,30,24,.55);align-items:center;justify-content:center;z-index:50;padding:12px;}
   .modal-bg.open{display:flex;}
+  /* Close "X" in a modal's top-right corner, and a plain text-link action
+     (used by the Sign Out dialog: X = cancel, Switch User = text link,
+     Sign Out = the primary button). */
+  .modal-x{position:absolute;top:8px;right:8px;width:36px;height:36px;background:none;border:none;font-size:26px;line-height:1;color:var(--muted);cursor:pointer;border-radius:6px;}
+  .modal-x:hover{background:#f1ede4;color:var(--navy);}
+  .link-btn{background:none;border:none;padding:8px 12px;font-family:inherit;font-size:var(--fs-md);font-weight:600;color:var(--gold-dark);text-decoration:underline;cursor:pointer;min-height:44px;}
+  .link-btn:hover{color:var(--gold);}
   .modal{background:#fff;border-radius:10px;max-width:560px;width:100%;max-height:96vh;overflow:auto;padding:14px;box-shadow:var(--shadow-lg);}
   .modal.small{max-width:360px;}
   .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:4px;}
@@ -445,6 +452,11 @@
   .prospect-card .name-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
   .prospect-card .name{font-weight:700;font-size:var(--fs-md);}
   .prospect-card .notes{font-size:var(--fs-sm);white-space:pre-wrap;margin-top:6px;}
+  /* Waiting-list entries are collapsible .group rows now (see
+     renderUnplacedCandidates); these carry over what .prospect-card gave
+     them - the notes styling and the orange left edge for Priority. */
+  .wl-body .notes{font-size:var(--fs-sm);white-space:pre-wrap;margin-top:6px;}
+  .group.wl-priority{border-left:4px solid var(--primary);}
   .flag-btn{color:var(--muted);}
   .flag-btn.active{color:var(--primary);}
   .flag-btn.active:hover{background:rgba(242,138,0,.14);color:var(--primary-dark);}
@@ -993,6 +1005,18 @@
   </div>
 </div>
 
+<div class="modal-bg" id="signOutModal">
+  <div class="modal small" role="dialog" aria-modal="true" aria-labelledby="signOutTitle" style="position:relative;">
+    <button type="button" class="modal-x" aria-label="Cancel" title="Cancel" onclick="document.getElementById('signOutModal').classList.remove('open')">&times;</button>
+    <h2 id="signOutTitle" style="padding-right:32px;">Sign out or switch user?</h2>
+    <p style="margin:0 0 18px;">Sign out to leave completely, or switch to sign in as a different Microsoft account.</p>
+    <div class="modal-actions" style="align-items:center;">
+      <button type="button" class="link-btn" onclick="doSignOut(true)">Switch User</button>
+      <button class="btn" onclick="doSignOut(false)">Sign Out</button>
+    </div>
+  </div>
+</div>
+
 <!-- Centered, full-viewport-width "what does this do?" modal (added
      2026-09-29, at the user's request) - style="max-width:none" overrides
      the shared .modal class's 560px cap just for this one, since every
@@ -1010,7 +1034,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-29.15";
+const APP_VERSION = "2026-09-30.5";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1099,10 +1123,49 @@ async function init(){
   await msalReady;
   const accounts = msalInstance.getAllAccounts();
   if(accounts.length > 0){
-    account = accounts[0];
+    // Prefer the account last chosen (setActiveAccount, see doSignOut/sign-in)
+    // over blindly taking the first one cached - after "Switch User" the
+    // cache holds both accounts, and accounts[0] would be the old one.
+    account = msalInstance.getActiveAccount() || accounts[0];
     await afterSignIn();
   }
 }
+window.doSignOut = async function(switchUser){
+  document.getElementById('signOutModal').classList.remove('open');
+  if(switchUser){
+    // Go straight to Microsoft's account picker from this click (a popup
+    // opened later, after a separate sign-out popup, would be blocked as
+    // not user-initiated - and the first attempt at this, sign out then
+    // make the user click Sign In again, is what the user rejected). On a
+    // pick, remember it as the active account and reload so the whole app
+    // starts fresh as that user; cancelling the picker just leaves them
+    // signed in as before.
+    try{
+      const oldAccount = account;
+      const result = await msalInstance.loginPopup({ scopes: GRAPH_SCOPES, prompt: 'select_account' });
+      // Forget the previous account locally, BEFORE setting the new one
+      // active (clearing can reset the active account). Leaving both cached
+      // let a page still using the old "first cached account" logic (the
+      // production Scheduler at the time) pick the old user - which
+      // redirected minister<->admin between the Scheduler and portal in an
+      // endless loop when the user switched from a minister to an admin.
+      if(oldAccount && oldAccount.homeAccountId !== result.account.homeAccountId && msalInstance.clearCache){
+        try{ await msalInstance.clearCache({ account: oldAccount }); }catch(e){ console.warn('Could not clear the previous account:', e.message); }
+      }
+      msalInstance.setActiveAccount(result.account);
+      location.reload();
+    }catch(e){
+      if(e.errorCode === 'interaction_in_progress') clearStuckMsalState();
+    }
+    return;
+  }
+  await msalInstance.logoutPopup({ account });
+  account = null;
+  clearStuckMsalState();
+  document.getElementById('appRoot').style.display = 'none';
+  document.getElementById('signinScreen').style.display = 'flex';
+  document.getElementById('signinMsg').textContent = 'Signed out. Sign in with your Microsoft 365 account to continue.';
+};
 function clearStuckMsalState(){
   Object.keys(sessionStorage).filter(k=>k.startsWith('msal.')).forEach(k=>sessionStorage.removeItem(k));
 }
@@ -1114,6 +1177,7 @@ document.getElementById('btnSignIn').addEventListener('click', async ()=>{
   try{
     const result = await msalInstance.loginPopup({ scopes: GRAPH_SCOPES });
     account = result.account;
+    msalInstance.setActiveAccount(account);
     await afterSignIn();
   }catch(e){
     if(e.errorCode === 'interaction_in_progress'){
@@ -1152,6 +1216,17 @@ async function afterSignIn(){
     const myEmail = (account.username||'').trim().toLowerCase();
     const isMinister = rawMin.some(m => (m.SignInEmail||'').trim().toLowerCase() === myEmail);
     if(isMinister){
+      // Loop guard, mirror of the portal's: if the portal already bounced us
+      // here moments ago, stop instead of ping-ponging between the two.
+      const lastBounce = parseInt(sessionStorage.getItem('fphm_to_portal')||'0', 10);
+      if(Date.now() - lastBounce < 20000){
+        document.getElementById('signinMsg').textContent = `You're signed in as ${account.username}, a Prayer Minister, and the portal sent you back here. Sign in with the right account instead.`;
+        sessionStorage.removeItem('fphm_to_portal');
+        account = null;
+        clearStuckMsalState();
+        return;
+      }
+      sessionStorage.setItem('fphm_to_portal', String(Date.now()));
       document.getElementById('signinMsg').textContent = "You're signed in as a Prayer Minister — redirecting to your portal…";
       window.location.href = PORTAL_URL;
       return;
@@ -1163,14 +1238,12 @@ async function afterSignIn(){
   document.getElementById('signinScreen').style.display = 'none';
   document.getElementById('appRoot').style.display = 'block';
   document.getElementById('whoami').textContent = 'Signed in as ' + (account.name || account.username);
-  document.getElementById('btnSignOut').onclick = async ()=>{
-    await msalInstance.logoutPopup({ account });
-    account = null;
-    clearStuckMsalState();
-    document.getElementById('appRoot').style.display = 'none';
-    document.getElementById('signinScreen').style.display = 'flex';
-    document.getElementById('signinMsg').textContent = 'Signed out. Sign in with your Microsoft 365 account to continue.';
-  };
+  // Microsoft has no single prompt that asks "sign out or switch user", so
+  // the button opens this app's own two-choice dialog first (#signOutModal);
+  // its buttons call doSignOut() below. Both paths use Microsoft's own
+  // logout popup - "Switch User" additionally makes the next sign-in show
+  // the account picker.
+  document.getElementById('btnSignOut').onclick = ()=>{ document.getElementById('signOutModal').classList.add('open'); };
   try{
     await loadAll();
     wireApp();
@@ -2251,18 +2324,21 @@ function renderUnplacedCandidates(){
   });
   $('#unplacedNoResults').hidden = rows.length>0;
   $('#unplacedCount').textContent = rows.length ? `${rows.length} waiting` : '';
-  $('#unplacedList').innerHTML = rows.map(s=>{
+  // Each waiting-list entry is a collapsible group (same groupRow/openState
+  // accordion the Intake Forms and Blackout tabs use): collapsed shows just
+  // the name, session number, tags and days waiting; expanded shows contact
+  // info, notes, the intake link and the action buttons. Collapsed by
+  // default so a long list scans quickly; open/closed state survives the
+  // re-renders every save triggers (openState).
+  const listBox = $('#unplacedList');
+  const opened = openState(listBox);
+  listBox.innerHTML = rows.map(s=>{
     const waiting = daysWaiting(s);
     const num = sessionNumberOf(s);
-    return `<div class="prospect-card${s.priority?' priority':''}">
-      <div class="name-row">
-        <span class="name">${escapeHtml(s.recipName)}</span>
-        <span class="tag ${num===1?'first':''}">Session #${num}</span>
-        ${s.genderPref==='Same-sex' ? `<span class="tag">${escapeHtml(s.recipGender||'Same-sex')} only</span>` : ''}
-        ${s.priority?'<span class="tag priority">Priority</span>':''}
-        ${s.contacted?'<span class="tag contacted">Contacted</span>':''}
-      </div>
-      <div class="helptext" style="margin:2px 0 0;">${escapeHtml(s.recipContact||'No contact info')} · Waiting ${waiting} day${waiting===1?'':'s'} · added ${fmtShort(s.added||s.date)}</div>
+    const key = 'wl-' + s.id;
+    const summary = `${s.priority?'<span class="tag priority">Priority</span>':''}${s.contacted?'<span class="tag contacted">Contacted</span>':''}${s.genderPref==='Same-sex' ? `<span class="tag">${escapeHtml(s.recipGender||'Same-sex')} only</span>` : ''}Waiting ${waiting} day${waiting===1?'':'s'}`;
+    const body = `<div class="wl-body">
+      <div class="helptext" style="margin:0;">${escapeHtml(s.recipContact||'No contact info')} · added ${fmtShort(s.added||s.date)}</div>
       ${s.notes?`<div class="notes">${escapeHtml(s.notes)}</div>`:''}
       ${renderIntakeLinkBlock(s)}
       <div class="toolbar" style="margin-top:10px;">
@@ -2272,6 +2348,8 @@ function renderUnplacedCandidates(){
         <button class="icon-btn danger" onclick="deleteSession(${s.id})" title="Delete" aria-label="Remove ${escapeHtml(s.recipName)} from the waiting list">${ICONS.trash}<span class="btn-label">Delete</span></button>
       </div>
     </div>`;
+    const html = groupRow(key, initials(s.recipName), s.recipName, `Session #${num}`, summary, body, opened.has(key) ? opened.get(key) : false);
+    return s.priority ? html.replace('<div class="group', '<div class="group wl-priority') : html;
   }).join('');
 }
 
@@ -5527,6 +5605,12 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Sep 30, 2026', version: '2026-09-30.2', items: [
+    'Changed: each person on the waiting list (Unplaced Candidates) is now a collapsible card. Collapsed, you see their name, session number, any Priority/Contacted tags and how long they\'ve waited; tap to expand for contact info, notes, the intake form link and the Contact / Flag Priority / Edit / Delete buttons. Cards start collapsed and stay open or closed through updates.'
+  ]},
+  { date: 'Sep 30, 2026', version: '2026-09-30.1', items: [
+    'Changed: clicking "Sign Out" now asks whether you want to sign out or switch user. Switch User opens Microsoft\'s account picker right away - pick a different account and the app reloads as that person (cancel and you stay signed in as before). The dialog is now just an X to cancel, a text "Switch User" and a primary "Sign Out", and switching between a minister and an admin account no longer bounces back and forth between the Scheduler and the portal. Same on the minister portal.'
+  ]},
   { date: 'Sep 29, 2026', version: '2026-09-29.15', items: [
     'New: a blackout date now shows a small "Added by admin" label when an admin (not the minister themselves) created it - visible to the minister on their portal\'s time-off list, and on the Blackout Dates tab here. Edit and Delete are unchanged.'
   ]},
@@ -5535,7 +5619,13 @@ const CHANGE_LOG = [
   ]},
   { date: 'Sep 29, 2026', version: '2026-09-29.12', items: [
     'Changed: the Changes tab keeps the five most recent versions on "Recent" and everything older on "Archive". If nothing is listed as recent, the tab shows one plain list instead.'
-  ]},
+  ]}
+];
+// Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
+// five most recent versions; at each promotion, anything beyond the newest
+// five moves here rather than being deleted - see the block comment above
+// for the maintenance rule.
+const CHANGE_LOG_ARCHIVE = [
   { date: 'Sep 29, 2026', version: '2026-09-29.10', items: [
     'Fixed: the Contacted button on a waiting recipient\'s card used to say "Contacted" by default (looked like a status, not a call to action) and flipped to "Not Contacted" right after you actually marked them contacted (looked like it hadn\'t worked). Now says "Contact" until you\'ve reached out, then "Contacted" once you have - matching the "Contacted" tag chip that appears next to their name.',
     'Fixed: icon buttons (Contact, Add to Calendar, Refresh, Next Appointment, and others) had zero space between the icon and its label on desktop, now that labels always show - a standing 8px spacing scale (4px as the icon-to-label exception) is now the standard for spacing here going forward.',
@@ -5547,13 +5637,7 @@ const CHANGE_LOG = [
   { date: 'Sep 28, 2026', version: '2026-09-28.6', items: [
     'New: Intake Forms has an "Archived" tab now, alongside Submitted and In progress. Every form gets an Archive button (reversible - Unarchive puts it right back) and a Delete button (permanent). Delete used to only be offered for in-progress forms; now that Archive exists as the safer option first, Delete works on any form.',
     'Setup needed for this to show cleanly in SharePoint\'s own list view: add "Archived" as a Choice option on the IntakeResponses list\'s Status column. The app works either way, but SharePoint\'s own UI won\'t display it properly until that option exists there too.'
-  ]}
-];
-// Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
-// five most recent versions; at each promotion, anything beyond the newest
-// five moves here rather than being deleted - see the block comment above
-// for the maintenance rule.
-const CHANGE_LOG_ARCHIVE = [
+  ]},
   { date: 'Sep 28, 2026', version: '2026-09-28.5', items: [
     'Changed: the Contacted button (mark whether you\'ve reached out to a waiting recipient) now sits right in a slot\'s summary row, usable without expanding the slot - it briefly lived in the expanded detail only. It also now always shows "Contacted"/"Mark Contacted" as text, not just an icon.',
     'Changed: icon buttons with a hidden text label (Contacted, Flag Priority, Edit, Delete on Unplaced Candidates and similar) now show that label on every screen size, not just phones - a hover tooltip only works with a mouse, so icon-only was never actually clear on touch, and desktop has the room for a label anyway. Standing rule going forward: no icon-only controls.',
