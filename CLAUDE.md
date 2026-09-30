@@ -564,6 +564,16 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
   shows one full list whenever `CHANGE_LOG` is empty, as a fallback.
   Runtime behavior, not a preview/production code fork, since `index.html`
   is a wholesale copy of `preview/index.html`.
+- **Waiting-list (Unplaced Candidates) cards are collapsible** (2026-09-30,
+  at the user's request): `renderUnplacedCandidates()` renders each entry
+  through the shared `groupRow()`/`openState()` accordion (key `wl-<id>`)
+  instead of a fixed `.prospect-card`. Collapsed = name, "Session #N", the
+  Priority/Contacted/same-sex tags and "Waiting N days"; expanded =
+  contact info, notes, `renderIntakeLinkBlock()` and the Contact/Flag
+  Priority/Edit/Delete toolbar (unchanged buttons). Starts collapsed;
+  open state survives re-renders. Priority keeps its orange left edge via
+  `.group.wl-priority`. The legacy unlinked Planning tab still uses
+  `.prospect-card` (dead code, untouched).
 - **"Sign Out / Switch User"** (2026-09-30, at the user's request, both
   `preview/index.html` and `portal/index.html`): the header button is
   relabeled, and Sign Out now sets `forceAccountPicker = true`, so the
