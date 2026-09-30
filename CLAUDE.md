@@ -574,14 +574,19 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
   open state survives re-renders. Priority keeps its orange left edge via
   `.group.wl-priority`. The legacy unlinked Planning tab still uses
   `.prospect-card` (dead code, untouched).
-- **"Sign Out / Switch User"** (2026-09-30, at the user's request, both
-  `preview/index.html` and `portal/index.html`): the header button is
-  relabeled, and Sign Out now sets `forceAccountPicker = true`, so the
-  *next* `loginPopup()` passes `prompt:'select_account'`. Without that,
-  Microsoft's single sign-on can silently sign the same person straight
-  back in, making "switch user" impossible. The flag is one-shot (cleared
-  after that sign-in), so a normal first visit is unchanged — no extra
-  click. Test only for the admin app; the portal deploys live.
+- **Sign Out asks "Sign out or switch user?"** (2026-09-30, at the user's
+  request, both `preview/index.html` and `portal/index.html`): the header
+  button still just says "Sign Out" (the user briefly had it relabeled
+  "Sign Out / Switch User", then preferred the plain label plus a prompt).
+  Clicking it opens `#signOutModal` — Cancel / Switch User / Sign Out.
+  **Microsoft has no single prompt that offers both choices**, so this
+  dialog is the app's own; both buttons call `doSignOut(switchUser)`, which
+  uses Microsoft's `logoutPopup()`. Switch User sets `forceAccountPicker =
+  true`, so the *next* `loginPopup()` passes `prompt:'select_account'` —
+  without that, Microsoft's single sign-on can silently sign the same
+  person straight back in, making "switch" impossible. The flag is
+  one-shot, so a normal first visit is unchanged. Admin app is Test only;
+  the portal deploys live.
 - **"Added by admin" label on blackout dates** (2026-09-29, at the user's
   request so a minister can tell an admin created an entry): both
   `listItems()` copies now carry `_createdByEmail` from Graph's
