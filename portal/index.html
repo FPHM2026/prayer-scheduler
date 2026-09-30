@@ -116,6 +116,10 @@
 
   .modal-bg{display:none;position:fixed;inset:0;background:rgba(35,30,24,.55);align-items:center;justify-content:center;z-index:50;padding:12px;}
   .modal-bg.open{display:flex;}
+  .modal-x{position:absolute;top:8px;right:8px;width:36px;height:36px;background:none;border:none;font-size:26px;line-height:1;color:var(--muted);cursor:pointer;border-radius:6px;}
+  .modal-x:hover{background:#f1ede4;color:var(--navy);}
+  .link-btn{background:none;border:none;padding:8px 12px;font-family:inherit;font-size:var(--fs-md);font-weight:600;color:var(--gold-dark);text-decoration:underline;cursor:pointer;min-height:44px;}
+  .link-btn:hover{color:var(--gold);}
   .modal{background:#fff;border-radius:10px;max-width:560px;width:100%;max-height:96vh;overflow:auto;padding:14px;box-shadow:var(--shadow-lg);}
   .modal.small{max-width:360px;}
   .modal-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:4px;position:sticky;bottom:0;background:#fff;padding:10px 0 2px;box-shadow:0 -6px 10px -6px rgba(0,0,0,.12);}
@@ -330,12 +334,12 @@
 </div>
 
 <div class="modal-bg" id="signOutModal">
-  <div class="modal small" role="dialog" aria-modal="true" aria-labelledby="signOutTitle">
-    <h2 id="signOutTitle">Sign out or switch user?</h2>
+  <div class="modal small" role="dialog" aria-modal="true" aria-labelledby="signOutTitle" style="position:relative;">
+    <button type="button" class="modal-x" aria-label="Cancel" title="Cancel" onclick="document.getElementById('signOutModal').classList.remove('open')">&times;</button>
+    <h2 id="signOutTitle" style="padding-right:32px;">Sign out or switch user?</h2>
     <p style="margin:0 0 18px;">Sign out to leave completely, or switch to sign in as a different Microsoft account.</p>
-    <div class="modal-actions" style="flex-wrap:wrap;">
-      <button class="btn secondary" onclick="document.getElementById('signOutModal').classList.remove('open')">Cancel</button>
-      <button class="btn secondary" onclick="doSignOut(true)">Switch User</button>
+    <div class="modal-actions" style="align-items:center;">
+      <button type="button" class="link-btn" onclick="doSignOut(true)">Switch User</button>
       <button class="btn" onclick="doSignOut(false)">Sign Out</button>
     </div>
   </div>
@@ -425,7 +429,13 @@ window.doSignOut = async function(switchUser){
     // Straight to Microsoft's account picker from this click, then reload as
     // the chosen account (see the admin app's doSignOut for the reasoning).
     try{
+      const oldAccount = account;
       const result = await msalInstance.loginPopup({ scopes: GRAPH_SCOPES, prompt: 'select_account' });
+      // Forget the previous account before activating the new one - see the
+      // admin app's doSignOut for the redirect-loop this prevents.
+      if(oldAccount && oldAccount.homeAccountId !== result.account.homeAccountId && msalInstance.clearCache){
+        try{ await msalInstance.clearCache({ account: oldAccount }); }catch(e){ console.warn('Could not clear the previous account:', e.message); }
+      }
       msalInstance.setActiveAccount(result.account);
       location.reload();
     }catch(e){
@@ -482,6 +492,19 @@ async function afterSignIn(){
     const myEmail = (account.username||'').trim().toLowerCase();
     const isMinister = rawMin.some(m => (m.SignInEmail||'').trim().toLowerCase() === myEmail);
     if(!isMinister){
+      // Loop guard: if we already bounced to the Scheduler moments ago and
+      // it sent us straight back, stop instead of ping-ponging forever
+      // (happened 2026-09-30 when a stale Scheduler picked the old account).
+      const lastBounce = parseInt(sessionStorage.getItem('fphm_to_scheduler')||'0', 10);
+      if(Date.now() - lastBounce < 20000){
+        document.getElementById('signinScreen').style.display = 'flex';
+        document.getElementById('signinMsg').textContent = `You're signed in as ${account.username}, which isn't on the minister roster, and the Scheduler sent you back here. Sign in with your admin or minister account instead.`;
+        sessionStorage.removeItem('fphm_to_scheduler');
+        account = null;
+        clearStuckMsalState();   // forget the cached sign-in so Sign In starts clean
+        return;
+      }
+      sessionStorage.setItem('fphm_to_scheduler', String(Date.now()));
       document.getElementById('signinMsg').textContent = "You're not signed in as a Prayer Minister — redirecting to the Scheduler…";
       window.location.href = '../';
       return;

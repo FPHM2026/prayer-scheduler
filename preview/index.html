@@ -218,6 +218,13 @@
      centered treatment via .small rather than becoming a sheet. ---- */
   .modal-bg{display:none;position:fixed;inset:0;background:rgba(35,30,24,.55);align-items:center;justify-content:center;z-index:50;padding:12px;}
   .modal-bg.open{display:flex;}
+  /* Close "X" in a modal's top-right corner, and a plain text-link action
+     (used by the Sign Out dialog: X = cancel, Switch User = text link,
+     Sign Out = the primary button). */
+  .modal-x{position:absolute;top:8px;right:8px;width:36px;height:36px;background:none;border:none;font-size:26px;line-height:1;color:var(--muted);cursor:pointer;border-radius:6px;}
+  .modal-x:hover{background:#f1ede4;color:var(--navy);}
+  .link-btn{background:none;border:none;padding:8px 12px;font-family:inherit;font-size:var(--fs-md);font-weight:600;color:var(--gold-dark);text-decoration:underline;cursor:pointer;min-height:44px;}
+  .link-btn:hover{color:var(--gold);}
   .modal{background:#fff;border-radius:10px;max-width:560px;width:100%;max-height:96vh;overflow:auto;padding:14px;box-shadow:var(--shadow-lg);}
   .modal.small{max-width:360px;}
   .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:4px;}
@@ -1011,12 +1018,12 @@
 </div>
 
 <div class="modal-bg" id="signOutModal">
-  <div class="modal small" role="dialog" aria-modal="true" aria-labelledby="signOutTitle">
-    <h2 id="signOutTitle">Sign out or switch user?</h2>
+  <div class="modal small" role="dialog" aria-modal="true" aria-labelledby="signOutTitle" style="position:relative;">
+    <button type="button" class="modal-x" aria-label="Cancel" title="Cancel" onclick="document.getElementById('signOutModal').classList.remove('open')">&times;</button>
+    <h2 id="signOutTitle" style="padding-right:32px;">Sign out or switch user?</h2>
     <p style="margin:0 0 18px;">Sign out to leave completely, or switch to sign in as a different Microsoft account.</p>
-    <div class="modal-actions" style="flex-wrap:wrap;">
-      <button class="btn secondary" onclick="document.getElementById('signOutModal').classList.remove('open')">Cancel</button>
-      <button class="btn secondary" onclick="doSignOut(true)">Switch User</button>
+    <div class="modal-actions" style="align-items:center;">
+      <button type="button" class="link-btn" onclick="doSignOut(true)">Switch User</button>
       <button class="btn" onclick="doSignOut(false)">Sign Out</button>
     </div>
   </div>
@@ -1039,7 +1046,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-30.4";
+const APP_VERSION = "2026-09-30.5";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1146,7 +1153,17 @@ window.doSignOut = async function(switchUser){
     // starts fresh as that user; cancelling the picker just leaves them
     // signed in as before.
     try{
+      const oldAccount = account;
       const result = await msalInstance.loginPopup({ scopes: GRAPH_SCOPES, prompt: 'select_account' });
+      // Forget the previous account locally, BEFORE setting the new one
+      // active (clearing can reset the active account). Leaving both cached
+      // let a page still using the old "first cached account" logic (the
+      // production Scheduler at the time) pick the old user - which
+      // redirected minister<->admin between the Scheduler and portal in an
+      // endless loop when the user switched from a minister to an admin.
+      if(oldAccount && oldAccount.homeAccountId !== result.account.homeAccountId && msalInstance.clearCache){
+        try{ await msalInstance.clearCache({ account: oldAccount }); }catch(e){ console.warn('Could not clear the previous account:', e.message); }
+      }
       msalInstance.setActiveAccount(result.account);
       location.reload();
     }catch(e){
@@ -1211,6 +1228,17 @@ async function afterSignIn(){
     const myEmail = (account.username||'').trim().toLowerCase();
     const isMinister = rawMin.some(m => (m.SignInEmail||'').trim().toLowerCase() === myEmail);
     if(isMinister){
+      // Loop guard, mirror of the portal's: if the portal already bounced us
+      // here moments ago, stop instead of ping-ponging between the two.
+      const lastBounce = parseInt(sessionStorage.getItem('fphm_to_portal')||'0', 10);
+      if(Date.now() - lastBounce < 20000){
+        document.getElementById('signinMsg').textContent = `You're signed in as ${account.username}, a Prayer Minister, and the portal sent you back here. Sign in with the right account instead.`;
+        sessionStorage.removeItem('fphm_to_portal');
+        account = null;
+        clearStuckMsalState();
+        return;
+      }
+      sessionStorage.setItem('fphm_to_portal', String(Date.now()));
       document.getElementById('signinMsg').textContent = "You're signed in as a Prayer Minister — redirecting to your portal…";
       window.location.href = PORTAL_URL;
       return;
@@ -5593,7 +5621,7 @@ const CHANGE_LOG = [
     'Changed: each person on the waiting list (Unplaced Candidates) is now a collapsible card. Collapsed, you see their name, session number, any Priority/Contacted tags and how long they\'ve waited; tap to expand for contact info, notes, the intake form link and the Contact / Flag Priority / Edit / Delete buttons. Cards start collapsed and stay open or closed through updates.'
   ]},
   { date: 'Sep 30, 2026', version: '2026-09-30.1', items: [
-    'Changed: clicking "Sign Out" now asks whether you want to sign out or switch user. Switch User opens Microsoft\'s account picker right away - pick a different account and the app reloads as that person (cancel and you stay signed in as before). Same on the minister portal.'
+    'Changed: clicking "Sign Out" now asks whether you want to sign out or switch user. Switch User opens Microsoft\'s account picker right away - pick a different account and the app reloads as that person (cancel and you stay signed in as before). The dialog is now just an X to cancel, a text "Switch User" and a primary "Sign Out", and switching between a minister and an admin account no longer bounces back and forth between the Scheduler and the portal. Same on the minister portal.'
   ]},
   { date: 'Sep 29, 2026', version: '2026-09-29.15', items: [
     'New: a blackout date now shows a small "Added by admin" label when an admin (not the minister themselves) created it - visible to the minister on their portal\'s time-off list, and on the Blackout Dates tab here. Edit and Delete are unchanged.'

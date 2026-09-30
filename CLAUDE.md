@@ -591,6 +591,23 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
   ("just signed me out and I had to click the orange button"). It can't
   simply chain a second popup after `logoutPopup()` either, since a popup
   opened after an `await` is no longer a user gesture and gets blocked.
+  **Dialog layout** (user feedback, same day): an X in the top-right is
+  Cancel (no Cancel button), "Switch User" is a plain text link
+  (`.link-btn`, secondary), "Sign Out" is the one primary button — the
+  first three-button row was misaligned. **Redirect-loop bug found live
+  2026-09-30**: switching from a minister to an admin account on the
+  portal bounced Scheduler→portal→Scheduler forever. Cause: after the
+  switch both accounts were cached; the portal (live, new code) used the
+  active account, but the *production Scheduler* still had the old
+  `accounts[0]` logic, picked the minister, and redirected back to the
+  portal. Fixes: (1) Switch User now calls `clearCache({account:old})`
+  *before* `setActiveAccount(new)` so only one account remains cached, which
+  also protects any page still running old logic; (2) loop guards — each
+  side records a `sessionStorage` timestamp (`fphm_to_scheduler` /
+  `fphm_to_portal`) before redirecting, and if it's bounced back within
+  20s it stops, clears the cached sign-in and shows a message instead.
+  The production Scheduler doesn't have change (2) or the
+  `getActiveAccount()` init below until the next promotion.
   `init()` now uses `msalInstance.getActiveAccount() || accounts[0]`
   (both sign-in paths call `setActiveAccount`), because after a switch the
   cache holds two accounts and `accounts[0]` would be the old one. Admin
