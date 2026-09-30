@@ -1039,7 +1039,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-30.3";
+const APP_VERSION = "2026-09-30.4";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1118,7 +1118,6 @@ const INTAKE_URL = "../intake/";
 const msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
 const msalReady = msalInstance.initialize();
 let account = null;
-let forceAccountPicker = false; // set by Sign Out / Switch User, consumed by the next loginPopup
 let siteId = null;
 let listIds = {};
 
@@ -1129,21 +1128,38 @@ async function init(){
   await msalReady;
   const accounts = msalInstance.getAllAccounts();
   if(accounts.length > 0){
-    account = accounts[0];
+    // Prefer the account last chosen (setActiveAccount, see doSignOut/sign-in)
+    // over blindly taking the first one cached - after "Switch User" the
+    // cache holds both accounts, and accounts[0] would be the old one.
+    account = msalInstance.getActiveAccount() || accounts[0];
     await afterSignIn();
   }
 }
 window.doSignOut = async function(switchUser){
   document.getElementById('signOutModal').classList.remove('open');
+  if(switchUser){
+    // Go straight to Microsoft's account picker from this click (a popup
+    // opened later, after a separate sign-out popup, would be blocked as
+    // not user-initiated - and the first attempt at this, sign out then
+    // make the user click Sign In again, is what the user rejected). On a
+    // pick, remember it as the active account and reload so the whole app
+    // starts fresh as that user; cancelling the picker just leaves them
+    // signed in as before.
+    try{
+      const result = await msalInstance.loginPopup({ scopes: GRAPH_SCOPES, prompt: 'select_account' });
+      msalInstance.setActiveAccount(result.account);
+      location.reload();
+    }catch(e){
+      if(e.errorCode === 'interaction_in_progress') clearStuckMsalState();
+    }
+    return;
+  }
   await msalInstance.logoutPopup({ account });
   account = null;
-  forceAccountPicker = !!switchUser;
   clearStuckMsalState();
   document.getElementById('appRoot').style.display = 'none';
   document.getElementById('signinScreen').style.display = 'flex';
-  document.getElementById('signinMsg').textContent = switchUser
-    ? 'Signed out. Choose a different account (or the same one) to sign in.'
-    : 'Signed out. Sign in with your Microsoft 365 account to continue.';
+  document.getElementById('signinMsg').textContent = 'Signed out. Sign in with your Microsoft 365 account to continue.';
 };
 function clearStuckMsalState(){
   Object.keys(sessionStorage).filter(k=>k.startsWith('msal.')).forEach(k=>sessionStorage.removeItem(k));
@@ -1154,13 +1170,9 @@ document.getElementById('btnSignIn').addEventListener('click', async ()=>{
   btn.disabled = true;
   btn.textContent = 'Signing in…';
   try{
-    // After an explicit Sign Out / Switch User, always show Microsoft's
-    // account picker - otherwise Microsoft's own single sign-on quietly
-    // signs the same person straight back in, which makes "switch user"
-    // impossible. A normal first visit keeps the default (no extra click).
-    const result = await msalInstance.loginPopup({ scopes: GRAPH_SCOPES, ...(forceAccountPicker ? { prompt: 'select_account' } : {}) });
-    forceAccountPicker = false;
+    const result = await msalInstance.loginPopup({ scopes: GRAPH_SCOPES });
     account = result.account;
+    msalInstance.setActiveAccount(account);
     await afterSignIn();
   }catch(e){
     if(e.errorCode === 'interaction_in_progress'){
@@ -5581,7 +5593,7 @@ const CHANGE_LOG = [
     'Changed: each person on the waiting list (Unplaced Candidates) is now a collapsible card. Collapsed, you see their name, session number, any Priority/Contacted tags and how long they\'ve waited; tap to expand for contact info, notes, the intake form link and the Contact / Flag Priority / Edit / Delete buttons. Cards start collapsed and stay open or closed through updates.'
   ]},
   { date: 'Sep 30, 2026', version: '2026-09-30.1', items: [
-    'Changed: clicking "Sign Out" now asks whether you want to sign out or switch user. Switch User signs you out and then shows Microsoft\'s account picker, so you can pick a different account instead of being signed straight back in as the same person. Same on the minister portal.'
+    'Changed: clicking "Sign Out" now asks whether you want to sign out or switch user. Switch User opens Microsoft\'s account picker right away - pick a different account and the app reloads as that person (cancel and you stay signed in as before). Same on the minister portal.'
   ]},
   { date: 'Sep 29, 2026', version: '2026-09-29.15', items: [
     'New: a blackout date now shows a small "Added by admin" label when an admin (not the minister themselves) created it - visible to the minister on their portal\'s time-off list, and on the Blackout Dates tab here. Edit and Delete are unchanged.'

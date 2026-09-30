@@ -406,7 +406,6 @@ const LIST_NAMES = { ministers: "PrayerMinisters", sessions: "PrayerSessions", b
 const msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
 const msalReady = msalInstance.initialize();
 let account = null;
-let forceAccountPicker = false; // set by Sign Out / Switch User, consumed by the next loginPopup
 let siteId = null;
 let listIds = {};
 
@@ -414,21 +413,32 @@ async function init(){
   await msalReady;
   const accounts = msalInstance.getAllAccounts();
   if(accounts.length > 0){
-    account = accounts[0];
+    // Prefer the account last chosen over the first cached one (see the admin
+    // app's note - matters after "Switch User" leaves two accounts cached).
+    account = msalInstance.getActiveAccount() || accounts[0];
     await afterSignIn();
   }
 }
 window.doSignOut = async function(switchUser){
   document.getElementById('signOutModal').classList.remove('open');
+  if(switchUser){
+    // Straight to Microsoft's account picker from this click, then reload as
+    // the chosen account (see the admin app's doSignOut for the reasoning).
+    try{
+      const result = await msalInstance.loginPopup({ scopes: GRAPH_SCOPES, prompt: 'select_account' });
+      msalInstance.setActiveAccount(result.account);
+      location.reload();
+    }catch(e){
+      if(e.errorCode === 'interaction_in_progress') clearStuckMsalState();
+    }
+    return;
+  }
   await msalInstance.logoutPopup({ account });
   account = null;
-  forceAccountPicker = !!switchUser;
   clearStuckMsalState();
   document.getElementById('appRoot').style.display = 'none';
   document.getElementById('signinScreen').style.display = 'flex';
-  document.getElementById('signinMsg').textContent = switchUser
-    ? 'Signed out. Choose a different account (or the same one) to sign in.'
-    : 'Signed out.';
+  document.getElementById('signinMsg').textContent = 'Signed out.';
 };
 function clearStuckMsalState(){
   Object.keys(sessionStorage).filter(k=>k.startsWith('msal.')).forEach(k=>sessionStorage.removeItem(k));
@@ -439,11 +449,9 @@ document.getElementById('btnSignIn').addEventListener('click', async ()=>{
   btn.disabled = true;
   btn.textContent = 'Signing in…';
   try{
-    // After Sign Out / Switch User, always show Microsoft's account picker so a
-    // different account can be chosen (see the same note in the admin app).
-    const result = await msalInstance.loginPopup({ scopes: GRAPH_SCOPES, ...(forceAccountPicker ? { prompt: 'select_account' } : {}) });
-    forceAccountPicker = false;
+    const result = await msalInstance.loginPopup({ scopes: GRAPH_SCOPES });
     account = result.account;
+    msalInstance.setActiveAccount(account);
     await afterSignIn();
   }catch(e){
     if(e.errorCode === 'interaction_in_progress'){

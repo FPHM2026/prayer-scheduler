@@ -580,13 +580,21 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
   "Sign Out / Switch User", then preferred the plain label plus a prompt).
   Clicking it opens `#signOutModal` — Cancel / Switch User / Sign Out.
   **Microsoft has no single prompt that offers both choices**, so this
-  dialog is the app's own; both buttons call `doSignOut(switchUser)`, which
-  uses Microsoft's `logoutPopup()`. Switch User sets `forceAccountPicker =
-  true`, so the *next* `loginPopup()` passes `prompt:'select_account'` —
-  without that, Microsoft's single sign-on can silently sign the same
-  person straight back in, making "switch" impossible. The flag is
-  one-shot, so a normal first visit is unchanged. Admin app is Test only;
-  the portal deploys live.
+  dialog is the app's own; both buttons call `doSignOut(switchUser)`.
+  Sign Out uses `logoutPopup()`. **Switch User does not sign out first**: it
+  calls `loginPopup({prompt:'select_account'})` directly from the click so
+  Microsoft's account picker appears immediately, then
+  `setActiveAccount()` + `location.reload()` so the whole app restarts as
+  the chosen user (cancelling the picker just leaves you signed in).
+  History: the first version signed out and set a one-shot flag so the
+  *next* Sign In click would show the picker — the user rejected that
+  ("just signed me out and I had to click the orange button"). It can't
+  simply chain a second popup after `logoutPopup()` either, since a popup
+  opened after an `await` is no longer a user gesture and gets blocked.
+  `init()` now uses `msalInstance.getActiveAccount() || accounts[0]`
+  (both sign-in paths call `setActiveAccount`), because after a switch the
+  cache holds two accounts and `accounts[0]` would be the old one. Admin
+  app is Test only; the portal deploys live.
 - **"Added by admin" label on blackout dates** (2026-09-29, at the user's
   request so a minister can tell an admin created an entry): both
   `listItems()` copies now carry `_createdByEmail` from Graph's
