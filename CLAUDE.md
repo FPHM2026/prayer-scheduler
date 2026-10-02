@@ -574,6 +574,30 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
   open state survives re-renders. Priority keeps its orange left edge via
   `.group.wl-priority`. The legacy unlinked Planning tab still uses
   `.prospect-card` (dead code, untouched).
+- **Standalone demo with invented data** (`demo/`, 2026-10-01, at the
+  user's request — they want to demo the tool but the real data is
+  private): live at `https://FPHM2026.github.io/prayer-scheduler/demo/`.
+  `demo/index.html` is the *real* admin app (a generated copy of
+  `preview/index.html`), not a re-implementation, so it behaves exactly
+  like the tool. `demo/demo-mock.js` loads in place of the MSAL script and
+  (1) fakes MSAL so it's always "signed in" as an invented "Demo Admin",
+  and (2) replaces `window.fetch` for `graph.microsoft.com` with an
+  in-memory fake of the SharePoint lists the app uses, seeded with
+  **entirely made-up** ministers, recipients, ~80 completed sessions across
+  the year, upcoming/waiting sessions, slots (open/tentative/booked),
+  blackouts and intake forms (seeded RNG, dates relative to today). Edits
+  work but live only in memory — a reload resets everything; nothing is
+  saved or sent (other hosts, e.g. the WhatsApp Worker, are stubbed to a
+  fake "ok", and the Open Intake Form link is disabled so nobody posts to
+  the real intake Worker). **To refresh the demo after changing the app:
+  `pwsh demo/build-demo.ps1`, then commit `demo/index.html`** — the script
+  makes exactly four edits to the copy (swap MSAL tag, DEMO banner,
+  disable intake link, title) and throws if the MSAL tag moves. `demo/` is
+  one folder deep like `preview/`, so the `../js/` paths work unchanged.
+  If a new SharePoint column/list is added to the app, add it to
+  `demo-mock.js`'s `lists` too or the demo will show it empty. The
+  `demo-static` entry in `.claude/launch.json` serves the repo root on
+  port 8814 for local checks.
 - **Reports: monthly Unique Recipients are a first-session cohort**
   (2026-09-30, at the user's request): in the year row's monthly
   breakdown, a recipient is counted once, in the month of their *first*

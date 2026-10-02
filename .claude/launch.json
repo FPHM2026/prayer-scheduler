@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "preview-static",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8813", "--directory", "preview"],
+      "port": 8813
+    },
+    {
+      "name": "demo-static",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8814"],
+      "port": 8814,
+      "url": "http://localhost:8814"
+    }
+  ]
+}
