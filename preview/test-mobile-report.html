@@ -1,0 +1,183 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Ministry Statistics</title>
+<style>
+  body{font-family:Georgia,'Times New Roman',serif;background:#faf8f4;color:#2a2a2a;margin:0;padding:40px;}
+  .wrap{max-width:800px;margin:0 auto;background:#fff;border:1px solid #ddd5c4;border-radius:10px;padding:36px 42px;}
+  /* Report tables can run to 8-9 columns (Freedom Sessions with the
+     recipient split + As Lead/Hours) - too wide for a phone screen no
+     matter how tight the padding gets. Rather than squeezing columns
+     down to unreadable widths, each table gets its own horizontally
+     scrollable strip so it can keep natural column widths and just
+     scroll within the card instead of overflowing past its edge. */
+  .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  @media (max-width:640px){
+    body{padding:16px;}
+    .wrap{padding:20px 16px;border-radius:8px;}
+    tr.detail-row:not(.month-row)>td{padding:12px 10px 16px 18px;}
+    tr.month-row td.month-label{padding-left:18px;}
+  }
+  .toolbar{display:flex;justify-content:flex-end;margin-bottom:10px;}
+  .toolbar button{background:#f28a00;color:#1a1a1a;border:none;padding:9px 18px;border-radius:6px;font-weight:700;font-size:14px;cursor:pointer;font-family:Georgia,'Times New Roman',serif;}
+  .toolbar button:hover{background:#ce7500;}
+  h1{color:#8a4a30;font-size:24px;margin:0 0 6px;}
+  .range{color:#6b6b6b;font-size:14px;margin:0 0 30px;}
+  .report-section{margin-bottom:34px;}
+  .report-section:last-child{margin-bottom:0;}
+  .report-section h2{font-size:16.5px;color:#474747;margin:0 0 14px;border-bottom:1px solid #ddd5c4;padding-bottom:9px;font-weight:700;}
+  table.year-table{width:100%;min-width:620px;border-collapse:collapse;margin:0 0 10px;font-size:13.5px;}
+  table.year-table th,table.year-table td{text-align:left;padding:9px 11px;border-bottom:1px solid #f1ede4;}
+  table.year-table th{font-size:11px;text-transform:uppercase;color:#6b6b6b;letter-spacing:.03em;font-weight:700;}
+  tr.total-row td{background:#f3ead9;font-weight:700;color:#474747;border-top:2px solid #ddd5c4;}
+  td.empty{color:#6b6b6b;font-style:italic;}
+  .inactive-tag{display:inline-block;background:#e7e2cf;color:#7a7a7a;font-size:10px;text-transform:uppercase;letter-spacing:.03em;font-weight:700;border-radius:8px;padding:2px 7px;margin-left:6px;}
+  tr.sub-row{cursor:pointer;}
+  tr.sub-row:hover td{background:#faf6ee;}
+  tr.sub-row td.chevron{width:20px;color:#aa5a3c;font-weight:700;}
+  tr.detail-row[hidden]{display:none;}
+  tr.detail-row:not(.month-row)>td{background:#faf8f4;padding:14px 18px 20px 38px;border-bottom:1px solid #f1ede4;}
+  tr.month-row td{background:#fbf9f5;color:#6b6b6b;font-size:12.5px;}
+  tr.month-row td.month-label{padding-left:34px;font-style:italic;}
+  /* Minister breakdown stays its own nested table - but themed with the
+     year-table's own palette (border color, uppercase header treatment,
+     chevron color/weight) so it reads as the same table family instead
+     of a visibly separate sub-widget. */
+  .toggle-trigger{cursor:pointer;font-weight:700;color:#474747;font-size:13px;padding:10px 0 4px;}
+  .toggle-trigger span{color:#aa5a3c;}
+  .minister-wrap[hidden]{display:none;}
+  .minister-wrap{margin-top:6px;}
+  table.minister-table{width:100%;min-width:640px;border-collapse:collapse;font-size:13px;}
+  table.minister-table th,table.minister-table td{text-align:left;padding:8px 10px;border-bottom:1px solid #f1ede4;}
+  table.minister-table th{font-size:11px;text-transform:uppercase;color:#6b6b6b;letter-spacing:.03em;font-weight:700;}
+  table.minister-table td.chevron{width:20px;color:#aa5a3c;font-weight:700;}
+  table.minister-table tbody tr.sub-row:hover td{background:#faf6ee;}
+  table.month-table{width:100%;min-width:520px;border-collapse:collapse;font-size:12.5px;margin:0;}
+  table.month-table th,table.month-table td{text-align:left;padding:6px 10px;border-bottom:1px solid #f1ede4;}
+  table.month-table th{font-size:10.5px;text-transform:uppercase;color:#6b6b6b;letter-spacing:.03em;font-weight:700;}
+  @media print{
+    body{background:#fff;padding:0;}
+    .wrap{border:none;padding:0;max-width:100%;}
+    .no-print{display:none!important;}
+    .report-section{break-inside:avoid;}
+    .table-scroll{overflow-x:visible;}
+  }
+</style></head><body>
+  <div class="wrap">
+    <div class="toolbar no-print">
+      <button type="button" onclick="document.querySelectorAll('[hidden]').forEach(function(el){el.hidden=false;});document.querySelectorAll('[id^=chev-]').forEach(function(c){c.textContent='▾';});window.print();">Print</button>
+    </div>
+    <h1>Ministry Statistics</h1>
+    <p class="range">Jan 1, 2026 – Sep 24, 2026</p>
+
+    <section class="report-section">
+      <h2>Freedom Sessions</h2>
+      <div class="table-scroll">
+      <table class="year-table">
+        <thead><tr><th></th><th>Year</th><th>Sessions</th><th>Unique Recipients</th><th>First-time</th><th>Follow-up</th><th>Hours</th></tr></thead>
+        <tbody>
+      <tr class="sub-row year-row" onclick="toggleGroup('y-sessions-2026')">
+        <td class="chevron"><span id="chev-y-sessions-2026">▸</span></td>
+        <td>2026</td><td>4</td>
+        <td>3</td><td>2</td><td>1</td><td>5.5</td>
+      </tr>
+
+        <tr class="detail-row month-row" data-group="y-sessions-2026" hidden>
+          <td></td><td class="month-label">January</td><td>2</td>
+          <td>1</td><td>0</td><td>1</td><td>2.5</td>
+        </tr>
+        <tr class="detail-row month-row" data-group="y-sessions-2026" hidden>
+          <td></td><td class="month-label">February</td><td>1</td>
+          <td>1</td><td>1</td><td>0</td><td>1.0</td>
+        </tr>
+        <tr class="detail-row month-row" data-group="y-sessions-2026" hidden>
+          <td></td><td class="month-label">March</td><td>1</td>
+          <td>1</td><td>1</td><td>0</td><td>2.0</td>
+        </tr>
+        <tr class="detail-row month-row" data-group="y-sessions-2026" hidden>
+          <td></td><td class="month-label">April</td><td>0</td>
+          <td>0</td><td>0</td><td>0</td><td>0.0</td>
+        </tr>
+        <tr class="detail-row month-row" data-group="y-sessions-2026" hidden>
+          <td></td><td class="month-label">May</td><td>0</td>
+          <td>0</td><td>0</td><td>0</td><td>0.0</td>
+        </tr>
+        <tr class="detail-row month-row" data-group="y-sessions-2026" hidden>
+          <td></td><td class="month-label">June</td><td>0</td>
+          <td>0</td><td>0</td><td>0</td><td>0.0</td>
+        </tr>
+        <tr class="detail-row month-row" data-group="y-sessions-2026" hidden>
+          <td></td><td class="month-label">July</td><td>0</td>
+          <td>0</td><td>0</td><td>0</td><td>0.0</td>
+        </tr>
+        <tr class="detail-row month-row" data-group="y-sessions-2026" hidden>
+          <td></td><td class="month-label">August</td><td>0</td>
+          <td>0</td><td>0</td><td>0</td><td>0.0</td>
+        </tr>
+        <tr class="detail-row month-row" data-group="y-sessions-2026" hidden>
+          <td></td><td class="month-label">September</td><td>0</td>
+          <td>0</td><td>0</td><td>0</td><td>0.0</td>
+        </tr>
+      <tr class="detail-row" data-group="y-sessions-2026" hidden>
+        <td colspan="7">
+          <div class="toggle-trigger" onclick="toggleRow('mb-sessions-2026')"><span id="chev-mb-sessions-2026">▸</span> Show minister breakdown (2)</div>
+          <div id="mb-sessions-2026" class="minister-wrap" hidden>
+            <div class="table-scroll">
+            <table class="minister-table">
+              <thead><tr><th></th><th>Minister</th><th>Sessions</th><th>Unique Recipients</th><th>First-time</th><th>Follow-up</th><th>As Lead</th><th>Hours</th></tr></thead>
+              <tbody>
+        <tr class="sub-row" onclick="toggleRow('m-sessions-2026-m1')">
+          <td class="chevron"><span id="chev-m-sessions-2026-m1">▸</span></td>
+          <td>Alice Smith</td>
+          <td>3</td><td>2</td><td>1</td><td>1</td><td>3</td><td>3.5</td>
+        </tr>
+        <tr class="detail-row" id="m-sessions-2026-m1" hidden>
+          <td colspan="8"><div class="table-scroll"><table class="month-table"><thead><tr><th>Month</th><th>Sessions</th><th>Unique Recipients</th><th>First-time</th><th>Follow-up</th><th>As Lead</th><th>Hours</th></tr></thead><tbody><tr><td>January</td><td>2</td><td>1</td><td>0</td><td>1</td><td>2</td><td>2.5</td></tr><tr><td>February</td><td>1</td><td>1</td><td>1</td><td>0</td><td>1</td><td>1.0</td></tr><tr><td>March</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0.0</td></tr><tr><td>April</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0.0</td></tr><tr><td>May</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0.0</td></tr><tr><td>June</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0.0</td></tr><tr><td>July</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0.0</td></tr><tr><td>August</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0.0</td></tr><tr><td>September</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0.0</td></tr></tbody></table></div></td>
+        </tr>
+        <tr class="sub-row" onclick="toggleRow('m-sessions-2026-m2')">
+          <td class="chevron"><span id="chev-m-sessions-2026-m2">▸</span></td>
+          <td>Bob Jones <span class="inactive-tag">Inactive</span></td>
+          <td>2</td><td>2</td><td>1</td><td>1</td><td>0</td><td>3.0</td>
+        </tr>
+        <tr class="detail-row" id="m-sessions-2026-m2" hidden>
+          <td colspan="8"><div class="table-scroll"><table class="month-table"><thead><tr><th>Month</th><th>Sessions</th><th>Unique Recipients</th><th>First-time</th><th>Follow-up</th><th>As Lead</th><th>Hours</th></tr></thead><tbody><tr><td>January</td><td>1</td><td>1</td><td>0</td><td>1</td><td>0</td><td>1.0</td></tr><tr><td>February</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0.0</td></tr><tr><td>March</td><td>1</td><td>1</td><td>1</td><td>0</td><td>0</td><td>2.0</td></tr><tr><td>April</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0.0</td></tr><tr><td>May</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0.0</td></tr><tr><td>June</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0.0</td></tr><tr><td>July</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0.0</td></tr><tr><td>August</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0.0</td></tr><tr><td>September</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0.0</td></tr></tbody></table></div></td>
+        </tr></tbody>
+            </table>
+            </div>
+          </div>
+        </td>
+      </tr></tbody>
+      </table>
+      </div>
+    </section>
+    <section class="report-section">
+      <h2>Sunday Drop-In</h2>
+      <div class="table-scroll">
+      <table class="year-table">
+        <thead><tr><th></th><th>Year</th><th>Sessions</th><th>Hours</th></tr></thead>
+        <tbody>
+      <tr class="sub-row year-row" onclick="toggleGroup('y-dropin-2026')">
+        <td class="chevron"><span id="chev-y-dropin-2026">▸</span></td>
+        <td>2026</td><td>0</td>
+        <td>0.0</td>
+      </tr>
+      </tbody>
+      </table>
+      </div>
+    </section>
+  </div>
+  <script>
+    function toggleRow(id){
+      var el = document.getElementById(id);
+      if(!el) return;
+      el.hidden = !el.hidden;
+      var chev = document.getElementById('chev-'+id);
+      if(chev) chev.textContent = el.hidden ? '▸' : '▾';
+    }
+    function toggleGroup(id){
+      var rows = document.querySelectorAll('[data-group="'+id+'"]');
+      if(!rows.length) return;
+      var makeHidden = !rows[0].hidden;
+      rows.forEach(function(el){ el.hidden = makeHidden; });
+      var chev = document.getElementById('chev-'+id);
+      if(chev) chev.textContent = makeHidden ? '▸' : '▾';
+    }
+  </script>
+</body></html>
