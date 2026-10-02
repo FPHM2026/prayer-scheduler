@@ -1046,15 +1046,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-// Group events (Sunday Drop-In / Training) are recognised by appointment type
-// OR by name, since some are saved with a normal type but named e.g. "Sunday Drop-In".
-function groupEventKind(s){
-  const name = String(s.recipName||'').trim();
-  if(s.apptType==='Drop-in' || /^(sunday\s+)?drop[\s-]*in\b/i.test(name)) return 'dropin';
-  if(s.apptType==='Training' || /^training\b/i.test(name)) return 'training';
-  return null;
-}
-const APP_VERSION = "2026-09-30.7";
+const APP_VERSION = "2026-09-30.6";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1969,7 +1961,7 @@ function completedStats(){
   // the first-time/follow-up split with what is really one shared event, so
   // they're excluded from every statistic even though the underlying session
   // records still show up normally in the grouped list above.
-  const all = sessions.filter(s=>s.status==='Completed' && !groupEventKind(s));
+  const all = sessions.filter(s=>s.status==='Completed' && s.apptType!=='Drop-in' && s.apptType!=='Training');
   const now = new Date();
   const thisYearStart = new Date(now.getFullYear(),0,1);
   const lastYearStart = new Date(now.getFullYear()-1,0,1);
@@ -3948,7 +3940,7 @@ function renderOverview(){
         // Drop-in/Training assign every minister to the same shared session -
         // excluded here too, or everyone's hours/led/supported counts would
         // include the same group event over and over.
-        if(groupEventKind(s)) return false;
+        if(s.apptType==='Drop-in' || s.apptType==='Training') return false;
         if(!ministerIdsOf(s).includes(m.id)) return false;
         if(fromVal && s.date<fromVal) return false;
         if(toVal && s.date>toVal) return false;
@@ -4026,7 +4018,7 @@ function renderOverviewStats(){
   const fromVal = $('#statsFrom').value, toVal = $('#statsTo').value;
   const activeMins = ministers.filter(m=>m.status==='Active');
   // Drop-in/Training excluded here too - see the matching note in renderOverview().
-  const notGroupSession = s => !groupEventKind(s);
+  const notGroupSession = s => s.apptType!=='Drop-in' && s.apptType!=='Training';
   const inRangeAll = sessions.filter(s=> s.status!=='Waiting' && notGroupSession(s) && (!fromVal || s.date>=fromVal) && (!toVal || s.date<=toVal));
   const lastYearFrom = shiftYear(fromVal,-1), lastYearTo = shiftYear(toVal,-1);
   const lastYearAll = sessions.filter(s=> s.status!=='Waiting' && notGroupSession(s) && (!lastYearFrom || s.date>=lastYearFrom) && (!lastYearTo || s.date<=lastYearTo));
@@ -5220,10 +5212,9 @@ window.setReportRange = function(preset){
 function reportSessionsFor(type, from, to){
   return sessions.filter(s=>{
     if(s.status!=='Completed' || s.date<from || s.date>to) return false;
-    const kind = groupEventKind(s);
-    if(type==='sessions') return kind===null;
-    if(type==='training') return kind==='training';
-    if(type==='dropin') return kind==='dropin';
+    if(type==='sessions') return s.apptType!=='Drop-in' && s.apptType!=='Training';
+    if(type==='training') return s.apptType==='Training';
+    if(type==='dropin') return s.apptType==='Drop-in';
     return false;
   });
 }
@@ -5660,9 +5651,6 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
-  { date: 'Oct 2, 2026', version: '2026-09-30.7', items: [
-    'Fixed: Drop-in and Training are now recognised by NAME as well as by type, so a session named "Sunday Drop-In" or "Training" is no longer counted as a ministry session on Reports (sessions, recipients, hours) or in minister stats. They still appear in their own Drop-in / Training report rows.'
-  ]},
   { date: 'Sep 30, 2026', version: '2026-09-30.6', items: [
     'Fixed: on Reports, the monthly Unique Recipients now show the month each recipient had their FIRST session of the year, so the months add up to the year\'s total (e.g. 43 for 2026) instead of counting the same person again in every month they were seen. First-time and Follow-up follow the same rule. Sessions and Hours are still per month. Applies to each minister\'s own monthly breakdown too.'
   ]},
@@ -5675,15 +5663,15 @@ const CHANGE_LOG = [
   { date: 'Sep 29, 2026', version: '2026-09-29.15', items: [
     'New: a blackout date now shows a small "Added by admin" label when an admin (not the minister themselves) created it - visible to the minister on their portal\'s time-off list, and on the Blackout Dates tab here. Edit and Delete are unchanged.'
   ]},
+  { date: 'Sep 29, 2026', version: '2026-09-29.14', items: [
+    'Moved: the intake questions editor is now a sub-tab of Intake Forms ("Edit Questions"), next to Unlinked, Linked, In progress and Archived, instead of living under Settings. Nothing about how it works changed.'
+  ]}
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
-  { date: 'Sep 29, 2026', version: '2026-09-29.14', items: [
-    'Moved: the intake questions editor is now a sub-tab of Intake Forms ("Edit Questions"), next to Unlinked, Linked, In progress and Archived, instead of living under Settings. Nothing about how it works changed.'
-  ]},
   { date: 'Sep 29, 2026', version: '2026-09-29.12', items: [
     'Changed: the Changes tab keeps the five most recent versions on "Recent" and everything older on "Archive". If nothing is listed as recent, the tab shows one plain list instead.'
   ]},
