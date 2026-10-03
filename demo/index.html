@@ -1072,7 +1072,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-03.2";
+const APP_VERSION = "2026-10-03.4";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1540,6 +1540,15 @@ async function loadAll(){
       // SharePoint yet, same convention as Contacted/WaNotified above.
       intakeResponseId: (s.IntakeResponseId!=null && s.IntakeResponseId!=='') ? parseInt(s.IntakeResponseId,10) : null
     };
+  });
+  // A slot's own team (ProposedMinisterIDs) is only the plan from when it
+  // was claimed/booked - once a real session is linked, that session's
+  // ministers are the truth (a minister added or removed after booking
+  // is only ever saved on the session). Without this the collapsed card
+  // and the busy-minister checks kept showing the original team.
+  slots.forEach(sl=>{
+    const linked = sl.linkedSessionId ? sessions.find(s=>s.id===sl.linkedSessionId) : null;
+    if(linked) sl.team = linked.ministers.map(m=>({ id: m.id, role: m.role }));
   });
   computeSessionNumbers();
   renderAll();
@@ -6050,6 +6059,12 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 3, 2026', version: '2026-10-03.4', items: [
+    'Fixed: a booked session\'s collapsed card on Schedule & Planning now shows the session\'s current prayer ministers, including anyone added (or removed) after it was booked, instead of only the original team.'
+  ]},
+  { date: 'Oct 3, 2026', version: '2026-10-03.3', items: [
+    'New (Test only for now): Session Notes. Settings has a new Session Notes tab - the same question editor as Intake Forms (sections, question types, required, and show-only-if branching) - for the form a session lead fills in about what happened. Each session card gets a Session Notes button that opens the form; each saved note is stored as a self-contained JSON document that includes the exact questions it was written with, so later form changes never alter old notes (Download JSON is available on a saved note). Needs two new SharePoint lists, SessionNotesSchema and SessionNotes - Settings > Session Notes explains the columns until they exist. Admin app only for now.'
+  ]},
   { date: 'Oct 3, 2026', version: '2026-10-03.2', items: [
     'New: the By Date view on Completed Sessions has Expand all and Collapse all buttons for the weeks.'
   ]},
@@ -6059,18 +6074,18 @@ const CHANGE_LOG = [
   { date: 'Sep 30, 2026', version: '2026-09-30.6', items: [
     'Fixed: on Reports, the monthly Unique Recipients now show the month each recipient had their FIRST session of the year, so the months add up to the year\'s total (e.g. 43 for 2026) instead of counting the same person again in every month they were seen. First-time and Follow-up follow the same rule. Sessions and Hours are still per month. Applies to each minister\'s own monthly breakdown too.'
   ]},
-  { date: 'Sep 30, 2026', version: '2026-09-30.2', items: [
-    'Changed: each person on the waiting list (Unplaced Candidates) is now a collapsible card. Collapsed, you see their name, session number, any Priority/Contacted tags and how long they\'ve waited; tap to expand for contact info, notes, the intake form link and the Contact / Flag Priority / Edit / Delete buttons. Cards start collapsed and stay open or closed through updates.'
-  ]},
-  { date: 'Sep 30, 2026', version: '2026-09-30.1', items: [
-    'Changed: clicking "Sign Out" now asks whether you want to sign out or switch user. Switch User opens Microsoft\'s account picker right away - pick a different account and the app reloads as that person (cancel and you stay signed in as before). The dialog is now just an X to cancel, a text "Switch User" and a primary "Sign Out", and switching between a minister and an admin account no longer bounces back and forth between the Scheduler and the portal. Same on the minister portal.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Sep 30, 2026', version: '2026-09-30.2', items: [
+    'Changed: each person on the waiting list (Unplaced Candidates) is now a collapsible card. Collapsed, you see their name, session number, any Priority/Contacted tags and how long they\'ve waited; tap to expand for contact info, notes, the intake form link and the Contact / Flag Priority / Edit / Delete buttons. Cards start collapsed and stay open or closed through updates.'
+  ]},
+  { date: 'Sep 30, 2026', version: '2026-09-30.1', items: [
+    'Changed: clicking "Sign Out" now asks whether you want to sign out or switch user. Switch User opens Microsoft\'s account picker right away - pick a different account and the app reloads as that person (cancel and you stay signed in as before). The dialog is now just an X to cancel, a text "Switch User" and a primary "Sign Out", and switching between a minister and an admin account no longer bounces back and forth between the Scheduler and the portal. Same on the minister portal.'
+  ]},
   { date: 'Sep 29, 2026', version: '2026-09-29.15', items: [
     'New: a blackout date now shows a small "Added by admin" label when an admin (not the minister themselves) created it - visible to the minister on their portal\'s time-off list, and on the Blackout Dates tab here. Edit and Delete are unchanged.'
   ]},
