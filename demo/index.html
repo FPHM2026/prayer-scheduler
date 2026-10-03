@@ -688,7 +688,7 @@
   </section>
 
   <section class="panel" id="panel-completed">
-    <p class="helptext">Grouped by recipient — most recently completed first.</p>
+    <p class="helptext" id="completedHelptext">Grouped by recipient — most recently completed first.</p>
     <div class="stats-collapse" id="completedStatsCollapse">
       <button class="stats-toggle" onclick="toggleStatsCollapse(this)" aria-expanded="true">
         <span class="chevron"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>
@@ -699,7 +699,12 @@
     <div class="search-row">
       <div class="search-wrap"><input id="completedSearch" placeholder="Search by minister or recipient..." aria-label="Search completed sessions by minister or recipient"><button type="button" class="search-clear" aria-label="Clear search" hidden>&times;</button></div>
     </div>
+    <nav class="subtabs" aria-label="Completed sessions view" id="completedSubtabs">
+      <button class="active" data-completedview="recipient">By Recipient</button>
+      <button data-completedview="date">By Date</button>
+    </nav>
     <div id="completedGroups"></div>
+    <div id="completedDates" hidden></div>
     <div class="no-results" id="completedNoResults" hidden>No completed sessions match your search.</div>
   </section>
 
@@ -1046,7 +1051,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-09-30.6";
+const APP_VERSION = "2026-10-03.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1731,6 +1736,11 @@ function wireApp(){
   wireSearchClear('planningSearch');
   $('#prospectSort').addEventListener('change', renderPlanning);
   $('#completedSearch').addEventListener('input', renderCompleted);
+  $('#completedSubtabs').querySelectorAll('button[data-completedview]').forEach(b=>b.addEventListener('click', ()=>{
+    completedView = b.dataset.completedview;
+    $('#completedSubtabs').querySelectorAll('button').forEach(x=>x.classList.toggle('active', x===b));
+    renderCompleted();
+  }));
   wireSearchClear('completedSearch');
   $('#overviewSearch').addEventListener('input', renderOverview);
   wireSearchClear('overviewSearch');
@@ -1937,8 +1947,72 @@ function completedSessionRow(s){
     </div>
   </div>`;
 }
+let completedView = 'recipient';
+const completedWeekOverrides = new Map();
+window.toggleCompletedWeek = function(wk){
+  const wasOpen = $('#completedDates').querySelector(`.week-block[data-wk="${wk}"]`)?.classList.contains('open');
+  completedWeekOverrides.set(wk, !wasOpen);
+  renderCompleted();
+};
+// Same week -> day layout as the Schedule tab, newest first, with each
+// day listing its completed sessions and the prayer ministers on them.
+function renderCompletedByDate(q){
+  const box = $('#completedDates'); const noResults = $('#completedNoResults');
+  const done = sessions.filter(s=>s.status==='Completed' && s.date && (!q ||
+    String(s.recipName||'').toLowerCase().includes(q) || ministerNamesOf(s).toLowerCase().includes(q)));
+  noResults.hidden = done.length>0;
+  const weeks = new Map();
+  done.forEach(s=>{
+    const wk = weekStartOf(s.date);
+    if(!weeks.has(wk)) weeks.set(wk, new Map());
+    const days = weeks.get(wk);
+    if(!days.has(s.date)) days.set(s.date, []);
+    days.get(s.date).push(s);
+  });
+  const ordered = [...weeks.keys()].sort().reverse();
+  box.innerHTML = ordered.map((wk,i)=>{
+    const days = weeks.get(wk);
+    const wkEnd = new Date(wk+'T00:00'); wkEnd.setDate(wkEnd.getDate()+6);
+    const count = [...days.values()].reduce((n,a)=>n+a.length,0);
+    const isOpen = q ? true : completedWeekOverrides.has(wk) ? completedWeekOverrides.get(wk) : i===0;
+    const dayHtml = [...days.keys()].sort().reverse().map(dateIso=>{
+      const d = new Date(dateIso+'T00:00');
+      const rows = days.get(dateIso).slice().sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+      return `<div class="day-row">
+        <div class="day-label"><span class="dow">${d.toLocaleDateString(undefined,{weekday:'short'})}</span>${d.toLocaleDateString(undefined,{month:'short',day:'numeric'})}</div>
+        <div class="slot-list">${rows.map(s=>`<div class="slot booked expanded">
+          <div class="slot-header" style="cursor:default;">
+            <span class="slot-header-top">
+              <span class="slot-time">${s.time?`${fmt12(s.time)}–${fmt12(s.endTime)}`:''}</span>
+              <span class="slot-status booked">Completed</span>
+            </span>
+            <span class="slot-header-detail">
+              <span class="slot-header-name">${escapeHtml(s.recipName)}</span>
+              ${s.apptType!=='Drop-in' && s.apptType!=='Training' ? `<span class="tag ${sessionNumberOf(s)===1?'first':''}">Session #${sessionNumberOf(s)}</span>` : ''}
+              ${ministerNamesOf(s) ? `<span class="slot-header-team">${escapeHtml(ministerNamesOf(s))}</span>` : ''}
+            </span>
+          </div>
+        </div>`).join('')}</div>
+      </div>`;
+    }).join('');
+    return `<div class="week-block${isOpen?' open':''}" data-wk="${wk}">
+      <button type="button" class="week-header" onclick="toggleCompletedWeek('${wk}')" aria-expanded="${isOpen}">
+        <span>${escapeHtml(fmtShort(wk))} – ${escapeHtml(fmtShort(isoDate(wkEnd)))} <span class="week-summary">${count} completed</span></span>
+        <span class="week-chevron">${ICONS.chevron}</span>
+      </button>
+      ${isOpen ? dayHtml : ''}
+    </div>`;
+  }).join('');
+}
 function renderCompleted(){
   const q = $('#completedSearch').value.trim().toLowerCase();
+  const byDate = completedView==='date';
+  $('#completedGroups').hidden = byDate;
+  $('#completedDates').hidden = !byDate;
+  $('#completedHelptext').textContent = byDate
+    ? 'Grouped by week and day — most recent first, with the prayer ministers on each session.'
+    : 'Grouped by recipient — most recently completed first.';
+  if(byDate){ renderCompletedByDate(q); renderCompletedStats(); return; }
   const box = $('#completedGroups'); const noResults = $('#completedNoResults');
   const opened = openState(box);
   const groups = groupByRecipient(sessions.filter(s=>s.status==='Completed')).map(g=>{
@@ -5651,6 +5725,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 3, 2026', version: '2026-10-03.1', items: [
+    'New: Completed Sessions now has two sub-tabs. By Recipient is the existing view; By Date groups completed sessions by week and day (newest first, like the Schedule tab) and shows the prayer ministers on each session. Search works in both.'
+  ]},
   { date: 'Sep 30, 2026', version: '2026-09-30.6', items: [
     'Fixed: on Reports, the monthly Unique Recipients now show the month each recipient had their FIRST session of the year, so the months add up to the year\'s total (e.g. 43 for 2026) instead of counting the same person again in every month they were seen. First-time and Follow-up follow the same rule. Sessions and Hours are still per month. Applies to each minister\'s own monthly breakdown too.'
   ]},
@@ -5663,15 +5740,15 @@ const CHANGE_LOG = [
   { date: 'Sep 29, 2026', version: '2026-09-29.15', items: [
     'New: a blackout date now shows a small "Added by admin" label when an admin (not the minister themselves) created it - visible to the minister on their portal\'s time-off list, and on the Blackout Dates tab here. Edit and Delete are unchanged.'
   ]},
-  { date: 'Sep 29, 2026', version: '2026-09-29.14', items: [
-    'Moved: the intake questions editor is now a sub-tab of Intake Forms ("Edit Questions"), next to Unlinked, Linked, In progress and Archived, instead of living under Settings. Nothing about how it works changed.'
-  ]}
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Sep 29, 2026', version: '2026-09-29.14', items: [
+    'Moved: the intake questions editor is now a sub-tab of Intake Forms ("Edit Questions"), next to Unlinked, Linked, In progress and Archived, instead of living under Settings. Nothing about how it works changed.'
+  ]},
   { date: 'Sep 29, 2026', version: '2026-09-29.12', items: [
     'Changed: the Changes tab keeps the five most recent versions on "Recent" and everything older on "Archive". If nothing is listed as recent, the tab shows one plain list instead.'
   ]},
