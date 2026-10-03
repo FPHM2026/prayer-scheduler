@@ -1051,7 +1051,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-03.1";
+const APP_VERSION = "2026-10-03.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1948,6 +1948,8 @@ function completedSessionRow(s){
   </div>`;
 }
 let completedView = 'recipient';
+let completedWeekKeys = [];
+window.setAllCompletedWeeks = function(open){ completedWeekKeys.forEach(wk=>completedWeekOverrides.set(wk, open)); renderCompleted(); };
 const completedWeekOverrides = new Map();
 window.toggleCompletedWeek = function(wk){
   const wasOpen = $('#completedDates').querySelector(`.week-block[data-wk="${wk}"]`)?.classList.contains('open');
@@ -1970,7 +1972,9 @@ function renderCompletedByDate(q){
     days.get(s.date).push(s);
   });
   const ordered = [...weeks.keys()].sort().reverse();
-  box.innerHTML = ordered.map((wk,i)=>{
+  completedWeekKeys = ordered;
+  const bar = ordered.length ? '<div style="display:flex;gap:16px;margin:0 0 10px;"><button type="button" class="link-btn" onclick="setAllCompletedWeeks(true)">Expand all</button><button type="button" class="link-btn" onclick="setAllCompletedWeeks(false)">Collapse all</button></div>' : '';
+  box.innerHTML = bar + ordered.map((wk,i)=>{
     const days = weeks.get(wk);
     const wkEnd = new Date(wk+'T00:00'); wkEnd.setDate(wkEnd.getDate()+6);
     const count = [...days.values()].reduce((n,a)=>n+a.length,0);
@@ -5725,6 +5729,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 3, 2026', version: '2026-10-03.2', items: [
+    'New: the By Date view on Completed Sessions has Expand all and Collapse all buttons for the weeks.'
+  ]},
   { date: 'Oct 3, 2026', version: '2026-10-03.1', items: [
     'New: Completed Sessions now has two sub-tabs. By Recipient is the existing view; By Date groups completed sessions by week and day (newest first, like the Schedule tab) and shows the prayer ministers on each session. Search works in both.'
   ]},
@@ -5737,15 +5744,15 @@ const CHANGE_LOG = [
   { date: 'Sep 30, 2026', version: '2026-09-30.1', items: [
     'Changed: clicking "Sign Out" now asks whether you want to sign out or switch user. Switch User opens Microsoft\'s account picker right away - pick a different account and the app reloads as that person (cancel and you stay signed in as before). The dialog is now just an X to cancel, a text "Switch User" and a primary "Sign Out", and switching between a minister and an admin account no longer bounces back and forth between the Scheduler and the portal. Same on the minister portal.'
   ]},
-  { date: 'Sep 29, 2026', version: '2026-09-29.15', items: [
-    'New: a blackout date now shows a small "Added by admin" label when an admin (not the minister themselves) created it - visible to the minister on their portal\'s time-off list, and on the Blackout Dates tab here. Edit and Delete are unchanged.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Sep 29, 2026', version: '2026-09-29.15', items: [
+    'New: a blackout date now shows a small "Added by admin" label when an admin (not the minister themselves) created it - visible to the minister on their portal\'s time-off list, and on the Blackout Dates tab here. Edit and Delete are unchanged.'
+  ]},
   { date: 'Sep 29, 2026', version: '2026-09-29.14', items: [
     'Moved: the intake questions editor is now a sub-tab of Intake Forms ("Edit Questions"), next to Unlinked, Linked, In progress and Archived, instead of living under Settings. Nothing about how it works changed.'
   ]},
