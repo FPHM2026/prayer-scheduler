@@ -142,6 +142,8 @@
       { id:6001, fields:{ Title:'Drop-In', Kind:'DropIn', DayOfWeek:null, StartTime:'17:00', EndTime:'19:00', LocationName:'Chapel Room' } },
       { id:6002, fields:{ Title:'Default Location', Kind:'DefaultLocation', DayOfWeek:null, StartTime:'', EndTime:'', LocationName:'Chapel Room' } }
     ],
+    SessionNotesSchema: [],
+    SessionNotes: [],
     IntakeResponses: intake,
     IntakeFormSchema: [ { id:7000, fields:{ Title:'schema', SchemaVersion:1, get SchemaJSON(){ return JSON.stringify(window.FPHM_INTAKE_CONFIG); } } } ]
   };

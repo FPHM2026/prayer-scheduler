@@ -1746,3 +1746,11 @@ feature work here, not something that needs to be asked for every time.
 Small doc-only or single-line fixes to the main checkout are fine without
 one. When a feature is done, merge its branch into `main` (or `preview`,
 per the promotion workflow above) normally and clean up the worktree.
+
+## Session Notes (added 2026-10-03, Test only)
+- Settings > **Session Notes** sub-tab edits a second form schema using the *same* editor as Intake Forms > Edit Questions: one DOM block (#intakeQuestionsView) is moved between the two hosts by showEditor('intake'|'notes'); ctiveEditor + D() (current draft) / dDirty() / dSetDirty() make every editor handler work for both. Intro/Liability boxes are hidden in notes mode.
+- Storage: two **optional** SharePoint lists (the app works without them; the button is hidden and Settings shows setup steps): SessionNotesSchema (SchemaJSON plain-text multiline, SchemaVersion number; single item, created on first Save) and SessionNotes (SessionId number, NotesJSON plain-text multiline, Title). Both multiline columns must be **Plain text** (gotcha #5).
+- Each note is one self-contained JSON document (	ype:'FPHMSessionNotes', formVersion, savedAt, session snapshot incl. lead + team, the full schema it was filled in with, and nswers for visible questions only), so notes never depend on the current form. Reopening a note uses its own embedded schema.
+- Session Notes button (
+otesButtonHtml) appears on booked/unlinked session cards and Completed rows (both views), not on Drop-in/Training. Admin app only; restricting to the session's lead belongs to the future portal version.
+- Demo mock has empty SessionNotesSchema/SessionNotes lists so the feature works there.
