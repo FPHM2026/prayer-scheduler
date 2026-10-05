@@ -304,8 +304,9 @@
   .ans-section{margin-bottom:20px;}
   .ans-section h3{font-family:'Playfair Display',Georgia,serif;color:var(--gold-dark);border-bottom:1px solid var(--border);padding-bottom:6px;margin:0 0 10px;}
   .ans-row{display:flex;flex-direction:column;margin-bottom:10px;}
-  .ans-q{font-weight:700;font-size:var(--fs-xs);color:var(--muted);}
-  .ans-a{font-size:var(--fs-sm);white-space:pre-wrap;}
+  .ans-q{font-weight:700;font-size:calc(var(--fs-xs) * var(--ans-scale,1));color:var(--muted);}
+  .ans-a{font-size:calc(var(--fs-sm) * var(--ans-scale,1));white-space:pre-wrap;}
+  #intakeDetail{--ans-scale:1;}
   @media print{
     @page{size:letter;margin:0.5in;}
     body{background:#fff;}
@@ -758,8 +759,9 @@
     <div class="no-results" id="intakeNoResults" hidden>No intake forms here yet.</div>
     <div id="intakeDetail" hidden></div>
 
-    <div id="intakeQuestionsView" hidden>
-      <p class="helptext">Edit the intake questionnaire's sections, questions and wording. Changes take effect for anyone opening the public form as soon as you save — no deploy needed.</p>
+    <div id="intakeQuestionsHost" hidden>
+    <div id="intakeQuestionsView">
+      <p class="helptext" id="formEditorHelp">Edit the intake questionnaire's sections, questions and wording. Changes take effect for anyone opening the public form as soon as you save — no deploy needed.</p>
       <div class="toolbar no-print">
         <button class="btn" id="btnFormEditorSave">Save changes</button>
         <button class="btn secondary" id="btnFormEditorDiscard">Discard unsaved changes</button>
@@ -772,6 +774,7 @@
         <button class="btn secondary" id="btnFormEditorAddSection">+ Add section</button>
       </div>
       <div id="formEditorLiability" style="margin-top:16px;"></div>
+    </div>
     </div>
   </section>
 
@@ -799,6 +802,7 @@
       <button class="active" data-settingsview="timewindows">Quick Slots</button>
       <button data-settingsview="locations">Locations</button>
       <button data-settingsview="defaultlocation">Sessions</button>
+      <button data-settingsview="notes">Session Notes</button>
     </nav>
 
     <div class="settings-subview active" id="settingsTimeWindowsView">
@@ -834,6 +838,11 @@
       </div>
       <p class="helptext">Deleting a location removes it from the dropdown for new sessions — sessions that already used it keep showing its original name.</p>
       <div id="settingsLocationsList"></div>
+    </div>
+
+    <div class="settings-subview" id="settingsNotesView">
+      <div class="errbox" id="notesSetupMsg" hidden style="margin:16px 0;"></div>
+      <div id="notesQuestionsHost" style="margin-top:12px;"></div>
     </div>
 
     <div class="settings-subview" id="settingsDefaultLocationView">
@@ -1004,6 +1013,19 @@
   </div>
 </div>
 
+<div class="modal-bg sheet" id="notesModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="notesTitle">
+    <h2 id="notesTitle">Session Notes</h2>
+    <p class="helptext" id="notesSub" style="margin:-6px 0 6px;"></p>
+    <p class="errbox" role="alert" id="notesMsg" hidden></p>
+    <div id="notesBody"></div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="btnNotesDownload" onclick="downloadSessionNotesJson()" hidden>Download JSON</button>
+      <button class="btn secondary" onclick="closeSessionNotes()">Cancel</button>
+      <button class="btn" onclick="withLoading(this,'Saving…',saveSessionNotes)">Save Notes</button>
+    </div>
+  </div>
+</div>
 <div class="modal-bg" id="confirmModal">
   <div class="modal small" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
     <h2 id="confirmTitle">Please confirm</h2>
@@ -1044,7 +1066,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-03.2";
+const APP_VERSION = "2026-10-05.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1114,6 +1136,13 @@ const LIST_NAMES = {
   timeWindows: "TimeWindows",
   intake: "IntakeResponses",
   formSchema: "IntakeFormSchema"
+};
+// Session Notes lists are OPTIONAL: if they have not been created in
+// SharePoint yet the rest of the app must keep working, so these are looked
+// up separately and never make resolveSiteAndLists() throw.
+const OPTIONAL_LIST_NAMES = {
+  notesSchema: "SessionNotesSchema",
+  notes: "SessionNotes"
 };
 // Relative to this file's own location (preview/) - portal/ is a sibling of
 // the repo root, one level up from here.
@@ -1295,6 +1324,11 @@ async function resolveSiteAndLists(){
     if(!match) throw new Error(`List "${LIST_NAMES[key]}" not found on this site.`);
     listIds[key] = match.id;
   }
+  for(const key of Object.keys(OPTIONAL_LIST_NAMES)){
+    const match = listsResp.value.find(l => l.displayName === OPTIONAL_LIST_NAMES[key]);
+    if(match) listIds[key] = match.id;
+  }
+  notesAvailable = !!(listIds.notesSchema && listIds.notes);
 }
 
 async function listItems(key){
@@ -1334,6 +1368,12 @@ let intakeSubStatus='Unlinked', intakeDetailId=null;
 // (deep-cloned from the loaded schema) without touching
 // window.FPHM_INTAKE_CONFIG until "Save changes" is actually clicked.
 let schemaItemId = null, schemaVersion = 0, schemaDraft = null, schemaDirty = false;
+// Session Notes: same shape as the intake schema above, but its own list.
+// notesSchema = last saved form, notesDraft = what the editor is changing,
+// sessionNotes = one entry per session that has notes written (see the
+// SESSION NOTES section for the stored JSON shape).
+let notesAvailable = false, notesSchemaItemId = null, notesSchemaVersion = 0, notesSchema = null, notesDraft = null, notesDirty = false;
+let sessionNotes = [];
 let editingId=null, prevId=null, selectedMinisters=[]; // selectedMinisters: [{id, role}]
 // Set by bookSlot() right after it opens the session modal on a Tentative
 // slot's claimed candidate - tells onSaveSession() which PlanningSlots item
@@ -1366,6 +1406,29 @@ async function loadAll(){
     }catch(e){
       console.warn('Stored intake schema is not valid JSON:', e.message);
     }
+  }
+  if(notesAvailable){
+    try{
+      const [rawNS, rawNotes] = await Promise.all([listItems('notesSchema'), listItems('notes')]);
+      const ns = rawNS[0];
+      if(ns){
+        notesSchemaItemId = ns.id; notesSchemaVersion = ns.SchemaVersion || 0;
+        try{ notesSchema = JSON.parse(ns.SchemaJSON); }catch(e){ console.warn('Session notes schema is not valid JSON:', e.message); }
+      }
+      if(!notesSchema || !Array.isArray(notesSchema.SECTIONS)) notesSchema = defaultNotesSchema();
+      if(!notesDirty || !notesDraft) notesDraft = JSON.parse(JSON.stringify(notesSchema));
+      sessionNotes = rawNotes.map(n=>{
+        let rec = null;
+        try{ rec = JSON.parse(n.NotesJSON||''); }catch(e){}
+        const sid = rec && rec.session && rec.session.id!=null ? parseInt(rec.session.id,10) : parseInt(n.SessionId,10);
+        return rec && !isNaN(sid) ? { id: n.id, sessionId: sid, record: rec } : null;
+      }).filter(Boolean);
+    }catch(e){
+      console.warn('Could not load session notes:', e.message);
+      sessionNotes = [];
+    }
+  } else if(!notesDraft){
+    notesDraft = defaultNotesSchema();
   }
   // ResponsesJSON is the whole answers object, keyed by question id from
   // formConfig.js - parsed once here so every intake render just reads
@@ -1471,6 +1534,15 @@ async function loadAll(){
       // SharePoint yet, same convention as Contacted/WaNotified above.
       intakeResponseId: (s.IntakeResponseId!=null && s.IntakeResponseId!=='') ? parseInt(s.IntakeResponseId,10) : null
     };
+  });
+  // A slot's own team (ProposedMinisterIDs) is only the plan from when it
+  // was claimed/booked - once a real session is linked, that session's
+  // ministers are the truth (a minister added or removed after booking
+  // is only ever saved on the session). Without this the collapsed card
+  // and the busy-minister checks kept showing the original team.
+  slots.forEach(sl=>{
+    const linked = sl.linkedSessionId ? sessions.find(s=>s.id===sl.linkedSessionId) : null;
+    if(linked) sl.team = linked.ministers.map(m=>({ id: m.id, role: m.role }));
   });
   computeSessionNumbers();
   renderAll();
@@ -1937,6 +2009,7 @@ function completedSessionRow(s){
       <div class="sess-meta">${fmtDate(new Date(s.date+'T'+s.time))} · ${fmt12(s.time)}–${fmt12(s.endTime)} · ${escapeHtml(sessionLocationDisplay(s))}</div>
       <div class="sess-meta">${escapeHtml(ministerNamesOf(s))}</div>
       ${s.notes ? `<div class="sess-meta">${escapeHtml(s.notes)}</div>` : ''}
+      ${notesButtonHtml(s) ? `<div class="toolbar" style="margin-top:8px;">${notesButtonHtml(s)}</div>` : ''}
     </div>
   </div>`;
 }
@@ -1989,6 +2062,7 @@ function renderCompletedByDate(q){
               ${ministerNamesOf(s) ? `<span class="slot-header-team">${escapeHtml(ministerNamesOf(s))}</span>` : ''}
             </span>
           </div>
+          ${notesButtonHtml(s) ? `<div style="padding:0 12px 10px;">${notesButtonHtml(s)}</div>` : ''}
         </div>`).join('')}</div>
       </div>`;
     }).join('');
@@ -2705,6 +2779,7 @@ function renderUnlinkedSessionCard(s){
       <div class="slot-detail-row">${waSectionHtml(s)}</div>
       <div class="toolbar" style="margin-top:10px;">
         <button class="btn secondary" onclick="assignSlotToSession(${s.id},this)">Assign to a Slot</button>
+        ${notesButtonHtml(s)}
         <button class="icon-btn" onclick="addToCalendar(${s.id})" title="Add to Calendar" aria-label="Add session for ${escapeHtml(s.recipName)} to your calendar">${ICONS.calendarPlus}<span class="btn-label">Add to Calendar</span></button>
         <button class="icon-btn" onclick="editSession(${s.id})" title="Edit" aria-label="Edit session for ${escapeHtml(s.recipName)}">${ICONS.pencil}<span class="btn-label">Edit</span></button>
         <button class="icon-btn success" onclick="markComplete(${s.id})" title="Mark Completed" aria-label="Mark session for ${escapeHtml(s.recipName)} as completed">${ICONS.checkCircle}<span class="btn-label">Mark Completed</span></button>
@@ -3052,6 +3127,7 @@ function renderBookedBody(sl){
     <div class="slot-detail-row">${waSectionHtml(linked)}</div>
     <div class="slot-detail-row">${renderIntakeLinkBlock(linked)}</div>
     <div class="toolbar" style="margin-top:10px;">
+      ${notesButtonHtml(linked)}
       <button class="icon-btn" onclick="addToCalendar(${linked.id})" title="Add to Calendar" aria-label="Add session for ${escapeHtml(linked.recipName)} to your calendar">${ICONS.calendarPlus}<span class="btn-label">Add to Calendar</span></button>
       <button class="icon-btn" onclick="editBookedSession(${sl.id},${linked.id})" title="Edit" aria-label="Edit session for ${escapeHtml(linked.recipName)}">${ICONS.pencil}<span class="btn-label">Edit</span></button>
       ${linked.status!=='Completed' ? `<button class="icon-btn success" onclick="markComplete(${linked.id})" title="Mark Completed" aria-label="Mark session for ${escapeHtml(linked.recipName)} as completed">${ICONS.checkCircle}<span class="btn-label">Mark Completed</span></button>` : ''}
@@ -3686,6 +3762,8 @@ function switchSettingsSub(view){
   $('#settingsTimeWindowsView').classList.toggle('active', view==='timewindows');
   $('#settingsLocationsView').classList.toggle('active', view==='locations');
   $('#settingsDefaultLocationView').classList.toggle('active', view==='defaultlocation');
+  $('#settingsNotesView').classList.toggle('active', view==='notes');
+  if(view==='notes') showNotesEditor();
 }
 function upcomingCountFor(ministerId){
   const now = new Date();
@@ -4510,12 +4588,13 @@ function renderIntake(){
   // editor's own render (renderFormEditor()) runs from renderAll()
   // regardless of visibility, so nothing else needs to know about it.
   const editingQuestions = intakeSubStatus === 'Questions';
-  $('#intakeQuestionsView').hidden = !editingQuestions;
+  $('#intakeQuestionsHost').hidden = !editingQuestions;
   $('#intakeSearchWrap').hidden = editingQuestions;
   $('#intakeHelptext').hidden = editingQuestions;
   if(editingQuestions){
     box.innerHTML = '';
     noResults.hidden = true;
+    if(activeEditor!=='intake' && $('#panel-intake').classList.contains('active')) showEditor('intake');
     return;
   }
   const opened = openState(box);
@@ -4616,6 +4695,8 @@ window.openIntakeDetail = function(id){
   detail.innerHTML = `
     <div class="toolbar no-print">
       <button type="button" class="btn secondary" onclick="closeIntakeDetail()">&larr; Back to list</button>
+      <button type="button" class="btn secondary" onclick="changeIntakeTextSize(-1)">Smaller text</button>
+      <button type="button" class="btn secondary" onclick="changeIntakeTextSize(1)">Larger text</button>
       <button type="button" class="btn" onclick="window.print()">Print / Save as PDF</button>
     </div>
     <h2>${escapeHtml(i.recipName||'(name not yet entered)')}</h2>
@@ -4623,6 +4704,21 @@ window.openIntakeDetail = function(id){
     ${FPHM.renderResponsesHtml(i.responses)}
     ${i.signatureDataUrl ? `<h3>Signature</h3><img src="${i.signatureDataUrl}" alt="Signature" style="max-width:300px;border:1px solid var(--border);border-radius:8px;background:#fff;">` : ''}
   `;
+  applyIntakeTextSize();
+};
+// On-screen text size for the intake answers (screen only - print has its
+// own fixed sizes). Remembered per browser; storage may be unavailable.
+function applyIntakeTextSize(){
+  let n = 1;
+  try{ n = parseFloat(localStorage.getItem('fphmIntakeTextScale')) || 1; }catch(e){}
+  $('#intakeDetail').style.setProperty('--ans-scale', n);
+}
+window.changeIntakeTextSize = function(dir){
+  let n = 1;
+  try{ n = parseFloat(localStorage.getItem('fphmIntakeTextScale')) || 1; }catch(e){}
+  n = Math.min(2, Math.max(0.8, Math.round((n + dir*0.15)*100)/100));
+  try{ localStorage.setItem('fphmIntakeTextScale', n); }catch(e){}
+  applyIntakeTextSize();
 };
 window.closeIntakeDetail = function(){
   intakeDetailId = null;
@@ -4780,8 +4876,38 @@ function renderIntakeLinkBlock(session){
 const QUESTION_TYPES = ['text','email','number','textarea','radio','select','checkboxes'];
 const TYPES_WITH_OPTIONS = ['radio','select','checkboxes'];
 
+/* One editor UI, two forms: the same DOM block (#intakeQuestionsView) is
+   moved between the Intake Forms "Edit Questions" sub-tab and the Settings
+   "Session Notes" sub-tab, and activeEditor says which schema it is
+   currently editing. D() is the working draft for whichever that is, so
+   every handler below works unchanged for both. */
+let activeEditor = 'intake'; // 'intake' | 'notes'
+function D(){ return activeEditor==='notes' ? notesDraft : schemaDraft; }
+function edDirty(){ return activeEditor==='notes' ? notesDirty : schemaDirty; }
+function edSetDirty(v){
+  if(activeEditor==='notes') notesDirty = v; else schemaDirty = v;
+  const badge = $('#formEditorDirtyBadge');
+  if(badge) badge.style.display = v ? 'inline-block' : 'none';
+}
+function showEditor(which){
+  activeEditor = which;
+  const view = $('#intakeQuestionsView');
+  const host = $(which==='notes' ? '#notesQuestionsHost' : '#intakeQuestionsHost');
+  if(view.parentNode!==host) host.appendChild(view);
+  const notes = which==='notes';
+  $('#formEditorHelp').textContent = notes
+    ? 'Edit the questions prayer ministers answer in Session Notes (opened from a session card): sections, questions, answer types and "show only if" branching. Each saved note keeps its own copy of the form it was filled in with, so changing questions later never alters notes already written.'
+    : "Edit the intake questionnaire's sections, questions and wording. Changes take effect for anyone opening the public form as soon as you save — no deploy needed.";
+  $('#formEditorIntro').hidden = notes;
+  $('#formEditorLiability').hidden = notes;
+  const badge = $('#formEditorDirtyBadge');
+  if(badge) badge.style.display = edDirty() ? 'inline-block' : 'none';
+  $('#formEditorMsg').hidden = true;
+  renderFormEditor();
+}
+
 function markSchemaDirty(){
-  schemaDirty = true;
+  edSetDirty(true);
   const badge = $('#formEditorDirtyBadge');
   if(badge) badge.style.display = 'inline-block';
 }
@@ -4790,13 +4916,13 @@ function slugify(label){
 }
 function uniqueQuestionId(base){
   const existing = new Set();
-  (schemaDraft.SECTIONS||[]).forEach(s=>(s.questions||[]).forEach(q=>existing.add(q.id)));
+  (D().SECTIONS||[]).forEach(s=>(s.questions||[]).forEach(q=>existing.add(q.id)));
   let id = base, n = 2;
   while(existing.has(id)){ id = base + '_' + n; n++; }
   return id;
 }
 function uniqueSectionId(base){
-  const existing = new Set((schemaDraft.SECTIONS||[]).map(s=>s.id));
+  const existing = new Set((D().SECTIONS||[]).map(s=>s.id));
   let id = base, n = 2;
   while(existing.has(id)){ id = base + '_' + n; n++; }
   return id;
@@ -4807,8 +4933,8 @@ function uniqueSectionId(base){
 // reference to a not-yet-answered question can't drive visibility).
 function questionsBefore(sIdx, qIdx){
   const out = [];
-  for(let i=0;i<schemaDraft.SECTIONS.length;i++){
-    const sec = schemaDraft.SECTIONS[i];
+  for(let i=0;i<D().SECTIONS.length;i++){
+    const sec = D().SECTIONS[i];
     for(let j=0;j<sec.questions.length;j++){
       if(i>sIdx || (i===sIdx && (qIdx===null || j>=qIdx))) return out;
       out.push(sec.questions[j]);
@@ -4817,7 +4943,7 @@ function questionsBefore(sIdx, qIdx){
   return out;
 }
 function findQuestionById(id){
-  for(const sec of schemaDraft.SECTIONS){
+  for(const sec of D().SECTIONS){
     const q = sec.questions.find(x=>x.id===id);
     if(q) return q;
   }
@@ -4870,15 +4996,15 @@ function richTextWordCount(html){
 // their own small editor above the sections list rather than being
 // squeezed into the same add/reorder/branching UI those use. Both are
 // rich text (added 2026-09-26, contenteditable + the toolbar above)
-// stored as real HTML in schemaDraft; FPHM.introBodyHtml()/
+// stored as real HTML in D(); FPHM.introBodyHtml()/
 // liabilityBodyHtml() (js/formEngine.js) transparently upgrade a
 // legacy array-of-paragraphs or plain-text value the first time it's
 // loaded into the box here.
 function renderFormEditorIntro(){
   const box = $('#formEditorIntro');
-  if(!box || !schemaDraft) return;
+  if(!box || !D()) return;
   const opened = openState(box);
-  const intro = schemaDraft.INTRO_TEXT || { title: '', body: [] };
+  const intro = D().INTRO_TEXT || { title: '', body: [] };
   const wasOpen = opened.has('intro-text') ? opened.get('intro-text') : false;
   const introHtml = FPHM.introBodyHtml(intro.body);
   const wc = richTextWordCount(introHtml);
@@ -4894,22 +5020,22 @@ function renderFormEditorIntro(){
   box.innerHTML = editorGroupRow('intro-text', 'i', 'Introduction Text', 'First screen', summaryHtml, body, wasOpen, '');
 }
 window.updateIntroField = function(field, value){
-  if(!schemaDraft.INTRO_TEXT) schemaDraft.INTRO_TEXT = { title: '', body: '' };
-  schemaDraft.INTRO_TEXT[field] = value;
+  if(!D().INTRO_TEXT) D().INTRO_TEXT = { title: '', body: '' };
+  D().INTRO_TEXT[field] = value;
   markSchemaDirty();
 };
 window.updateIntroBody = function(html){
-  if(!schemaDraft.INTRO_TEXT) schemaDraft.INTRO_TEXT = { title: '', body: '' };
-  schemaDraft.INTRO_TEXT.body = html;
+  if(!D().INTRO_TEXT) D().INTRO_TEXT = { title: '', body: '' };
+  D().INTRO_TEXT.body = html;
   markSchemaDirty();
 };
 
 // Liability release wording, shown on the final signature screen.
 function renderFormEditorLiability(){
   const box = $('#formEditorLiability');
-  if(!box || !schemaDraft) return;
+  if(!box || !D()) return;
   const opened = openState(box);
-  const liability = schemaDraft.LIABILITY_TEXT || { title: '', body: '' };
+  const liability = D().LIABILITY_TEXT || { title: '', body: '' };
   const wasOpen = opened.has('liability-text') ? opened.get('liability-text') : false;
   const liabilityHtml = FPHM.liabilityBodyHtml(liability.body);
   const wc = richTextWordCount(liabilityHtml);
@@ -4925,24 +5051,24 @@ function renderFormEditorLiability(){
   box.innerHTML = editorGroupRow('liability-text', 'L', 'Liability Release & Signature', 'Final screen', summaryHtml, body, wasOpen, '');
 }
 window.updateLiabilityField = function(field, value){
-  if(!schemaDraft.LIABILITY_TEXT) schemaDraft.LIABILITY_TEXT = { title: '', body: '' };
-  schemaDraft.LIABILITY_TEXT[field] = value;
+  if(!D().LIABILITY_TEXT) D().LIABILITY_TEXT = { title: '', body: '' };
+  D().LIABILITY_TEXT[field] = value;
   markSchemaDirty();
 };
 window.updateLiabilityBody = function(html){
-  if(!schemaDraft.LIABILITY_TEXT) schemaDraft.LIABILITY_TEXT = { title: '', body: '' };
-  schemaDraft.LIABILITY_TEXT.body = html;
+  if(!D().LIABILITY_TEXT) D().LIABILITY_TEXT = { title: '', body: '' };
+  D().LIABILITY_TEXT.body = html;
   markSchemaDirty();
 };
 
 function renderFormEditor(){
   const box = $('#formEditorSections');
   if(!box) return;
-  renderFormEditorIntro();
-  if(!schemaDraft){ box.innerHTML = '<p class="helptext">Loading…</p>'; return; }
+  if(activeEditor==='intake') renderFormEditorIntro();
+  if(!D()){ box.innerHTML = '<p class="helptext">Loading…</p>'; return; }
   const opened = openState(box);
-  box.innerHTML = schemaDraft.SECTIONS.map((sec,sIdx)=>renderSectionEditor(sec,sIdx,opened)).join('');
-  renderFormEditorLiability();
+  box.innerHTML = D().SECTIONS.map((sec,sIdx)=>renderSectionEditor(sec,sIdx,opened)).join('');
+  if(activeEditor==='intake') renderFormEditorLiability();
 }
 
 function visibleIfPickerHtml(kind, sIdx, qIdx, cond, candidateQuestions){
@@ -5026,7 +5152,7 @@ function renderSectionEditor(sec, sIdx, opened){
   const summaryHtml = escapeHtml([visSummary || 'Always shown', sec.intro ? 'has intro text' : null].filter(Boolean).join(' · '));
   const actions = `
     <button class="icon-btn icon-btn-lg" title="Move up" onclick="moveSection(${sIdx},-1)" ${sIdx===0?'disabled':''}>${ICONS.arrowUp}</button>
-    <button class="icon-btn icon-btn-lg" title="Move down" onclick="moveSection(${sIdx},1)" ${sIdx===schemaDraft.SECTIONS.length-1?'disabled':''}>${ICONS.arrowDown}</button>
+    <button class="icon-btn icon-btn-lg" title="Move down" onclick="moveSection(${sIdx},1)" ${sIdx===D().SECTIONS.length-1?'disabled':''}>${ICONS.arrowDown}</button>
     <button class="icon-btn icon-btn-lg danger" title="Delete section" onclick="deleteSection(${sIdx})">${ICONS.trash}</button>`;
   const body = `
     <div class="field"><label>Section title</label>
@@ -5090,24 +5216,24 @@ function renderQuestionEditor(q, sIdx, qIdx, sec, opened){
 
 // ---- mutation handlers (called from the inline event handlers above) ----
 window.updateSectionField = function(sIdx, field, value){
-  schemaDraft.SECTIONS[sIdx][field] = value;
+  D().SECTIONS[sIdx][field] = value;
   markSchemaDirty();
 };
 window.updateQuestionField = function(sIdx, qIdx, field, value){
-  schemaDraft.SECTIONS[sIdx].questions[qIdx][field] = value;
+  D().SECTIONS[sIdx].questions[qIdx][field] = value;
   markSchemaDirty();
 };
 window.updateQuestionFieldAndRerender = function(sIdx, qIdx, field, value){
-  schemaDraft.SECTIONS[sIdx].questions[qIdx][field] = value;
+  D().SECTIONS[sIdx].questions[qIdx][field] = value;
   markSchemaDirty();
   renderFormEditor();
 };
 window.updateQuestionOptions = function(sIdx, qIdx, text){
-  schemaDraft.SECTIONS[sIdx].questions[qIdx].options = text.split('\n').map(s=>s.trim()).filter(Boolean);
+  D().SECTIONS[sIdx].questions[qIdx].options = text.split('\n').map(s=>s.trim()).filter(Boolean);
   markSchemaDirty();
 };
 window.onQuestionTypeChange = function(sIdx, qIdx, newType){
-  const q = schemaDraft.SECTIONS[sIdx].questions[qIdx];
+  const q = D().SECTIONS[sIdx].questions[qIdx];
   q.type = newType;
   if(TYPES_WITH_OPTIONS.includes(newType) && !Array.isArray(q.options)) q.options = ['Yes','No'];
   if(!TYPES_WITH_OPTIONS.includes(newType)){ delete q.options; delete q.otherOption; }
@@ -5118,19 +5244,19 @@ window.onQuestionTypeChange = function(sIdx, qIdx, newType){
 };
 window.addQuestion = function(sIdx){
   const id = uniqueQuestionId('question');
-  schemaDraft.SECTIONS[sIdx].questions.push({ id, type:'text', label:'New question', required:false });
+  D().SECTIONS[sIdx].questions.push({ id, type:'text', label:'New question', required:false });
   markSchemaDirty();
   renderFormEditor();
 };
 window.deleteQuestion = async function(sIdx, qIdx){
-  const q = schemaDraft.SECTIONS[sIdx].questions[qIdx];
+  const q = D().SECTIONS[sIdx].questions[qIdx];
   if(!(await askConfirm(`Delete the question "${q.label}"? Any other question whose visibility depends on this one will need to be fixed manually.`))) return;
-  schemaDraft.SECTIONS[sIdx].questions.splice(qIdx,1);
+  D().SECTIONS[sIdx].questions.splice(qIdx,1);
   markSchemaDirty();
   renderFormEditor();
 };
 window.moveQuestion = function(sIdx, qIdx, dir){
-  const arr = schemaDraft.SECTIONS[sIdx].questions;
+  const arr = D().SECTIONS[sIdx].questions;
   const j = qIdx+dir;
   if(j<0||j>=arr.length) return;
   [arr[qIdx],arr[j]] = [arr[j],arr[qIdx]];
@@ -5139,19 +5265,19 @@ window.moveQuestion = function(sIdx, qIdx, dir){
 };
 window.addFormSection = function(){
   const id = uniqueSectionId('section');
-  schemaDraft.SECTIONS.push({ id, title:'New section', questions:[] });
+  D().SECTIONS.push({ id, title:'New section', questions:[] });
   markSchemaDirty();
   renderFormEditor();
 };
 window.deleteSection = async function(sIdx){
-  const sec = schemaDraft.SECTIONS[sIdx];
+  const sec = D().SECTIONS[sIdx];
   if(!(await askConfirm(`Delete the whole "${sec.title}" section and all ${sec.questions.length} question(s) in it?`))) return;
-  schemaDraft.SECTIONS.splice(sIdx,1);
+  D().SECTIONS.splice(sIdx,1);
   markSchemaDirty();
   renderFormEditor();
 };
 window.moveSection = function(sIdx, dir){
-  const arr = schemaDraft.SECTIONS;
+  const arr = D().SECTIONS;
   const j = sIdx+dir;
   if(j<0||j>=arr.length) return;
   [arr[sIdx],arr[j]] = [arr[j],arr[sIdx]];
@@ -5162,7 +5288,7 @@ window.moveSection = function(sIdx, dir){
 // visibleIf editing - kind/sIdx/qIdx locate the section or question being
 // edited; qIdx is `null` for a section-level visibleIf.
 function targetOf(kind, sIdx, qIdx){
-  return qIdx===null ? schemaDraft.SECTIONS[sIdx] : schemaDraft.SECTIONS[sIdx].questions[qIdx];
+  return qIdx===null ? D().SECTIONS[sIdx] : D().SECTIONS[sIdx].questions[qIdx];
 }
 window.onVisibleIfModeChange = function(kind, sIdx, qIdx, mode){
   const obj = targetOf(kind, sIdx, qIdx);
@@ -5191,19 +5317,22 @@ window.onVisibleIfValueChange = function(kind, sIdx, qIdx, value, isArray){
 async function saveFormSchema(){
   const msg = $('#formEditorMsg');
   msg.hidden = true;
+  const notes = activeEditor==='notes';
+  const draft = D();
   // Lightweight validation - catch the two mistakes most likely to
   // silently break the live form before they ever reach it.
   const allIds = [];
-  schemaDraft.SECTIONS.forEach(s=>s.questions.forEach(q=>allIds.push(q.id)));
+  draft.SECTIONS.forEach(s=>s.questions.forEach(q=>allIds.push(q.id)));
   const dupes = allIds.filter((id,i)=>allIds.indexOf(id)!==i);
   const idSet = new Set(allIds);
   const brokenRefs = [];
-  schemaDraft.SECTIONS.forEach(s=>{
+  draft.SECTIONS.forEach(s=>{
     if(s.visibleIf && !idSet.has(s.visibleIf.id)) brokenRefs.push(`Section "${s.title}"`);
     s.questions.forEach(q=>{ if(q.visibleIf && !idSet.has(q.visibleIf.id)) brokenRefs.push(`Question "${q.label}"`); });
   });
   if(dupes.length || brokenRefs.length){
     msg.hidden = false;
+    msg.className = 'errbox';
     msg.innerHTML = [
       dupes.length ? `Duplicate question id(s): ${[...new Set(dupes)].join(', ')}.` : '',
       brokenRefs.length ? `These have a "show only if" pointing at a question that no longer exists or hasn't been chosen yet: ${brokenRefs.join(', ')}.` : ''
@@ -5211,15 +5340,26 @@ async function saveFormSchema(){
     return;
   }
   try{
-    await updateItem('formSchema', schemaItemId, { SchemaJSON: JSON.stringify(schemaDraft), SchemaVersion: schemaVersion+1 });
-    schemaVersion += 1;
-    schemaDirty = false;
-    $('#formEditorDirtyBadge').style.display = 'none';
-    FPHM.applyLiveSchema(schemaDraft);
-    renderIntake();
+    if(notes){
+      if(!notesAvailable) throw new Error('The SessionNotesSchema / SessionNotes SharePoint lists have not been created yet.');
+      const fields = { Title: 'schema', SchemaJSON: JSON.stringify(draft), SchemaVersion: notesSchemaVersion+1 };
+      if(notesSchemaItemId) await updateItem('notesSchema', notesSchemaItemId, fields);
+      else { const r = await createItem('notesSchema', fields); notesSchemaItemId = parseInt(r.id,10); }
+      notesSchemaVersion += 1;
+      notesSchema = JSON.parse(JSON.stringify(draft));
+      edSetDirty(false);
+    } else {
+      await updateItem('formSchema', schemaItemId, { SchemaJSON: JSON.stringify(schemaDraft), SchemaVersion: schemaVersion+1 });
+      schemaVersion += 1;
+      edSetDirty(false);
+      FPHM.applyLiveSchema(schemaDraft);
+      renderIntake();
+    }
     msg.hidden = false;
     msg.className = 'helptext';
-    msg.textContent = 'Saved — the public form will use these changes immediately.';
+    msg.textContent = notes
+      ? 'Saved — new session notes will use these questions. Notes already written keep the questions they were filled in with.'
+      : 'Saved — the public form will use these changes immediately.';
     setTimeout(()=>{ msg.hidden = true; msg.className='errbox'; }, 4000);
   }catch(e){
     msg.hidden = false;
@@ -5228,13 +5368,221 @@ async function saveFormSchema(){
   }
 }
 async function discardFormSchemaChanges(){
-  if(schemaDirty && !(await askConfirm('Discard all unsaved question edits and reload the last saved version?'))) return;
-  schemaDirty = false; // must be cleared BEFORE loadAll() - its own guard checks this flag to decide whether to reset schemaDraft
-  $('#formEditorDirtyBadge').style.display = 'none';
+  if(edDirty() && !(await askConfirm('Discard all unsaved question edits and reload the last saved version?'))) return;
+  edSetDirty(false); // must be cleared BEFORE loadAll() - its own guard checks this flag to decide whether to reset the draft
   await loadAll();
   renderFormEditor();
 }
+/* =========================================================================
+   SESSION NOTES — a lead's record of what happened in a session, filled in
+   from a staff-editable form (Settings > Session Notes, same editor as the
+   intake questions) and opened from a button on the session card.
 
+   Each saved note is ONE self-contained JSON document in the SessionNotes
+   list's NotesJSON column:
+     { type:'FPHMSessionNotes', formVersion, savedAt,
+       session:{ id, recipName, date, time, lead, ministers:[...] },
+       schema:{ SECTIONS:[...] },   <- the exact form the note was filled in with
+       answers:{ questionId: value } }
+   Because the questions travel with the answers, a note can always be
+   shown, edited or exported exactly as written no matter how the form is
+   changed afterwards. Only answers to questions that were visible (per the
+   branching rules) when saved are kept.
+
+   The admin app only for now; restricting it to the session's lead is a
+   portal-side concern for when this moves there (see CLAUDE.md).
+========================================================================= */
+function defaultNotesSchema(){
+  return { SECTIONS: [ { id:'general', title:'Session Notes', questions: [
+    { id:'summary', type:'textarea', label:'What happened during this session?', required:false }
+  ] } ] };
+}
+function showNotesEditor(){
+  const msg = $('#notesSetupMsg'), host = $('#notesQuestionsHost');
+  if(!notesAvailable){
+    msg.hidden = false;
+    msg.innerHTML = `<strong>Session Notes needs two new SharePoint lists before it can be used.</strong> Create them on the same site as the other lists:<br>
+      1. <strong>SessionNotesSchema</strong> — add columns <em>SchemaJSON</em> (Multiple lines of text, <u>Plain text</u>) and <em>SchemaVersion</em> (Number).<br>
+      2. <strong>SessionNotes</strong> — add columns <em>SessionId</em> (Number) and <em>NotesJSON</em> (Multiple lines of text, <u>Plain text</u>).<br>
+      Then reload this page. Until then the Session Notes button stays hidden on session cards.`;
+    host.hidden = true;
+    return;
+  }
+  msg.hidden = true;
+  host.hidden = false;
+  showEditor('notes');
+}
+function sessionNotesFor(sessionId){ return sessionNotes.find(n=>n.sessionId===sessionId) || null; }
+// Not offered on the shared Drop-in / Training events - there's no single
+// session team to write notes about.
+function notesButtonHtml(s){
+  if(!notesAvailable || !s || s.apptType==='Drop-in' || s.apptType==='Training') return '';
+  const has = !!sessionNotesFor(s.id);
+  return `<button class="icon-btn${has?' success':''}" onclick="openSessionNotes(${s.id})" title="Session Notes" aria-label="${has?'View or edit':'Write'} session notes for ${escapeHtml(s.recipName)}">${ICONS.pencil}<span class="btn-label">${has?'Session Notes ✓':'Session Notes'}</span></button>`;
+}
+
+let notesCtx = null; // { session, schema, answers, existing, formVersion }
+window.openSessionNotes = function(sessionId){
+  const s = sessions.find(x=>x.id===sessionId);
+  if(!s) return;
+  const existing = sessionNotesFor(sessionId);
+  notesCtx = {
+    session: s, existing,
+    // An existing note reopens with the form it was written with; a new one
+    // uses the current saved form.
+    schema: JSON.parse(JSON.stringify(existing ? existing.record.schema : notesSchema)),
+    formVersion: existing ? existing.record.formVersion : notesSchemaVersion,
+    answers: existing ? JSON.parse(JSON.stringify(existing.record.answers||{})) : {}
+  };
+  const lead = s.ministers.find(m=>m.role==='Lead');
+  const leadName = lead ? (ministers.find(m=>m.id===lead.id)||{}).name : '';
+  $('#notesTitle').textContent = 'Session Notes';
+  $('#notesSub').textContent = `${s.recipName} · ${fmtShort(s.date)}${leadName ? ' · Lead: '+leadName : ''}`;
+  $('#notesMsg').hidden = true;
+  $('#btnNotesDownload').hidden = !existing;
+  renderNotesForm();
+  $('#notesModal').classList.add('open');
+};
+function renderNotesForm(){
+  const c = notesCtx;
+  const sections = c.schema.SECTIONS||[];
+  if(!sections.length || !sections.some(s=>(s.questions||[]).length)){
+    $('#notesBody').innerHTML = '<p class="helptext">This form has no questions yet — add some under Settings › Session Notes.</p>';
+    return;
+  }
+  $('#notesBody').innerHTML = sections.map((sec,si)=>`
+    <div class="nt-sec" data-si="${si}">
+      <h3 style="margin:14px 0 4px;color:var(--navy);font-size:var(--fs-md);">${escapeHtml(sec.title||'')}</h3>
+      ${sec.intro ? `<p class="helptext" style="margin:0 0 8px;">${escapeHtml(sec.intro)}</p>` : ''}
+      ${(sec.questions||[]).map((q,qi)=>notesQuestionHtml(q,si,qi)).join('')}
+    </div>`).join('');
+  notesApplyVisibility();
+}
+function notesQuestionHtml(q, si, qi){
+  const id = `nq_${si}_${qi}`;
+  const v = notesCtx.answers[q.id];
+  const label = `<label${['radio','checkboxes'].includes(q.type)?'':` for="${id}"`}>${escapeHtml(q.label||'')}${q.required?' *':''}</label>`;
+  let input = '';
+  if(q.type==='textarea'){
+    input = `<textarea id="${id}" rows="4" oninput="notesSet(${si},${qi},this.value)">${escapeHtml(v||'')}</textarea>`;
+  } else if(q.type==='select'){
+    input = `<select id="${id}" onchange="notesSet(${si},${qi},this.value)"><option value="">— Select —</option>${(q.options||[]).map(o=>`<option value="${escapeHtml(o)}"${v===o?' selected':''}>${escapeHtml(o)}</option>`).join('')}</select>`;
+  } else if(q.type==='radio'){
+    input = (q.options||[]).map((o,oi)=>`<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin:4px 0;"><input type="radio" name="${id}" ${v===o?'checked':''} onchange="notesSet(${si},${qi},${JSON.stringify(o).replace(/&/g,'&amp;').replace(/"/g,'&quot;')})"> ${escapeHtml(o)}</label>`).join('');
+  } else if(q.type==='checkboxes'){
+    const arr = Array.isArray(v) ? v : [];
+    const other = arr.find(x=>String(x).startsWith('__other__:'));
+    input = (q.options||[]).map((o,oi)=>`<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin:4px 0;"><input type="checkbox" ${arr.includes(o)?'checked':''} onchange="notesToggle(${si},${qi},${oi},this.checked)"> ${escapeHtml(o)}</label>`).join('')
+      + (q.otherOption ? `<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin:4px 0;"><input type="checkbox" ${other!==undefined?'checked':''} onchange="notesOtherToggle(${si},${qi},this.checked,this)"> Other:
+          <input type="text" style="flex:1;" value="${escapeHtml(other?String(other).slice(10):'')}" oninput="notesOtherText(${si},${qi},this.value)"></label>` : '');
+  } else {
+    const type = q.type==='email' ? 'email' : q.type==='number' ? 'number' : 'text';
+    input = `<input id="${id}" type="${type}" ${q.min!==undefined?`min="${q.min}"`:''} ${q.max!==undefined?`max="${q.max}"`:''} value="${escapeHtml(v===undefined?'':v)}" oninput="notesSet(${si},${qi},this.value)">`;
+  }
+  return `<div class="field nt-q" data-si="${si}" data-qi="${qi}">${label}${input}</div>`;
+}
+function notesQ(si,qi){ return notesCtx.schema.SECTIONS[si].questions[qi]; }
+window.notesSet = function(si, qi, value){
+  const q = notesQ(si,qi);
+  if(q.type==='number') value = value==='' ? '' : Number(value);
+  notesCtx.answers[q.id] = value;
+  notesApplyVisibility();
+};
+window.notesToggle = function(si, qi, oi, checked){
+  const q = notesQ(si,qi), o = q.options[oi];
+  const arr = Array.isArray(notesCtx.answers[q.id]) ? notesCtx.answers[q.id].slice() : [];
+  const i = arr.indexOf(o);
+  if(checked && i<0) arr.push(o); if(!checked && i>=0) arr.splice(i,1);
+  notesCtx.answers[q.id] = arr;
+  notesApplyVisibility();
+};
+window.notesOtherToggle = function(si, qi, checked, el){
+  const q = notesQ(si,qi);
+  const arr = (Array.isArray(notesCtx.answers[q.id]) ? notesCtx.answers[q.id] : []).filter(x=>!String(x).startsWith('__other__:'));
+  if(checked) arr.push('__other__:' + (el.parentNode.querySelector('input[type=text]').value||''));
+  notesCtx.answers[q.id] = arr;
+  notesApplyVisibility();
+};
+window.notesOtherText = function(si, qi, text){
+  const q = notesQ(si,qi);
+  const arr = (Array.isArray(notesCtx.answers[q.id]) ? notesCtx.answers[q.id] : []).filter(x=>!String(x).startsWith('__other__:'));
+  arr.push('__other__:' + text);
+  notesCtx.answers[q.id] = arr;
+};
+// Branching: show/hide sections and questions in place (no re-render, so
+// typing never loses focus) according to each visibleIf.
+function notesApplyVisibility(){
+  const a = notesCtx.answers;
+  notesCtx.schema.SECTIONS.forEach((sec,si)=>{
+    const secEl = $(`#notesBody .nt-sec[data-si="${si}"]`);
+    if(!secEl) return;
+    secEl.hidden = !FPHM.evalCond(sec.visibleIf, a);
+    (sec.questions||[]).forEach((q,qi)=>{
+      const qEl = secEl.querySelector(`.nt-q[data-qi="${qi}"]`);
+      if(qEl) qEl.hidden = !FPHM.evalCond(q.visibleIf, a);
+    });
+  });
+}
+// Only answers to questions that are visible right now are kept.
+function notesVisibleAnswers(){
+  const a = notesCtx.answers, out = {}, missing = [];
+  notesCtx.schema.SECTIONS.forEach(sec=>{
+    if(!FPHM.evalCond(sec.visibleIf, a)) return;
+    (sec.questions||[]).forEach(q=>{
+      if(!FPHM.evalCond(q.visibleIf, a)) return;
+      const v = a[q.id];
+      const blank = v===undefined || v===null || v==='' || (Array.isArray(v) && v.length===0);
+      if(blank){ if(q.required) missing.push(q.label); return; }
+      out[q.id] = v;
+    });
+  });
+  return { answers: out, missing };
+}
+function notesRecord(answers){
+  const c = notesCtx, s = c.session;
+  const nameOf = id => (ministers.find(m=>m.id===id)||{}).name || '';
+  const lead = s.ministers.find(m=>m.role==='Lead');
+  return {
+    type: 'FPHMSessionNotes',
+    formVersion: c.formVersion,
+    savedAt: new Date().toISOString(),
+    session: { id: s.id, recipName: s.recipName, date: s.date, time: s.time, endTime: s.endTime,
+      lead: lead ? nameOf(lead.id) : '', ministers: s.ministers.map(m=>({ name: nameOf(m.id), role: m.role })) },
+    schema: c.schema,
+    answers
+  };
+}
+window.saveSessionNotes = async function(){
+  const msg = $('#notesMsg');
+  const { answers, missing } = notesVisibleAnswers();
+  if(missing.length){
+    msg.hidden = false; msg.className = 'errbox';
+    msg.textContent = 'Please answer: ' + missing.join('; ');
+    return;
+  }
+  const s = notesCtx.session;
+  const fields = { Title: `${s.recipName} — ${s.date}`, SessionId: s.id, NotesJSON: JSON.stringify(notesRecord(answers)) };
+  try{
+    if(notesCtx.existing) await updateItem('notes', notesCtx.existing.id, fields);
+    else await createItem('notes', fields);
+    closeSessionNotes();
+    await loadAll();
+  }catch(e){
+    msg.hidden = false; msg.className = 'errbox';
+    msg.textContent = 'Save failed: ' + e.message;
+  }
+};
+window.closeSessionNotes = function(){ $('#notesModal').classList.remove('open'); notesCtx = null; };
+window.downloadSessionNotesJson = function(){
+  if(!notesCtx || !notesCtx.existing) return;
+  const rec = notesCtx.existing.record, s = notesCtx.session;
+  const blob = new Blob([JSON.stringify(rec, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `session-notes-${(s.recipName||'session').replace(/[^a-z0-9]+/gi,'-').toLowerCase()}-${s.date}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1500);
+};
 /* =========================================================================
    REPORTS — Freedom Sessions / Drop-In / Training statistics for an
    arbitrary date range, computed here against the live sessions/ministers
@@ -5722,12 +6070,28 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 5, 2026', version: '2026-10-05.1', items: [
+    'New: when you open an intake form, Smaller text and Larger text buttons sit next to Print so the answers are easier to read. Your choice is remembered, and printing is unchanged.',
+    'New: the intake questionnaire now asks "Please explain" when "Was there a sense of security and harmony in your home during the first 12 years of your life?" is answered No (matching the old Microsoft Form). Add it in Edit Questions too if it is not showing on the live form.'
+  ]},
+  { date: 'Oct 3, 2026', version: '2026-10-03.4', items: [
+    'Fixed: a booked session\'s collapsed card on Schedule & Planning now shows the session\'s current prayer ministers, including anyone added (or removed) after it was booked, instead of only the original team.'
+  ]},
+  { date: 'Oct 3, 2026', version: '2026-10-03.3', items: [
+    'New (Test only for now): Session Notes. Settings has a new Session Notes tab - the same question editor as Intake Forms (sections, question types, required, and show-only-if branching) - for the form a session lead fills in about what happened. Each session card gets a Session Notes button that opens the form; each saved note is stored as a self-contained JSON document that includes the exact questions it was written with, so later form changes never alter old notes (Download JSON is available on a saved note). Needs two new SharePoint lists, SessionNotesSchema and SessionNotes - Settings > Session Notes explains the columns until they exist. Admin app only for now.'
+  ]},
   { date: 'Oct 3, 2026', version: '2026-10-03.2', items: [
     'New: the By Date view on Completed Sessions has Expand all and Collapse all buttons for the weeks.'
   ]},
   { date: 'Oct 3, 2026', version: '2026-10-03.1', items: [
     'New: Completed Sessions now has two sub-tabs. By Recipient is the existing view; By Date groups completed sessions by week and day (newest first, like the Schedule tab) and shows the prayer ministers on each session. Search works in both.'
   ]},
+];
+// Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
+// five most recent versions; at each promotion, anything beyond the newest
+// five moves here rather than being deleted - see the block comment above
+// for the maintenance rule.
+const CHANGE_LOG_ARCHIVE = [
   { date: 'Sep 30, 2026', version: '2026-09-30.6', items: [
     'Fixed: on Reports, the monthly Unique Recipients now show the month each recipient had their FIRST session of the year, so the months add up to the year\'s total (e.g. 43 for 2026) instead of counting the same person again in every month they were seen. First-time and Follow-up follow the same rule. Sessions and Hours are still per month. Applies to each minister\'s own monthly breakdown too.'
   ]},
@@ -5737,12 +6101,6 @@ const CHANGE_LOG = [
   { date: 'Sep 30, 2026', version: '2026-09-30.1', items: [
     'Changed: clicking "Sign Out" now asks whether you want to sign out or switch user. Switch User opens Microsoft\'s account picker right away - pick a different account and the app reloads as that person (cancel and you stay signed in as before). The dialog is now just an X to cancel, a text "Switch User" and a primary "Sign Out", and switching between a minister and an admin account no longer bounces back and forth between the Scheduler and the portal. Same on the minister portal.'
   ]},
-];
-// Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
-// five most recent versions; at each promotion, anything beyond the newest
-// five moves here rather than being deleted - see the block comment above
-// for the maintenance rule.
-const CHANGE_LOG_ARCHIVE = [
   { date: 'Sep 29, 2026', version: '2026-09-29.15', items: [
     'New: a blackout date now shows a small "Added by admin" label when an admin (not the minister themselves) created it - visible to the minister on their portal\'s time-off list, and on the Blackout Dates tab here. Edit and Delete are unchanged.'
   ]},

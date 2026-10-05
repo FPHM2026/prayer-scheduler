@@ -90,6 +90,8 @@ const SECTIONS = [
       { id: "adopted", type: "radio", label: "Were you adopted?", required: true, options: YES_NO },
       { id: "primaryCaregiver", type: "text", label: "Who was your primary caregiver?", required: true },
       { id: "homeSecurity", type: "radio", label: "Was there a sense of security and harmony in your home during the first 12 years of your life?", required: true, options: YES_NO },
+      { id: "homeSecurityExplain", type: "textarea", label: "Please explain", required: true,
+        visibleIf: { id: "homeSecurity", equals: "No" } },
       { id: "hasSiblings", type: "radio", label: "Do you have siblings?", required: true, options: YES_NO },
       { id: "siblingsInfo", type: "textarea", label: "What would you like us to know about your siblings? Conflict?", required: true,
         visibleIf: { id: "hasSiblings", equals: "Yes" } }
