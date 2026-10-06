@@ -1754,3 +1754,5 @@ per the promotion workflow above) normally and clean up the worktree.
 - Session Notes button (
 otesButtonHtml) appears on booked/unlinked session cards and Completed rows (both views), not on Drop-in/Training. Admin app only; restricting to the session's lead belongs to the future portal version.
 - Demo mock has empty SessionNotesSchema/SessionNotes lists so the feature works there.
+
+- **Portal intake view** (2026-10-06): the minister portal's intake modal (#intakeViewModal) is now full-viewport with a pinned header holding the name, A−/A+ text-size buttons (same phmIntakeTextScale localStorage key as the admin app), Print and Close. Admin app's intake view was deliberately left unchanged.
