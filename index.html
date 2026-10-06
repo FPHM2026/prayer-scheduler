@@ -307,6 +307,19 @@
   .ans-q{font-weight:700;font-size:calc(var(--fs-xs) * var(--ans-scale,1));color:var(--muted);}
   .ans-a{font-size:calc(var(--fs-sm) * var(--ans-scale,1));white-space:pre-wrap;}
   #intakeDetail{--ans-scale:1;}
+  /* Open / Copy link row: Open left, Copy right, both plain text links. */
+  .intake-linkrow{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px 16px;margin-bottom:12px;}
+  .intake-linkrow a,.intake-linkrow .link-btn{font-size:var(--fs-md);font-weight:600;}
+  .intake-linkrow .helptext{flex:1 0 100%;text-align:right;margin:0;}
+  button.link-btn{background:none;border:none;padding:8px 0;min-height:44px;color:var(--gold);text-decoration:underline;cursor:pointer;font-family:inherit;}
+  button.link-btn:hover{color:var(--navy);}
+  /* Intake detail header: name left, text-size icon buttons right. */
+  .intake-namerow{display:flex;justify-content:space-between;align-items:center;gap:12px;}
+  .intake-namerow h2{margin:0;}
+  .intake-namerow .size-btns{display:flex;gap:6px;flex:0 0 auto;}
+  .intake-namerow button.icon-btn-lg{font-family:inherit;font-weight:700;line-height:1;color:var(--navy);}
+  .intake-namerow button.icon-btn-lg .a-sm{font-size:15px;}
+  .intake-namerow button.icon-btn-lg .a-lg{font-size:24px;}
   @media print{
     @page{size:letter;margin:0.5in;}
     body{background:#fff;}
@@ -741,9 +754,9 @@
   </section>
 
   <section class="panel" id="panel-intake">
-    <div class="toolbar no-print" style="margin-bottom:12px;">
-      <a class="btn" id="btnOpenIntakeForm" href="intake/" target="_blank" rel="noopener">Open Intake Form</a>
-      <button class="btn secondary" type="button" id="btnCopyIntakeLink">Copy Link to Intake Form</button>
+    <div class="intake-linkrow no-print">
+      <a id="btnOpenIntakeForm" href="intake/" target="_blank" rel="noopener">Open Intake Form</a>
+      <button class="link-btn" type="button" id="btnCopyIntakeLink">Copy Link to Intake Form</button>
       <span class="helptext" id="intakeLinkCopiedMsg" style="display:none;">Link copied!</span>
     </div>
     <p class="helptext" id="intakeHelptext">Recipients' completed (and in-progress) intake questionnaires. Unlinked/Linked splits submitted forms by whether they're attached to a session yet. Archive a form to get it out of the way without deleting it - Delete is permanent.</p>
@@ -1066,7 +1079,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-05.1";
+const APP_VERSION = "2026-10-05.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -4695,11 +4708,15 @@ window.openIntakeDetail = function(id){
   detail.innerHTML = `
     <div class="toolbar no-print">
       <button type="button" class="btn secondary" onclick="closeIntakeDetail()">&larr; Back to list</button>
-      <button type="button" class="btn secondary" onclick="changeIntakeTextSize(-1)">Smaller text</button>
-      <button type="button" class="btn secondary" onclick="changeIntakeTextSize(1)">Larger text</button>
       <button type="button" class="btn" onclick="window.print()">Print / Save as PDF</button>
     </div>
-    <h2>${escapeHtml(i.recipName||'(name not yet entered)')}</h2>
+    <div class="intake-namerow">
+      <h2>${escapeHtml(i.recipName||'(name not yet entered)')}</h2>
+      <div class="size-btns no-print">
+        <button type="button" class="icon-btn icon-btn-lg" onclick="changeIntakeTextSize(-1)" title="Smaller text" aria-label="Make text smaller"><span class="a-sm" aria-hidden="true">A</span><span aria-hidden="true">&minus;</span></button>
+        <button type="button" class="icon-btn icon-btn-lg" onclick="changeIntakeTextSize(1)" title="Larger text" aria-label="Make text larger"><span class="a-lg" aria-hidden="true">A</span><span aria-hidden="true">+</span></button>
+      </div>
+    </div>
     <p class="helptext">${escapeHtml(i.recipEmail||'')} — ${i.status==='Submitted' ? 'Submitted '+fmtShort((i.submittedAt||'').split('T')[0]) : i.status==='InProgress' ? 'In progress' : 'Archived'}</p>
     ${FPHM.renderResponsesHtml(i.responses)}
     ${i.signatureDataUrl ? `<h3>Signature</h3><img src="${i.signatureDataUrl}" alt="Signature" style="max-width:300px;border:1px solid var(--border);border-radius:8px;background:#fff;">` : ''}
@@ -6070,6 +6087,10 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 5, 2026', version: '2026-10-05.2', items: [
+    'Changed: on Intake Forms, Open Intake Form (left) and Copy Link to Intake Form (right) are now plain text links on one row.',
+    'Changed: the text-size controls on an open intake form are now two small A- / A+ icon buttons on the right of the person\'s name, instead of two wide buttons above it.'
+  ]},
   { date: 'Oct 5, 2026', version: '2026-10-05.1', items: [
     'New: when you open an intake form, Smaller text and Larger text buttons sit next to Print so the answers are easier to read. Your choice is remembered, and printing is unchanged.',
     'New: the intake questionnaire now asks "Please explain" when "Was there a sense of security and harmony in your home during the first 12 years of your life?" is answered No (matching the old Microsoft Form). Add it in Edit Questions too if it is not showing on the live form.'
