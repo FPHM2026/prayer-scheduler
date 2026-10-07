@@ -6114,15 +6114,15 @@ const CHANGE_LOG = [
   { date: 'Oct 3, 2026', version: '2026-10-03.3', items: [
     'New (Test only for now): Session Notes. Settings has a new Session Notes tab - the same question editor as Intake Forms (sections, question types, required, and show-only-if branching) - for the form a session lead fills in about what happened. Each session card gets a Session Notes button that opens the form; each saved note is stored as a self-contained JSON document that includes the exact questions it was written with, so later form changes never alter old notes (Download JSON is available on a saved note). Needs two new SharePoint lists, SessionNotesSchema and SessionNotes - Settings > Session Notes explains the columns until they exist. Admin app only for now.'
   ]},
-  { date: 'Oct 3, 2026', version: '2026-10-03.2', items: [
-    'New: the By Date view on Completed Sessions has Expand all and Collapse all buttons for the weeks.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 3, 2026', version: '2026-10-03.2', items: [
+    'New: the By Date view on Completed Sessions has Expand all and Collapse all buttons for the weeks.'
+  ]},
   { date: 'Oct 3, 2026', version: '2026-10-03.1', items: [
     'New: Completed Sessions now has two sub-tabs. By Recipient is the existing view; By Date groups completed sessions by week and day (newest first, like the Schedule tab) and shows the prayer ministers on each session. Search works in both.'
   ]},
