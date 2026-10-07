@@ -308,8 +308,22 @@
   .ans-section{margin-bottom:20px;}
   .ans-section h3{font-family:'Playfair Display',Georgia,serif;color:var(--gold-dark);border-bottom:1px solid var(--border);padding-bottom:6px;margin:0 0 10px;}
   .ans-row{display:flex;flex-direction:column;margin-bottom:10px;}
-  .ans-q{font-weight:700;font-size:var(--fs-xs);color:var(--muted);}
-  .ans-a{font-size:var(--fs-sm);white-space:pre-wrap;}
+  .ans-q{font-weight:700;font-size:calc(var(--fs-xs) * var(--ans-scale,1));color:var(--muted);}
+  .ans-a{font-size:calc(var(--fs-sm) * var(--ans-scale,1));white-space:pre-wrap;}
+  #intakeDetail{--ans-scale:1;}
+  /* Open / Copy link row: Open left, Copy right, both plain text links. */
+  .intake-linkrow{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px 16px;margin-bottom:12px;}
+  .intake-linkrow a,.intake-linkrow .link-btn{font-size:var(--fs-md);font-weight:600;}
+  .intake-linkrow .helptext{flex:1 0 100%;text-align:right;margin:0;}
+  button.link-btn{background:none;border:none;padding:8px 0;min-height:44px;color:var(--gold);text-decoration:underline;cursor:pointer;font-family:inherit;}
+  button.link-btn:hover{color:var(--navy);}
+  /* Intake detail header: name left, text-size icon buttons right. */
+  .intake-namerow{display:flex;justify-content:space-between;align-items:center;gap:12px;}
+  .intake-namerow h2{margin:0;}
+  .intake-namerow .size-btns{display:flex;gap:6px;flex:0 0 auto;}
+  .intake-namerow button.icon-btn-lg{font-family:inherit;font-weight:700;line-height:1;color:var(--navy);}
+  .intake-namerow button.icon-btn-lg .a-sm{font-size:15px;}
+  .intake-namerow button.icon-btn-lg .a-lg{font-size:24px;}
   @media print{
     @page{size:letter;margin:0.5in;}
     body{background:#fff;}
@@ -747,9 +761,9 @@
   </section>
 
   <section class="panel" id="panel-intake">
-    <div class="toolbar no-print" style="margin-bottom:12px;">
-      <a class="btn" id="btnOpenIntakeForm" href="#" onclick="alert('Disabled in the demo.'); return false;">Open Intake Form</a>
-      <button class="btn secondary" type="button" id="btnCopyIntakeLink">Copy Link to Intake Form</button>
+    <div class="intake-linkrow no-print">
+      <a id="btnOpenIntakeForm" href="#" onclick="alert('Disabled in the demo.'); return false;">Open Intake Form</a>
+      <button class="link-btn" type="button" id="btnCopyIntakeLink">Copy Link to Intake Form</button>
       <span class="helptext" id="intakeLinkCopiedMsg" style="display:none;">Link copied!</span>
     </div>
     <p class="helptext" id="intakeHelptext">Recipients' completed (and in-progress) intake questionnaires. Unlinked/Linked splits submitted forms by whether they're attached to a session yet. Archive a form to get it out of the way without deleting it - Delete is permanent.</p>
@@ -1072,7 +1086,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-03.4";
+const APP_VERSION = "2026-10-05.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3860,6 +3874,9 @@ function renderDayLabel(){
 }
 function renderSlotButtons(){
   const d = $('#sessDate').value; const box = $('#slotButtons');
+  // Booking a slot already fixes the time (it defaults to the slot's own),
+  // so the quick-time buttons would only be noise there.
+  if(pendingBookSlotId){ box.innerHTML = ''; return; }
   const starts = slotStartsFor(d);
   if(!starts.length){ box.innerHTML = d ? '<p class="helptext">No preset window for this day — pick any custom start/end time above.</p>' : ''; return; }
   box.innerHTML = starts.map(t=>`<button type="button" class="slot-btn ${$('#sessTime').value===t?'chosen':''}" onclick="pickSlot('${t}')">${fmt12(t)}</button>`).join('');
@@ -4703,11 +4720,32 @@ window.openIntakeDetail = function(id){
       <button type="button" class="btn secondary" onclick="closeIntakeDetail()">&larr; Back to list</button>
       <button type="button" class="btn" onclick="window.print()">Print / Save as PDF</button>
     </div>
-    <h2>${escapeHtml(i.recipName||'(name not yet entered)')}</h2>
+    <div class="intake-namerow">
+      <h2>${escapeHtml(i.recipName||'(name not yet entered)')}</h2>
+      <div class="size-btns no-print">
+        <button type="button" class="icon-btn icon-btn-lg" onclick="changeIntakeTextSize(-1)" title="Smaller text" aria-label="Make text smaller"><span class="a-sm" aria-hidden="true">A</span><span aria-hidden="true">&minus;</span></button>
+        <button type="button" class="icon-btn icon-btn-lg" onclick="changeIntakeTextSize(1)" title="Larger text" aria-label="Make text larger"><span class="a-lg" aria-hidden="true">A</span><span aria-hidden="true">+</span></button>
+      </div>
+    </div>
     <p class="helptext">${escapeHtml(i.recipEmail||'')} — ${i.status==='Submitted' ? 'Submitted '+fmtShort((i.submittedAt||'').split('T')[0]) : i.status==='InProgress' ? 'In progress' : 'Archived'}</p>
     ${FPHM.renderResponsesHtml(i.responses)}
     ${i.signatureDataUrl ? `<h3>Signature</h3><img src="${i.signatureDataUrl}" alt="Signature" style="max-width:300px;border:1px solid var(--border);border-radius:8px;background:#fff;">` : ''}
   `;
+  applyIntakeTextSize();
+};
+// On-screen text size for the intake answers (screen only - print has its
+// own fixed sizes). Remembered per browser; storage may be unavailable.
+function applyIntakeTextSize(){
+  let n = 1;
+  try{ n = parseFloat(localStorage.getItem('fphmIntakeTextScale')) || 1; }catch(e){}
+  $('#intakeDetail').style.setProperty('--ans-scale', n);
+}
+window.changeIntakeTextSize = function(dir){
+  let n = 1;
+  try{ n = parseFloat(localStorage.getItem('fphmIntakeTextScale')) || 1; }catch(e){}
+  n = Math.min(2, Math.max(0.8, Math.round((n + dir*0.15)*100)/100));
+  try{ localStorage.setItem('fphmIntakeTextScale', n); }catch(e){}
+  applyIntakeTextSize();
 };
 window.closeIntakeDetail = function(){
   intakeDetailId = null;
@@ -6059,6 +6097,17 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 7, 2026', version: '2026-10-07.1', items: [
+    'Changed: when booking a slot, the session window no longer shows the quick start-time buttons - the time already comes from the slot. They still appear when creating or editing a session any other way.'
+  ]},
+  { date: 'Oct 5, 2026', version: '2026-10-05.2', items: [
+    'Changed: on Intake Forms, Open Intake Form (left) and Copy Link to Intake Form (right) are now plain text links on one row.',
+    'Changed: the text-size controls on an open intake form are now two small A- / A+ icon buttons on the right of the person\'s name, instead of two wide buttons above it.'
+  ]},
+  { date: 'Oct 5, 2026', version: '2026-10-05.1', items: [
+    'New: when you open an intake form, Smaller text and Larger text buttons sit next to Print so the answers are easier to read. Your choice is remembered, and printing is unchanged.',
+    'New: the intake questionnaire now asks "Please explain" when "Was there a sense of security and harmony in your home during the first 12 years of your life?" is answered No (matching the old Microsoft Form). Add it in Edit Questions too if it is not showing on the live form.'
+  ]},
   { date: 'Oct 3, 2026', version: '2026-10-03.4', items: [
     'Fixed: a booked session\'s collapsed card on Schedule & Planning now shows the session\'s current prayer ministers, including anyone added (or removed) after it was booked, instead of only the original team.'
   ]},
@@ -6068,18 +6117,18 @@ const CHANGE_LOG = [
   { date: 'Oct 3, 2026', version: '2026-10-03.2', items: [
     'New: the By Date view on Completed Sessions has Expand all and Collapse all buttons for the weeks.'
   ]},
-  { date: 'Oct 3, 2026', version: '2026-10-03.1', items: [
-    'New: Completed Sessions now has two sub-tabs. By Recipient is the existing view; By Date groups completed sessions by week and day (newest first, like the Schedule tab) and shows the prayer ministers on each session. Search works in both.'
-  ]},
-  { date: 'Sep 30, 2026', version: '2026-09-30.6', items: [
-    'Fixed: on Reports, the monthly Unique Recipients now show the month each recipient had their FIRST session of the year, so the months add up to the year\'s total (e.g. 43 for 2026) instead of counting the same person again in every month they were seen. First-time and Follow-up follow the same rule. Sessions and Hours are still per month. Applies to each minister\'s own monthly breakdown too.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 3, 2026', version: '2026-10-03.1', items: [
+    'New: Completed Sessions now has two sub-tabs. By Recipient is the existing view; By Date groups completed sessions by week and day (newest first, like the Schedule tab) and shows the prayer ministers on each session. Search works in both.'
+  ]},
+  { date: 'Sep 30, 2026', version: '2026-09-30.6', items: [
+    'Fixed: on Reports, the monthly Unique Recipients now show the month each recipient had their FIRST session of the year, so the months add up to the year\'s total (e.g. 43 for 2026) instead of counting the same person again in every month they were seen. First-time and Follow-up follow the same rule. Sessions and Hours are still per month. Applies to each minister\'s own monthly breakdown too.'
+  ]},
   { date: 'Sep 30, 2026', version: '2026-09-30.2', items: [
     'Changed: each person on the waiting list (Unplaced Candidates) is now a collapsible card. Collapsed, you see their name, session number, any Priority/Contacted tags and how long they\'ve waited; tap to expand for contact info, notes, the intake form link and the Contact / Flag Priority / Edit / Delete buttons. Cards start collapsed and stay open or closed through updates.'
   ]},

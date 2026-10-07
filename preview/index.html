@@ -3874,6 +3874,9 @@ function renderDayLabel(){
 }
 function renderSlotButtons(){
   const d = $('#sessDate').value; const box = $('#slotButtons');
+  // Booking a slot already fixes the time (it defaults to the slot's own),
+  // so the quick-time buttons would only be noise there.
+  if(pendingBookSlotId){ box.innerHTML = ''; return; }
   const starts = slotStartsFor(d);
   if(!starts.length){ box.innerHTML = d ? '<p class="helptext">No preset window for this day — pick any custom start/end time above.</p>' : ''; return; }
   box.innerHTML = starts.map(t=>`<button type="button" class="slot-btn ${$('#sessTime').value===t?'chosen':''}" onclick="pickSlot('${t}')">${fmt12(t)}</button>`).join('');
@@ -6094,6 +6097,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 7, 2026', version: '2026-10-07.1', items: [
+    'Changed: when booking a slot, the session window no longer shows the quick start-time buttons - the time already comes from the slot. They still appear when creating or editing a session any other way.'
+  ]},
   { date: 'Oct 5, 2026', version: '2026-10-05.2', items: [
     'Changed: on Intake Forms, Open Intake Form (left) and Copy Link to Intake Form (right) are now plain text links on one row.',
     'Changed: the text-size controls on an open intake form are now two small A- / A+ icon buttons on the right of the person\'s name, instead of two wide buttons above it.'
@@ -6111,15 +6117,15 @@ const CHANGE_LOG = [
   { date: 'Oct 3, 2026', version: '2026-10-03.2', items: [
     'New: the By Date view on Completed Sessions has Expand all and Collapse all buttons for the weeks.'
   ]},
-  { date: 'Oct 3, 2026', version: '2026-10-03.1', items: [
-    'New: Completed Sessions now has two sub-tabs. By Recipient is the existing view; By Date groups completed sessions by week and day (newest first, like the Schedule tab) and shows the prayer ministers on each session. Search works in both.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 3, 2026', version: '2026-10-03.1', items: [
+    'New: Completed Sessions now has two sub-tabs. By Recipient is the existing view; By Date groups completed sessions by week and day (newest first, like the Schedule tab) and shows the prayer ministers on each session. Search works in both.'
+  ]},
   { date: 'Sep 30, 2026', version: '2026-09-30.6', items: [
     'Fixed: on Reports, the monthly Unique Recipients now show the month each recipient had their FIRST session of the year, so the months add up to the year\'s total (e.g. 43 for 2026) instead of counting the same person again in every month they were seen. First-time and Follow-up follow the same rule. Sessions and Hours are still per month. Applies to each minister\'s own monthly breakdown too.'
   ]},
