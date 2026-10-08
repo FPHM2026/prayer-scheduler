@@ -1086,7 +1086,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-07.2";
+const APP_VERSION = "2026-10-08.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3063,6 +3063,7 @@ function renderTentativeBody(sl){
     </div>
     ${c.notes ? `<div class="notes">${escapeHtml(c.notes)}</div>` : ''}
     <div class="cand-history">${renderTentativeHistoryReal(sl, historyForRecipient(c.recipName, c.id))}</div>
+    <div class="slot-detail-row">${renderIntakeLinkBlock(c)}</div>
     <div class="toolbar" style="margin-top:10px;">
       <button class="btn" onclick="bookSlot(${sl.id})">Book This Session</button>
       <button class="btn secondary" onclick="releaseSlot(${sl.id})">Release Back to Open</button>
@@ -6104,6 +6105,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 8, 2026', version: '2026-10-08.1', items: [
+    'New: an intake form can now be linked (or changed/unlinked) on a Tentative slot, not only once the session is Booked - the same Link / Search & link controls now show on the Tentative card. The link carries over when the session is booked.'
+  ]},
   { date: 'Oct 7, 2026', version: '2026-10-07.2', items: [
     'Changed: Add custom slot now fills the End time automatically, 2.5 hours after the Start time you pick (you can still change it).'
   ]},
@@ -6118,15 +6122,15 @@ const CHANGE_LOG = [
     'New: when you open an intake form, Smaller text and Larger text buttons sit next to Print so the answers are easier to read. Your choice is remembered, and printing is unchanged.',
     'New: the intake questionnaire now asks "Please explain" when "Was there a sense of security and harmony in your home during the first 12 years of your life?" is answered No (matching the old Microsoft Form). Add it in Edit Questions too if it is not showing on the live form.'
   ]},
-  { date: 'Oct 3, 2026', version: '2026-10-03.4', items: [
-    'Fixed: a booked session\'s collapsed card on Schedule & Planning now shows the session\'s current prayer ministers, including anyone added (or removed) after it was booked, instead of only the original team.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 3, 2026', version: '2026-10-03.4', items: [
+    'Fixed: a booked session\'s collapsed card on Schedule & Planning now shows the session\'s current prayer ministers, including anyone added (or removed) after it was booked, instead of only the original team.'
+  ]},
   { date: 'Oct 3, 2026', version: '2026-10-03.3', items: [
     'New (Test only for now): Session Notes. Settings has a new Session Notes tab - the same question editor as Intake Forms (sections, question types, required, and show-only-if branching) - for the form a session lead fills in about what happened. Each session card gets a Session Notes button that opens the form; each saved note is stored as a self-contained JSON document that includes the exact questions it was written with, so later form changes never alter old notes (Download JSON is available on a saved note). Needs two new SharePoint lists, SessionNotesSchema and SessionNotes - Settings > Session Notes explains the columns until they exist. Admin app only for now.'
   ]},
