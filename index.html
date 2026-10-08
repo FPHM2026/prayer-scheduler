@@ -652,9 +652,14 @@
       <button class="btn secondary" id="btnAddWaiting2">+ Add to Waiting List</button>
       <button class="btn secondary" id="btnRemoveUnusedSlots">Remove Unused Slots</button>
     </div>
-    <div class="section-title" style="display:flex;align-items:baseline;gap:8px;margin:0 0 12px;"><h2 style="font-size:var(--fs-lg);margin:0;color:var(--navy);">Slots</h2></div>
+    <nav class="subtabs" aria-label="Show on Schedule & Planning" id="schedFilterTabs">
+      <button class="active" data-schedfilter="all">All</button>
+      <button data-schedfilter="tentative">Tentative <span id="schedFilterTentCount"></span></button>
+      <button data-schedfilter="waiting">Waiting <span id="schedFilterWaitCount"></span></button>
+    </nav>
+    <div class="section-title" id="slotsTitle" style="display:flex;align-items:baseline;gap:8px;margin:0 0 12px;"><h2 style="font-size:var(--fs-lg);margin:0;color:var(--navy);">Slots</h2></div>
     <div id="slotWeeks"></div>
-    <div class="section-title" style="display:flex;align-items:baseline;gap:8px;margin:26px 0 12px;"><h2 style="font-size:var(--fs-lg);margin:0;color:var(--navy);">Unplaced Candidates</h2><span class="helptext" id="unplacedCount" style="margin:0;"></span></div>
+    <div class="section-title" id="unplacedTitle" style="display:flex;align-items:baseline;gap:8px;margin:26px 0 12px;"><h2 style="font-size:var(--fs-lg);margin:0;color:var(--navy);">Unplaced Candidates</h2><span class="helptext" id="unplacedCount" style="margin:0;"></span></div>
     <div id="unplacedList"></div>
     <div class="no-results" id="unplacedNoResults" hidden>Everyone on the waiting list has been claimed onto a slot.</div>
   </section>
@@ -1079,7 +1084,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-07.2";
+const APP_VERSION = "2026-10-08.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1814,6 +1819,7 @@ function wireApp(){
   wireSearchClear('planningSearch');
   $('#prospectSort').addEventListener('change', renderPlanning);
   $('#completedSearch').addEventListener('input', renderCompleted);
+  $('#schedFilterTabs').querySelectorAll('button[data-schedfilter]').forEach(b=>b.addEventListener('click', ()=>{ schedFilter = b.dataset.schedfilter; renderSchedPlan(); }));
   $('#completedSubtabs').querySelectorAll('button[data-completedview]').forEach(b=>b.addEventListener('click', ()=>{
     completedView = b.dataset.completedview;
     $('#completedSubtabs').querySelectorAll('button').forEach(x=>x.classList.toggle('active', x===b));
@@ -2485,7 +2491,20 @@ function renderSchedPlanStats(){
     </div>`;
 }
 
-function renderSchedPlan(){ renderSlotWeeks(); renderUnplacedCandidates(); renderSchedPlanStats(); }
+function renderSchedPlan(){
+  // Filter tabs: show/hide whole sections, and keep the counts current.
+  const showSlots = schedFilter!=='waiting', showWaiting = schedFilter!=='tentative';
+  $('#slotsTitle').style.display = showSlots ? 'flex' : 'none'; $('#slotWeeks').hidden = !showSlots;
+  $('#unplacedTitle').style.display = showWaiting ? 'flex' : 'none'; $('#unplacedList').hidden = !showWaiting;
+  const prev = schedFilter; schedFilter = 'tentative';
+  const tent = slots.filter(isSlotVisible).length;
+  schedFilter = prev;
+  $('#schedFilterTentCount').textContent = '(' + tent + ')';
+  $('#schedFilterWaitCount').textContent = '(' + unplacedCandidates().length + ')';
+  $('#schedFilterTabs').querySelectorAll('button').forEach(b=>b.classList.toggle('active', b.dataset.schedfilter===schedFilter));
+  renderSlotWeeks(); renderUnplacedCandidates(); renderSchedPlanStats();
+  if(!showWaiting) $('#unplacedNoResults').hidden = true;
+}
 
 function renderUnplacedCandidates(){
   const rows = unplacedCandidates().slice().sort((a,b)=>{
@@ -2654,7 +2673,12 @@ function slotPastUnused(sl){
   const todayIso = isoDate(new Date());
   return sl.date < todayIso && (sl.status==='Open' || (sl.status==='Drop-In' && !sl.linkedSessionId));
 }
-function isSlotVisible(sl){ return !slotDone(sl) && !slotPastUnused(sl); }
+// Which slice of Schedule & Planning is showing: all | tentative | waiting.
+let schedFilter = 'all';
+function isSlotVisible(sl){
+  if(slotDone(sl) || slotPastUnused(sl)) return false;
+  return schedFilter!=='tentative' || sl.status==='Tentative';
+}
 function renderSlotWeeks(){
   const weekMap = new Map(); // weekStart -> Set of dateIso that have slots or unlinked sessions
   const addDate = dateIso => {
@@ -2665,9 +2689,9 @@ function renderSlotWeeks(){
   };
   const visibleSlots = slots.filter(isSlotVisible);
   visibleSlots.forEach(sl=>addDate(sl.date));
-  sessions.forEach(s=>{ if(s.status==='Scheduled' && !slots.some(sl=>sl.linkedSessionId===s.id)) addDate(s.date); });
+  if(schedFilter==='all') sessions.forEach(s=>{ if(s.status==='Scheduled' && !slots.some(sl=>sl.linkedSessionId===s.id)) addDate(s.date); });
   if(!weekMap.size){
-    $('#slotWeeks').innerHTML = '<div class="no-results">No slots yet — use Quick Add Slots to get started.</div>';
+    $('#slotWeeks').innerHTML = schedFilter==='tentative' ? '<div class="no-results">No tentative slots right now.</div>' : '<div class="no-results">No slots yet — use Quick Add Slots to get started.</div>';
     return;
   }
   // Plain chronological order, oldest to newest - Sunday already starts
@@ -2699,13 +2723,13 @@ function renderSlotWeeks(){
 function renderDayRow(dateIso){
   const d = new Date(dateIso+'T00:00');
   const daySlots = slots.filter(sl=>sl.date===dateIso && isSlotVisible(sl)).slice().sort((a,b)=>(a.start||'').localeCompare(b.start||''));
-  const extraSessions = unlinkedSessionsOn(dateIso).slice().sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+  const extraSessions = (schedFilter==='all' ? unlinkedSessionsOn(dateIso) : []).slice().sort((a,b)=>(a.time||'').localeCompare(b.time||''));
   return `<div class="day-row">
     <div class="day-label"><span class="dow">${d.toLocaleDateString(undefined,{weekday:'short'})}</span>${d.toLocaleDateString(undefined,{month:'short',day:'numeric'})}</div>
     <div class="slot-list">
       ${daySlots.map(sl=>renderSlotCard(sl)).join('')}
       ${extraSessions.map(s=>renderUnlinkedSessionCard(s)).join('')}
-      ${renderDayCustomAdd(dateIso)}
+      ${schedFilter==='all' ? renderDayCustomAdd(dateIso) : ''}
     </div>
   </div>`;
 }
@@ -3056,6 +3080,7 @@ function renderTentativeBody(sl){
     </div>
     ${c.notes ? `<div class="notes">${escapeHtml(c.notes)}</div>` : ''}
     <div class="cand-history">${renderTentativeHistoryReal(sl, historyForRecipient(c.recipName, c.id))}</div>
+    <div class="slot-detail-row">${renderIntakeLinkBlock(c)}</div>
     <div class="toolbar" style="margin-top:10px;">
       <button class="btn" onclick="bookSlot(${sl.id})">Book This Session</button>
       <button class="btn secondary" onclick="releaseSlot(${sl.id})">Release Back to Open</button>
@@ -6097,6 +6122,12 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 8, 2026', version: '2026-10-08.2', items: [
+    'New: Schedule & Planning has All / Tentative / Waiting filter tabs (with counts). Tentative shows only tentative slots; Waiting shows only the Unplaced Candidates list; All is the full page as before.'
+  ]},
+  { date: 'Oct 8, 2026', version: '2026-10-08.1', items: [
+    'New: an intake form can now be linked (or changed/unlinked) on a Tentative slot, not only once the session is Booked - the same Link / Search & link controls now show on the Tentative card. The link carries over when the session is booked.'
+  ]},
   { date: 'Oct 7, 2026', version: '2026-10-07.2', items: [
     'Changed: Add custom slot now fills the End time automatically, 2.5 hours after the Start time you pick (you can still change it).'
   ]},
@@ -6107,6 +6138,12 @@ const CHANGE_LOG = [
     'Changed: on Intake Forms, Open Intake Form (left) and Copy Link to Intake Form (right) are now plain text links on one row.',
     'Changed: the text-size controls on an open intake form are now two small A- / A+ icon buttons on the right of the person\'s name, instead of two wide buttons above it.'
   ]},
+];
+// Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
+// five most recent versions; at each promotion, anything beyond the newest
+// five moves here rather than being deleted - see the block comment above
+// for the maintenance rule.
+const CHANGE_LOG_ARCHIVE = [
   { date: 'Oct 5, 2026', version: '2026-10-05.1', items: [
     'New: when you open an intake form, Smaller text and Larger text buttons sit next to Print so the answers are easier to read. Your choice is remembered, and printing is unchanged.',
     'New: the intake questionnaire now asks "Please explain" when "Was there a sense of security and harmony in your home during the first 12 years of your life?" is answered No (matching the old Microsoft Form). Add it in Edit Questions too if it is not showing on the live form.'
@@ -6114,12 +6151,6 @@ const CHANGE_LOG = [
   { date: 'Oct 3, 2026', version: '2026-10-03.4', items: [
     'Fixed: a booked session\'s collapsed card on Schedule & Planning now shows the session\'s current prayer ministers, including anyone added (or removed) after it was booked, instead of only the original team.'
   ]},
-];
-// Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
-// five most recent versions; at each promotion, anything beyond the newest
-// five moves here rather than being deleted - see the block comment above
-// for the maintenance rule.
-const CHANGE_LOG_ARCHIVE = [
   { date: 'Oct 3, 2026', version: '2026-10-03.3', items: [
     'New (Test only for now): Session Notes. Settings has a new Session Notes tab - the same question editor as Intake Forms (sections, question types, required, and show-only-if branching) - for the form a session lead fills in about what happened. Each session card gets a Session Notes button that opens the form; each saved note is stored as a self-contained JSON document that includes the exact questions it was written with, so later form changes never alter old notes (Download JSON is available on a saved note). Needs two new SharePoint lists, SessionNotesSchema and SessionNotes - Settings > Session Notes explains the columns until they exist. Admin app only for now.'
   ]},
