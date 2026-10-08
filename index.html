@@ -181,6 +181,7 @@
   }
 
   .tag{display:inline-block;background:#f2ece1;color:var(--navy);border-radius:10px;padding:2px 9px;font-size:var(--fs-2xs);font-weight:700;margin-right:6px;}
+  .tag.intake-match{background:var(--ok-bg);color:var(--ok);}
   .tag.completed{background:var(--ok-bg);color:var(--ok);}
   .tag.first{background:rgba(242,138,0,.16);color:#8a4a00;}
   .tag.scheduled{background:#eef4fb;color:#2c5f8a;}
@@ -1084,7 +1085,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-08.2";
+const APP_VERSION = "2026-10-08.4";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -2937,6 +2938,7 @@ function renderSlotCard(sl){
         <span class="slot-header-detail">
           ${nameForHeader ? `<span class="slot-header-name">${escapeHtml(nameForHeader)}</span>` : ''}
           ${showSessionNum ? `<span class="tag ${sessionNumberOf(sessionForHeader)===1?'first':''}">Session #${sessionNumberOf(sessionForHeader)}</span>` : ''}
+          ${(sl.status==='Tentative' && cand && !cand.intakeResponseId && findIntakeForRecipient(cand.recipName)) ? `<span class="tag intake-match">Intake form match</span>` : ''}
           ${teamForHeader ? `<span class="slot-header-team">${escapeHtml(teamForHeader)}</span>` : (sl.status==='Open' ? renderOpenAvailNow(sl) : '')}
         </span>
         <span class="slot-chevron">${ICONS.chevron}</span>
@@ -4742,7 +4744,7 @@ window.openIntakeDetail = function(id){
   detail.hidden = false;
   detail.innerHTML = `
     <div class="toolbar no-print">
-      <button type="button" class="btn secondary" onclick="closeIntakeDetail()">&larr; Back to list</button>
+      <button type="button" class="btn secondary" onclick="closeIntakeDetail()">&larr; ${intakeReturn ? 'Back to '+escapeHtml(intakeReturn.label) : 'Back to list'}</button>
       <button type="button" class="btn" onclick="window.print()">Print / Save as PDF</button>
     </div>
     <div class="intake-namerow">
@@ -4773,12 +4775,14 @@ window.changeIntakeTextSize = function(dir){
   applyIntakeTextSize();
 };
 window.closeIntakeDetail = function(){
+  const ret = intakeReturn; intakeReturn = null;
   intakeDetailId = null;
   ['intakeGroups','intakeSubtabs','intakeSearch','intakeHelptext'].forEach(id=>{ const el=$('#'+id); if(el) el.hidden = false; });
   const detail = $('#intakeDetail');
   detail.hidden = true;
   detail.innerHTML = '';
   renderIntake();
+  if(ret){ switchTab(ret.tab); window.scrollTo(0, ret.scrollY); }
 };
 // Best-effort match against a completed/in-progress intake form for the
 // given recipient name, used by renderRecipientHistory() below - name
@@ -4837,10 +4841,18 @@ window.unlinkIntakeForm = async function(sessionId){
   await updateItem('sessions', sessionId, { IntakeResponseId: null });
   await loadAll();
 };
+// Where "View" was clicked from (tab + scroll position), so the intake
+// detail's back button can return there instead of to the Intake Forms
+// list. Null when the detail was opened from the Intake Forms list itself.
+let intakeReturn = null;
 window.viewLinkedIntake = function(id){
+  const activeBtn = document.querySelector('nav[aria-label="Primary"] button.active');
+  const from = activeBtn ? { tab: activeBtn.dataset.tab, label: activeBtn.textContent.trim(), scrollY: window.scrollY } : null;
   switchTab('intake');
   closeIntakeDetail();
+  intakeReturn = from && from.tab!=='intake' ? from : null;
   openIntakeDetail(id);
+  window.scrollTo(0, 0);
 };
 // Filters the picker's result list via direct DOM update rather than a
 // full renderSchedPlan() re-render on every keystroke - same
@@ -6122,6 +6134,12 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 8, 2026', version: '2026-10-08.4', items: [
+    'Changed: clicking View on a linked or suggested intake form (e.g. from a Tentative or Booked card, or the waiting list) now opens it with a "Back to [that tab]" button that returns you to where you were, at the same scroll position, instead of dropping you on the Intake Forms list.'
+  ]},
+  { date: 'Oct 8, 2026', version: '2026-10-08.3', items: [
+    'New: a Tentative slot\'s card shows an "Intake form match" chip when there is an intake form that looks like a match for the recipient and it isn\'t linked yet, so you can spot which ones to link without opening each card.'
+  ]},
   { date: 'Oct 8, 2026', version: '2026-10-08.2', items: [
     'New: Schedule & Planning has All / Tentative / Waiting filter tabs (with counts). Tentative shows only tentative slots; Waiting shows only the Unplaced Candidates list; All is the full page as before.'
   ]},
@@ -6131,6 +6149,12 @@ const CHANGE_LOG = [
   { date: 'Oct 7, 2026', version: '2026-10-07.2', items: [
     'Changed: Add custom slot now fills the End time automatically, 2.5 hours after the Start time you pick (you can still change it).'
   ]},
+];
+// Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
+// five most recent versions; at each promotion, anything beyond the newest
+// five moves here rather than being deleted - see the block comment above
+// for the maintenance rule.
+const CHANGE_LOG_ARCHIVE = [
   { date: 'Oct 7, 2026', version: '2026-10-07.1', items: [
     'Changed: when booking a slot, the session window no longer shows the quick start-time buttons - the time already comes from the slot. They still appear when creating or editing a session any other way.'
   ]},
@@ -6138,12 +6162,6 @@ const CHANGE_LOG = [
     'Changed: on Intake Forms, Open Intake Form (left) and Copy Link to Intake Form (right) are now plain text links on one row.',
     'Changed: the text-size controls on an open intake form are now two small A- / A+ icon buttons on the right of the person\'s name, instead of two wide buttons above it.'
   ]},
-];
-// Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
-// five most recent versions; at each promotion, anything beyond the newest
-// five moves here rather than being deleted - see the block comment above
-// for the maintenance rule.
-const CHANGE_LOG_ARCHIVE = [
   { date: 'Oct 5, 2026', version: '2026-10-05.1', items: [
     'New: when you open an intake form, Smaller text and Larger text buttons sit next to Print so the answers are easier to read. Your choice is remembered, and printing is unchanged.',
     'New: the intake questionnaire now asks "Please explain" when "Was there a sense of security and harmony in your home during the first 12 years of your life?" is answered No (matching the old Microsoft Form). Add it in Edit Questions too if it is not showing on the live form.'
