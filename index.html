@@ -1085,7 +1085,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-08.4";
+const APP_VERSION = "2026-10-12.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1722,9 +1722,10 @@ function closeConfirm(result){
   if(confirmResolver){ confirmResolver(result); confirmResolver = null; }
 }
 function askConfirm(message, opts={}){
-  const { confirmLabel='Delete', danger=true } = opts;
+  const { confirmLabel='Delete', danger=true, cancelLabel='Cancel' } = opts;
   return new Promise(resolve=>{
     confirmResolver = resolve;
+    $('#btnConfirmCancel').textContent = cancelLabel;
     $('#confirmMsg').textContent = message;
     const okBtn = $('#btnConfirmOk');
     okBtn.textContent = confirmLabel;
@@ -1931,10 +1932,50 @@ function renderSchedule(){
       g.vis.map(s=>scheduleSessionRow(s)).join(''), wasOpen);
   }).join('');
 }
+// ---- Cancellation WhatsApp notice ----
+// When a booked session is removed/deleted and its ministers had already
+// been notified through WhatsApp (WaNotified), offer to tell them it's off.
+// Must run BEFORE the removal: reverting a session to Waiting clears its
+// minister ids and date, so the recipients and wording are captured here
+// first. Returns a function that does the sending (call after the removal
+// succeeds), or null if there's nothing to send / the admin said no.
+async function offerCancellationNotice(s){
+  if(!s || !s.waNotified || !s.date || !s.time) return null;
+  const to = s.ministers.map(ref=>ministers.find(x=>x.id===ref.id)).filter(Boolean)
+    .map(m=>({ m, to: toE164(m.phone) })).filter(x=>x.to);
+  if(!to.length) return null;
+  const when = fmtDate(new Date(s.date+'T'+s.time)), at = fmt12(s.time);
+  const ok = await askConfirm(
+    `These ministers were already notified on WhatsApp. Send ${to.length} minister${to.length===1?'':'s'} a message that ${s.recipName}'s session on ${when} at ${at} was canceled?${WHATSAPP_NOTIFY.dryRun?' (dry run - nothing will actually be sent)':''}`,
+    { confirmLabel: 'Send cancellation', cancelLabel: "Don't send", danger: false }
+  );
+  if(!ok) return null;
+  return async function(){
+    const results = await Promise.all(to.map(async ({m, to})=>{
+      try{
+        const resp = await fetch(WHATSAPP_NOTIFY.workerUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + WHATSAPP_NOTIFY.sharedSecret },
+          body: JSON.stringify({ type: 'cancel', to, recipientName: s.recipName, sessionDate: when, sessionTime: at, dryRun: WHATSAPP_NOTIFY.dryRun })
+        });
+        return { m, ok: resp.ok, data: await resp.json() };
+      }catch(e){ return { m, ok: false, data: { error: e.message } }; }
+    }));
+    const failed = results.filter(r=>!r.ok);
+    if(failed.length){
+      showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">${failed.length} cancellation message${failed.length===1?'':'s'} failed</div>${failed.map(f=>`<div>${escapeHtml(f.m.name)}: ${escapeHtml(f.data.error||'Unknown error')}</div>`).join('')}`);
+    } else if(WHATSAPP_NOTIFY.dryRun){
+      showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Dry run OK</div><div>Would send cancellation to: ${results.map(r=>escapeHtml(r.m.name)).join(', ')}</div>`);
+    }
+    return !WHATSAPP_NOTIFY.dryRun && results.some(r=>r.ok);
+  };
+}
 window.deleteSession = async function(id){
   const s = sessions.find(x=>x.id===id);
   if(!(await askConfirm(`Delete the session with ${s ? s.recipName : 'this recipient'}${s && s.date ? ' on '+s.date : ''}? This can't be undone.`))) return;
+  const sendCancel = (s && s.status==='Scheduled') ? await offerCancellationNotice(s) : null;
   await deleteItem('sessions', id);
+  if(sendCancel) await sendCancel();
   await loadAll();
 };
 window.markComplete = async function(id){
@@ -2838,8 +2879,10 @@ window.deleteUnlinkedSession = async function(sessionId){
     ? `Delete this ${s.apptType} session${s.date?' on '+s.date:''}? This can't be undone.`
     : `Remove the booked session for ${s.recipName}${s.date?' on '+s.date:''}? They'll go back on the waiting list.`;
   if(!(await askConfirm(msg, {confirmLabel: isGroupSession?'Delete':'Remove Booking', danger:true}))) return;
+  const sendCancel = isGroupSession ? null : await offerCancellationNotice(s);
   if(isGroupSession) await deleteItem('sessions', sessionId);
   else await revertSessionToWaiting(sessionId);
+  if(sendCancel && await sendCancel()) await updateItem('sessions', sessionId, { WaNotified: false });
   await loadAll();
 };
 // Creates a real PlanningSlots record for a session that predates this
@@ -3220,8 +3263,10 @@ window.deleteBookedSession = async function(slotId, sessionId){
     ? `Delete this ${s.apptType} session${s.date?' on '+s.date:''}? This can't be undone. The slot will reopen for someone else.`
     : `Remove the booked session for ${s.recipName}${s.date?' on '+s.date:''}? They'll go back on the waiting list, and the slot will reopen for someone else.`;
   if(!(await askConfirm(msg, {confirmLabel: isGroupSession?'Delete':'Remove Booking', danger:true}))) return;
+  const sendCancel = isGroupSession ? null : await offerCancellationNotice(s);
   if(isGroupSession) await deleteItem('sessions', sessionId);
   else await revertSessionToWaiting(sessionId);
+  if(sendCancel && await sendCancel()) await updateItem('sessions', sessionId, { WaNotified: false });
   await updateItem('slots', slotId, { Status:'Open', ClaimedWaitingId:null, ClaimedDate:null, ProposedMinisterIDs:'', ProposedLeadIDs:'', LinkedSessionId:null });
   await loadAll();
 };
@@ -6134,6 +6179,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 12, 2026', version: '2026-10-12.1', items: [
+    'New: removing a booked session (Remove Booking, or deleting a scheduled session) whose ministers were already notified on WhatsApp now asks "Send cancellation" / "Don\'t send". Sending uses a new WhatsApp template, prayer_session_canceled, which must be approved in WhatsApp Manager and the notify Worker redeployed before it will deliver - until then the send reports a failure and nothing else changes.'
+  ]},
   { date: 'Oct 8, 2026', version: '2026-10-08.4', items: [
     'Changed: clicking View on a linked or suggested intake form (e.g. from a Tentative or Booked card, or the waiting list) now opens it with a "Back to [that tab]" button that returns you to where you were, at the same scroll position, instead of dropping you on the Intake Forms list.'
   ]},
@@ -6146,15 +6194,15 @@ const CHANGE_LOG = [
   { date: 'Oct 8, 2026', version: '2026-10-08.1', items: [
     'New: an intake form can now be linked (or changed/unlinked) on a Tentative slot, not only once the session is Booked - the same Link / Search & link controls now show on the Tentative card. The link carries over when the session is booked.'
   ]},
-  { date: 'Oct 7, 2026', version: '2026-10-07.2', items: [
-    'Changed: Add custom slot now fills the End time automatically, 2.5 hours after the Start time you pick (you can still change it).'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 7, 2026', version: '2026-10-07.2', items: [
+    'Changed: Add custom slot now fills the End time automatically, 2.5 hours after the Start time you pick (you can still change it).'
+  ]},
   { date: 'Oct 7, 2026', version: '2026-10-07.1', items: [
     'Changed: when booking a slot, the session window no longer shows the quick start-time buttons - the time already comes from the slot. They still appear when creating or editing a session any other way.'
   ]},
