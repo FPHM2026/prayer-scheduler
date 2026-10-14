@@ -791,6 +791,7 @@
       <div class="toolbar no-print">
         <button class="btn" id="btnFormEditorSave">Save changes</button>
         <button class="btn secondary" id="btnFormEditorDiscard">Discard unsaved changes</button>
+        <button class="btn secondary" id="btnFormEditorPreview" hidden>Preview form</button>
         <span id="formEditorDirtyBadge" class="tag" style="display:none;">Unsaved changes</span>
       </div>
       <p class="errbox" role="alert" id="formEditorMsg" hidden></p>
@@ -1048,7 +1049,7 @@
     <div class="modal-actions">
       <button class="btn secondary" id="btnNotesDownload" onclick="downloadSessionNotesJson()" hidden>Download JSON</button>
       <button class="btn secondary" onclick="closeSessionNotes()">Cancel</button>
-      <button class="btn" onclick="withLoading(this,'Saving…',saveSessionNotes)">Save Notes</button>
+      <button class="btn" id="btnNotesSave" onclick="withLoading(this,'Saving…',saveSessionNotes)">Save Notes</button>
     </div>
   </div>
 </div>
@@ -1092,7 +1093,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-12.1";
+const APP_VERSION = "2026-10-14.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1813,6 +1814,7 @@ function wireApp(){
   $('#btnFormEditorSave').addEventListener('click', ()=>withLoading($('#btnFormEditorSave'), 'Saving…', saveFormSchema));
   $('#btnFormEditorDiscard').addEventListener('click', discardFormSchemaChanges);
   $('#btnFormEditorAddSection').addEventListener('click', addFormSection);
+  $('#btnFormEditorPreview').addEventListener('click', openNotesPreview);
   $('#btnAddMinister').addEventListener('click', ()=>openMinisterModal());
   $('#btnMinCancel').addEventListener('click', ()=>$('#ministerModal').classList.remove('open'));
   $('#btnMinSave').addEventListener('click', ()=>withLoading($('#btnMinSave'), 'Saving…', onSaveMinister));
@@ -5015,6 +5017,7 @@ function showEditor(which){
     ? 'Edit the questions prayer ministers answer in Session Notes (opened from a session card): sections, questions, answer types and "show only if" branching. Each saved note keeps its own copy of the form it was filled in with, so changing questions later never alters notes already written.'
     : "Edit the intake questionnaire's sections, questions and wording. Changes take effect for anyone opening the public form as soon as you save — no deploy needed.";
   $('#formEditorIntro').hidden = notes;
+  $('#btnFormEditorPreview').hidden = !notes;
   $('#formEditorLiability').hidden = notes;
   const badge = $('#formEditorDirtyBadge');
   if(badge) badge.style.display = edDirty() ? 'inline-block' : 'none';
@@ -5552,6 +5555,7 @@ window.openSessionNotes = function(sessionId){
   };
   const lead = s.ministers.find(m=>m.role==='Lead');
   const leadName = lead ? (ministers.find(m=>m.id===lead.id)||{}).name : '';
+  $('#btnNotesSave').hidden = false;
   $('#notesTitle').textContent = 'Session Notes';
   $('#notesSub').textContent = `${s.recipName} · ${fmtShort(s.date)}${leadName ? ' · Lead: '+leadName : ''}`;
   $('#notesMsg').hidden = true;
@@ -5668,7 +5672,21 @@ function notesRecord(answers){
     answers
   };
 }
+// Preview of the form as currently edited (including unsaved changes) - no
+// session, nothing is saved, answers are throwaway.
+window.openNotesPreview = function(){
+  notesCtx = { preview: true, session: null, existing: null, formVersion: 'draft',
+    schema: JSON.parse(JSON.stringify(notesDraft)), answers: {} };
+  $('#notesTitle').textContent = 'Preview: Session Notes';
+  $('#notesSub').textContent = 'This is how the form looks right now, including unsaved changes. Nothing you enter here is saved.';
+  $('#notesMsg').hidden = true;
+  $('#btnNotesDownload').hidden = true;
+  $('#btnNotesSave').hidden = true;
+  renderNotesForm();
+  $('#notesModal').classList.add('open');
+};
 window.saveSessionNotes = async function(){
+  if(notesCtx && notesCtx.preview) return;
   const msg = $('#notesMsg');
   const { answers, missing } = notesVisibleAnswers();
   if(missing.length){
@@ -6186,6 +6204,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 14, 2026', version: '2026-10-14.2', items: [
+    'New: Settings > Session Notes has a Preview form button that opens the form exactly as currently edited - unsaved changes included, branching working - without saving or opening a session. Nothing entered in the preview is saved.'
+  ]},
   { date: 'Oct 12, 2026', version: '2026-10-12.1', items: [
     'New: removing a booked session (Remove Booking, or deleting a scheduled session) whose ministers were already notified on WhatsApp now asks "Send cancellation" / "Don\'t send". Sending uses a new WhatsApp template, prayer_session_canceled, which must be approved in WhatsApp Manager and the notify Worker redeployed before it will deliver - until then the send reports a failure and nothing else changes.'
   ]},
@@ -6198,15 +6219,15 @@ const CHANGE_LOG = [
   { date: 'Oct 8, 2026', version: '2026-10-08.2', items: [
     'New: Schedule & Planning has All / Tentative / Waiting filter tabs (with counts). Tentative shows only tentative slots; Waiting shows only the Unplaced Candidates list; All is the full page as before.'
   ]},
-  { date: 'Oct 8, 2026', version: '2026-10-08.1', items: [
-    'New: an intake form can now be linked (or changed/unlinked) on a Tentative slot, not only once the session is Booked - the same Link / Search & link controls now show on the Tentative card. The link carries over when the session is booked.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 8, 2026', version: '2026-10-08.1', items: [
+    'New: an intake form can now be linked (or changed/unlinked) on a Tentative slot, not only once the session is Booked - the same Link / Search & link controls now show on the Tentative card. The link carries over when the session is booked.'
+  ]},
   { date: 'Oct 7, 2026', version: '2026-10-07.2', items: [
     'Changed: Add custom slot now fills the End time automatically, 2.5 hours after the Start time you pick (you can still change it).'
   ]},
