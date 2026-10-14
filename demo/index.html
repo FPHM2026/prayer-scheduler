@@ -1093,7 +1093,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-14.2";
+const APP_VERSION = "2026-10-14.3";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -5305,6 +5305,11 @@ function renderQuestionEditor(q, sIdx, qIdx, sec, opened){
     <div class="field"><label>Question text</label>
       <input type="text" value="${escapeHtml(q.label||'')}" oninput="updateQuestionField(${sIdx},${qIdx},'label',this.value)">
     </div>
+    ${D().SECTIONS.length>1 ? `<div class="field"><label>Section</label>
+      <select onchange="moveQuestionToSection(${sIdx},${qIdx},parseInt(this.value,10))">
+        ${D().SECTIONS.map((s,i)=>`<option value="${i}" ${i===sIdx?'selected':''}>${escapeHtml(s.title||'(untitled section)')}</option>`).join('')}
+      </select>
+    </div>` : ''}
     <div class="field-row">
       <div class="field"><label>Answer type</label>
         <select onchange="onQuestionTypeChange(${sIdx},${qIdx},this.value)">
@@ -5381,6 +5386,29 @@ window.moveQuestion = function(sIdx, qIdx, dir){
   [arr[qIdx],arr[j]] = [arr[j],arr[qIdx]];
   markSchemaDirty();
   renderFormEditor();
+};
+// Moves a question to the END of another section. Any "show only if"
+// that now points forward (at a question that comes later) can no longer
+// work, so those are reported right away instead of failing silently.
+window.moveQuestionToSection = function(sIdx, qIdx, toIdx){
+  if(isNaN(toIdx) || toIdx===sIdx) return;
+  const [q] = D().SECTIONS[sIdx].questions.splice(qIdx, 1);
+  D().SECTIONS[toIdx].questions.push(q);
+  edSetDirty(true);
+  renderFormEditor();
+  const order = [];
+  D().SECTIONS.forEach(s=>s.questions.forEach(x=>order.push(x.id)));
+  const pos = id => order.indexOf(id);
+  const bad = [];
+  D().SECTIONS.forEach(s=>{
+    if(s.visibleIf && pos(s.visibleIf.id) > pos((s.questions[0]||{}).id)) bad.push(`Section "${s.title}"`);
+    s.questions.forEach(x=>{ if(x.visibleIf && x.visibleIf.id && pos(x.visibleIf.id) > pos(x.id)) bad.push(`"${x.label}"`); });
+  });
+  const msg = $('#formEditorMsg');
+  if(bad.length){
+    msg.hidden = false; msg.className = 'errbox';
+    msg.textContent = `Moved. Heads up: ${bad.join(', ')} now depends on a question that comes after it, so its "show only if" can't work - move the question it depends on above it, or reset its visibility.`;
+  } else { msg.hidden = true; }
 };
 window.addFormSection = function(){
   const id = uniqueSectionId('section');
@@ -6204,6 +6232,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 14, 2026', version: '2026-10-14.3', items: [
+    'New: in the question editors (Session Notes and Intake Questions), each question has a Section picker so it can be moved to another section. It lands at the end of that section, and you are warned if a "show only if" now points at a question that comes later.'
+  ]},
   { date: 'Oct 14, 2026', version: '2026-10-14.2', items: [
     'New: Settings > Session Notes has a Preview form button that opens the form exactly as currently edited - unsaved changes included, branching working - without saving or opening a session. Nothing entered in the preview is saved.'
   ]},
@@ -6216,15 +6247,15 @@ const CHANGE_LOG = [
   { date: 'Oct 8, 2026', version: '2026-10-08.3', items: [
     'New: a Tentative slot\'s card shows an "Intake form match" chip when there is an intake form that looks like a match for the recipient and it isn\'t linked yet, so you can spot which ones to link without opening each card.'
   ]},
-  { date: 'Oct 8, 2026', version: '2026-10-08.2', items: [
-    'New: Schedule & Planning has All / Tentative / Waiting filter tabs (with counts). Tentative shows only tentative slots; Waiting shows only the Unplaced Candidates list; All is the full page as before.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 8, 2026', version: '2026-10-08.2', items: [
+    'New: Schedule & Planning has All / Tentative / Waiting filter tabs (with counts). Tentative shows only tentative slots; Waiting shows only the Unplaced Candidates list; All is the full page as before.'
+  ]},
   { date: 'Oct 8, 2026', version: '2026-10-08.1', items: [
     'New: an intake form can now be linked (or changed/unlinked) on a Tentative slot, not only once the session is Booked - the same Link / Search & link controls now show on the Tentative card. The link carries over when the session is booked.'
   ]},
