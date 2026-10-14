@@ -1093,7 +1093,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-14.3";
+const APP_VERSION = "2026-10-14.4";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -5215,6 +5215,7 @@ function visibleIfPickerHtml(kind, sIdx, qIdx, cond, candidateQuestions){
       const val = cond.equals!==undefined?cond.equals:cond.notEquals!==undefined?cond.notEquals:cond.includes!==undefined?cond.includes:'';
       valueControl = optionsForTarget
         ? `<select onchange="onVisibleIfValueChange('${kind}',${sIdx},${qIdx===null?'null':qIdx},this.value,false)">
+            ${val==='' || val===undefined ? `<option value="" selected disabled>Select a value…</option>` : ''}
             ${optionsForTarget.map(o=>`<option value="${escapeHtml(o)}" ${val===o?'selected':''}>${escapeHtml(o)}</option>`).join('')}
           </select>`
         : `<input type="text" value="${escapeHtml(val)}" onchange="onVisibleIfValueChange('${kind}',${sIdx},${qIdx===null?'null':qIdx},this.value,false)">`;
@@ -5448,6 +5449,17 @@ window.onVisibleIfModeChange = function(kind, sIdx, qIdx, mode){
 window.onVisibleIfTargetChange = function(kind, sIdx, qIdx, targetId){
   const obj = targetOf(kind, sIdx, qIdx);
   obj.visibleIf.id = targetId;
+  // The value picker shows a list of the target's choices; without this the
+  // first choice LOOKED selected while the stored value stayed empty, so the
+  // condition silently never matched. Store the first choice as the default.
+  const target = findQuestionById(targetId);
+  const c = obj.visibleIf;
+  if(target && Array.isArray(target.options) && target.options.length && c.in===undefined){
+    const first = target.options[0];
+    if(c.equals!==undefined) c.equals = first;
+    else if(c.notEquals!==undefined) c.notEquals = first;
+    else if(c.includes!==undefined) c.includes = first;
+  }
   markSchemaDirty();
   renderFormEditor();
 };
@@ -5477,12 +5489,19 @@ async function saveFormSchema(){
     if(s.visibleIf && !idSet.has(s.visibleIf.id)) brokenRefs.push(`Section "${s.title}"`);
     s.questions.forEach(q=>{ if(q.visibleIf && !idSet.has(q.visibleIf.id)) brokenRefs.push(`Question "${q.label}"`); });
   });
-  if(dupes.length || brokenRefs.length){
+  const noValue = [];
+  const hasValue = c => c.in!==undefined ? c.in.length>0 : [c.equals,c.notEquals,c.includes].some(v=>v!==undefined && v!=='');
+  draft.SECTIONS.forEach(s=>{
+    if(s.visibleIf && s.visibleIf.id && !hasValue(s.visibleIf)) noValue.push(`Section "${s.title}"`);
+    s.questions.forEach(q=>{ if(q.visibleIf && q.visibleIf.id && !hasValue(q.visibleIf)) noValue.push(`Question "${q.label}"`); });
+  });
+  if(dupes.length || brokenRefs.length || noValue.length){
     msg.hidden = false;
     msg.className = 'errbox';
     msg.innerHTML = [
       dupes.length ? `Duplicate question id(s): ${[...new Set(dupes)].join(', ')}.` : '',
-      brokenRefs.length ? `These have a "show only if" pointing at a question that no longer exists or hasn't been chosen yet: ${brokenRefs.join(', ')}.` : ''
+      brokenRefs.length ? `These have a "show only if" pointing at a question that no longer exists or hasn't been chosen yet: ${brokenRefs.join(', ')}.` : '',
+      noValue.length ? `These have a "show only if" with no value chosen, so they would never show - pick a value: ${noValue.join(', ')}.` : ''
     ].filter(Boolean).join(' ');
     return;
   }
@@ -6232,6 +6251,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 14, 2026', version: '2026-10-14.4', items: [
+    'Fixed: a "show only if" on a choice/checkbox question could look like it had a value selected (the first choice) while actually storing none, so the question never appeared. Choosing the question now stores its first choice, an unset value shows "Select a value…", and saving is blocked with a message if a condition has no value. If you already have such a condition, re-select its value and save.'
+  ]},
   { date: 'Oct 14, 2026', version: '2026-10-14.3', items: [
     'New: in the question editors (Session Notes and Intake Questions), each question has a Section picker so it can be moved to another section. It lands at the end of that section, and you are warned if a "show only if" now points at a question that comes later.'
   ]},
@@ -6244,15 +6266,15 @@ const CHANGE_LOG = [
   { date: 'Oct 8, 2026', version: '2026-10-08.4', items: [
     'Changed: clicking View on a linked or suggested intake form (e.g. from a Tentative or Booked card, or the waiting list) now opens it with a "Back to [that tab]" button that returns you to where you were, at the same scroll position, instead of dropping you on the Intake Forms list.'
   ]},
-  { date: 'Oct 8, 2026', version: '2026-10-08.3', items: [
-    'New: a Tentative slot\'s card shows an "Intake form match" chip when there is an intake form that looks like a match for the recipient and it isn\'t linked yet, so you can spot which ones to link without opening each card.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 8, 2026', version: '2026-10-08.3', items: [
+    'New: a Tentative slot\'s card shows an "Intake form match" chip when there is an intake form that looks like a match for the recipient and it isn\'t linked yet, so you can spot which ones to link without opening each card.'
+  ]},
   { date: 'Oct 8, 2026', version: '2026-10-08.2', items: [
     'New: Schedule & Planning has All / Tentative / Waiting filter tabs (with counts). Tentative shows only tentative slots; Waiting shows only the Unplaced Candidates list; All is the full page as before.'
   ]},
