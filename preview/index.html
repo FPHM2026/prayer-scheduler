@@ -882,13 +882,6 @@
         <button class="btn" id="btnSaveDefaultLocationSetting">Save Default Location</button>
       </div>
       <p class="helptext" id="settingsDefaultLocationMsg"></p>
-
-      <div class="settings-card" style="margin-top:28px;">
-        <h2>Fix session lengths (one-time)</h2>
-        <p class="helptext">Finds <strong>Completed</strong> sessions saved as exactly 1.5 hours and changes them to 2.5 hours (the end time moves 1 hour later). Sunday Drop-In sessions that are 1.5 hours are set to the current Drop-In times from Settings &rsaquo; Quick Slots instead. Training and anything not exactly 1.5 hours are left alone. You see the full list before anything changes, and a backup file of the original times is downloaded first.</p>
-        <div class="toolbar"><button class="btn secondary" id="btnLenFixPreview">Preview changes</button></div>
-        <div id="lenFixResult"></div>
-      </div>
     </div>
   </section>
 
@@ -1099,7 +1092,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-14.1";
+const APP_VERSION = "2026-10-12.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1807,7 +1800,6 @@ function wireApp(){
   $('#btnSaveDropInSettings').addEventListener('click', ()=>withLoading($('#btnSaveDropInSettings'), 'Saving…', saveDropInSettings));
   $('#btnSaveDefaultLocationSetting').addEventListener('click', ()=>withLoading($('#btnSaveDefaultLocationSetting'), 'Saving…', saveDefaultLocationSetting));
   $('#settingsSubtabs').querySelectorAll('button[data-settingsview]').forEach(b=>b.addEventListener('click', ()=>switchSettingsSub(b.dataset.settingsview)));
-  $('#btnLenFixPreview').addEventListener('click', renderLenFixPreview);
   $('#changesSubtabs').querySelectorAll('button[data-changesview]').forEach(b=>b.addEventListener('click', ()=>switchChangesSub(b.dataset.changesview)));
   $('#intakeSubtabs').querySelectorAll('button[data-intakestatus]').forEach(b=>b.addEventListener('click', ()=>{
     intakeSubStatus = b.dataset.intakestatus;
@@ -5497,80 +5489,6 @@ async function discardFormSchemaChanges(){
   await loadAll();
   renderFormEditor();
 }
-/* ---- One-time fix: Completed 1.5h sessions -> 2.5h (Drop-In -> current
-   Drop-In times). Always previews first; downloads a JSON backup of the
-   original start/end before writing anything. ---- */
-let lenFixRows = [];
-function lenFixKind(s){
-  if(s.apptType==='Training' || /^training\b/i.test(s.recipName||'')) return 'skip';
-  if(s.apptType==='Drop-in' || /drop[\s-]*in/i.test(s.recipName||'')) return 'dropin';
-  return 'session';
-}
-function lenFixPlan(){
-  const win = dropInWindow();
-  const rows = [];
-  sessions.forEach(s=>{
-    if(s.status!=='Completed' || !s.date || !s.time || !s.endTime) return;
-    if(Math.round(durationHours(s)*60)!==90) return;
-    const kind = lenFixKind(s);
-    if(kind==='skip') return;
-    if(kind==='dropin'){
-      if(!win || !win.start || !win.end) return;
-      if(s.time===win.start && s.endTime===win.end) return;
-      rows.push({ id:s.id, recip:s.recipName, date:s.date, kind, oldStart:s.time, oldEnd:s.endTime, newStart:win.start, newEnd:win.end });
-    } else {
-      const [h,m] = s.time.split(':').map(Number);
-      const total = h*60+m+150;
-      if(total>1439) return;
-      const newEnd = String(Math.floor(total/60)).padStart(2,'0')+':'+String(total%60).padStart(2,'0');
-      rows.push({ id:s.id, recip:s.recipName, date:s.date, kind, oldStart:s.time, oldEnd:s.endTime, newStart:s.time, newEnd });
-    }
-  });
-  return rows.sort((a,b)=>a.date.localeCompare(b.date));
-}
-function renderLenFixPreview(){
-  lenFixRows = lenFixPlan();
-  const box = $('#lenFixResult');
-  if(!lenFixRows.length){ box.innerHTML = '<p class="helptext">Nothing to change - no Completed sessions are exactly 1.5 hours long.</p>'; return; }
-  const win = dropInWindow();
-  const dropN = lenFixRows.filter(r=>r.kind==='dropin').length;
-  box.innerHTML = `<p style="margin:12px 0 6px;"><strong>${lenFixRows.length}</strong> session${lenFixRows.length===1?'':'s'} will change${dropN?` (${dropN} Drop-In to ${fmt12(win.start)}–${fmt12(win.end)})`:''}:</p>
-    <div style="max-height:320px;overflow:auto;border:1px solid var(--border);border-radius:8px;">
-      <table class="plain-table" style="width:100%;font-size:var(--fs-sm);">
-        <thead><tr><th>Date</th><th>Recipient</th><th>Before</th><th>After</th></tr></thead>
-        <tbody>${lenFixRows.map(r=>`<tr><td>${escapeHtml(r.date)}</td><td>${escapeHtml(r.recip)}${r.kind==='dropin'?' <span class="helptext">(Drop-In)</span>':''}</td><td>${fmt12(r.oldStart)}–${fmt12(r.oldEnd)}</td><td>${fmt12(r.newStart)}–${fmt12(r.newEnd)}</td></tr>`).join('')}</tbody>
-      </table>
-    </div>
-    <div class="toolbar" style="margin-top:10px;">
-      <button class="btn danger" id="btnLenFixApply">Apply ${lenFixRows.length} change${lenFixRows.length===1?'':'s'}</button>
-    </div>
-    <p class="helptext" id="lenFixMsg"></p>`;
-  $('#btnLenFixApply').addEventListener('click', applyLenFix);
-}
-async function applyLenFix(){
-  const rows = lenFixRows.slice();
-  if(!rows.length) return;
-  if(!(await askConfirm(`Change ${rows.length} completed session${rows.length===1?'':'s'}? A backup file of the original times will download first.`, { confirmLabel:'Apply changes', danger:true }))) return;
-  const msg = $('#lenFixMsg'), btn = $('#btnLenFixApply');
-  btn.disabled = true;
-  // Backup first, so the original times can always be restored.
-  const blob = new Blob([JSON.stringify({ takenAt:new Date().toISOString(), note:'Original start/end times before the 1.5h -> 2.5h fix', sessions: rows }, null, 2)], {type:'application/json'});
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'session-times-backup-'+isoDate(new Date())+'.json';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(()=>URL.revokeObjectURL(a.href), 1500);
-  let done = 0, failed = [];
-  for(const r of rows){
-    try{
-      const fields = { SessionEndDate: new Date(r.date+'T'+r.newEnd).toISOString() };
-      if(r.newStart!==r.oldStart) fields.SessionDate = new Date(r.date+'T'+r.newStart).toISOString();
-      await updateItem('sessions', r.id, fields);
-      done++;
-      msg.textContent = `Updated ${done} of ${rows.length}…`;
-    }catch(e){ failed.push(`${r.recip} (${r.date}): ${e.message}`); }
-  }
-  await loadAll();
-  lenFixRows = [];
-  $('#lenFixResult').innerHTML = `<p class="${failed.length?'errbox':'helptext'}" role="status">Updated ${done} of ${rows.length} sessions.${failed.length?' Failed: '+escapeHtml(failed.join('; ')):''} The backup file was saved to your Downloads folder.</p>`;
-}
 /* =========================================================================
    SESSION NOTES — a lead's record of what happened in a session, filled in
    from a staff-editable form (Settings > Session Notes, same editor as the
@@ -6268,9 +6186,6 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
-  { date: 'Oct 14, 2026', version: '2026-10-14.1', items: [
-    'New (one-time tool): Settings > Sessions > Fix session lengths. Previews, then changes Completed sessions saved as exactly 1.5 hours to 2.5 hours, and Drop-In sessions that were 1.5 hours to the current Sunday Drop-In times. Downloads a backup of the original times first. Training and everything else is left alone.'
-  ]},
   { date: 'Oct 12, 2026', version: '2026-10-12.1', items: [
     'New: removing a booked session (Remove Booking, or deleting a scheduled session) whose ministers were already notified on WhatsApp now asks "Send cancellation" / "Don\'t send". Sending uses a new WhatsApp template, prayer_session_canceled, which must be approved in WhatsApp Manager and the notify Worker redeployed before it will deliver - until then the send reports a failure and nothing else changes.'
   ]},
@@ -6283,15 +6198,15 @@ const CHANGE_LOG = [
   { date: 'Oct 8, 2026', version: '2026-10-08.2', items: [
     'New: Schedule & Planning has All / Tentative / Waiting filter tabs (with counts). Tentative shows only tentative slots; Waiting shows only the Unplaced Candidates list; All is the full page as before.'
   ]},
+  { date: 'Oct 8, 2026', version: '2026-10-08.1', items: [
+    'New: an intake form can now be linked (or changed/unlinked) on a Tentative slot, not only once the session is Booked - the same Link / Search & link controls now show on the Tentative card. The link carries over when the session is booked.'
+  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
-  { date: 'Oct 8, 2026', version: '2026-10-08.1', items: [
-    'New: an intake form can now be linked (or changed/unlinked) on a Tentative slot, not only once the session is Booked - the same Link / Search & link controls now show on the Tentative card. The link carries over when the session is booked.'
-  ]},
   { date: 'Oct 7, 2026', version: '2026-10-07.2', items: [
     'Changed: Add custom slot now fills the End time automatically, 2.5 hours after the Start time you pick (you can still change it).'
   ]},
