@@ -1156,7 +1156,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-17.1";
+const APP_VERSION = "2026-10-19.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -2935,6 +2935,7 @@ function renderUnlinkedSessionCard(s){
       ${s.location?`<div class="slot-detail-row">${escapeHtml(sessionLocationDisplay(s))}</div>`:''}
       ${s.notes?`<div class="notes">${escapeHtml(s.notes)}</div>`:''}
       <div class="slot-detail-row">${waSectionHtml(s)}</div>
+      ${s.apptType!=='Drop-in' && s.apptType!=='Training' ? `<div class="slot-detail-row">${renderIntakeLinkBlock(s)}</div>` : ''}
       <div class="toolbar" style="margin-top:10px;">
         <button class="btn secondary" onclick="assignSlotToSession(${s.id},this)">Assign to a Slot</button>
         ${notesButtonHtml(s)}
@@ -6712,6 +6713,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 19, 2026', version: '2026-10-19.1', items: [
+    'Fixed: a scheduled session that is not attached to a slot (shown as its own card on Schedule & Planning) now shows its intake form - View / Link controls and the match suggestion - the same as a booked slot card does. Previously those cards never showed the intake form even when one was linked.'
+  ]},
   { date: 'Oct 17, 2026', version: '2026-10-17.1', items: [
     'New: Add-rows table question type for Session Notes. The minister adds and removes rows with buttons; you design the columns in the editor - text, number, Yes/No, or Yes/No that opens a text box when Yes. New tables start with Spirit, Underlings, Ground, Leader (text box on Yes) and Removed, all editable.'
   ]},
@@ -6724,15 +6728,15 @@ const CHANGE_LOG = [
   { date: 'Oct 16, 2026', version: '2026-10-16.2', items: [
     'New: a grid question can pull its rows from an earlier grid question - only the rows answered with a chosen value (e.g. just the Yes ones) are shown, and the question stays hidden if there are none. Any grid can also have an optional text box below it, with its own label.'
   ]},
-  { date: 'Oct 16, 2026', version: '2026-10-16.1', items: [
-    'Changed: on phones, the question editors (Session Notes and Intake Questions) put the move/delete buttons of each section and question on their own row above the title, and the title, questions and answers use the full width; the pinned Save/Discard/Preview buttons shrink to one row. Wider screens keep the existing layout.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 16, 2026', version: '2026-10-16.1', items: [
+    'Changed: on phones, the question editors (Session Notes and Intake Questions) put the move/delete buttons of each section and question on their own row above the title, and the title, questions and answers use the full width; the pinned Save/Discard/Preview buttons shrink to one row. Wider screens keep the existing layout.'
+  ]},
   { date: 'Oct 15, 2026', version: '2026-10-15.4', items: [
     'New: two Session Notes question types - Multiple choice grid (one answer per row) and Checkbox grid (any number per row). Set the rows and columns in the editor, optionally limit to one response per column, and mark Required to need an answer in every row. Available in Session Notes only (not the public intake form).'
   ]},
