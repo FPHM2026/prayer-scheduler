@@ -467,6 +467,29 @@
   /* Question editors: Save / Discard / Preview stay pinned just under the tab
      bar while scrolling. --nav-h is the tab bar's real height (it wraps to
      two rows on narrow screens), kept current by syncNavHeight(). */
+  /* Visual separation between sections - in the question editors (each
+     section is a bordered block with a bold side rule) and in the notes
+     form (a rule and spacing above every section after the first). */
+  .ed-section{margin:0 0 22px;padding:8px 8px 4px 12px;border:1px solid var(--border);border-left:6px solid var(--primary);border-radius:10px;background:rgba(0,0,0,.02);}
+  .ed-section > .group{margin-bottom:6px;}
+  /* Session Notes form: same look as the public intake form - each section is
+     a card with a serif heading, intro in a tinted callout, questions with
+     bold labels, and choices as bordered boxes that highlight when ticked. */
+  #notesBody .nt-sec{background:#fff;border:1px solid var(--border);border-radius:12px;padding:18px 18px 4px;margin-top:16px;}
+  #notesBody .nt-sec:first-child{margin-top:4px;}
+  #notesBody .nt-sec h3{font-family:'Playfair Display',Georgia,serif;font-size:1.15rem;color:#8a4a30;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+  #notesBody .section-intro{background:#f0ede4;border-left:3px solid #aa5a3c;padding:10px 14px;border-radius:6px;font-size:var(--fs-sm);color:var(--muted);margin:0 0 16px;white-space:pre-wrap;}
+  #notesBody .nt-q{margin-bottom:20px;}
+  #notesBody .qlabel{display:block;font-weight:600;margin-bottom:8px;}
+  #notesBody .required-mark{color:#c0392b;margin-left:3px;}
+  #notesBody .choice-group{display:flex;flex-direction:column;gap:8px;}
+  #notesBody .choice-option{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:#fff;font-weight:400;}
+  #notesBody .choice-option:has(input:checked){border-color:#aa5a3c;background:#f3e7e0;}
+  #notesBody .choice-option input[type=radio],#notesBody .choice-option input[type=checkbox]{width:18px;height:18px;flex-shrink:0;}
+  #notesBody .choice-option .other-text{flex:1 1 100%;width:auto;min-width:0;}
+  #notesBody input[type=text],#notesBody input[type=email],#notesBody input[type=number],#notesBody textarea,#notesBody select{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:8px;font-size:1rem;font-family:inherit;background:#fff;box-sizing:border-box;}
+  #notesBody textarea{min-height:90px;resize:vertical;}
+  #notesBody .choice-option .other-text{flex:1 1 100%;width:auto;}
   .editor-sticky{position:sticky;top:var(--nav-h,0px);z-index:15;background:var(--bg);padding:8px 0 6px;margin-bottom:8px;border-bottom:1px solid var(--border);}
   .editor-sticky .toolbar{margin-bottom:4px;}
   .editor-sticky .errbox{margin:6px 0 0;}
@@ -1101,7 +1124,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-15.1";
+const APP_VERSION = "2026-10-15.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -5201,7 +5224,7 @@ function renderFormEditor(){
   if(activeEditor==='intake') renderFormEditorIntro();
   if(!D()){ box.innerHTML = '<p class="helptext">Loading…</p>'; return; }
   const opened = openState(box);
-  box.innerHTML = D().SECTIONS.map((sec,sIdx)=>renderSectionEditor(sec,sIdx,opened)).join('');
+  box.innerHTML = D().SECTIONS.map((sec,sIdx)=>`<div class="ed-section">${renderSectionEditor(sec,sIdx,opened)}</div>`).join('');
   if(activeEditor==='intake') renderFormEditorLiability();
 }
 
@@ -5647,8 +5670,8 @@ function renderNotesForm(){
   }
   $('#notesBody').innerHTML = sections.map((sec,si)=>`
     <div class="nt-sec" data-si="${si}">
-      <h3 style="margin:14px 0 4px;color:var(--navy);font-size:var(--fs-md);">${escapeHtml(sec.title||'')}</h3>
-      ${sec.intro ? `<p class="helptext" style="margin:0 0 8px;">${escapeHtml(sec.intro)}</p>` : ''}
+      <h3>${escapeHtml(sec.title||'')}</h3>
+      ${sec.intro ? `<div class="section-intro">${escapeHtml(sec.intro)}</div>` : ''}
       ${(sec.questions||[]).map((q,qi)=>notesQuestionHtml(q,si,qi)).join('')}
     </div>`).join('');
   notesApplyVisibility();
@@ -5656,25 +5679,28 @@ function renderNotesForm(){
 function notesQuestionHtml(q, si, qi){
   const id = `nq_${si}_${qi}`;
   const v = notesCtx.answers[q.id];
-  const label = `<label${['radio','checkboxes'].includes(q.type)?'':` for="${id}"`}>${escapeHtml(q.label||'')}${q.required?' *':''}</label>`;
+  const isChoice = ['radio','checkboxes'].includes(q.type);
+  const label = `<label class="qlabel"${isChoice?'':` for="${id}"`}>${escapeHtml(q.label||'')}${q.required?'<span class="required-mark">*</span>':''}</label>`;
+  const esc = o => JSON.stringify(o).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
   let input = '';
   if(q.type==='textarea'){
     input = `<textarea id="${id}" rows="4" oninput="notesSet(${si},${qi},this.value)">${escapeHtml(v||'')}</textarea>`;
   } else if(q.type==='select'){
     input = `<select id="${id}" onchange="notesSet(${si},${qi},this.value)"><option value="">— Select —</option>${(q.options||[]).map(o=>`<option value="${escapeHtml(o)}"${v===o?' selected':''}>${escapeHtml(o)}</option>`).join('')}</select>`;
   } else if(q.type==='radio'){
-    input = (q.options||[]).map((o,oi)=>`<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin:4px 0;"><input type="radio" name="${id}" ${v===o?'checked':''} onchange="notesSet(${si},${qi},${JSON.stringify(o).replace(/&/g,'&amp;').replace(/"/g,'&quot;')})"> ${escapeHtml(o)}</label>`).join('');
+    input = `<div class="choice-group">${(q.options||[]).map(o=>`<label class="choice-option"><input type="radio" name="${id}" ${v===o?'checked':''} onchange="notesSet(${si},${qi},${esc(o)})"> <span>${escapeHtml(o)}</span></label>`).join('')}</div>`;
   } else if(q.type==='checkboxes'){
     const arr = Array.isArray(v) ? v : [];
     const other = arr.find(x=>String(x).startsWith('__other__:'));
-    input = (q.options||[]).map((o,oi)=>`<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin:4px 0;"><input type="checkbox" ${arr.includes(o)?'checked':''} onchange="notesToggle(${si},${qi},${oi},this.checked)"> ${escapeHtml(o)}</label>`).join('')
-      + (q.otherOption ? `<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin:4px 0;"><input type="checkbox" ${other!==undefined?'checked':''} onchange="notesOtherToggle(${si},${qi},this.checked,this)"> Other:
-          <input type="text" style="flex:1;" value="${escapeHtml(other?String(other).slice(10):'')}" oninput="notesOtherText(${si},${qi},this.value)"></label>` : '');
+    input = `<div class="choice-group">${(q.options||[]).map((o,oi)=>`<label class="choice-option"><input type="checkbox" ${arr.includes(o)?'checked':''} onchange="notesToggle(${si},${qi},${oi},this.checked)"> <span>${escapeHtml(o)}</span></label>`).join('')}`
+      + (q.otherOption ? `<label class="choice-option"><input type="checkbox" ${other!==undefined?'checked':''} onchange="notesOtherToggle(${si},${qi},this.checked,this)"> <span>Other:</span>
+          <input type="text" class="other-text" value="${escapeHtml(other?String(other).slice(10):'')}" oninput="notesOtherText(${si},${qi},this.value)"></label>` : '')
+      + `</div>`;
   } else {
     const type = q.type==='email' ? 'email' : q.type==='number' ? 'number' : 'text';
     input = `<input id="${id}" type="${type}" ${q.min!==undefined?`min="${q.min}"`:''} ${q.max!==undefined?`max="${q.max}"`:''} value="${escapeHtml(v===undefined?'':v)}" oninput="notesSet(${si},${qi},this.value)">`;
   }
-  return `<div class="field nt-q" data-si="${si}" data-qi="${qi}">${label}${input}</div>`;
+  return `<div class="nt-q" data-si="${si}" data-qi="${qi}">${label}${input}</div>`;
 }
 function notesQ(si,qi){ return notesCtx.schema.SECTIONS[si].questions[qi]; }
 window.notesSet = function(si, qi, value){
@@ -6279,6 +6305,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 15, 2026', version: '2026-10-15.2', items: [
+    'Changed: sections are now visually separated - in the question editors each section sits in its own bordered block with a bold side rule, and the Session Notes form now has the same look as the public intake form: each section is a card with a serif heading, section intro text in a tinted callout, and choices as bordered boxes that highlight when ticked.'
+  ]},
   { date: 'Oct 15, 2026', version: '2026-10-15.1', items: [
     'Changed: in the question editors (Session Notes and Intake Questions), the Save changes / Discard / Preview buttons stay pinned under the tab bar while you scroll, so they are always in reach.'
   ]},
@@ -6291,15 +6320,15 @@ const CHANGE_LOG = [
   { date: 'Oct 14, 2026', version: '2026-10-14.3', items: [
     'New: in the question editors (Session Notes and Intake Questions), each question has a Section picker so it can be moved to another section. It lands at the end of that section, and you are warned if a "show only if" now points at a question that comes later.'
   ]},
-  { date: 'Oct 14, 2026', version: '2026-10-14.2', items: [
-    'New: Settings > Session Notes has a Preview form button that opens the form exactly as currently edited - unsaved changes included, branching working - without saving or opening a session. Nothing entered in the preview is saved.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 14, 2026', version: '2026-10-14.2', items: [
+    'New: Settings > Session Notes has a Preview form button that opens the form exactly as currently edited - unsaved changes included, branching working - without saving or opening a session. Nothing entered in the preview is saved.'
+  ]},
   { date: 'Oct 12, 2026', version: '2026-10-12.1', items: [
     'New: removing a booked session (Remove Booking, or deleting a scheduled session) whose ministers were already notified on WhatsApp now asks "Send cancellation" / "Don\'t send". Sending uses a new WhatsApp template, prayer_session_canceled, which must be approved in WhatsApp Manager and the notify Worker redeployed before it will deliver - until then the send reports a failure and nothing else changes.'
   ]},
