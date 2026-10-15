@@ -1153,7 +1153,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-20.1";
+const APP_VERSION = "2026-10-21.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -5106,7 +5106,7 @@ const TABLE_COL_TYPES = [
   { id:'text',     label:'Text' },
   { id:'number',   label:'Number' },
   { id:'yesno',    label:'Yes / No' },
-  { id:'yesnotext',label:'Yes / No, with a text box when Yes' }
+  { id:'yesnotext',label:'Yes / No, with a text box' }
 ];
 function defaultTableColumns(){
   return [
@@ -5480,8 +5480,14 @@ function tableEditorHtml(q, sIdx, qIdx){
             ${TABLE_COL_TYPES.map(t=>`<option value="${t.id}" ${c.type===t.id?'selected':''}>${t.label}</option>`).join('')}
           </select></div>
       </div>
-      ${c.type==='yesnotext' ? `<div class="field"><label>Text box label (shown when Yes)</label>
-        <input type="text" value="${escapeHtml(c.textLabel||'')}" placeholder="Details" oninput="updateTableCol(${sIdx},${qIdx},${ci},'textLabel',this.value)"></div>` : ''}
+      ${c.type==='yesnotext' ? `<div class="field-row">
+        <div class="field"><label>Show the text box when the answer is</label>
+          <select onchange="updateTableCol(${sIdx},${qIdx},${ci},'textWhen',this.value)">
+            ${[['Yes','Yes'],['No','No'],['any','Either answer']].map(([v,l])=>`<option value="${v}" ${(c.textWhen||'Yes')===v?'selected':''}>${l}</option>`).join('')}
+          </select></div>
+        <div class="field"><label>Text box label</label>
+          <input type="text" value="${escapeHtml(c.textLabel||'')}" placeholder="Details" oninput="updateTableCol(${sIdx},${qIdx},${ci},'textLabel',this.value)"></div>
+      </div>` : ''}
       ${colCondHtml(c, sIdx, qIdx, ci, cands)}
       <div class="toolbar" style="flex-direction:row;flex-wrap:wrap;gap:6px;margin:0 0 6px;">
         <button type="button" class="btn secondary" style="width:auto;padding:6px 12px;" onclick="moveTableCol(${sIdx},${qIdx},${ci},-1)" ${ci===0?'disabled':''}>Move column up</button>
@@ -6002,6 +6008,13 @@ function notesRowsOf(q){
   return notesRowsOf(src).filter(r => src.type==='choicegrid' ? ans[r]===want : (Array.isArray(ans[r]) && ans[r].includes(want)));
 }
 // ---- Add-rows table (rowtable): answer = array of { columnId: value } ----
+// A Yes/No column with a text box shows it for the configured answer:
+// "Yes" (the default), "No", or "any" (either answer).
+function tableTextShown(c, val){
+  if(c.type!=='yesnotext' || (val!=='Yes' && val!=='No')) return false;
+  const when = c.textWhen || 'Yes';
+  return when==='any' || when===val;
+}
 function notesTableRows(q){
   const v = notesCtx.answers[q.id];
   return Array.isArray(v) && v.length ? v : [{}];
@@ -6018,7 +6031,7 @@ function notesTableHtml(q, si, qi){
         let ctl;
         if(c.type==='number') ctl = `<input type="number" inputmode="decimal" value="${escapeHtml(val===undefined?'':val)}" oninput="notesTableSet(${si},${qi},${ri},'${escapeHtml(c.id)}',this.value,false)">`;
         else if(c.type==='yesno' || c.type==='yesnotext') ctl = `<div class="choice-group" style="flex-direction:row;flex-wrap:wrap;">${yn(ri, c, val)}</div>`
-          + (c.type==='yesnotext' && val==='Yes' ? `<textarea rows="2" style="margin-top:8px;" placeholder="${escapeHtml(c.textLabel||'Details')}" aria-label="${escapeHtml(c.label)}: ${escapeHtml(c.textLabel||'Details')}" oninput="notesTableSet(${si},${qi},${ri},'${escapeHtml(c.id)}__text',this.value,false)">${escapeHtml(row[c.id+'__text']||'')}</textarea>` : '');
+          + (tableTextShown(c, val) ? `<textarea rows="2" style="margin-top:8px;" placeholder="${escapeHtml(c.textLabel||'Details')}" aria-label="${escapeHtml(c.label)}: ${escapeHtml(c.textLabel||'Details')}" oninput="notesTableSet(${si},${qi},${ri},'${escapeHtml(c.id)}__text',this.value,false)">${escapeHtml(row[c.id+'__text']||'')}</textarea>` : '');
         else ctl = `<input type="text" value="${escapeHtml(val===undefined?'':val)}" oninput="notesTableSet(${si},${qi},${ri},'${escapeHtml(c.id)}',this.value,false)">`;
         return `<div class="rt-field" data-col="${escapeHtml(c.id)}"><label class="qlabel">${escapeHtml(c.label)}</label>${ctl}</div>`;
       }).join('')}</div>
@@ -6211,7 +6224,7 @@ function notesVisibleAnswers(){
             if(!notesEvalCond(c.visibleIf, a)) return;   // column hidden by an earlier answer
             const x = r[c.id];
             if(x!==undefined && x!==null && String(x).trim()!=='') o[c.id] = x;
-            if(c.type==='yesnotext' && x==='Yes'){
+            if(tableTextShown(c, x)){
               const tx = r[c.id + '__text'];
               if(tx && String(tx).trim()) o[c.id + '__text'] = String(tx);
             }
@@ -6795,6 +6808,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 21, 2026', version: '2026-10-21.1', items: [
+    'New: in an add-rows table, a Yes / No column with a text box can now be set to show that text box for Yes, for No, or for either answer (it used to be Yes only).'
+  ]},
   { date: 'Oct 20, 2026', version: '2026-10-20.1', items: [
     'Fixed: a long section in the question editors was cut off and could not be scrolled to - open sections now grow to fit all their questions. New: each column of an add-rows table can be set to show only when an earlier question has a certain answer; hidden columns are left out of the saved note.'
   ]},
@@ -6807,15 +6823,15 @@ const CHANGE_LOG = [
   { date: 'Oct 17, 2026', version: '2026-10-17.1', items: [
     'New: Add-rows table question type for Session Notes. The minister adds and removes rows with buttons; you design the columns in the editor - text, number, Yes/No, or Yes/No that opens a text box when Yes. New tables start with Spirit, Underlings, Ground, Leader (text box on Yes) and Removed, all editable.'
   ]},
-  { date: 'Oct 16, 2026', version: '2026-10-16.4', items: [
-    'New: a multiple choice (radio) question can show a text box - either whenever an answer is chosen, or only for one specific answer - with its own label. Set it in the question editor under Text box.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 16, 2026', version: '2026-10-16.4', items: [
+    'New: a multiple choice (radio) question can show a text box - either whenever an answer is chosen, or only for one specific answer - with its own label. Set it in the question editor under Text box.'
+  ]},
   { date: 'Oct 16, 2026', version: '2026-10-16.3', items: [
     'New: Sort A to Z / Z to A buttons under every list you type in the question editors - the choices of a radio, dropdown or checkbox question, and the rows and columns of a grid - so you can enter them in any order and sort with one tap.'
   ]},
