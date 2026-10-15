@@ -1156,7 +1156,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-19.1";
+const APP_VERSION = "2026-10-19.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3061,7 +3061,7 @@ function renderSlotCard(sl){
         <span class="slot-header-detail">
           ${nameForHeader ? `<span class="slot-header-name">${escapeHtml(nameForHeader)}</span>` : ''}
           ${showSessionNum ? `<span class="tag ${sessionNumberOf(sessionForHeader)===1?'first':''}">Session #${sessionNumberOf(sessionForHeader)}</span>` : ''}
-          ${(sl.status==='Tentative' && cand && !cand.intakeResponseId && findIntakeForRecipient(cand.recipName)) ? `<span class="tag intake-match">Intake form match</span>` : ''}
+          ${(sl.status==='Tentative' && cand && !personIntakeId(cand) && findIntakeForRecipient(cand.recipName)) ? `<span class="tag intake-match">Intake form match</span>` : ''}
           ${teamForHeader ? `<span class="slot-header-team">${escapeHtml(teamForHeader)}</span>` : (sl.status==='Open' ? renderOpenAvailNow(sl) : '')}
         </span>
         <span class="slot-chevron">${ICONS.chevron}</span>
@@ -3713,7 +3713,8 @@ window.pickRecipNameAt = function(i){
 function renderIntakeMatchPanel(name){
   const box = $('#intakeMatchPanel');
   if(!box) return;
-  const match = findIntakeForRecipient(name);
+  const pid = personIntakeIdByName(name);
+  const match = (pid && intakeResponses.find(i=>i.id===pid)) || findIntakeForRecipient(name);
   if(!match){ box.innerHTML=''; return; }
   const label = match.status==='Submitted'
     ? `Intake form on file — submitted ${fmtShort((match.submittedAt||'').split('T')[0])}`
@@ -4920,6 +4921,21 @@ window.closeIntakeDetail = function(){
 function linkedIntakeResponseIds(){
   return new Set(sessions.filter(s=>s.intakeResponseId!=null).map(s=>s.intakeResponseId));
 }
+// An intake form belongs to the PERSON, not to one session: it is stored on
+// whichever session it was linked from, but every session of the same
+// recipient (matched by name, like the rest of the app) shows it. When more
+// than one of their sessions carries a link, the most recent session wins.
+function personIntakeIdByName(name){
+  const key = String(name||'').trim().toLowerCase();
+  if(!key) return null;
+  const carriers = sessions
+    .filter(s=>s.intakeResponseId!=null && String(s.recipName||'').trim().toLowerCase()===key)
+    .sort((a,b)=>(b.date||b.added||'').localeCompare(a.date||a.added||''));
+  return carriers.length ? carriers[0].intakeResponseId : null;
+}
+function personIntakeId(session){
+  return session.intakeResponseId || personIntakeIdByName(session.recipName);
+}
 function findIntakeForRecipient(name){
   if(!name) return null;
   const norm = name.trim().toLowerCase();
@@ -4957,13 +4973,30 @@ window.toggleIntakeLinkPicker = function(sessionId){
 };
 window.linkIntakeForm = async function(sessionId, intakeId){
   await updateItem('sessions', sessionId, { IntakeResponseId: intakeId });
+  // One form per person: drop any older, different link on their other sessions
+  // so the new choice is the one every session shows.
+  const me = sessions.find(x=>x.id===sessionId);
+  if(me){
+    const key = String(me.recipName||'').trim().toLowerCase();
+    for(const o of sessions){
+      if(o.id!==sessionId && o.intakeResponseId!=null && o.intakeResponseId!==intakeId && String(o.recipName||'').trim().toLowerCase()===key){
+        await updateItem('sessions', o.id, { IntakeResponseId: null });
+      }
+    }
+  }
   intakeLinkPickerFor = null;
   await loadAll();
 };
 window.unlinkIntakeForm = async function(sessionId){
   const ok = await askConfirm('Unlink this intake form from the recipient? The intake form itself is not deleted or changed.', {confirmLabel:'Unlink', danger:false});
   if(!ok) return;
-  await updateItem('sessions', sessionId, { IntakeResponseId: null });
+  // The form follows the person, so unlinking clears it from all of their
+  // sessions - otherwise another session's copy of the link would bring it back.
+  const me = sessions.find(x=>x.id===sessionId);
+  const key = me ? String(me.recipName||'').trim().toLowerCase() : null;
+  const ids = new Set([sessionId]);
+  if(key) sessions.forEach(o=>{ if(o.intakeResponseId!=null && String(o.recipName||'').trim().toLowerCase()===key) ids.add(o.id); });
+  for(const id of ids) await updateItem('sessions', id, { IntakeResponseId: null });
   await loadAll();
 };
 // Where "View" was clicked from (tab + scroll position), so the intake
@@ -5012,7 +5045,8 @@ function renderIntakeLinkPicker(sessionId){
 // entry - session is the PrayerSessions record either way.
 function renderIntakeLinkBlock(session){
   const pickerOpen = intakeLinkPickerFor === session.id;
-  const linked = session.intakeResponseId ? intakeResponses.find(i=>i.id===session.intakeResponseId) : null;
+  const linkedId = personIntakeId(session);
+  const linked = linkedId ? intakeResponses.find(i=>i.id===linkedId) : null;
   if(linked){
     const mismatch = linked.recipName && session.recipName
       && linked.recipName.trim().toLowerCase()!==session.recipName.trim().toLowerCase();
@@ -6713,6 +6747,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 19, 2026', version: '2026-10-19.2', items: [
+    'Changed: an intake form now follows the person. Once it is linked on any of their sessions, every session for that recipient (first, follow-ups, upcoming, tentative) shows it, with no need to relink. Linking a different form replaces the old one for the whole person, and Unlink removes it from all their sessions.'
+  ]},
   { date: 'Oct 19, 2026', version: '2026-10-19.1', items: [
     'Fixed: a scheduled session that is not attached to a slot (shown as its own card on Schedule & Planning) now shows its intake form - View / Link controls and the match suggestion - the same as a booked slot card does. Previously those cards never showed the intake form even when one was linked.'
   ]},
@@ -6725,15 +6762,15 @@ const CHANGE_LOG = [
   { date: 'Oct 16, 2026', version: '2026-10-16.3', items: [
     'New: Sort A to Z / Z to A buttons under every list you type in the question editors - the choices of a radio, dropdown or checkbox question, and the rows and columns of a grid - so you can enter them in any order and sort with one tap.'
   ]},
-  { date: 'Oct 16, 2026', version: '2026-10-16.2', items: [
-    'New: a grid question can pull its rows from an earlier grid question - only the rows answered with a chosen value (e.g. just the Yes ones) are shown, and the question stays hidden if there are none. Any grid can also have an optional text box below it, with its own label.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 16, 2026', version: '2026-10-16.2', items: [
+    'New: a grid question can pull its rows from an earlier grid question - only the rows answered with a chosen value (e.g. just the Yes ones) are shown, and the question stays hidden if there are none. Any grid can also have an optional text box below it, with its own label.'
+  ]},
   { date: 'Oct 16, 2026', version: '2026-10-16.1', items: [
     'Changed: on phones, the question editors (Session Notes and Intake Questions) put the move/delete buttons of each section and question on their own row above the title, and the title, questions and answers use the full width; the pinned Save/Discard/Preview buttons shrink to one row. Wider screens keep the existing layout.'
   ]},
