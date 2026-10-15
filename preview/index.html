@@ -506,6 +506,12 @@
   #notesBody .choice-option:has(input:checked){border-color:#aa5a3c;background:#f3e7e0;}
   #notesBody .choice-option input[type=radio],#notesBody .choice-option input[type=checkbox]{width:18px;height:18px;flex-shrink:0;}
   #notesBody .choice-option .other-text{flex:1 1 100%;width:auto;min-width:0;}
+  #notesBody .rt-wrap{display:flex;flex-direction:column;gap:12px;}
+  #notesBody .rt-row{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:#fdfbf7;}
+  #notesBody .rt-row-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;}
+  #notesBody .rt-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px 14px;}
+  #notesBody .rt-field .qlabel{font-size:var(--fs-sm);margin-bottom:4px;}
+  .tbl-col-edit{border:1px solid var(--border);border-radius:8px;padding:10px 10px 4px;margin-bottom:10px;background:rgba(0,0,0,.02);}
   #notesBody .grid-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px;}
   #notesBody .nt-grid{width:100%;border-collapse:collapse;font-size:var(--fs-sm);}
   #notesBody .nt-grid th,#notesBody .nt-grid td{padding:10px 12px;text-align:center;border-bottom:1px solid #e8e0d3;}
@@ -1150,7 +1156,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-16.4";
+const APP_VERSION = "2026-10-17.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -5060,8 +5066,26 @@ const QUESTION_TYPES = ['text','email','number','textarea','radio','select','che
 // public intake form's renderer doesn't know them. choicegrid = one pick per
 // row (Google's 'multiple choice grid'); checkboxgrid = any number per row.
 const GRID_TYPES = ['choicegrid','checkboxgrid'];
-const GRID_LABELS = { choicegrid:'multiple choice grid', checkboxgrid:'checkbox grid' };
-function questionTypesForEditor(){ return activeEditor==='notes' ? QUESTION_TYPES.concat(GRID_TYPES) : QUESTION_TYPES; }
+const GRID_LABELS = { choicegrid:'multiple choice grid', checkboxgrid:'checkbox grid', rowtable:'add-rows table' };
+// Add-rows table: the minister adds/removes rows themselves; every column has
+// its own kind (text, number, yes/no, or yes/no that opens a text box on Yes).
+const TABLE_TYPE = 'rowtable';
+const TABLE_COL_TYPES = [
+  { id:'text',     label:'Text' },
+  { id:'number',   label:'Number' },
+  { id:'yesno',    label:'Yes / No' },
+  { id:'yesnotext',label:'Yes / No, with a text box when Yes' }
+];
+function defaultTableColumns(){
+  return [
+    { id:'spirit',    label:'Spirit',     type:'text' },
+    { id:'underlings',label:'Underlings', type:'number' },
+    { id:'ground',    label:'Ground',     type:'yesno' },
+    { id:'leader',    label:'Leader',     type:'yesnotext', textLabel:'Details' },
+    { id:'removed',   label:'Removed',    type:'yesno' }
+  ];
+}
+function questionTypesForEditor(){ return activeEditor==='notes' ? QUESTION_TYPES.concat(GRID_TYPES, [TABLE_TYPE]) : QUESTION_TYPES; }
 const TYPES_WITH_OPTIONS = ['radio','select','checkboxes'];
 
 /* One editor UI, two forms: the same DOM block (#intakeQuestionsView) is
@@ -5336,7 +5360,7 @@ function editorGroupRow(key, avatarText, name, countLabel, summaryHtml, bodyHtml
 }
 
 function renderSectionEditor(sec, sIdx, opened){
-  const candidateQuestions = questionsBefore(sIdx, null).filter(q=>!GRID_TYPES.includes(q.type));
+  const candidateQuestions = questionsBefore(sIdx, null).filter(q=>!GRID_TYPES.includes(q.type) && q.type!==TABLE_TYPE);
   const wasOpen = opened.has(sec.id) ? opened.get(sec.id) : false;
   const visSummary = describeVisibleIf(sec.visibleIf);
   const summaryHtml = escapeHtml([visSummary || 'Always shown', sec.intro ? 'has intro text' : null].filter(Boolean).join(' · '));
@@ -5368,6 +5392,58 @@ function renderSectionEditor(sec, sIdx, opened){
 // columns) - type the entries in any order, then tidy them with one tap.
 // Radio questions can show a free-text box: always (once an answer is
 // chosen) or only when one particular answer is chosen.
+// Column designer for an add-rows table.
+function tableEditorHtml(q, sIdx, qIdx){
+  const cols = q.tableColumns || [];
+  return `<div class="field"><label>Columns</label>
+    ${cols.map((c,ci)=>`<div class="tbl-col-edit">
+      <div class="field-row">
+        <div class="field"><label>Column ${ci+1} name</label>
+          <input type="text" value="${escapeHtml(c.label||'')}" oninput="updateTableCol(${sIdx},${qIdx},${ci},'label',this.value)"></div>
+        <div class="field"><label>Answer</label>
+          <select onchange="onTableColType(${sIdx},${qIdx},${ci},this.value)">
+            ${TABLE_COL_TYPES.map(t=>`<option value="${t.id}" ${c.type===t.id?'selected':''}>${t.label}</option>`).join('')}
+          </select></div>
+      </div>
+      ${c.type==='yesnotext' ? `<div class="field"><label>Text box label (shown when Yes)</label>
+        <input type="text" value="${escapeHtml(c.textLabel||'')}" placeholder="Details" oninput="updateTableCol(${sIdx},${qIdx},${ci},'textLabel',this.value)"></div>` : ''}
+      <div class="toolbar" style="flex-direction:row;flex-wrap:wrap;gap:6px;margin:0 0 6px;">
+        <button type="button" class="btn secondary" style="width:auto;padding:6px 12px;" onclick="moveTableCol(${sIdx},${qIdx},${ci},-1)" ${ci===0?'disabled':''}>Move column up</button>
+        <button type="button" class="btn secondary" style="width:auto;padding:6px 12px;" onclick="moveTableCol(${sIdx},${qIdx},${ci},1)" ${ci===cols.length-1?'disabled':''}>Move column down</button>
+        <button type="button" class="btn danger" style="width:auto;padding:6px 12px;" onclick="deleteTableCol(${sIdx},${qIdx},${ci})">Remove column</button>
+      </div>
+    </div>`).join('')}
+    <button type="button" class="btn secondary" onclick="addTableCol(${sIdx},${qIdx})">+ Add column</button>
+    <p class="helptext" style="margin:8px 0 0;">Ministers see an <strong>Add row</strong> button and a <strong>Remove row</strong> button on each row.</p>
+  </div>`;
+}
+window.updateTableCol = function(sIdx, qIdx, ci, field, value){
+  D().SECTIONS[sIdx].questions[qIdx].tableColumns[ci][field] = value;
+  edSetDirty(true);
+};
+window.onTableColType = function(sIdx, qIdx, ci, type){
+  D().SECTIONS[sIdx].questions[qIdx].tableColumns[ci].type = type;
+  edSetDirty(true); renderFormEditor();
+};
+window.moveTableCol = function(sIdx, qIdx, ci, dir){
+  const arr = D().SECTIONS[sIdx].questions[qIdx].tableColumns, j = ci + dir;
+  if(j<0 || j>=arr.length) return;
+  [arr[ci], arr[j]] = [arr[j], arr[ci]];
+  edSetDirty(true); renderFormEditor();
+};
+window.deleteTableCol = function(sIdx, qIdx, ci){
+  D().SECTIONS[sIdx].questions[qIdx].tableColumns.splice(ci, 1);
+  edSetDirty(true); renderFormEditor();
+};
+window.addTableCol = function(sIdx, qIdx){
+  const q = D().SECTIONS[sIdx].questions[qIdx];
+  // Ids are fixed once created so renaming a column never orphans saved answers.
+  const used = new Set((q.tableColumns||[]).map(c=>c.id));
+  let n = used.size + 1, id = 'col' + n;
+  while(used.has(id)){ n++; id = 'col' + n; }
+  q.tableColumns.push({ id, label:'New column', type:'text' });
+  edSetDirty(true); renderFormEditor();
+};
 function radioTextBoxEditorHtml(q, sIdx, qIdx){
   const tb = q.textBox || null;
   const mode = tb ? tb.mode : 'none';
@@ -5467,12 +5543,12 @@ window.onGridRowsFromValue = function(sIdx, qIdx, value){
   edSetDirty(true);
 };
 function renderQuestionEditor(q, sIdx, qIdx, sec, opened){
-  const candidateQuestions = questionsBefore(sIdx, qIdx).filter(q=>!GRID_TYPES.includes(q.type));
+  const candidateQuestions = questionsBefore(sIdx, qIdx).filter(q=>!GRID_TYPES.includes(q.type) && q.type!==TABLE_TYPE);
   const hasOptions = TYPES_WITH_OPTIONS.includes(q.type);
   const wasOpen = opened.has(q.id) ? opened.get(q.id) : false;
   const visSummary = describeVisibleIf(q.visibleIf);
   const summaryHtml = escapeHtml([q.required ? 'Required' : 'Optional', visSummary || 'Always shown'].join(' · '));
-  const avatar = { text:'Ab', email:'@', number:'#', textarea:'¶', radio:'◉', select:'▾', checkboxes:'☑', choicegrid:'▦', checkboxgrid:'▦' }[q.type] || '?';
+  const avatar = { text:'Ab', email:'@', number:'#', textarea:'¶', radio:'◉', select:'▾', checkboxes:'☑', choicegrid:'▦', checkboxgrid:'▦', rowtable:'▤' }[q.type] || '?';
   const actions = `
     <button class="icon-btn icon-btn-lg" title="Move up" onclick="moveQuestion(${sIdx},${qIdx},-1)" ${qIdx===0?'disabled':''}>${ICONS.arrowUp}</button>
     <button class="icon-btn icon-btn-lg" title="Move down" onclick="moveQuestion(${sIdx},${qIdx},1)" ${qIdx===sec.questions.length-1?'disabled':''}>${ICONS.arrowDown}</button>
@@ -5508,6 +5584,7 @@ function renderQuestionEditor(q, sIdx, qIdx, sec, opened){
         <input type="checkbox" ${q.otherOption?'checked':''} onchange="updateQuestionFieldAndRerender(${sIdx},${qIdx},'otherOption',this.checked)"> Allow an "Other, please specify" choice
       </label>
     </div>` : ''}
+    ${q.type===TABLE_TYPE ? tableEditorHtml(q, sIdx, qIdx) : ''}
     ${q.type==='radio' ? radioTextBoxEditorHtml(q, sIdx, qIdx) : ''}
     ${q.type==='number' ? `<div class="field-row">
       <div class="field"><label>Minimum</label><input type="number" value="${q.min??''}" oninput="updateQuestionField(${sIdx},${qIdx},'min',this.value===''?undefined:Number(this.value))"></div>
@@ -5551,6 +5628,8 @@ window.onQuestionTypeChange = function(sIdx, qIdx, newType){
   if(newType!=='checkboxes') delete q.otherOption;
   if(newType!=='number'){ delete q.min; delete q.max; }
   if(newType!=='radio'){ delete q.textBox; }
+  if(newType===TABLE_TYPE){ if(!Array.isArray(q.tableColumns)) q.tableColumns = defaultTableColumns(); }
+  else { delete q.tableColumns; }
   markSchemaDirty();
   renderFormEditor();
 };
@@ -5681,19 +5760,22 @@ async function saveFormSchema(){
   draft.SECTIONS.forEach(s=>s.questions.forEach(q=>{ if(q.rowsFrom && (!q.rowsFrom.id || !idSet.has(q.rowsFrom.id) || !q.rowsFrom.value)) rowSrc.push(`Question "${q.label}"`); }));
   const tbBad = [];
   draft.SECTIONS.forEach(s=>s.questions.forEach(q=>{ if(q.textBox && q.textBox.mode==='when' && !(q.options||[]).includes(q.textBox.value)) tbBad.push(`Question "${q.label}"`); }));
+  const tblBad = [];
+  draft.SECTIONS.forEach(s=>s.questions.forEach(q=>{ if(q.type===TABLE_TYPE && (!(q.tableColumns||[]).length || q.tableColumns.some(c=>!String(c.label||'').trim()))) tblBad.push(`Question "${q.label}"`); }));
   const noValue = [];
   const hasValue = c => c.in!==undefined ? c.in.length>0 : [c.equals,c.notEquals,c.includes].some(v=>v!==undefined && v!=='');
   draft.SECTIONS.forEach(s=>{
     if(s.visibleIf && s.visibleIf.id && !hasValue(s.visibleIf)) noValue.push(`Section "${s.title}"`);
     s.questions.forEach(q=>{ if(q.visibleIf && q.visibleIf.id && !hasValue(q.visibleIf)) noValue.push(`Question "${q.label}"`); });
   });
-  if(dupes.length || brokenRefs.length || noValue.length || rowSrc.length || tbBad.length){
+  if(dupes.length || brokenRefs.length || noValue.length || rowSrc.length || tbBad.length || tblBad.length){
     msg.hidden = false;
     msg.className = 'errbox';
     msg.innerHTML = [
       dupes.length ? `Duplicate question id(s): ${[...new Set(dupes)].join(', ')}.` : '',
       brokenRefs.length ? `These have a "show only if" pointing at a question that no longer exists or hasn't been chosen yet: ${brokenRefs.join(', ')}.` : '',
       noValue.length ? `These have a "show only if" with no value chosen, so they would never show - pick a value: ${noValue.join(', ')}.` : '',
+      tblBad.length ? `These add-rows tables need at least one column, and every column needs a name: ${tblBad.join(', ')}.` : '',
       tbBad.length ? `These questions show a text box for an answer that is no longer one of the choices - pick the answer again: ${tbBad.join(', ')}.` : '',
       rowSrc.length ? `These grid questions pull their rows from another question but no source or value is chosen: ${rowSrc.join(', ')}.` : ''
     ].filter(Boolean).join(' ');
@@ -5843,6 +5925,59 @@ function notesRowsOf(q){
   const want = q.rowsFrom.value;
   return notesRowsOf(src).filter(r => src.type==='choicegrid' ? ans[r]===want : (Array.isArray(ans[r]) && ans[r].includes(want)));
 }
+// ---- Add-rows table (rowtable): answer = array of { columnId: value } ----
+function notesTableRows(q){
+  const v = notesCtx.answers[q.id];
+  return Array.isArray(v) && v.length ? v : [{}];
+}
+function notesTableHtml(q, si, qi){
+  const cols = q.tableColumns || [];
+  const rows = notesTableRows(q);
+  const yn = (ri, c, val) => ['Yes','No'].map(o=>`<label class="choice-option" style="padding:8px 12px;"><input type="radio" name="tb_${si}_${qi}_${ri}_${c.id}" ${val===o?'checked':''} onchange="notesTableSet(${si},${qi},${ri},'${escapeHtml(c.id)}','${o}',true)"> <span>${o}</span></label>`).join('');
+  return `<div class="rt-wrap">${rows.map((row,ri)=>`<div class="rt-row">
+      <div class="rt-row-head"><strong>Row ${ri+1}</strong>
+        <button type="button" class="btn secondary" style="width:auto;padding:6px 12px;" onclick="notesTableDel(${si},${qi},${ri})">Remove row</button></div>
+      <div class="rt-fields">${cols.map(c=>{
+        const val = row[c.id];
+        let ctl;
+        if(c.type==='number') ctl = `<input type="number" inputmode="decimal" value="${escapeHtml(val===undefined?'':val)}" oninput="notesTableSet(${si},${qi},${ri},'${escapeHtml(c.id)}',this.value,false)">`;
+        else if(c.type==='yesno' || c.type==='yesnotext') ctl = `<div class="choice-group" style="flex-direction:row;flex-wrap:wrap;">${yn(ri, c, val)}</div>`
+          + (c.type==='yesnotext' && val==='Yes' ? `<textarea rows="2" style="margin-top:8px;" placeholder="${escapeHtml(c.textLabel||'Details')}" aria-label="${escapeHtml(c.label)}: ${escapeHtml(c.textLabel||'Details')}" oninput="notesTableSet(${si},${qi},${ri},'${escapeHtml(c.id)}__text',this.value,false)">${escapeHtml(row[c.id+'__text']||'')}</textarea>` : '');
+        else ctl = `<input type="text" value="${escapeHtml(val===undefined?'':val)}" oninput="notesTableSet(${si},${qi},${ri},'${escapeHtml(c.id)}',this.value,false)">`;
+        return `<div class="rt-field"><label class="qlabel">${escapeHtml(c.label)}</label>${ctl}</div>`;
+      }).join('')}</div>
+    </div>`).join('')}
+    <button type="button" class="btn secondary" onclick="notesTableAdd(${si},${qi})">+ Add row</button></div>`;
+}
+function notesTableRerender(si, qi){
+  const q = notesQ(si, qi);
+  const el = $(`#notesBody .nt-q[data-si="${si}"][data-qi="${qi}"]`);
+  if(el) el.outerHTML = notesQuestionHtml(q, si, qi);
+  notesApplyVisibility();
+}
+window.notesTableAdd = function(si, qi){
+  const q = notesQ(si, qi);
+  const rows = notesTableRows(q).slice();
+  rows.push({});
+  notesCtx.answers[q.id] = rows;
+  notesTableRerender(si, qi);
+};
+window.notesTableDel = function(si, qi, ri){
+  const q = notesQ(si, qi);
+  const rows = notesTableRows(q).slice();
+  rows.splice(ri, 1);
+  notesCtx.answers[q.id] = rows.length ? rows : [{}];
+  notesTableRerender(si, qi);
+};
+window.notesTableSet = function(si, qi, ri, colId, value, rerender){
+  const q = notesQ(si, qi);
+  const rows = notesTableRows(q).slice();
+  rows[ri] = Object.assign({}, rows[ri] || {});
+  const col = (q.tableColumns||[]).find(c=>c.id===colId);
+  rows[ri][colId] = (col && col.type==='number') ? (value==='' ? '' : Number(value)) : value;
+  notesCtx.answers[q.id] = rows;
+  if(rerender) notesTableRerender(si, qi);
+};
 function notesQuestionHtml(q, si, qi){
   const id = `nq_${si}_${qi}`;
   const v = notesCtx.answers[q.id];
@@ -5864,6 +5999,8 @@ function notesQuestionHtml(q, si, qi){
       + (q.otherOption ? `<label class="choice-option"><input type="checkbox" ${other!==undefined?'checked':''} onchange="notesOtherToggle(${si},${qi},this.checked,this)"> <span>Other:</span>
           <input type="text" class="other-text" value="${escapeHtml(other?String(other).slice(10):'')}" oninput="notesOtherText(${si},${qi},this.value)"></label>` : '')
       + `</div>`;
+  } else if(q.type===TABLE_TYPE){
+    input = notesTableHtml(q, si, qi);
   } else if(GRID_TYPES.includes(q.type)){
     const rows = notesRowsOf(q), cols = q.columns||[];
     const ans = (v && typeof v==='object' && !Array.isArray(v)) ? v : {};
@@ -5982,6 +6119,26 @@ function notesVisibleAnswers(){
     (sec.questions||[]).forEach(q=>{
       if(!notesEvalCond(q.visibleIf, a)) return;
       const v = a[q.id];
+      if(q.type===TABLE_TYPE){
+        // Keep only known columns; the "Yes" text only when the answer is Yes;
+        // rows with nothing filled in are dropped. Required = at least one row.
+        const cols = q.tableColumns || [];
+        const cleaned = (Array.isArray(v) ? v : []).map(r=>{
+          const o = {};
+          cols.forEach(c=>{
+            const x = r[c.id];
+            if(x!==undefined && x!==null && String(x).trim()!=='') o[c.id] = x;
+            if(c.type==='yesnotext' && x==='Yes'){
+              const tx = r[c.id + '__text'];
+              if(tx && String(tx).trim()) o[c.id + '__text'] = String(tx);
+            }
+          });
+          return o;
+        }).filter(o=>Object.keys(o).length);
+        if(!cleaned.length){ if(q.required) missing.push(q.label + ' (add at least one row)'); return; }
+        out[q.id] = cleaned;
+        return;
+      }
       if(GRID_TYPES.includes(q.type)){
         // Keep only rows/columns that still exist; required = every row answered.
         const rows = notesRowsOf(q), cols = q.columns||[];
@@ -6555,6 +6712,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 17, 2026', version: '2026-10-17.1', items: [
+    'New: Add-rows table question type for Session Notes. The minister adds and removes rows with buttons; you design the columns in the editor - text, number, Yes/No, or Yes/No that opens a text box when Yes. New tables start with Spirit, Underlings, Ground, Leader (text box on Yes) and Removed, all editable.'
+  ]},
   { date: 'Oct 16, 2026', version: '2026-10-16.4', items: [
     'New: a multiple choice (radio) question can show a text box - either whenever an answer is chosen, or only for one specific answer - with its own label. Set it in the question editor under Text box.'
   ]},
@@ -6567,15 +6727,15 @@ const CHANGE_LOG = [
   { date: 'Oct 16, 2026', version: '2026-10-16.1', items: [
     'Changed: on phones, the question editors (Session Notes and Intake Questions) put the move/delete buttons of each section and question on their own row above the title, and the title, questions and answers use the full width; the pinned Save/Discard/Preview buttons shrink to one row. Wider screens keep the existing layout.'
   ]},
-  { date: 'Oct 15, 2026', version: '2026-10-15.4', items: [
-    'New: two Session Notes question types - Multiple choice grid (one answer per row) and Checkbox grid (any number per row). Set the rows and columns in the editor, optionally limit to one response per column, and mark Required to need an answer in every row. Available in Session Notes only (not the public intake form).'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 15, 2026', version: '2026-10-15.4', items: [
+    'New: two Session Notes question types - Multiple choice grid (one answer per row) and Checkbox grid (any number per row). Set the rows and columns in the editor, optionally limit to one response per column, and mark Required to need an answer in every row. Available in Session Notes only (not the public intake form).'
+  ]},
   { date: 'Oct 15, 2026', version: '2026-10-15.2', items: [
     'Changed: sections are now visually separated - in the question editors each section sits in its own bordered block with a bold side rule, and the Session Notes form now has the same look as the public intake form: each section is a card with a serif heading, section intro text in a tinted callout, and choices as bordered boxes that highlight when ticked.'
   ]},
