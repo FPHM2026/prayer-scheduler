@@ -302,6 +302,10 @@
      (non-nested) use of .group/.group-body elsewhere in this app is
      unaffected, since .group-body is already a direct child there too. */
   .group.open > .group-body{max-height:3000px;}
+  /* The question editors nest whole sections (dozens of questions) inside one
+     group body; the 3000px cap above clipped the rest with no way to scroll to
+     it. An open editor group simply takes the height it needs. */
+  .ed-group.open > .group-body{max-height:none;overflow:visible;}
   .group-body-inner{padding:0 16px 14px;border-top:1px solid var(--border);}
 
   /* Intake form answers - produced by FPHM.renderResponsesHtml() in
@@ -1156,7 +1160,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-19.2";
+const APP_VERSION = "2026-10-20.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -5428,7 +5432,50 @@ function renderSectionEditor(sec, sIdx, opened){
 // Radio questions can show a free-text box: always (once an answer is
 // chosen) or only when one particular answer is chosen.
 // Column designer for an add-rows table.
+// "Show this column only if <earlier question> is <value>" for one column.
+function colCondHtml(c, sIdx, qIdx, ci, cands){
+  const cond = c.visibleIf || null;
+  const target = cond ? cands.find(x=>x.id===cond.id) : null;
+  const key = cond ? (cond.includes!==undefined ? 'includes' : 'equals') : null;
+  const val = cond ? (cond.includes!==undefined ? cond.includes : cond.equals) : '';
+  const valueCtl = !cond ? '' : (target && Array.isArray(target.options) && target.options.length
+    ? `<select onchange="onTableColCond(${sIdx},${qIdx},${ci},'value',this.value)">
+         ${val==='' || val===undefined ? '<option value="" selected disabled>Select a value…</option>' : ''}
+         ${target.options.map(o=>`<option value="${escapeHtml(o)}" ${val===o?'selected':''}>${escapeHtml(o)}</option>`).join('')}
+       </select>`
+    : `<input type="text" value="${escapeHtml(val||'')}" placeholder="Value" oninput="onTableColCond(${sIdx},${qIdx},${ci},'value',this.value)">`);
+  return `<div class="field"><label>Show this column</label>
+    <select onchange="onTableColCond(${sIdx},${qIdx},${ci},'mode',this.value)">
+      <option value="always" ${cond?'':'selected'}>Always</option>
+      <option value="if" ${cond?'selected':''}>Only if an earlier question has a certain answer</option>
+    </select></div>
+    ${cond ? `<div class="field-row">
+      <div class="field"><label>Earlier question</label>
+        <select onchange="onTableColCond(${sIdx},${qIdx},${ci},'id',this.value)">
+          <option value="" ${target?'':'selected'} disabled>Select a question…</option>
+          ${cands.map(x=>`<option value="${escapeHtml(x.id)}" ${cond.id===x.id?'selected':''}>${escapeHtml(x.label)}</option>`).join('')}
+        </select></div>
+      <div class="field"><label>Answer</label>${valueCtl}</div>
+    </div>` : ''}`;
+}
+window.onTableColCond = function(sIdx, qIdx, ci, field, v){
+  const c = D().SECTIONS[sIdx].questions[qIdx].tableColumns[ci];
+  if(field==='mode'){
+    if(v==='always') delete c.visibleIf; else c.visibleIf = { id:'', equals:'' };
+  } else if(field==='id'){
+    const t2 = findQuestionById(v);
+    // checkbox answers are lists, so they need "includes"; everything else "equals"
+    const isList = t2 && t2.type==='checkboxes';
+    const first = t2 && Array.isArray(t2.options) && t2.options.length ? t2.options[0] : '';
+    c.visibleIf = isList ? { id:v, includes:first } : { id:v, equals:first };
+  } else if(field==='value' && c.visibleIf){
+    if(c.visibleIf.includes!==undefined) c.visibleIf.includes = v; else c.visibleIf.equals = v;
+  }
+  edSetDirty(true);
+  if(field!=='value') renderFormEditor();
+};
 function tableEditorHtml(q, sIdx, qIdx){
+  const cands = questionsBefore(sIdx, qIdx).filter(x=>!GRID_TYPES.includes(x.type) && x.type!==TABLE_TYPE);
   const cols = q.tableColumns || [];
   return `<div class="field"><label>Columns</label>
     ${cols.map((c,ci)=>`<div class="tbl-col-edit">
@@ -5442,6 +5489,7 @@ function tableEditorHtml(q, sIdx, qIdx){
       </div>
       ${c.type==='yesnotext' ? `<div class="field"><label>Text box label (shown when Yes)</label>
         <input type="text" value="${escapeHtml(c.textLabel||'')}" placeholder="Details" oninput="updateTableCol(${sIdx},${qIdx},${ci},'textLabel',this.value)"></div>` : ''}
+      ${colCondHtml(c, sIdx, qIdx, ci, cands)}
       <div class="toolbar" style="flex-direction:row;flex-wrap:wrap;gap:6px;margin:0 0 6px;">
         <button type="button" class="btn secondary" style="width:auto;padding:6px 12px;" onclick="moveTableCol(${sIdx},${qIdx},${ci},-1)" ${ci===0?'disabled':''}>Move column up</button>
         <button type="button" class="btn secondary" style="width:auto;padding:6px 12px;" onclick="moveTableCol(${sIdx},${qIdx},${ci},1)" ${ci===cols.length-1?'disabled':''}>Move column down</button>
@@ -5796,7 +5844,7 @@ async function saveFormSchema(){
   const tbBad = [];
   draft.SECTIONS.forEach(s=>s.questions.forEach(q=>{ if(q.textBox && q.textBox.mode==='when' && !(q.options||[]).includes(q.textBox.value)) tbBad.push(`Question "${q.label}"`); }));
   const tblBad = [];
-  draft.SECTIONS.forEach(s=>s.questions.forEach(q=>{ if(q.type===TABLE_TYPE && (!(q.tableColumns||[]).length || q.tableColumns.some(c=>!String(c.label||'').trim()))) tblBad.push(`Question "${q.label}"`); }));
+  draft.SECTIONS.forEach(s=>s.questions.forEach(q=>{ if(q.type===TABLE_TYPE && (!(q.tableColumns||[]).length || q.tableColumns.some(c=>!String(c.label||'').trim() || (c.visibleIf && (!c.visibleIf.id || (c.visibleIf.equals===undefined && c.visibleIf.includes===undefined) || (c.visibleIf.equals==='' || c.visibleIf.includes==='')))))) tblBad.push(`Question "${q.label}"`); }));
   const noValue = [];
   const hasValue = c => c.in!==undefined ? c.in.length>0 : [c.equals,c.notEquals,c.includes].some(v=>v!==undefined && v!=='');
   draft.SECTIONS.forEach(s=>{
@@ -5810,7 +5858,7 @@ async function saveFormSchema(){
       dupes.length ? `Duplicate question id(s): ${[...new Set(dupes)].join(', ')}.` : '',
       brokenRefs.length ? `These have a "show only if" pointing at a question that no longer exists or hasn't been chosen yet: ${brokenRefs.join(', ')}.` : '',
       noValue.length ? `These have a "show only if" with no value chosen, so they would never show - pick a value: ${noValue.join(', ')}.` : '',
-      tblBad.length ? `These add-rows tables need at least one column, and every column needs a name: ${tblBad.join(', ')}.` : '',
+      tblBad.length ? `These add-rows tables need at least one column, every column needs a name, and a column set to show only for an answer needs a question and an answer: ${tblBad.join(', ')}.` : '',
       tbBad.length ? `These questions show a text box for an answer that is no longer one of the choices - pick the answer again: ${tbBad.join(', ')}.` : '',
       rowSrc.length ? `These grid questions pull their rows from another question but no source or value is chosen: ${rowSrc.join(', ')}.` : ''
     ].filter(Boolean).join(' ');
@@ -5979,7 +6027,7 @@ function notesTableHtml(q, si, qi){
         else if(c.type==='yesno' || c.type==='yesnotext') ctl = `<div class="choice-group" style="flex-direction:row;flex-wrap:wrap;">${yn(ri, c, val)}</div>`
           + (c.type==='yesnotext' && val==='Yes' ? `<textarea rows="2" style="margin-top:8px;" placeholder="${escapeHtml(c.textLabel||'Details')}" aria-label="${escapeHtml(c.label)}: ${escapeHtml(c.textLabel||'Details')}" oninput="notesTableSet(${si},${qi},${ri},'${escapeHtml(c.id)}__text',this.value,false)">${escapeHtml(row[c.id+'__text']||'')}</textarea>` : '');
         else ctl = `<input type="text" value="${escapeHtml(val===undefined?'':val)}" oninput="notesTableSet(${si},${qi},${ri},'${escapeHtml(c.id)}',this.value,false)">`;
-        return `<div class="rt-field"><label class="qlabel">${escapeHtml(c.label)}</label>${ctl}</div>`;
+        return `<div class="rt-field" data-col="${escapeHtml(c.id)}"><label class="qlabel">${escapeHtml(c.label)}</label>${ctl}</div>`;
       }).join('')}</div>
     </div>`).join('')}
     <button type="button" class="btn secondary" onclick="notesTableAdd(${si},${qi})">+ Add row</button></div>`;
@@ -6142,6 +6190,12 @@ function notesApplyVisibility(){
         qEl.hidden = !notesEvalCond(q.visibleIf, a) || (!!q.rowsFrom && notesRowsOf(q).length===0);
         const tb = qEl.querySelector('.nt-radio-text');
         if(tb) tb.hidden = !notesRadioTextVisible(q);
+        if(q.type===TABLE_TYPE){
+          qEl.querySelectorAll('.rt-field[data-col]').forEach(f=>{
+            const col = (q.tableColumns||[]).find(c=>c.id===f.dataset.col);
+            if(col) f.hidden = !notesEvalCond(col.visibleIf, a);
+          });
+        }
       }
     });
   });
@@ -6161,6 +6215,7 @@ function notesVisibleAnswers(){
         const cleaned = (Array.isArray(v) ? v : []).map(r=>{
           const o = {};
           cols.forEach(c=>{
+            if(!notesEvalCond(c.visibleIf, a)) return;   // column hidden by an earlier answer
             const x = r[c.id];
             if(x!==undefined && x!==null && String(x).trim()!=='') o[c.id] = x;
             if(c.type==='yesnotext' && x==='Yes'){
@@ -6747,6 +6802,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 20, 2026', version: '2026-10-20.1', items: [
+    'Fixed: a long section in the question editors was cut off and could not be scrolled to - open sections now grow to fit all their questions. New: each column of an add-rows table can be set to show only when an earlier question has a certain answer; hidden columns are left out of the saved note.'
+  ]},
   { date: 'Oct 19, 2026', version: '2026-10-19.2', items: [
     'Changed: an intake form now follows the person. Once it is linked on any of their sessions, every session for that recipient (first, follow-ups, upcoming, tentative) shows it, with no need to relink. Linking a different form replaces the old one for the whole person, and Unlink removes it from all their sessions.'
   ]},
@@ -6759,15 +6817,15 @@ const CHANGE_LOG = [
   { date: 'Oct 16, 2026', version: '2026-10-16.4', items: [
     'New: a multiple choice (radio) question can show a text box - either whenever an answer is chosen, or only for one specific answer - with its own label. Set it in the question editor under Text box.'
   ]},
-  { date: 'Oct 16, 2026', version: '2026-10-16.3', items: [
-    'New: Sort A to Z / Z to A buttons under every list you type in the question editors - the choices of a radio, dropdown or checkbox question, and the rows and columns of a grid - so you can enter them in any order and sort with one tap.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 16, 2026', version: '2026-10-16.3', items: [
+    'New: Sort A to Z / Z to A buttons under every list you type in the question editors - the choices of a radio, dropdown or checkbox question, and the rows and columns of a grid - so you can enter them in any order and sort with one tap.'
+  ]},
   { date: 'Oct 16, 2026', version: '2026-10-16.2', items: [
     'New: a grid question can pull its rows from an earlier grid question - only the rows answered with a chosen value (e.g. just the Yes ones) are shown, and the question stays hidden if there are none. Any grid can also have an optional text box below it, with its own label.'
   ]},
