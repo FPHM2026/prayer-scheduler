@@ -472,6 +472,25 @@
      form (a rule and spacing above every section after the first). */
   .ed-section{margin:0 0 22px;padding:8px 8px 4px 12px;border:1px solid var(--border);border-left:6px solid var(--primary);border-radius:10px;background:rgba(0,0,0,.02);}
   .ed-section > .group{margin-bottom:6px;}
+  /* Phones: in the question editors the move/delete buttons sit on their own
+     row ABOVE the title, and the title/summary, questions and answers use
+     the full width instead of being squeezed beside the buttons. Wider
+     screens keep the side-by-side layout. */
+  @media (max-width:640px){
+    .ed-group .group-row-wrap{flex-direction:column;align-items:stretch;}
+    .ed-group .group-row-wrap .sess-actions{order:-1;justify-content:flex-end;padding:8px 10px 0;}
+    .ed-group .group-row-toggle{width:100%;padding:10px 12px 14px;}
+    .ed-group .group-avatar{display:none;}
+    .ed-group .group-chevron{margin-left:auto;}
+    /* Pinned Save/Discard/Preview: one compact row so they don't eat the screen. */
+    .editor-sticky .toolbar{display:flex;flex-direction:row;flex-wrap:nowrap;gap:6px;align-items:center;margin-bottom:4px;}
+    .editor-sticky .toolbar > .btn{flex:1 1 0;width:auto;min-width:0;padding:10px 4px;font-size:var(--fs-sm);}
+    .editor-sticky #btnFormEditorDiscard{flex-grow:2.2;}
+    .editor-sticky .tag{display:none!important;}
+    .ed-group .group-body-inner{padding:0 12px 12px;}
+    .ed-section{padding:6px 6px 2px 8px;border-left-width:4px;}
+    .ed-section > .group{margin-bottom:8px;}
+  }
   /* Session Notes form: same look as the public intake form - each section is
      a card with a serif heading, intro in a tinted callout, questions with
      bold labels, and choices as bordered boxes that highlight when ticked. */
@@ -1131,7 +1150,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-15.4";
+const APP_VERSION = "2026-10-16.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -5297,7 +5316,7 @@ function visibleIfPickerHtml(kind, sIdx, qIdx, cond, candidateQuestions){
 // user feedback on the first version, which buried them in the body).
 function editorGroupRow(key, avatarText, name, countLabel, summaryHtml, bodyHtml, wasOpen, actionsHtml){
   return `
-  <div class="group${wasOpen ? ' open' : ''}" data-key="${escapeHtml(key)}">
+  <div class="group ed-group${wasOpen ? ' open' : ''}" data-key="${escapeHtml(key)}">
     <div class="group-row-wrap">
       <button class="group-row-toggle" onclick="this.closest('.group').classList.toggle('open')" aria-expanded="${wasOpen}">
         <span class="group-avatar" aria-hidden="true">${escapeHtml(avatarText)}</span>
@@ -6384,6 +6403,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 16, 2026', version: '2026-10-16.1', items: [
+    'Changed: on phones, the question editors (Session Notes and Intake Questions) put the move/delete buttons of each section and question on their own row above the title, and the title, questions and answers use the full width; the pinned Save/Discard/Preview buttons shrink to one row. Wider screens keep the existing layout.'
+  ]},
   { date: 'Oct 15, 2026', version: '2026-10-15.4', items: [
     'New: two Session Notes question types - Multiple choice grid (one answer per row) and Checkbox grid (any number per row). Set the rows and columns in the editor, optionally limit to one response per column, and mark Required to need an answer in every row. Available in Session Notes only (not the public intake form).'
   ]},
@@ -6396,15 +6418,15 @@ const CHANGE_LOG = [
   { date: 'Oct 14, 2026', version: '2026-10-14.5', items: [
     'Fixed: a "show only if" set to "equals" a choice of a checkbox question never showed, because a checkbox answer is a list. In Session Notes it now treats equals as includes; picking a checkbox question in the editor sets the condition to includes automatically.'
   ]},
-  { date: 'Oct 14, 2026', version: '2026-10-14.4', items: [
-    'Fixed: a "show only if" on a choice/checkbox question could look like it had a value selected (the first choice) while actually storing none, so the question never appeared. Choosing the question now stores its first choice, an unset value shows "Select a value…", and saving is blocked with a message if a condition has no value. If you already have such a condition, re-select its value and save.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 14, 2026', version: '2026-10-14.4', items: [
+    'Fixed: a "show only if" on a choice/checkbox question could look like it had a value selected (the first choice) while actually storing none, so the question never appeared. Choosing the question now stores its first choice, an unset value shows "Select a value…", and saving is blocked with a message if a condition has no value. If you already have such a condition, re-select its value and save.'
+  ]},
   { date: 'Oct 14, 2026', version: '2026-10-14.3', items: [
     'New: in the question editors (Session Notes and Intake Questions), each question has a Section picker so it can be moved to another section. It lands at the end of that section, and you are warned if a "show only if" now points at a question that comes later.'
   ]},
