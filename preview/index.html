@@ -487,6 +487,13 @@
   #notesBody .choice-option:has(input:checked){border-color:#aa5a3c;background:#f3e7e0;}
   #notesBody .choice-option input[type=radio],#notesBody .choice-option input[type=checkbox]{width:18px;height:18px;flex-shrink:0;}
   #notesBody .choice-option .other-text{flex:1 1 100%;width:auto;min-width:0;}
+  #notesBody .grid-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px;}
+  #notesBody .nt-grid{width:100%;border-collapse:collapse;font-size:var(--fs-sm);}
+  #notesBody .nt-grid th,#notesBody .nt-grid td{padding:10px 12px;text-align:center;border-bottom:1px solid #e8e0d3;}
+  #notesBody .nt-grid thead th{font-weight:600;color:var(--muted);background:#faf6ee;}
+  #notesBody .nt-grid tbody th{text-align:left;font-weight:600;min-width:120px;}
+  #notesBody .nt-grid tbody tr:last-child th,#notesBody .nt-grid tbody tr:last-child td{border-bottom:none;}
+  #notesBody .nt-grid input{width:20px;height:20px;cursor:pointer;}
   #notesBody input[type=text],#notesBody input[type=email],#notesBody input[type=number],#notesBody textarea,#notesBody select{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:8px;font-size:1rem;font-family:inherit;background:#fff;box-sizing:border-box;}
   #notesBody textarea{min-height:90px;resize:vertical;}
   #notesBody .choice-option .other-text{flex:1 1 100%;width:auto;}
@@ -1124,7 +1131,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-15.2";
+const APP_VERSION = "2026-10-15.4";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -5030,6 +5037,12 @@ function renderIntakeLinkBlock(session){
    target change) trigger renderFormEditor() to redraw.
 ========================================================================= */
 const QUESTION_TYPES = ['text','email','number','textarea','radio','select','checkboxes'];
+// Grid questions (rows x columns) are only offered for Session Notes - the
+// public intake form's renderer doesn't know them. choicegrid = one pick per
+// row (Google's 'multiple choice grid'); checkboxgrid = any number per row.
+const GRID_TYPES = ['choicegrid','checkboxgrid'];
+const GRID_LABELS = { choicegrid:'multiple choice grid', checkboxgrid:'checkbox grid' };
+function questionTypesForEditor(){ return activeEditor==='notes' ? QUESTION_TYPES.concat(GRID_TYPES) : QUESTION_TYPES; }
 const TYPES_WITH_OPTIONS = ['radio','select','checkboxes'];
 
 /* One editor UI, two forms: the same DOM block (#intakeQuestionsView) is
@@ -5304,7 +5317,7 @@ function editorGroupRow(key, avatarText, name, countLabel, summaryHtml, bodyHtml
 }
 
 function renderSectionEditor(sec, sIdx, opened){
-  const candidateQuestions = questionsBefore(sIdx, null);
+  const candidateQuestions = questionsBefore(sIdx, null).filter(q=>!GRID_TYPES.includes(q.type));
   const wasOpen = opened.has(sec.id) ? opened.get(sec.id) : false;
   const visSummary = describeVisibleIf(sec.visibleIf);
   const summaryHtml = escapeHtml([visSummary || 'Always shown', sec.intro ? 'has intro text' : null].filter(Boolean).join(' · '));
@@ -5330,12 +5343,12 @@ function renderSectionEditor(sec, sIdx, opened){
 }
 
 function renderQuestionEditor(q, sIdx, qIdx, sec, opened){
-  const candidateQuestions = questionsBefore(sIdx, qIdx);
+  const candidateQuestions = questionsBefore(sIdx, qIdx).filter(q=>!GRID_TYPES.includes(q.type));
   const hasOptions = TYPES_WITH_OPTIONS.includes(q.type);
   const wasOpen = opened.has(q.id) ? opened.get(q.id) : false;
   const visSummary = describeVisibleIf(q.visibleIf);
   const summaryHtml = escapeHtml([q.required ? 'Required' : 'Optional', visSummary || 'Always shown'].join(' · '));
-  const avatar = { text:'Ab', email:'@', number:'#', textarea:'¶', radio:'◉', select:'▾', checkboxes:'☑' }[q.type] || '?';
+  const avatar = { text:'Ab', email:'@', number:'#', textarea:'¶', radio:'◉', select:'▾', checkboxes:'☑', choicegrid:'▦', checkboxgrid:'▦' }[q.type] || '?';
   const actions = `
     <button class="icon-btn icon-btn-lg" title="Move up" onclick="moveQuestion(${sIdx},${qIdx},-1)" ${qIdx===0?'disabled':''}>${ICONS.arrowUp}</button>
     <button class="icon-btn icon-btn-lg" title="Move down" onclick="moveQuestion(${sIdx},${qIdx},1)" ${qIdx===sec.questions.length-1?'disabled':''}>${ICONS.arrowDown}</button>
@@ -5352,7 +5365,7 @@ function renderQuestionEditor(q, sIdx, qIdx, sec, opened){
     <div class="field-row">
       <div class="field"><label>Answer type</label>
         <select onchange="onQuestionTypeChange(${sIdx},${qIdx},this.value)">
-          ${QUESTION_TYPES.map(t=>`<option value="${t}" ${q.type===t?'selected':''}>${t}</option>`).join('')}
+          ${questionTypesForEditor().map(t=>`<option value="${t}" ${q.type===t?'selected':''}>${GRID_LABELS[t]||t}</option>`).join('')}
         </select>
       </div>
       <div class="field" style="display:flex;align-items:flex-end;">
@@ -5361,6 +5374,15 @@ function renderQuestionEditor(q, sIdx, qIdx, sec, opened){
         </label>
       </div>
     </div>
+    ${GRID_TYPES.includes(q.type) ? `<div class="field-row">
+      <div class="field"><label>Rows (one per line)</label>
+        <textarea rows="4" oninput="updateGridList(${sIdx},${qIdx},'rows',this.value)">${escapeHtml((q.rows||[]).join('\n'))}</textarea></div>
+      <div class="field"><label>Columns (one per line)</label>
+        <textarea rows="4" oninput="updateGridList(${sIdx},${qIdx},'columns',this.value)">${escapeHtml((q.columns||[]).join('\n'))}</textarea></div>
+    </div>
+    <div class="field"><label style="display:flex;align-items:center;gap:6px;font-weight:400;">
+      <input type="checkbox" ${q.limitPerColumn?'checked':''} onchange="updateQuestionField(${sIdx},${qIdx},'limitPerColumn',this.checked)"> Limit to one response per column
+    </label></div>` : ''}
     ${hasOptions ? `<div class="field"><label>Choices (one per line)</label>
       <textarea rows="4" oninput="updateQuestionOptions(${sIdx},${qIdx},this.value)">${escapeHtml((q.options||[]).join('\n'))}</textarea>
     </div>` : ''}
@@ -5391,6 +5413,10 @@ window.updateQuestionFieldAndRerender = function(sIdx, qIdx, field, value){
   markSchemaDirty();
   renderFormEditor();
 };
+window.updateGridList = function(sIdx, qIdx, which, text){
+  D().SECTIONS[sIdx].questions[qIdx][which] = text.split('\n').map(s=>s.trim()).filter(Boolean);
+  edSetDirty(true);
+};
 window.updateQuestionOptions = function(sIdx, qIdx, text){
   D().SECTIONS[sIdx].questions[qIdx].options = text.split('\n').map(s=>s.trim()).filter(Boolean);
   markSchemaDirty();
@@ -5399,6 +5425,10 @@ window.onQuestionTypeChange = function(sIdx, qIdx, newType){
   const q = D().SECTIONS[sIdx].questions[qIdx];
   q.type = newType;
   if(TYPES_WITH_OPTIONS.includes(newType) && !Array.isArray(q.options)) q.options = ['Yes','No'];
+  if(GRID_TYPES.includes(newType)){
+    if(!Array.isArray(q.rows)) q.rows = ['Row 1','Row 2'];
+    if(!Array.isArray(q.columns)) q.columns = ['Column 1','Column 2','Column 3'];
+  } else { delete q.rows; delete q.columns; delete q.limitPerColumn; }
   if(!TYPES_WITH_OPTIONS.includes(newType)){ delete q.options; delete q.otherOption; }
   if(newType!=='checkboxes') delete q.otherOption;
   if(newType!=='number'){ delete q.min; delete q.max; }
@@ -5696,6 +5726,14 @@ function notesQuestionHtml(q, si, qi){
       + (q.otherOption ? `<label class="choice-option"><input type="checkbox" ${other!==undefined?'checked':''} onchange="notesOtherToggle(${si},${qi},this.checked,this)"> <span>Other:</span>
           <input type="text" class="other-text" value="${escapeHtml(other?String(other).slice(10):'')}" oninput="notesOtherText(${si},${qi},this.value)"></label>` : '')
       + `</div>`;
+  } else if(GRID_TYPES.includes(q.type)){
+    const rows = q.rows||[], cols = q.columns||[];
+    const ans = (v && typeof v==='object' && !Array.isArray(v)) ? v : {};
+    const isRadio = q.type==='choicegrid';
+    input = `<div class="grid-wrap"><table class="nt-grid"><thead><tr><th></th>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((r,ri)=>`<tr><th scope="row">${escapeHtml(r)}</th>${cols.map((c,ci)=>{
+      const on = isRadio ? ans[r]===c : (Array.isArray(ans[r]) && ans[r].includes(c));
+      return `<td><input type="${isRadio?'radio':'checkbox'}" name="${id}_${ri}" ${on?'checked':''} aria-label="${escapeHtml(r)}: ${escapeHtml(c)}" onchange="notesGridSet(${si},${qi},${ri},${ci},this.checked)"></td>`;
+    }).join('')}</tr>`).join('')}</tbody></table></div>`;
   } else {
     const type = q.type==='email' ? 'email' : q.type==='number' ? 'number' : 'text';
     input = `<input id="${id}" type="${type}" ${q.min!==undefined?`min="${q.min}"`:''} ${q.max!==undefined?`max="${q.max}"`:''} value="${escapeHtml(v===undefined?'':v)}" oninput="notesSet(${si},${qi},this.value)">`;
@@ -5715,6 +5753,34 @@ window.notesToggle = function(si, qi, oi, checked){
   const i = arr.indexOf(o);
   if(checked && i<0) arr.push(o); if(!checked && i>=0) arr.splice(i,1);
   notesCtx.answers[q.id] = arr;
+  notesApplyVisibility();
+};
+// Grid answers are objects: { rowLabel: column } for a multiple choice grid,
+// { rowLabel: [columns] } for a checkbox grid.
+window.notesGridSet = function(si, qi, ri, ci, checked){
+  const q = notesQ(si,qi), row = q.rows[ri], col = q.columns[ci];
+  const cur = notesCtx.answers[q.id];
+  const a = (cur && typeof cur==='object' && !Array.isArray(cur)) ? cur : {};
+  if(q.type==='choicegrid'){ a[row] = col; }
+  else {
+    const arr = Array.isArray(a[row]) ? a[row].slice() : [];
+    const i = arr.indexOf(col);
+    if(checked && i<0) arr.push(col);
+    if(!checked && i>=0) arr.splice(i,1);
+    if(arr.length) a[row] = arr; else delete a[row];
+  }
+  if(q.limitPerColumn && checked){
+    q.rows.forEach(r2=>{
+      if(r2===row) return;
+      if(q.type==='choicegrid'){ if(a[r2]===col) delete a[r2]; }
+      else if(Array.isArray(a[r2])){ a[r2] = a[r2].filter(c=>c!==col); if(!a[r2].length) delete a[r2]; }
+    });
+  }
+  notesCtx.answers[q.id] = a;
+  if(q.limitPerColumn){
+    const el = $(`#notesBody .nt-q[data-si="${si}"][data-qi="${qi}"]`);
+    if(el) el.outerHTML = notesQuestionHtml(q, si, qi);
+  }
   notesApplyVisibility();
 };
 window.notesOtherToggle = function(si, qi, checked, el){
@@ -5752,6 +5818,19 @@ function notesVisibleAnswers(){
     (sec.questions||[]).forEach(q=>{
       if(!notesEvalCond(q.visibleIf, a)) return;
       const v = a[q.id];
+      if(GRID_TYPES.includes(q.type)){
+        // Keep only rows/columns that still exist; required = every row answered.
+        const rows = q.rows||[], cols = q.columns||[];
+        const src = (v && typeof v==='object' && !Array.isArray(v)) ? v : {};
+        const clean = {};
+        rows.forEach(r=>{
+          if(q.type==='choicegrid'){ if(cols.includes(src[r])) clean[r] = src[r]; }
+          else if(Array.isArray(src[r])){ const keep = src[r].filter(c=>cols.includes(c)); if(keep.length) clean[r] = keep; }
+        });
+        if(q.required && rows.some(r=>!(r in clean))){ missing.push(q.label + ' (every row)'); return; }
+        if(Object.keys(clean).length) out[q.id] = clean;
+        return;
+      }
       const blank = v===undefined || v===null || v==='' || (Array.isArray(v) && v.length===0);
       if(blank){ if(q.required) missing.push(q.label); return; }
       out[q.id] = v;
@@ -6305,6 +6384,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 15, 2026', version: '2026-10-15.4', items: [
+    'New: two Session Notes question types - Multiple choice grid (one answer per row) and Checkbox grid (any number per row). Set the rows and columns in the editor, optionally limit to one response per column, and mark Required to need an answer in every row. Available in Session Notes only (not the public intake form).'
+  ]},
   { date: 'Oct 15, 2026', version: '2026-10-15.2', items: [
     'Changed: sections are now visually separated - in the question editors each section sits in its own bordered block with a bold side rule, and the Session Notes form now has the same look as the public intake form: each section is a card with a serif heading, section intro text in a tinted callout, and choices as bordered boxes that highlight when ticked.'
   ]},
@@ -6317,15 +6399,15 @@ const CHANGE_LOG = [
   { date: 'Oct 14, 2026', version: '2026-10-14.4', items: [
     'Fixed: a "show only if" on a choice/checkbox question could look like it had a value selected (the first choice) while actually storing none, so the question never appeared. Choosing the question now stores its first choice, an unset value shows "Select a value…", and saving is blocked with a message if a condition has no value. If you already have such a condition, re-select its value and save.'
   ]},
-  { date: 'Oct 14, 2026', version: '2026-10-14.3', items: [
-    'New: in the question editors (Session Notes and Intake Questions), each question has a Section picker so it can be moved to another section. It lands at the end of that section, and you are warned if a "show only if" now points at a question that comes later.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 14, 2026', version: '2026-10-14.3', items: [
+    'New: in the question editors (Session Notes and Intake Questions), each question has a Section picker so it can be moved to another section. It lands at the end of that section, and you are warned if a "show only if" now points at a question that comes later.'
+  ]},
   { date: 'Oct 14, 2026', version: '2026-10-14.2', items: [
     'New: Settings > Session Notes has a Preview form button that opens the form exactly as currently edited - unsaved changes included, branching working - without saving or opening a session. Nothing entered in the preview is saved.'
   ]},
