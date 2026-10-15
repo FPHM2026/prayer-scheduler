@@ -1093,7 +1093,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-14.4";
+const APP_VERSION = "2026-10-14.5";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -5454,6 +5454,7 @@ window.onVisibleIfTargetChange = function(kind, sIdx, qIdx, targetId){
   // condition silently never matched. Store the first choice as the default.
   const target = findQuestionById(targetId);
   const c = obj.visibleIf;
+  if(target && target.type==='checkboxes' && c.equals!==undefined){ c.includes = c.equals; delete c.equals; }
   if(target && Array.isArray(target.options) && target.options.length && c.in===undefined){
     const first = target.options[0];
     if(c.equals!==undefined) c.equals = first;
@@ -5587,6 +5588,18 @@ function notesButtonHtml(s){
   return `<button class="icon-btn${has?' success':''}" onclick="openSessionNotes(${s.id})" title="Session Notes" aria-label="${has?'View or edit':'Write'} session notes for ${escapeHtml(s.recipName)}">${ICONS.pencil}<span class="btn-label">${has?'Session Notes ✓':'Session Notes'}</span></button>`;
 }
 
+// Same rules as FPHM.evalCond, except that "equals"/"notEquals" against a
+// checkbox answer (an array) mean "includes" / "does not include" - a
+// checkbox answer can never be strictly equal to a single choice, so a
+// condition set up that way would otherwise never show anything.
+function notesEvalCond(cond, answers){
+  if(cond && Array.isArray(answers[cond.id])){
+    const arr = answers[cond.id];
+    if(cond.equals!==undefined) return arr.includes(cond.equals);
+    if(cond.notEquals!==undefined) return !arr.includes(cond.notEquals);
+  }
+  return FPHM.evalCond(cond, answers);
+}
 let notesCtx = null; // { session, schema, answers, existing, formVersion }
 window.openSessionNotes = function(sessionId){
   const s = sessions.find(x=>x.id===sessionId);
@@ -5683,10 +5696,10 @@ function notesApplyVisibility(){
   notesCtx.schema.SECTIONS.forEach((sec,si)=>{
     const secEl = $(`#notesBody .nt-sec[data-si="${si}"]`);
     if(!secEl) return;
-    secEl.hidden = !FPHM.evalCond(sec.visibleIf, a);
+    secEl.hidden = !notesEvalCond(sec.visibleIf, a);
     (sec.questions||[]).forEach((q,qi)=>{
       const qEl = secEl.querySelector(`.nt-q[data-qi="${qi}"]`);
-      if(qEl) qEl.hidden = !FPHM.evalCond(q.visibleIf, a);
+      if(qEl) qEl.hidden = !notesEvalCond(q.visibleIf, a);
     });
   });
 }
@@ -5694,9 +5707,9 @@ function notesApplyVisibility(){
 function notesVisibleAnswers(){
   const a = notesCtx.answers, out = {}, missing = [];
   notesCtx.schema.SECTIONS.forEach(sec=>{
-    if(!FPHM.evalCond(sec.visibleIf, a)) return;
+    if(!notesEvalCond(sec.visibleIf, a)) return;
     (sec.questions||[]).forEach(q=>{
-      if(!FPHM.evalCond(q.visibleIf, a)) return;
+      if(!notesEvalCond(q.visibleIf, a)) return;
       const v = a[q.id];
       const blank = v===undefined || v===null || v==='' || (Array.isArray(v) && v.length===0);
       if(blank){ if(q.required) missing.push(q.label); return; }
@@ -6251,6 +6264,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 14, 2026', version: '2026-10-14.5', items: [
+    'Fixed: a "show only if" set to "equals" a choice of a checkbox question never showed, because a checkbox answer is a list. In Session Notes it now treats equals as includes; picking a checkbox question in the editor sets the condition to includes automatically.'
+  ]},
   { date: 'Oct 14, 2026', version: '2026-10-14.4', items: [
     'Fixed: a "show only if" on a choice/checkbox question could look like it had a value selected (the first choice) while actually storing none, so the question never appeared. Choosing the question now stores its first choice, an unset value shows "Select a value…", and saving is blocked with a message if a condition has no value. If you already have such a condition, re-select its value and save.'
   ]},
@@ -6263,15 +6279,15 @@ const CHANGE_LOG = [
   { date: 'Oct 12, 2026', version: '2026-10-12.1', items: [
     'New: removing a booked session (Remove Booking, or deleting a scheduled session) whose ministers were already notified on WhatsApp now asks "Send cancellation" / "Don\'t send". Sending uses a new WhatsApp template, prayer_session_canceled, which must be approved in WhatsApp Manager and the notify Worker redeployed before it will deliver - until then the send reports a failure and nothing else changes.'
   ]},
-  { date: 'Oct 8, 2026', version: '2026-10-08.4', items: [
-    'Changed: clicking View on a linked or suggested intake form (e.g. from a Tentative or Booked card, or the waiting list) now opens it with a "Back to [that tab]" button that returns you to where you were, at the same scroll position, instead of dropping you on the Intake Forms list.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 8, 2026', version: '2026-10-08.4', items: [
+    'Changed: clicking View on a linked or suggested intake form (e.g. from a Tentative or Booked card, or the waiting list) now opens it with a "Back to [that tab]" button that returns you to where you were, at the same scroll position, instead of dropping you on the Intake Forms list.'
+  ]},
   { date: 'Oct 8, 2026', version: '2026-10-08.3', items: [
     'New: a Tentative slot\'s card shows an "Intake form match" chip when there is an intake form that looks like a match for the recipient and it isn\'t linked yet, so you can spot which ones to link without opening each card.'
   ]},
