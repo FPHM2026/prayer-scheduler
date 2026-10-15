@@ -1150,7 +1150,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-16.1";
+const APP_VERSION = "2026-10-16.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -5361,6 +5361,63 @@ function renderSectionEditor(sec, sIdx, opened){
   return editorGroupRow(sec.id, String(sIdx+1), sec.title||'(untitled section)', `${sec.questions.length} question${sec.questions.length===1?'':'s'}`, summaryHtml, body, wasOpen, actions);
 }
 
+// Grid question editor: rows typed in, or pulled from an earlier grid
+// question (only the rows that were answered with a chosen value there),
+// columns, one-per-column limit, and an optional free-text box below.
+function gridEditorHtml(q, sIdx, qIdx){
+  const sources = questionsBefore(sIdx, qIdx).filter(x=>GRID_TYPES.includes(x.type));
+  const fromMode = !!q.rowsFrom;
+  const src = fromMode ? sources.find(x=>x.id===q.rowsFrom.id) : null;
+  const modeSel = `<div class="field"><label>Rows</label>
+    <select onchange="onGridRowsMode(${sIdx},${qIdx},this.value)">
+      <option value="list" ${fromMode?'':'selected'}>Type the rows myself</option>
+      <option value="from" ${fromMode?'selected':''} ${sources.length?'':'disabled'}>Pull rows from an earlier grid question${sources.length?'':' (none above yet)'}</option>
+    </select></div>`;
+  let rowsPart;
+  if(!fromMode){
+    rowsPart = `<div class="field"><label>Rows (one per line)</label>
+      <textarea rows="4" oninput="updateGridList(${sIdx},${qIdx},'rows',this.value)">${escapeHtml((q.rows||[]).join('\n'))}</textarea></div>`;
+  } else {
+    rowsPart = `<div class="field-row">
+      <div class="field"><label>Take rows from</label>
+        <select onchange="onGridRowsFromId(${sIdx},${qIdx},this.value)">
+          <option value="" ${src?'':'selected'} disabled>Select a grid question…</option>
+          ${sources.map(x=>`<option value="${escapeHtml(x.id)}" ${q.rowsFrom.id===x.id?'selected':''}>${escapeHtml(x.label)}</option>`).join('')}
+        </select></div>
+      <div class="field"><label>Only rows answered</label>
+        <select onchange="onGridRowsFromValue(${sIdx},${qIdx},this.value)">
+          ${src ? (src.columns||[]).map(c=>`<option value="${escapeHtml(c)}" ${q.rowsFrom.value===c?'selected':''}>${escapeHtml(c)}</option>`).join('') : '<option value="">—</option>'}
+        </select></div>
+    </div>
+    <p class="helptext" style="margin:-4px 0 10px;">Only the rows answered with this value are shown. If none were, the question stays hidden.</p>`;
+  }
+  return `${modeSel}${rowsPart}
+    <div class="field"><label>Columns (one per line)</label>
+      <textarea rows="4" oninput="updateGridList(${sIdx},${qIdx},'columns',this.value)">${escapeHtml((q.columns||[]).join('\n'))}</textarea></div>
+    <div class="field"><label style="display:flex;align-items:center;gap:6px;font-weight:400;">
+      <input type="checkbox" ${q.limitPerColumn?'checked':''} onchange="updateQuestionField(${sIdx},${qIdx},'limitPerColumn',this.checked)"> Limit to one response per column
+    </label></div>
+    <div class="field"><label style="display:flex;align-items:center;gap:6px;font-weight:400;">
+      <input type="checkbox" ${q.withNotes?'checked':''} onchange="updateQuestionFieldAndRerender(${sIdx},${qIdx},'withNotes',this.checked)"> Add a text box below the grid
+    </label></div>
+    ${q.withNotes ? `<div class="field"><label>Text box label</label>
+      <input type="text" value="${escapeHtml(q.notesLabel||'')}" placeholder="Notes" oninput="updateQuestionField(${sIdx},${qIdx},'notesLabel',this.value)"></div>` : ''}`;
+}
+window.onGridRowsMode = function(sIdx, qIdx, mode){
+  const q = D().SECTIONS[sIdx].questions[qIdx];
+  if(mode==='from') q.rowsFrom = { id:'', value:'' }; else delete q.rowsFrom;
+  edSetDirty(true); renderFormEditor();
+};
+window.onGridRowsFromId = function(sIdx, qIdx, id){
+  const q = D().SECTIONS[sIdx].questions[qIdx];
+  const src = findQuestionById(id);
+  q.rowsFrom = { id, value: src && (src.columns||[]).length ? src.columns[0] : '' };
+  edSetDirty(true); renderFormEditor();
+};
+window.onGridRowsFromValue = function(sIdx, qIdx, value){
+  D().SECTIONS[sIdx].questions[qIdx].rowsFrom.value = value;
+  edSetDirty(true);
+};
 function renderQuestionEditor(q, sIdx, qIdx, sec, opened){
   const candidateQuestions = questionsBefore(sIdx, qIdx).filter(q=>!GRID_TYPES.includes(q.type));
   const hasOptions = TYPES_WITH_OPTIONS.includes(q.type);
@@ -5393,15 +5450,7 @@ function renderQuestionEditor(q, sIdx, qIdx, sec, opened){
         </label>
       </div>
     </div>
-    ${GRID_TYPES.includes(q.type) ? `<div class="field-row">
-      <div class="field"><label>Rows (one per line)</label>
-        <textarea rows="4" oninput="updateGridList(${sIdx},${qIdx},'rows',this.value)">${escapeHtml((q.rows||[]).join('\n'))}</textarea></div>
-      <div class="field"><label>Columns (one per line)</label>
-        <textarea rows="4" oninput="updateGridList(${sIdx},${qIdx},'columns',this.value)">${escapeHtml((q.columns||[]).join('\n'))}</textarea></div>
-    </div>
-    <div class="field"><label style="display:flex;align-items:center;gap:6px;font-weight:400;">
-      <input type="checkbox" ${q.limitPerColumn?'checked':''} onchange="updateQuestionField(${sIdx},${qIdx},'limitPerColumn',this.checked)"> Limit to one response per column
-    </label></div>` : ''}
+    ${GRID_TYPES.includes(q.type) ? gridEditorHtml(q, sIdx, qIdx) : ''}
     ${hasOptions ? `<div class="field"><label>Choices (one per line)</label>
       <textarea rows="4" oninput="updateQuestionOptions(${sIdx},${qIdx},this.value)">${escapeHtml((q.options||[]).join('\n'))}</textarea>
     </div>` : ''}
@@ -5447,7 +5496,7 @@ window.onQuestionTypeChange = function(sIdx, qIdx, newType){
   if(GRID_TYPES.includes(newType)){
     if(!Array.isArray(q.rows)) q.rows = ['Row 1','Row 2'];
     if(!Array.isArray(q.columns)) q.columns = ['Column 1','Column 2','Column 3'];
-  } else { delete q.rows; delete q.columns; delete q.limitPerColumn; }
+  } else { delete q.rows; delete q.columns; delete q.limitPerColumn; delete q.rowsFrom; delete q.withNotes; delete q.notesLabel; }
   if(!TYPES_WITH_OPTIONS.includes(newType)){ delete q.options; delete q.otherOption; }
   if(newType!=='checkboxes') delete q.otherOption;
   if(newType!=='number'){ delete q.min; delete q.max; }
@@ -5577,19 +5626,22 @@ async function saveFormSchema(){
     if(s.visibleIf && !idSet.has(s.visibleIf.id)) brokenRefs.push(`Section "${s.title}"`);
     s.questions.forEach(q=>{ if(q.visibleIf && !idSet.has(q.visibleIf.id)) brokenRefs.push(`Question "${q.label}"`); });
   });
+  const rowSrc = [];
+  draft.SECTIONS.forEach(s=>s.questions.forEach(q=>{ if(q.rowsFrom && (!q.rowsFrom.id || !idSet.has(q.rowsFrom.id) || !q.rowsFrom.value)) rowSrc.push(`Question "${q.label}"`); }));
   const noValue = [];
   const hasValue = c => c.in!==undefined ? c.in.length>0 : [c.equals,c.notEquals,c.includes].some(v=>v!==undefined && v!=='');
   draft.SECTIONS.forEach(s=>{
     if(s.visibleIf && s.visibleIf.id && !hasValue(s.visibleIf)) noValue.push(`Section "${s.title}"`);
     s.questions.forEach(q=>{ if(q.visibleIf && q.visibleIf.id && !hasValue(q.visibleIf)) noValue.push(`Question "${q.label}"`); });
   });
-  if(dupes.length || brokenRefs.length || noValue.length){
+  if(dupes.length || brokenRefs.length || noValue.length || rowSrc.length){
     msg.hidden = false;
     msg.className = 'errbox';
     msg.innerHTML = [
       dupes.length ? `Duplicate question id(s): ${[...new Set(dupes)].join(', ')}.` : '',
       brokenRefs.length ? `These have a "show only if" pointing at a question that no longer exists or hasn't been chosen yet: ${brokenRefs.join(', ')}.` : '',
-      noValue.length ? `These have a "show only if" with no value chosen, so they would never show - pick a value: ${noValue.join(', ')}.` : ''
+      noValue.length ? `These have a "show only if" with no value chosen, so they would never show - pick a value: ${noValue.join(', ')}.` : '',
+      rowSrc.length ? `These grid questions pull their rows from another question but no source or value is chosen: ${rowSrc.join(', ')}.` : ''
     ].filter(Boolean).join(' ');
     return;
   }
@@ -5725,6 +5777,18 @@ function renderNotesForm(){
     </div>`).join('');
   notesApplyVisibility();
 }
+// A grid's rows: its own list, or - when rowsFrom is set - the rows of an
+// earlier grid answered with the chosen value (e.g. only the "Yes" rows).
+function notesRowsOf(q){
+  if(!q.rowsFrom || !q.rowsFrom.id) return q.rows||[];
+  let src = null;
+  notesCtx.schema.SECTIONS.forEach(s=>(s.questions||[]).forEach(x=>{ if(x.id===q.rowsFrom.id) src = x; }));
+  if(!src) return [];
+  const ans = notesCtx.answers[src.id];
+  if(!ans || typeof ans!=='object' || Array.isArray(ans)) return [];
+  const want = q.rowsFrom.value;
+  return notesRowsOf(src).filter(r => src.type==='choicegrid' ? ans[r]===want : (Array.isArray(ans[r]) && ans[r].includes(want)));
+}
 function notesQuestionHtml(q, si, qi){
   const id = `nq_${si}_${qi}`;
   const v = notesCtx.answers[q.id];
@@ -5746,13 +5810,14 @@ function notesQuestionHtml(q, si, qi){
           <input type="text" class="other-text" value="${escapeHtml(other?String(other).slice(10):'')}" oninput="notesOtherText(${si},${qi},this.value)"></label>` : '')
       + `</div>`;
   } else if(GRID_TYPES.includes(q.type)){
-    const rows = q.rows||[], cols = q.columns||[];
+    const rows = notesRowsOf(q), cols = q.columns||[];
     const ans = (v && typeof v==='object' && !Array.isArray(v)) ? v : {};
     const isRadio = q.type==='choicegrid';
     input = `<div class="grid-wrap"><table class="nt-grid"><thead><tr><th></th>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((r,ri)=>`<tr><th scope="row">${escapeHtml(r)}</th>${cols.map((c,ci)=>{
       const on = isRadio ? ans[r]===c : (Array.isArray(ans[r]) && ans[r].includes(c));
       return `<td><input type="${isRadio?'radio':'checkbox'}" name="${id}_${ri}" ${on?'checked':''} aria-label="${escapeHtml(r)}: ${escapeHtml(c)}" onchange="notesGridSet(${si},${qi},${ri},${ci},this.checked)"></td>`;
-    }).join('')}</tr>`).join('')}</tbody></table></div>`;
+    }).join('')}</tr>`).join('')}</tbody></table></div>`
+      + (q.withNotes ? `<label class="qlabel" style="margin-top:14px;">${escapeHtml(q.notesLabel||'Notes')}</label><textarea rows="3" oninput="notesSetGridNotes(${si},${qi},this.value)">${escapeHtml(notesCtx.answers[q.id+'__notes']||'')}</textarea>` : '');
   } else {
     const type = q.type==='email' ? 'email' : q.type==='number' ? 'number' : 'text';
     input = `<input id="${id}" type="${type}" ${q.min!==undefined?`min="${q.min}"`:''} ${q.max!==undefined?`max="${q.max}"`:''} value="${escapeHtml(v===undefined?'':v)}" oninput="notesSet(${si},${qi},this.value)">`;
@@ -5777,7 +5842,7 @@ window.notesToggle = function(si, qi, oi, checked){
 // Grid answers are objects: { rowLabel: column } for a multiple choice grid,
 // { rowLabel: [columns] } for a checkbox grid.
 window.notesGridSet = function(si, qi, ri, ci, checked){
-  const q = notesQ(si,qi), row = q.rows[ri], col = q.columns[ci];
+  const q = notesQ(si,qi), row = notesRowsOf(q)[ri], col = q.columns[ci];
   const cur = notesCtx.answers[q.id];
   const a = (cur && typeof cur==='object' && !Array.isArray(cur)) ? cur : {};
   if(q.type==='choicegrid'){ a[row] = col; }
@@ -5789,7 +5854,7 @@ window.notesGridSet = function(si, qi, ri, ci, checked){
     if(arr.length) a[row] = arr; else delete a[row];
   }
   if(q.limitPerColumn && checked){
-    q.rows.forEach(r2=>{
+    notesRowsOf(q).forEach(r2=>{
       if(r2===row) return;
       if(q.type==='choicegrid'){ if(a[r2]===col) delete a[r2]; }
       else if(Array.isArray(a[r2])){ a[r2] = a[r2].filter(c=>c!==col); if(!a[r2].length) delete a[r2]; }
@@ -5800,7 +5865,17 @@ window.notesGridSet = function(si, qi, ri, ci, checked){
     const el = $(`#notesBody .nt-q[data-si="${si}"][data-qi="${qi}"]`);
     if(el) el.outerHTML = notesQuestionHtml(q, si, qi);
   }
+  // Any grid that pulls its rows from this one must re-render with the new rows.
+  notesCtx.schema.SECTIONS.forEach((sec, s2)=>(sec.questions||[]).forEach((x, q2)=>{
+    if(x.rowsFrom && x.rowsFrom.id===q.id){
+      const el2 = $(`#notesBody .nt-q[data-si="${s2}"][data-qi="${q2}"]`);
+      if(el2) el2.outerHTML = notesQuestionHtml(x, s2, q2);
+    }
+  }));
   notesApplyVisibility();
+};
+window.notesSetGridNotes = function(si, qi, text){
+  notesCtx.answers[notesQ(si,qi).id + '__notes'] = text;
 };
 window.notesOtherToggle = function(si, qi, checked, el){
   const q = notesQ(si,qi);
@@ -5825,7 +5900,7 @@ function notesApplyVisibility(){
     secEl.hidden = !notesEvalCond(sec.visibleIf, a);
     (sec.questions||[]).forEach((q,qi)=>{
       const qEl = secEl.querySelector(`.nt-q[data-qi="${qi}"]`);
-      if(qEl) qEl.hidden = !notesEvalCond(q.visibleIf, a);
+      if(qEl) qEl.hidden = !notesEvalCond(q.visibleIf, a) || (!!q.rowsFrom && notesRowsOf(q).length===0);
     });
   });
 }
@@ -5839,15 +5914,18 @@ function notesVisibleAnswers(){
       const v = a[q.id];
       if(GRID_TYPES.includes(q.type)){
         // Keep only rows/columns that still exist; required = every row answered.
-        const rows = q.rows||[], cols = q.columns||[];
+        const rows = notesRowsOf(q), cols = q.columns||[];
         const src = (v && typeof v==='object' && !Array.isArray(v)) ? v : {};
         const clean = {};
         rows.forEach(r=>{
           if(q.type==='choicegrid'){ if(cols.includes(src[r])) clean[r] = src[r]; }
           else if(Array.isArray(src[r])){ const keep = src[r].filter(c=>cols.includes(c)); if(keep.length) clean[r] = keep; }
         });
+        if(q.rowsFrom && rows.length===0) return;
         if(q.required && rows.some(r=>!(r in clean))){ missing.push(q.label + ' (every row)'); return; }
         if(Object.keys(clean).length) out[q.id] = clean;
+        const gn = a[q.id + '__notes'];
+        if(q.withNotes && gn && String(gn).trim()) out[q.id + '__notes'] = String(gn);
         return;
       }
       const blank = v===undefined || v===null || v==='' || (Array.isArray(v) && v.length===0);
@@ -6403,6 +6481,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 16, 2026', version: '2026-10-16.2', items: [
+    'New: a grid question can pull its rows from an earlier grid question - only the rows answered with a chosen value (e.g. just the Yes ones) are shown, and the question stays hidden if there are none. Any grid can also have an optional text box below it, with its own label.'
+  ]},
   { date: 'Oct 16, 2026', version: '2026-10-16.1', items: [
     'Changed: on phones, the question editors (Session Notes and Intake Questions) put the move/delete buttons of each section and question on their own row above the title, and the title, questions and answers use the full width; the pinned Save/Discard/Preview buttons shrink to one row. Wider screens keep the existing layout.'
   ]},
@@ -6415,15 +6496,15 @@ const CHANGE_LOG = [
   { date: 'Oct 15, 2026', version: '2026-10-15.1', items: [
     'Changed: in the question editors (Session Notes and Intake Questions), the Save changes / Discard / Preview buttons stay pinned under the tab bar while you scroll, so they are always in reach.'
   ]},
-  { date: 'Oct 14, 2026', version: '2026-10-14.5', items: [
-    'Fixed: a "show only if" set to "equals" a choice of a checkbox question never showed, because a checkbox answer is a list. In Session Notes it now treats equals as includes; picking a checkbox question in the editor sets the condition to includes automatically.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 14, 2026', version: '2026-10-14.5', items: [
+    'Fixed: a "show only if" set to "equals" a choice of a checkbox question never showed, because a checkbox answer is a list. In Session Notes it now treats equals as includes; picking a checkbox question in the editor sets the condition to includes automatically.'
+  ]},
   { date: 'Oct 14, 2026', version: '2026-10-14.4', items: [
     'Fixed: a "show only if" on a choice/checkbox question could look like it had a value selected (the first choice) while actually storing none, so the question never appeared. Choosing the question now stores its first choice, an unset value shows "Select a value…", and saving is blocked with a message if a condition has no value. If you already have such a condition, re-select its value and save.'
   ]},
