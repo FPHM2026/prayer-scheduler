@@ -1150,7 +1150,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-16.3";
+const APP_VERSION = "2026-10-16.4";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -5366,6 +5366,36 @@ function renderSectionEditor(sec, sIdx, opened){
 // columns, one-per-column limit, and an optional free-text box below.
 // "Sort A→Z / Z→A" buttons under any typed list (choices, grid rows, grid
 // columns) - type the entries in any order, then tidy them with one tap.
+// Radio questions can show a free-text box: always (once an answer is
+// chosen) or only when one particular answer is chosen.
+function radioTextBoxEditorHtml(q, sIdx, qIdx){
+  const tb = q.textBox || null;
+  const mode = tb ? tb.mode : 'none';
+  return `<div class="field"><label>Text box</label>
+    <select onchange="onRadioTextMode(${sIdx},${qIdx},this.value)">
+      <option value="none" ${mode==='none'?'selected':''}>No text box</option>
+      <option value="always" ${mode==='always'?'selected':''}>Show one whenever an answer is chosen</option>
+      <option value="when" ${mode==='when'?'selected':''}>Show one only for a specific answer</option>
+    </select></div>
+    ${mode==='when' ? `<div class="field"><label>Show the text box when the answer is</label>
+      <select onchange="onRadioTextValue(${sIdx},${qIdx},this.value)">
+        ${(q.options||[]).map(o=>`<option value="${escapeHtml(o)}" ${tb.value===o?'selected':''}>${escapeHtml(o)}</option>`).join('')}
+      </select></div>` : ''}
+    ${mode!=='none' ? `<div class="field"><label>Text box label</label>
+      <input type="text" value="${escapeHtml(tb.label||'')}" placeholder="Please explain" oninput="onRadioTextLabel(${sIdx},${qIdx},this.value)"></div>` : ''}`;
+}
+window.onRadioTextMode = function(sIdx, qIdx, mode){
+  const q = D().SECTIONS[sIdx].questions[qIdx];
+  if(mode==='none') delete q.textBox;
+  else {
+    const label = q.textBox ? q.textBox.label : '';
+    q.textBox = { mode, label: label||'' };
+    if(mode==='when') q.textBox.value = (q.options||[])[0] || '';
+  }
+  edSetDirty(true); renderFormEditor();
+};
+window.onRadioTextValue = function(sIdx, qIdx, v){ D().SECTIONS[sIdx].questions[qIdx].textBox.value = v; edSetDirty(true); };
+window.onRadioTextLabel = function(sIdx, qIdx, v){ D().SECTIONS[sIdx].questions[qIdx].textBox.label = v; edSetDirty(true); };
 function sortButtonsHtml(sIdx, qIdx, field){
   return `<div class="toolbar" style="flex-direction:row;flex-wrap:wrap;gap:6px;margin:4px 0 0;">
     <button type="button" class="btn secondary" style="width:auto;padding:6px 12px;" onclick="sortQuestionList(${sIdx},${qIdx},'${field}',1)">Sort A&rarr;Z</button>
@@ -5478,6 +5508,7 @@ function renderQuestionEditor(q, sIdx, qIdx, sec, opened){
         <input type="checkbox" ${q.otherOption?'checked':''} onchange="updateQuestionFieldAndRerender(${sIdx},${qIdx},'otherOption',this.checked)"> Allow an "Other, please specify" choice
       </label>
     </div>` : ''}
+    ${q.type==='radio' ? radioTextBoxEditorHtml(q, sIdx, qIdx) : ''}
     ${q.type==='number' ? `<div class="field-row">
       <div class="field"><label>Minimum</label><input type="number" value="${q.min??''}" oninput="updateQuestionField(${sIdx},${qIdx},'min',this.value===''?undefined:Number(this.value))"></div>
       <div class="field"><label>Maximum</label><input type="number" value="${q.max??''}" oninput="updateQuestionField(${sIdx},${qIdx},'max',this.value===''?undefined:Number(this.value))"></div>
@@ -5519,6 +5550,7 @@ window.onQuestionTypeChange = function(sIdx, qIdx, newType){
   if(!TYPES_WITH_OPTIONS.includes(newType)){ delete q.options; delete q.otherOption; }
   if(newType!=='checkboxes') delete q.otherOption;
   if(newType!=='number'){ delete q.min; delete q.max; }
+  if(newType!=='radio'){ delete q.textBox; }
   markSchemaDirty();
   renderFormEditor();
 };
@@ -5647,19 +5679,22 @@ async function saveFormSchema(){
   });
   const rowSrc = [];
   draft.SECTIONS.forEach(s=>s.questions.forEach(q=>{ if(q.rowsFrom && (!q.rowsFrom.id || !idSet.has(q.rowsFrom.id) || !q.rowsFrom.value)) rowSrc.push(`Question "${q.label}"`); }));
+  const tbBad = [];
+  draft.SECTIONS.forEach(s=>s.questions.forEach(q=>{ if(q.textBox && q.textBox.mode==='when' && !(q.options||[]).includes(q.textBox.value)) tbBad.push(`Question "${q.label}"`); }));
   const noValue = [];
   const hasValue = c => c.in!==undefined ? c.in.length>0 : [c.equals,c.notEquals,c.includes].some(v=>v!==undefined && v!=='');
   draft.SECTIONS.forEach(s=>{
     if(s.visibleIf && s.visibleIf.id && !hasValue(s.visibleIf)) noValue.push(`Section "${s.title}"`);
     s.questions.forEach(q=>{ if(q.visibleIf && q.visibleIf.id && !hasValue(q.visibleIf)) noValue.push(`Question "${q.label}"`); });
   });
-  if(dupes.length || brokenRefs.length || noValue.length || rowSrc.length){
+  if(dupes.length || brokenRefs.length || noValue.length || rowSrc.length || tbBad.length){
     msg.hidden = false;
     msg.className = 'errbox';
     msg.innerHTML = [
       dupes.length ? `Duplicate question id(s): ${[...new Set(dupes)].join(', ')}.` : '',
       brokenRefs.length ? `These have a "show only if" pointing at a question that no longer exists or hasn't been chosen yet: ${brokenRefs.join(', ')}.` : '',
       noValue.length ? `These have a "show only if" with no value chosen, so they would never show - pick a value: ${noValue.join(', ')}.` : '',
+      tbBad.length ? `These questions show a text box for an answer that is no longer one of the choices - pick the answer again: ${tbBad.join(', ')}.` : '',
       rowSrc.length ? `These grid questions pull their rows from another question but no source or value is chosen: ${rowSrc.join(', ')}.` : ''
     ].filter(Boolean).join(' ');
     return;
@@ -5820,7 +5855,8 @@ function notesQuestionHtml(q, si, qi){
   } else if(q.type==='select'){
     input = `<select id="${id}" onchange="notesSet(${si},${qi},this.value)"><option value="">— Select —</option>${(q.options||[]).map(o=>`<option value="${escapeHtml(o)}"${v===o?' selected':''}>${escapeHtml(o)}</option>`).join('')}</select>`;
   } else if(q.type==='radio'){
-    input = `<div class="choice-group">${(q.options||[]).map(o=>`<label class="choice-option"><input type="radio" name="${id}" ${v===o?'checked':''} onchange="notesSet(${si},${qi},${esc(o)})"> <span>${escapeHtml(o)}</span></label>`).join('')}</div>`;
+    input = `<div class="choice-group">${(q.options||[]).map(o=>`<label class="choice-option"><input type="radio" name="${id}" ${v===o?'checked':''} onchange="notesSet(${si},${qi},${esc(o)})"> <span>${escapeHtml(o)}</span></label>`).join('')}</div>`
+      + (q.textBox ? `<div class="nt-radio-text" data-si="${si}" data-qi="${qi}" hidden style="margin-top:12px;"><label class="qlabel">${escapeHtml(q.textBox.label||'Please explain')}</label><textarea rows="3" oninput="notesSetRadioText(${si},${qi},this.value)">${escapeHtml(notesCtx.answers[q.id+'__text']||'')}</textarea></div>` : '');
   } else if(q.type==='checkboxes'){
     const arr = Array.isArray(v) ? v : [];
     const other = arr.find(x=>String(x).startsWith('__other__:'));
@@ -5896,6 +5932,17 @@ window.notesGridSet = function(si, qi, ri, ci, checked){
 window.notesSetGridNotes = function(si, qi, text){
   notesCtx.answers[notesQ(si,qi).id + '__notes'] = text;
 };
+window.notesSetRadioText = function(si, qi, text){
+  notesCtx.answers[notesQ(si,qi).id + '__text'] = text;
+};
+// The radio's text box: "always" shows it once any answer is chosen;
+// "when" only while the chosen answer is the configured one.
+function notesRadioTextVisible(q){
+  if(!q.textBox) return false;
+  const a = notesCtx.answers[q.id];
+  if(a===undefined || a===null || a==='') return false;
+  return q.textBox.mode==='always' || a===q.textBox.value;
+}
 window.notesOtherToggle = function(si, qi, checked, el){
   const q = notesQ(si,qi);
   const arr = (Array.isArray(notesCtx.answers[q.id]) ? notesCtx.answers[q.id] : []).filter(x=>!String(x).startsWith('__other__:'));
@@ -5919,7 +5966,11 @@ function notesApplyVisibility(){
     secEl.hidden = !notesEvalCond(sec.visibleIf, a);
     (sec.questions||[]).forEach((q,qi)=>{
       const qEl = secEl.querySelector(`.nt-q[data-qi="${qi}"]`);
-      if(qEl) qEl.hidden = !notesEvalCond(q.visibleIf, a) || (!!q.rowsFrom && notesRowsOf(q).length===0);
+      if(qEl){
+        qEl.hidden = !notesEvalCond(q.visibleIf, a) || (!!q.rowsFrom && notesRowsOf(q).length===0);
+        const tb = qEl.querySelector('.nt-radio-text');
+        if(tb) tb.hidden = !notesRadioTextVisible(q);
+      }
     });
   });
 }
@@ -5950,6 +6001,10 @@ function notesVisibleAnswers(){
       const blank = v===undefined || v===null || v==='' || (Array.isArray(v) && v.length===0);
       if(blank){ if(q.required) missing.push(q.label); return; }
       out[q.id] = v;
+      if(q.type==='radio' && notesRadioTextVisible(q)){
+        const rt = a[q.id + '__text'];
+        if(rt && String(rt).trim()) out[q.id + '__text'] = String(rt);
+      }
     });
   });
   return { answers: out, missing };
@@ -6500,6 +6555,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 16, 2026', version: '2026-10-16.4', items: [
+    'New: a multiple choice (radio) question can show a text box - either whenever an answer is chosen, or only for one specific answer - with its own label. Set it in the question editor under Text box.'
+  ]},
   { date: 'Oct 16, 2026', version: '2026-10-16.3', items: [
     'New: Sort A to Z / Z to A buttons under every list you type in the question editors - the choices of a radio, dropdown or checkbox question, and the rows and columns of a grid - so you can enter them in any order and sort with one tap.'
   ]},
@@ -6512,15 +6570,15 @@ const CHANGE_LOG = [
   { date: 'Oct 15, 2026', version: '2026-10-15.4', items: [
     'New: two Session Notes question types - Multiple choice grid (one answer per row) and Checkbox grid (any number per row). Set the rows and columns in the editor, optionally limit to one response per column, and mark Required to need an answer in every row. Available in Session Notes only (not the public intake form).'
   ]},
-  { date: 'Oct 15, 2026', version: '2026-10-15.2', items: [
-    'Changed: sections are now visually separated - in the question editors each section sits in its own bordered block with a bold side rule, and the Session Notes form now has the same look as the public intake form: each section is a card with a serif heading, section intro text in a tinted callout, and choices as bordered boxes that highlight when ticked.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 15, 2026', version: '2026-10-15.2', items: [
+    'Changed: sections are now visually separated - in the question editors each section sits in its own bordered block with a bold side rule, and the Session Notes form now has the same look as the public intake form: each section is a card with a serif heading, section intro text in a tinted callout, and choices as bordered boxes that highlight when ticked.'
+  ]},
   { date: 'Oct 15, 2026', version: '2026-10-15.1', items: [
     'Changed: in the question editors (Session Notes and Intake Questions), the Save changes / Discard / Preview buttons stay pinned under the tab bar while you scroll, so they are always in reach.'
   ]},
