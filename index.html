@@ -460,6 +460,67 @@
     .overview-filters .date-pair{flex:none;}
   }
 
+  /* Question editors: Save / Discard / Preview stay pinned just under the tab
+     bar while scrolling. --nav-h is the tab bar's real height (it wraps to
+     two rows on narrow screens), kept current by syncNavHeight(). */
+  /* Visual separation between sections - in the question editors (each
+     section is a bordered block with a bold side rule) and in the notes
+     form (a rule and spacing above every section after the first). */
+  .ed-section{margin:0 0 22px;padding:8px 8px 4px 12px;border:1px solid var(--border);border-left:6px solid var(--primary);border-radius:10px;background:rgba(0,0,0,.02);}
+  .ed-section > .group{margin-bottom:6px;}
+  /* Phones: in the question editors the move/delete buttons sit on their own
+     row ABOVE the title, and the title/summary, questions and answers use
+     the full width instead of being squeezed beside the buttons. Wider
+     screens keep the side-by-side layout. */
+  @media (max-width:640px){
+    .ed-group .group-row-wrap{flex-direction:column;align-items:stretch;}
+    .ed-group .group-row-wrap .sess-actions{order:-1;justify-content:flex-end;padding:8px 10px 0;}
+    .ed-group .group-row-toggle{width:100%;padding:10px 12px 14px;}
+    .ed-group .group-avatar{display:none;}
+    .ed-group .group-chevron{margin-left:auto;}
+    /* Pinned Save/Discard/Preview: one compact row so they don't eat the screen. */
+    .editor-sticky .toolbar{display:flex;flex-direction:row;flex-wrap:nowrap;gap:6px;align-items:center;margin-bottom:4px;}
+    .editor-sticky .toolbar > .btn{flex:1 1 0;width:auto;min-width:0;padding:10px 4px;font-size:var(--fs-sm);}
+    .editor-sticky #btnFormEditorDiscard{flex-grow:2.2;}
+    .editor-sticky .tag{display:none!important;}
+    .ed-group .group-body-inner{padding:0 12px 12px;}
+    .ed-section{padding:6px 6px 2px 8px;border-left-width:4px;}
+    .ed-section > .group{margin-bottom:8px;}
+  }
+  /* Session Notes form: same look as the public intake form - each section is
+     a card with a serif heading, intro in a tinted callout, questions with
+     bold labels, and choices as bordered boxes that highlight when ticked. */
+  #notesBody .nt-sec{background:#fff;border:1px solid var(--border);border-radius:12px;padding:18px 18px 4px;margin-top:16px;}
+  #notesBody .nt-sec:first-child{margin-top:4px;}
+  #notesBody .nt-sec h3{font-family:'Playfair Display',Georgia,serif;font-size:1.15rem;color:#8a4a30;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+  #notesBody .section-intro{background:#f0ede4;border-left:3px solid #aa5a3c;padding:10px 14px;border-radius:6px;font-size:var(--fs-sm);color:var(--muted);margin:0 0 16px;white-space:pre-wrap;}
+  #notesBody .nt-q{margin-bottom:20px;}
+  #notesBody .qlabel{display:block;font-weight:600;margin-bottom:8px;}
+  #notesBody .required-mark{color:#c0392b;margin-left:3px;}
+  #notesBody .choice-group{display:flex;flex-direction:column;gap:8px;}
+  #notesBody .choice-option{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:#fff;font-weight:400;}
+  #notesBody .choice-option:has(input:checked){border-color:#aa5a3c;background:#f3e7e0;}
+  #notesBody .choice-option input[type=radio],#notesBody .choice-option input[type=checkbox]{width:18px;height:18px;flex-shrink:0;}
+  #notesBody .choice-option .other-text{flex:1 1 100%;width:auto;min-width:0;}
+  #notesBody .rt-wrap{display:flex;flex-direction:column;gap:12px;}
+  #notesBody .rt-row{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:#fdfbf7;}
+  #notesBody .rt-row-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;}
+  #notesBody .rt-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px 14px;}
+  #notesBody .rt-field .qlabel{font-size:var(--fs-sm);margin-bottom:4px;}
+  .tbl-col-edit{border:1px solid var(--border);border-radius:8px;padding:10px 10px 4px;margin-bottom:10px;background:rgba(0,0,0,.02);}
+  #notesBody .grid-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px;}
+  #notesBody .nt-grid{width:100%;border-collapse:collapse;font-size:var(--fs-sm);}
+  #notesBody .nt-grid th,#notesBody .nt-grid td{padding:10px 12px;text-align:center;border-bottom:1px solid #e8e0d3;}
+  #notesBody .nt-grid thead th{font-weight:600;color:var(--muted);background:#faf6ee;}
+  #notesBody .nt-grid tbody th{text-align:left;font-weight:600;min-width:120px;}
+  #notesBody .nt-grid tbody tr:last-child th,#notesBody .nt-grid tbody tr:last-child td{border-bottom:none;}
+  #notesBody .nt-grid input{width:20px;height:20px;cursor:pointer;}
+  #notesBody input[type=text],#notesBody input[type=email],#notesBody input[type=number],#notesBody textarea,#notesBody select{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:8px;font-size:1rem;font-family:inherit;background:#fff;box-sizing:border-box;}
+  #notesBody textarea{min-height:90px;resize:vertical;}
+  #notesBody .choice-option .other-text{flex:1 1 100%;width:auto;}
+  .editor-sticky{position:sticky;top:var(--nav-h,0px);z-index:15;background:var(--bg);padding:8px 0 6px;margin-bottom:8px;border-bottom:1px solid var(--border);}
+  .editor-sticky .toolbar{margin-bottom:4px;}
+  .editor-sticky .errbox{margin:6px 0 0;}
   .subtabs{display:flex;gap:20px;margin:4px 0 16px;border-bottom:1px solid var(--border);}
   .subtabs button{background:none;border:none;border-bottom:3px solid transparent;padding:8px 2px;font-weight:700;font-size:var(--fs-sm);color:var(--muted);cursor:pointer;}
   .subtabs button:hover{color:var(--gold-dark);}
@@ -781,12 +842,15 @@
     <div id="intakeQuestionsHost" hidden>
     <div id="intakeQuestionsView">
       <p class="helptext" id="formEditorHelp">Edit the intake questionnaire's sections, questions and wording. Changes take effect for anyone opening the public form as soon as you save — no deploy needed.</p>
-      <div class="toolbar no-print">
+      <div class="editor-sticky no-print" id="formEditorSticky">
+      <div class="toolbar">
         <button class="btn" id="btnFormEditorSave">Save changes</button>
         <button class="btn secondary" id="btnFormEditorDiscard">Discard unsaved changes</button>
+        <button class="btn secondary" id="btnFormEditorPreview" hidden>Preview form</button>
         <span id="formEditorDirtyBadge" class="tag" style="display:none;">Unsaved changes</span>
       </div>
       <p class="errbox" role="alert" id="formEditorMsg" hidden></p>
+      </div>
       <div id="formEditorIntro"></div>
       <div id="formEditorSections"></div>
       <div class="toolbar" style="margin-top:16px;">
@@ -1041,7 +1105,7 @@
     <div class="modal-actions">
       <button class="btn secondary" id="btnNotesDownload" onclick="downloadSessionNotesJson()" hidden>Download JSON</button>
       <button class="btn secondary" onclick="closeSessionNotes()">Cancel</button>
-      <button class="btn" onclick="withLoading(this,'Saving…',saveSessionNotes)">Save Notes</button>
+      <button class="btn" id="btnNotesSave" onclick="withLoading(this,'Saving…',saveSessionNotes)">Save Notes</button>
     </div>
   </div>
 </div>
@@ -1085,7 +1149,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-12.1";
+const APP_VERSION = "2026-10-19.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1760,10 +1824,17 @@ function wireSearchClear(inputId){
   });
   toggle();
 }
+function syncNavHeight(){
+  const nav = document.querySelector('nav[aria-label="Primary"]');
+  if(nav) document.documentElement.style.setProperty('--nav-h', nav.offsetHeight + 'px');
+}
 let appWired = false;
 function wireApp(){
   if(appWired) return;
   appWired = true;
+  syncNavHeight();
+  window.addEventListener('resize', syncNavHeight);
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(syncNavHeight);
   document.querySelectorAll('nav[aria-label="Primary"] button').forEach(b=>b.addEventListener('click', ()=>switchTab(b.dataset.tab)));
   $('#btnRefresh').addEventListener('click', ()=>withLoading($('#btnRefresh'), 'Refreshing…', loadAll));
   $('#btnRefreshData').addEventListener('click', refreshDataKeepingPlace);
@@ -1806,6 +1877,7 @@ function wireApp(){
   $('#btnFormEditorSave').addEventListener('click', ()=>withLoading($('#btnFormEditorSave'), 'Saving…', saveFormSchema));
   $('#btnFormEditorDiscard').addEventListener('click', discardFormSchemaChanges);
   $('#btnFormEditorAddSection').addEventListener('click', addFormSection);
+  $('#btnFormEditorPreview').addEventListener('click', openNotesPreview);
   $('#btnAddMinister').addEventListener('click', ()=>openMinisterModal());
   $('#btnMinCancel').addEventListener('click', ()=>$('#ministerModal').classList.remove('open'));
   $('#btnMinSave').addEventListener('click', ()=>withLoading($('#btnMinSave'), 'Saving…', onSaveMinister));
@@ -2856,6 +2928,7 @@ function renderUnlinkedSessionCard(s){
       ${s.location?`<div class="slot-detail-row">${escapeHtml(sessionLocationDisplay(s))}</div>`:''}
       ${s.notes?`<div class="notes">${escapeHtml(s.notes)}</div>`:''}
       <div class="slot-detail-row">${waSectionHtml(s)}</div>
+      ${s.apptType!=='Drop-in' && s.apptType!=='Training' ? `<div class="slot-detail-row">${renderIntakeLinkBlock(s)}</div>` : ''}
       <div class="toolbar" style="margin-top:10px;">
         <button class="btn secondary" onclick="assignSlotToSession(${s.id},this)">Assign to a Slot</button>
         ${notesButtonHtml(s)}
@@ -2981,7 +3054,7 @@ function renderSlotCard(sl){
         <span class="slot-header-detail">
           ${nameForHeader ? `<span class="slot-header-name">${escapeHtml(nameForHeader)}</span>` : ''}
           ${showSessionNum ? `<span class="tag ${sessionNumberOf(sessionForHeader)===1?'first':''}">Session #${sessionNumberOf(sessionForHeader)}</span>` : ''}
-          ${(sl.status==='Tentative' && cand && !cand.intakeResponseId && findIntakeForRecipient(cand.recipName)) ? `<span class="tag intake-match">Intake form match</span>` : ''}
+          ${(sl.status==='Tentative' && cand && !personIntakeId(cand) && findIntakeForRecipient(cand.recipName)) ? `<span class="tag intake-match">Intake form match</span>` : ''}
           ${teamForHeader ? `<span class="slot-header-team">${escapeHtml(teamForHeader)}</span>` : (sl.status==='Open' ? renderOpenAvailNow(sl) : '')}
         </span>
         <span class="slot-chevron">${ICONS.chevron}</span>
@@ -3633,7 +3706,8 @@ window.pickRecipNameAt = function(i){
 function renderIntakeMatchPanel(name){
   const box = $('#intakeMatchPanel');
   if(!box) return;
-  const match = findIntakeForRecipient(name);
+  const pid = personIntakeIdByName(name);
+  const match = (pid && intakeResponses.find(i=>i.id===pid)) || findIntakeForRecipient(name);
   if(!match){ box.innerHTML=''; return; }
   const label = match.status==='Submitted'
     ? `Intake form on file — submitted ${fmtShort((match.submittedAt||'').split('T')[0])}`
@@ -4840,6 +4914,21 @@ window.closeIntakeDetail = function(){
 function linkedIntakeResponseIds(){
   return new Set(sessions.filter(s=>s.intakeResponseId!=null).map(s=>s.intakeResponseId));
 }
+// An intake form belongs to the PERSON, not to one session: it is stored on
+// whichever session it was linked from, but every session of the same
+// recipient (matched by name, like the rest of the app) shows it. When more
+// than one of their sessions carries a link, the most recent session wins.
+function personIntakeIdByName(name){
+  const key = String(name||'').trim().toLowerCase();
+  if(!key) return null;
+  const carriers = sessions
+    .filter(s=>s.intakeResponseId!=null && String(s.recipName||'').trim().toLowerCase()===key)
+    .sort((a,b)=>(b.date||b.added||'').localeCompare(a.date||a.added||''));
+  return carriers.length ? carriers[0].intakeResponseId : null;
+}
+function personIntakeId(session){
+  return session.intakeResponseId || personIntakeIdByName(session.recipName);
+}
 function findIntakeForRecipient(name){
   if(!name) return null;
   const norm = name.trim().toLowerCase();
@@ -4877,13 +4966,30 @@ window.toggleIntakeLinkPicker = function(sessionId){
 };
 window.linkIntakeForm = async function(sessionId, intakeId){
   await updateItem('sessions', sessionId, { IntakeResponseId: intakeId });
+  // One form per person: drop any older, different link on their other sessions
+  // so the new choice is the one every session shows.
+  const me = sessions.find(x=>x.id===sessionId);
+  if(me){
+    const key = String(me.recipName||'').trim().toLowerCase();
+    for(const o of sessions){
+      if(o.id!==sessionId && o.intakeResponseId!=null && o.intakeResponseId!==intakeId && String(o.recipName||'').trim().toLowerCase()===key){
+        await updateItem('sessions', o.id, { IntakeResponseId: null });
+      }
+    }
+  }
   intakeLinkPickerFor = null;
   await loadAll();
 };
 window.unlinkIntakeForm = async function(sessionId){
   const ok = await askConfirm('Unlink this intake form from the recipient? The intake form itself is not deleted or changed.', {confirmLabel:'Unlink', danger:false});
   if(!ok) return;
-  await updateItem('sessions', sessionId, { IntakeResponseId: null });
+  // The form follows the person, so unlinking clears it from all of their
+  // sessions - otherwise another session's copy of the link would bring it back.
+  const me = sessions.find(x=>x.id===sessionId);
+  const key = me ? String(me.recipName||'').trim().toLowerCase() : null;
+  const ids = new Set([sessionId]);
+  if(key) sessions.forEach(o=>{ if(o.intakeResponseId!=null && String(o.recipName||'').trim().toLowerCase()===key) ids.add(o.id); });
+  for(const id of ids) await updateItem('sessions', id, { IntakeResponseId: null });
   await loadAll();
 };
 // Where "View" was clicked from (tab + scroll position), so the intake
@@ -4932,7 +5038,8 @@ function renderIntakeLinkPicker(sessionId){
 // entry - session is the PrayerSessions record either way.
 function renderIntakeLinkBlock(session){
   const pickerOpen = intakeLinkPickerFor === session.id;
-  const linked = session.intakeResponseId ? intakeResponses.find(i=>i.id===session.intakeResponseId) : null;
+  const linkedId = personIntakeId(session);
+  const linked = linkedId ? intakeResponses.find(i=>i.id===linkedId) : null;
   if(linked){
     const mismatch = linked.recipName && session.recipName
       && linked.recipName.trim().toLowerCase()!==session.recipName.trim().toLowerCase();
@@ -4983,6 +5090,30 @@ function renderIntakeLinkBlock(session){
    target change) trigger renderFormEditor() to redraw.
 ========================================================================= */
 const QUESTION_TYPES = ['text','email','number','textarea','radio','select','checkboxes'];
+// Grid questions (rows x columns) are only offered for Session Notes - the
+// public intake form's renderer doesn't know them. choicegrid = one pick per
+// row (Google's 'multiple choice grid'); checkboxgrid = any number per row.
+const GRID_TYPES = ['choicegrid','checkboxgrid'];
+const GRID_LABELS = { choicegrid:'multiple choice grid', checkboxgrid:'checkbox grid', rowtable:'add-rows table' };
+// Add-rows table: the minister adds/removes rows themselves; every column has
+// its own kind (text, number, yes/no, or yes/no that opens a text box on Yes).
+const TABLE_TYPE = 'rowtable';
+const TABLE_COL_TYPES = [
+  { id:'text',     label:'Text' },
+  { id:'number',   label:'Number' },
+  { id:'yesno',    label:'Yes / No' },
+  { id:'yesnotext',label:'Yes / No, with a text box when Yes' }
+];
+function defaultTableColumns(){
+  return [
+    { id:'spirit',    label:'Spirit',     type:'text' },
+    { id:'underlings',label:'Underlings', type:'number' },
+    { id:'ground',    label:'Ground',     type:'yesno' },
+    { id:'leader',    label:'Leader',     type:'yesnotext', textLabel:'Details' },
+    { id:'removed',   label:'Removed',    type:'yesno' }
+  ];
+}
+function questionTypesForEditor(){ return activeEditor==='notes' ? QUESTION_TYPES.concat(GRID_TYPES, [TABLE_TYPE]) : QUESTION_TYPES; }
 const TYPES_WITH_OPTIONS = ['radio','select','checkboxes'];
 
 /* One editor UI, two forms: the same DOM block (#intakeQuestionsView) is
@@ -5008,6 +5139,7 @@ function showEditor(which){
     ? 'Edit the questions prayer ministers answer in Session Notes (opened from a session card): sections, questions, answer types and "show only if" branching. Each saved note keeps its own copy of the form it was filled in with, so changing questions later never alters notes already written.'
     : "Edit the intake questionnaire's sections, questions and wording. Changes take effect for anyone opening the public form as soon as you save — no deploy needed.";
   $('#formEditorIntro').hidden = notes;
+  $('#btnFormEditorPreview').hidden = !notes;
   $('#formEditorLiability').hidden = notes;
   const badge = $('#formEditorDirtyBadge');
   if(badge) badge.style.display = edDirty() ? 'inline-block' : 'none';
@@ -5176,7 +5308,7 @@ function renderFormEditor(){
   if(activeEditor==='intake') renderFormEditorIntro();
   if(!D()){ box.innerHTML = '<p class="helptext">Loading…</p>'; return; }
   const opened = openState(box);
-  box.innerHTML = D().SECTIONS.map((sec,sIdx)=>renderSectionEditor(sec,sIdx,opened)).join('');
+  box.innerHTML = D().SECTIONS.map((sec,sIdx)=>`<div class="ed-section">${renderSectionEditor(sec,sIdx,opened)}</div>`).join('');
   if(activeEditor==='intake') renderFormEditorLiability();
 }
 
@@ -5205,6 +5337,7 @@ function visibleIfPickerHtml(kind, sIdx, qIdx, cond, candidateQuestions){
       const val = cond.equals!==undefined?cond.equals:cond.notEquals!==undefined?cond.notEquals:cond.includes!==undefined?cond.includes:'';
       valueControl = optionsForTarget
         ? `<select onchange="onVisibleIfValueChange('${kind}',${sIdx},${qIdx===null?'null':qIdx},this.value,false)">
+            ${val==='' || val===undefined ? `<option value="" selected disabled>Select a value…</option>` : ''}
             ${optionsForTarget.map(o=>`<option value="${escapeHtml(o)}" ${val===o?'selected':''}>${escapeHtml(o)}</option>`).join('')}
           </select>`
         : `<input type="text" value="${escapeHtml(val)}" onchange="onVisibleIfValueChange('${kind}',${sIdx},${qIdx===null?'null':qIdx},this.value,false)">`;
@@ -5235,7 +5368,7 @@ function visibleIfPickerHtml(kind, sIdx, qIdx, cond, candidateQuestions){
 // user feedback on the first version, which buried them in the body).
 function editorGroupRow(key, avatarText, name, countLabel, summaryHtml, bodyHtml, wasOpen, actionsHtml){
   return `
-  <div class="group${wasOpen ? ' open' : ''}" data-key="${escapeHtml(key)}">
+  <div class="group ed-group${wasOpen ? ' open' : ''}" data-key="${escapeHtml(key)}">
     <div class="group-row-wrap">
       <button class="group-row-toggle" onclick="this.closest('.group').classList.toggle('open')" aria-expanded="${wasOpen}">
         <span class="group-avatar" aria-hidden="true">${escapeHtml(avatarText)}</span>
@@ -5255,7 +5388,7 @@ function editorGroupRow(key, avatarText, name, countLabel, summaryHtml, bodyHtml
 }
 
 function renderSectionEditor(sec, sIdx, opened){
-  const candidateQuestions = questionsBefore(sIdx, null);
+  const candidateQuestions = questionsBefore(sIdx, null).filter(q=>!GRID_TYPES.includes(q.type) && q.type!==TABLE_TYPE);
   const wasOpen = opened.has(sec.id) ? opened.get(sec.id) : false;
   const visSummary = describeVisibleIf(sec.visibleIf);
   const summaryHtml = escapeHtml([visSummary || 'Always shown', sec.intro ? 'has intro text' : null].filter(Boolean).join(' · '));
@@ -5280,13 +5413,170 @@ function renderSectionEditor(sec, sIdx, opened){
   return editorGroupRow(sec.id, String(sIdx+1), sec.title||'(untitled section)', `${sec.questions.length} question${sec.questions.length===1?'':'s'}`, summaryHtml, body, wasOpen, actions);
 }
 
+// Grid question editor: rows typed in, or pulled from an earlier grid
+// question (only the rows that were answered with a chosen value there),
+// columns, one-per-column limit, and an optional free-text box below.
+// "Sort A→Z / Z→A" buttons under any typed list (choices, grid rows, grid
+// columns) - type the entries in any order, then tidy them with one tap.
+// Radio questions can show a free-text box: always (once an answer is
+// chosen) or only when one particular answer is chosen.
+// Column designer for an add-rows table.
+function tableEditorHtml(q, sIdx, qIdx){
+  const cols = q.tableColumns || [];
+  return `<div class="field"><label>Columns</label>
+    ${cols.map((c,ci)=>`<div class="tbl-col-edit">
+      <div class="field-row">
+        <div class="field"><label>Column ${ci+1} name</label>
+          <input type="text" value="${escapeHtml(c.label||'')}" oninput="updateTableCol(${sIdx},${qIdx},${ci},'label',this.value)"></div>
+        <div class="field"><label>Answer</label>
+          <select onchange="onTableColType(${sIdx},${qIdx},${ci},this.value)">
+            ${TABLE_COL_TYPES.map(t=>`<option value="${t.id}" ${c.type===t.id?'selected':''}>${t.label}</option>`).join('')}
+          </select></div>
+      </div>
+      ${c.type==='yesnotext' ? `<div class="field"><label>Text box label (shown when Yes)</label>
+        <input type="text" value="${escapeHtml(c.textLabel||'')}" placeholder="Details" oninput="updateTableCol(${sIdx},${qIdx},${ci},'textLabel',this.value)"></div>` : ''}
+      <div class="toolbar" style="flex-direction:row;flex-wrap:wrap;gap:6px;margin:0 0 6px;">
+        <button type="button" class="btn secondary" style="width:auto;padding:6px 12px;" onclick="moveTableCol(${sIdx},${qIdx},${ci},-1)" ${ci===0?'disabled':''}>Move column up</button>
+        <button type="button" class="btn secondary" style="width:auto;padding:6px 12px;" onclick="moveTableCol(${sIdx},${qIdx},${ci},1)" ${ci===cols.length-1?'disabled':''}>Move column down</button>
+        <button type="button" class="btn danger" style="width:auto;padding:6px 12px;" onclick="deleteTableCol(${sIdx},${qIdx},${ci})">Remove column</button>
+      </div>
+    </div>`).join('')}
+    <button type="button" class="btn secondary" onclick="addTableCol(${sIdx},${qIdx})">+ Add column</button>
+    <p class="helptext" style="margin:8px 0 0;">Ministers see an <strong>Add row</strong> button and a <strong>Remove row</strong> button on each row.</p>
+  </div>`;
+}
+window.updateTableCol = function(sIdx, qIdx, ci, field, value){
+  D().SECTIONS[sIdx].questions[qIdx].tableColumns[ci][field] = value;
+  edSetDirty(true);
+};
+window.onTableColType = function(sIdx, qIdx, ci, type){
+  D().SECTIONS[sIdx].questions[qIdx].tableColumns[ci].type = type;
+  edSetDirty(true); renderFormEditor();
+};
+window.moveTableCol = function(sIdx, qIdx, ci, dir){
+  const arr = D().SECTIONS[sIdx].questions[qIdx].tableColumns, j = ci + dir;
+  if(j<0 || j>=arr.length) return;
+  [arr[ci], arr[j]] = [arr[j], arr[ci]];
+  edSetDirty(true); renderFormEditor();
+};
+window.deleteTableCol = function(sIdx, qIdx, ci){
+  D().SECTIONS[sIdx].questions[qIdx].tableColumns.splice(ci, 1);
+  edSetDirty(true); renderFormEditor();
+};
+window.addTableCol = function(sIdx, qIdx){
+  const q = D().SECTIONS[sIdx].questions[qIdx];
+  // Ids are fixed once created so renaming a column never orphans saved answers.
+  const used = new Set((q.tableColumns||[]).map(c=>c.id));
+  let n = used.size + 1, id = 'col' + n;
+  while(used.has(id)){ n++; id = 'col' + n; }
+  q.tableColumns.push({ id, label:'New column', type:'text' });
+  edSetDirty(true); renderFormEditor();
+};
+function radioTextBoxEditorHtml(q, sIdx, qIdx){
+  const tb = q.textBox || null;
+  const mode = tb ? tb.mode : 'none';
+  return `<div class="field"><label>Text box</label>
+    <select onchange="onRadioTextMode(${sIdx},${qIdx},this.value)">
+      <option value="none" ${mode==='none'?'selected':''}>No text box</option>
+      <option value="always" ${mode==='always'?'selected':''}>Show one whenever an answer is chosen</option>
+      <option value="when" ${mode==='when'?'selected':''}>Show one only for a specific answer</option>
+    </select></div>
+    ${mode==='when' ? `<div class="field"><label>Show the text box when the answer is</label>
+      <select onchange="onRadioTextValue(${sIdx},${qIdx},this.value)">
+        ${(q.options||[]).map(o=>`<option value="${escapeHtml(o)}" ${tb.value===o?'selected':''}>${escapeHtml(o)}</option>`).join('')}
+      </select></div>` : ''}
+    ${mode!=='none' ? `<div class="field"><label>Text box label</label>
+      <input type="text" value="${escapeHtml(tb.label||'')}" placeholder="Please explain" oninput="onRadioTextLabel(${sIdx},${qIdx},this.value)"></div>` : ''}`;
+}
+window.onRadioTextMode = function(sIdx, qIdx, mode){
+  const q = D().SECTIONS[sIdx].questions[qIdx];
+  if(mode==='none') delete q.textBox;
+  else {
+    const label = q.textBox ? q.textBox.label : '';
+    q.textBox = { mode, label: label||'' };
+    if(mode==='when') q.textBox.value = (q.options||[])[0] || '';
+  }
+  edSetDirty(true); renderFormEditor();
+};
+window.onRadioTextValue = function(sIdx, qIdx, v){ D().SECTIONS[sIdx].questions[qIdx].textBox.value = v; edSetDirty(true); };
+window.onRadioTextLabel = function(sIdx, qIdx, v){ D().SECTIONS[sIdx].questions[qIdx].textBox.label = v; edSetDirty(true); };
+function sortButtonsHtml(sIdx, qIdx, field){
+  return `<div class="toolbar" style="flex-direction:row;flex-wrap:wrap;gap:6px;margin:4px 0 0;">
+    <button type="button" class="btn secondary" style="width:auto;padding:6px 12px;" onclick="sortQuestionList(${sIdx},${qIdx},'${field}',1)">Sort A&rarr;Z</button>
+    <button type="button" class="btn secondary" style="width:auto;padding:6px 12px;" onclick="sortQuestionList(${sIdx},${qIdx},'${field}',-1)">Sort Z&rarr;A</button>
+  </div>`;
+}
+window.sortQuestionList = function(sIdx, qIdx, field, dir){
+  const q = D().SECTIONS[sIdx].questions[qIdx];
+  if(!Array.isArray(q[field])) return;
+  // numeric-aware and case-insensitive, so "2" comes before "10" and "apple" with "Banana".
+  q[field] = q[field].slice().sort((a,b)=>dir*String(a).localeCompare(String(b), undefined, {numeric:true, sensitivity:'base'}));
+  edSetDirty(true);
+  renderFormEditor();
+};
+function gridEditorHtml(q, sIdx, qIdx){
+  const sources = questionsBefore(sIdx, qIdx).filter(x=>GRID_TYPES.includes(x.type));
+  const fromMode = !!q.rowsFrom;
+  const src = fromMode ? sources.find(x=>x.id===q.rowsFrom.id) : null;
+  const modeSel = `<div class="field"><label>Rows</label>
+    <select onchange="onGridRowsMode(${sIdx},${qIdx},this.value)">
+      <option value="list" ${fromMode?'':'selected'}>Type the rows myself</option>
+      <option value="from" ${fromMode?'selected':''} ${sources.length?'':'disabled'}>Pull rows from an earlier grid question${sources.length?'':' (none above yet)'}</option>
+    </select></div>`;
+  let rowsPart;
+  if(!fromMode){
+    rowsPart = `<div class="field"><label>Rows (one per line)</label>
+      <textarea rows="4" oninput="updateGridList(${sIdx},${qIdx},'rows',this.value)">${escapeHtml((q.rows||[]).join('\n'))}</textarea>
+      ${sortButtonsHtml(sIdx, qIdx, 'rows')}</div>`;
+  } else {
+    rowsPart = `<div class="field-row">
+      <div class="field"><label>Take rows from</label>
+        <select onchange="onGridRowsFromId(${sIdx},${qIdx},this.value)">
+          <option value="" ${src?'':'selected'} disabled>Select a grid question…</option>
+          ${sources.map(x=>`<option value="${escapeHtml(x.id)}" ${q.rowsFrom.id===x.id?'selected':''}>${escapeHtml(x.label)}</option>`).join('')}
+        </select></div>
+      <div class="field"><label>Only rows answered</label>
+        <select onchange="onGridRowsFromValue(${sIdx},${qIdx},this.value)">
+          ${src ? (src.columns||[]).map(c=>`<option value="${escapeHtml(c)}" ${q.rowsFrom.value===c?'selected':''}>${escapeHtml(c)}</option>`).join('') : '<option value="">—</option>'}
+        </select></div>
+    </div>
+    <p class="helptext" style="margin:-4px 0 10px;">Only the rows answered with this value are shown. If none were, the question stays hidden.</p>`;
+  }
+  return `${modeSel}${rowsPart}
+    <div class="field"><label>Columns (one per line)</label>
+      <textarea rows="4" oninput="updateGridList(${sIdx},${qIdx},'columns',this.value)">${escapeHtml((q.columns||[]).join('\n'))}</textarea>
+      ${sortButtonsHtml(sIdx, qIdx, 'columns')}</div>
+    <div class="field"><label style="display:flex;align-items:center;gap:6px;font-weight:400;">
+      <input type="checkbox" ${q.limitPerColumn?'checked':''} onchange="updateQuestionField(${sIdx},${qIdx},'limitPerColumn',this.checked)"> Limit to one response per column
+    </label></div>
+    <div class="field"><label style="display:flex;align-items:center;gap:6px;font-weight:400;">
+      <input type="checkbox" ${q.withNotes?'checked':''} onchange="updateQuestionFieldAndRerender(${sIdx},${qIdx},'withNotes',this.checked)"> Add a text box below the grid
+    </label></div>
+    ${q.withNotes ? `<div class="field"><label>Text box label</label>
+      <input type="text" value="${escapeHtml(q.notesLabel||'')}" placeholder="Notes" oninput="updateQuestionField(${sIdx},${qIdx},'notesLabel',this.value)"></div>` : ''}`;
+}
+window.onGridRowsMode = function(sIdx, qIdx, mode){
+  const q = D().SECTIONS[sIdx].questions[qIdx];
+  if(mode==='from') q.rowsFrom = { id:'', value:'' }; else delete q.rowsFrom;
+  edSetDirty(true); renderFormEditor();
+};
+window.onGridRowsFromId = function(sIdx, qIdx, id){
+  const q = D().SECTIONS[sIdx].questions[qIdx];
+  const src = findQuestionById(id);
+  q.rowsFrom = { id, value: src && (src.columns||[]).length ? src.columns[0] : '' };
+  edSetDirty(true); renderFormEditor();
+};
+window.onGridRowsFromValue = function(sIdx, qIdx, value){
+  D().SECTIONS[sIdx].questions[qIdx].rowsFrom.value = value;
+  edSetDirty(true);
+};
 function renderQuestionEditor(q, sIdx, qIdx, sec, opened){
-  const candidateQuestions = questionsBefore(sIdx, qIdx);
+  const candidateQuestions = questionsBefore(sIdx, qIdx).filter(q=>!GRID_TYPES.includes(q.type) && q.type!==TABLE_TYPE);
   const hasOptions = TYPES_WITH_OPTIONS.includes(q.type);
   const wasOpen = opened.has(q.id) ? opened.get(q.id) : false;
   const visSummary = describeVisibleIf(q.visibleIf);
   const summaryHtml = escapeHtml([q.required ? 'Required' : 'Optional', visSummary || 'Always shown'].join(' · '));
-  const avatar = { text:'Ab', email:'@', number:'#', textarea:'¶', radio:'◉', select:'▾', checkboxes:'☑' }[q.type] || '?';
+  const avatar = { text:'Ab', email:'@', number:'#', textarea:'¶', radio:'◉', select:'▾', checkboxes:'☑', choicegrid:'▦', checkboxgrid:'▦', rowtable:'▤' }[q.type] || '?';
   const actions = `
     <button class="icon-btn icon-btn-lg" title="Move up" onclick="moveQuestion(${sIdx},${qIdx},-1)" ${qIdx===0?'disabled':''}>${ICONS.arrowUp}</button>
     <button class="icon-btn icon-btn-lg" title="Move down" onclick="moveQuestion(${sIdx},${qIdx},1)" ${qIdx===sec.questions.length-1?'disabled':''}>${ICONS.arrowDown}</button>
@@ -5295,10 +5585,15 @@ function renderQuestionEditor(q, sIdx, qIdx, sec, opened){
     <div class="field"><label>Question text</label>
       <input type="text" value="${escapeHtml(q.label||'')}" oninput="updateQuestionField(${sIdx},${qIdx},'label',this.value)">
     </div>
+    ${D().SECTIONS.length>1 ? `<div class="field"><label>Section</label>
+      <select onchange="moveQuestionToSection(${sIdx},${qIdx},parseInt(this.value,10))">
+        ${D().SECTIONS.map((s,i)=>`<option value="${i}" ${i===sIdx?'selected':''}>${escapeHtml(s.title||'(untitled section)')}</option>`).join('')}
+      </select>
+    </div>` : ''}
     <div class="field-row">
       <div class="field"><label>Answer type</label>
         <select onchange="onQuestionTypeChange(${sIdx},${qIdx},this.value)">
-          ${QUESTION_TYPES.map(t=>`<option value="${t}" ${q.type===t?'selected':''}>${t}</option>`).join('')}
+          ${questionTypesForEditor().map(t=>`<option value="${t}" ${q.type===t?'selected':''}>${GRID_LABELS[t]||t}</option>`).join('')}
         </select>
       </div>
       <div class="field" style="display:flex;align-items:flex-end;">
@@ -5307,14 +5602,18 @@ function renderQuestionEditor(q, sIdx, qIdx, sec, opened){
         </label>
       </div>
     </div>
+    ${GRID_TYPES.includes(q.type) ? gridEditorHtml(q, sIdx, qIdx) : ''}
     ${hasOptions ? `<div class="field"><label>Choices (one per line)</label>
       <textarea rows="4" oninput="updateQuestionOptions(${sIdx},${qIdx},this.value)">${escapeHtml((q.options||[]).join('\n'))}</textarea>
+      ${sortButtonsHtml(sIdx, qIdx, 'options')}
     </div>` : ''}
     ${q.type==='checkboxes' ? `<div class="field">
       <label style="display:flex;align-items:center;gap:6px;font-weight:400;">
         <input type="checkbox" ${q.otherOption?'checked':''} onchange="updateQuestionFieldAndRerender(${sIdx},${qIdx},'otherOption',this.checked)"> Allow an "Other, please specify" choice
       </label>
     </div>` : ''}
+    ${q.type===TABLE_TYPE ? tableEditorHtml(q, sIdx, qIdx) : ''}
+    ${q.type==='radio' ? radioTextBoxEditorHtml(q, sIdx, qIdx) : ''}
     ${q.type==='number' ? `<div class="field-row">
       <div class="field"><label>Minimum</label><input type="number" value="${q.min??''}" oninput="updateQuestionField(${sIdx},${qIdx},'min',this.value===''?undefined:Number(this.value))"></div>
       <div class="field"><label>Maximum</label><input type="number" value="${q.max??''}" oninput="updateQuestionField(${sIdx},${qIdx},'max',this.value===''?undefined:Number(this.value))"></div>
@@ -5337,6 +5636,10 @@ window.updateQuestionFieldAndRerender = function(sIdx, qIdx, field, value){
   markSchemaDirty();
   renderFormEditor();
 };
+window.updateGridList = function(sIdx, qIdx, which, text){
+  D().SECTIONS[sIdx].questions[qIdx][which] = text.split('\n').map(s=>s.trim()).filter(Boolean);
+  edSetDirty(true);
+};
 window.updateQuestionOptions = function(sIdx, qIdx, text){
   D().SECTIONS[sIdx].questions[qIdx].options = text.split('\n').map(s=>s.trim()).filter(Boolean);
   markSchemaDirty();
@@ -5345,9 +5648,16 @@ window.onQuestionTypeChange = function(sIdx, qIdx, newType){
   const q = D().SECTIONS[sIdx].questions[qIdx];
   q.type = newType;
   if(TYPES_WITH_OPTIONS.includes(newType) && !Array.isArray(q.options)) q.options = ['Yes','No'];
+  if(GRID_TYPES.includes(newType)){
+    if(!Array.isArray(q.rows)) q.rows = ['Row 1','Row 2'];
+    if(!Array.isArray(q.columns)) q.columns = ['Column 1','Column 2','Column 3'];
+  } else { delete q.rows; delete q.columns; delete q.limitPerColumn; delete q.rowsFrom; delete q.withNotes; delete q.notesLabel; }
   if(!TYPES_WITH_OPTIONS.includes(newType)){ delete q.options; delete q.otherOption; }
   if(newType!=='checkboxes') delete q.otherOption;
   if(newType!=='number'){ delete q.min; delete q.max; }
+  if(newType!=='radio'){ delete q.textBox; }
+  if(newType===TABLE_TYPE){ if(!Array.isArray(q.tableColumns)) q.tableColumns = defaultTableColumns(); }
+  else { delete q.tableColumns; }
   markSchemaDirty();
   renderFormEditor();
 };
@@ -5371,6 +5681,29 @@ window.moveQuestion = function(sIdx, qIdx, dir){
   [arr[qIdx],arr[j]] = [arr[j],arr[qIdx]];
   markSchemaDirty();
   renderFormEditor();
+};
+// Moves a question to the END of another section. Any "show only if"
+// that now points forward (at a question that comes later) can no longer
+// work, so those are reported right away instead of failing silently.
+window.moveQuestionToSection = function(sIdx, qIdx, toIdx){
+  if(isNaN(toIdx) || toIdx===sIdx) return;
+  const [q] = D().SECTIONS[sIdx].questions.splice(qIdx, 1);
+  D().SECTIONS[toIdx].questions.push(q);
+  edSetDirty(true);
+  renderFormEditor();
+  const order = [];
+  D().SECTIONS.forEach(s=>s.questions.forEach(x=>order.push(x.id)));
+  const pos = id => order.indexOf(id);
+  const bad = [];
+  D().SECTIONS.forEach(s=>{
+    if(s.visibleIf && pos(s.visibleIf.id) > pos((s.questions[0]||{}).id)) bad.push(`Section "${s.title}"`);
+    s.questions.forEach(x=>{ if(x.visibleIf && x.visibleIf.id && pos(x.visibleIf.id) > pos(x.id)) bad.push(`"${x.label}"`); });
+  });
+  const msg = $('#formEditorMsg');
+  if(bad.length){
+    msg.hidden = false; msg.className = 'errbox';
+    msg.textContent = `Moved. Heads up: ${bad.join(', ')} now depends on a question that comes after it, so its "show only if" can't work - move the question it depends on above it, or reset its visibility.`;
+  } else { msg.hidden = true; }
 };
 window.addFormSection = function(){
   const id = uniqueSectionId('section');
@@ -5410,6 +5743,18 @@ window.onVisibleIfModeChange = function(kind, sIdx, qIdx, mode){
 window.onVisibleIfTargetChange = function(kind, sIdx, qIdx, targetId){
   const obj = targetOf(kind, sIdx, qIdx);
   obj.visibleIf.id = targetId;
+  // The value picker shows a list of the target's choices; without this the
+  // first choice LOOKED selected while the stored value stayed empty, so the
+  // condition silently never matched. Store the first choice as the default.
+  const target = findQuestionById(targetId);
+  const c = obj.visibleIf;
+  if(target && target.type==='checkboxes' && c.equals!==undefined){ c.includes = c.equals; delete c.equals; }
+  if(target && Array.isArray(target.options) && target.options.length && c.in===undefined){
+    const first = target.options[0];
+    if(c.equals!==undefined) c.equals = first;
+    else if(c.notEquals!==undefined) c.notEquals = first;
+    else if(c.includes!==undefined) c.includes = first;
+  }
   markSchemaDirty();
   renderFormEditor();
 };
@@ -5439,12 +5784,28 @@ async function saveFormSchema(){
     if(s.visibleIf && !idSet.has(s.visibleIf.id)) brokenRefs.push(`Section "${s.title}"`);
     s.questions.forEach(q=>{ if(q.visibleIf && !idSet.has(q.visibleIf.id)) brokenRefs.push(`Question "${q.label}"`); });
   });
-  if(dupes.length || brokenRefs.length){
+  const rowSrc = [];
+  draft.SECTIONS.forEach(s=>s.questions.forEach(q=>{ if(q.rowsFrom && (!q.rowsFrom.id || !idSet.has(q.rowsFrom.id) || !q.rowsFrom.value)) rowSrc.push(`Question "${q.label}"`); }));
+  const tbBad = [];
+  draft.SECTIONS.forEach(s=>s.questions.forEach(q=>{ if(q.textBox && q.textBox.mode==='when' && !(q.options||[]).includes(q.textBox.value)) tbBad.push(`Question "${q.label}"`); }));
+  const tblBad = [];
+  draft.SECTIONS.forEach(s=>s.questions.forEach(q=>{ if(q.type===TABLE_TYPE && (!(q.tableColumns||[]).length || q.tableColumns.some(c=>!String(c.label||'').trim()))) tblBad.push(`Question "${q.label}"`); }));
+  const noValue = [];
+  const hasValue = c => c.in!==undefined ? c.in.length>0 : [c.equals,c.notEquals,c.includes].some(v=>v!==undefined && v!=='');
+  draft.SECTIONS.forEach(s=>{
+    if(s.visibleIf && s.visibleIf.id && !hasValue(s.visibleIf)) noValue.push(`Section "${s.title}"`);
+    s.questions.forEach(q=>{ if(q.visibleIf && q.visibleIf.id && !hasValue(q.visibleIf)) noValue.push(`Question "${q.label}"`); });
+  });
+  if(dupes.length || brokenRefs.length || noValue.length || rowSrc.length || tbBad.length || tblBad.length){
     msg.hidden = false;
     msg.className = 'errbox';
     msg.innerHTML = [
       dupes.length ? `Duplicate question id(s): ${[...new Set(dupes)].join(', ')}.` : '',
-      brokenRefs.length ? `These have a "show only if" pointing at a question that no longer exists or hasn't been chosen yet: ${brokenRefs.join(', ')}.` : ''
+      brokenRefs.length ? `These have a "show only if" pointing at a question that no longer exists or hasn't been chosen yet: ${brokenRefs.join(', ')}.` : '',
+      noValue.length ? `These have a "show only if" with no value chosen, so they would never show - pick a value: ${noValue.join(', ')}.` : '',
+      tblBad.length ? `These add-rows tables need at least one column, and every column needs a name: ${tblBad.join(', ')}.` : '',
+      tbBad.length ? `These questions show a text box for an answer that is no longer one of the choices - pick the answer again: ${tbBad.join(', ')}.` : '',
+      rowSrc.length ? `These grid questions pull their rows from another question but no source or value is chosen: ${rowSrc.join(', ')}.` : ''
     ].filter(Boolean).join(' ');
     return;
   }
@@ -5530,6 +5891,18 @@ function notesButtonHtml(s){
   return `<button class="icon-btn${has?' success':''}" onclick="openSessionNotes(${s.id})" title="Session Notes" aria-label="${has?'View or edit':'Write'} session notes for ${escapeHtml(s.recipName)}">${ICONS.pencil}<span class="btn-label">${has?'Session Notes ✓':'Session Notes'}</span></button>`;
 }
 
+// Same rules as FPHM.evalCond, except that "equals"/"notEquals" against a
+// checkbox answer (an array) mean "includes" / "does not include" - a
+// checkbox answer can never be strictly equal to a single choice, so a
+// condition set up that way would otherwise never show anything.
+function notesEvalCond(cond, answers){
+  if(cond && Array.isArray(answers[cond.id])){
+    const arr = answers[cond.id];
+    if(cond.equals!==undefined) return arr.includes(cond.equals);
+    if(cond.notEquals!==undefined) return !arr.includes(cond.notEquals);
+  }
+  return FPHM.evalCond(cond, answers);
+}
 let notesCtx = null; // { session, schema, answers, existing, formVersion }
 window.openSessionNotes = function(sessionId){
   const s = sessions.find(x=>x.id===sessionId);
@@ -5545,6 +5918,7 @@ window.openSessionNotes = function(sessionId){
   };
   const lead = s.ministers.find(m=>m.role==='Lead');
   const leadName = lead ? (ministers.find(m=>m.id===lead.id)||{}).name : '';
+  $('#btnNotesSave').hidden = false;
   $('#notesTitle').textContent = 'Session Notes';
   $('#notesSub').textContent = `${s.recipName} · ${fmtShort(s.date)}${leadName ? ' · Lead: '+leadName : ''}`;
   $('#notesMsg').hidden = true;
@@ -5561,34 +5935,114 @@ function renderNotesForm(){
   }
   $('#notesBody').innerHTML = sections.map((sec,si)=>`
     <div class="nt-sec" data-si="${si}">
-      <h3 style="margin:14px 0 4px;color:var(--navy);font-size:var(--fs-md);">${escapeHtml(sec.title||'')}</h3>
-      ${sec.intro ? `<p class="helptext" style="margin:0 0 8px;">${escapeHtml(sec.intro)}</p>` : ''}
+      <h3>${escapeHtml(sec.title||'')}</h3>
+      ${sec.intro ? `<div class="section-intro">${escapeHtml(sec.intro)}</div>` : ''}
       ${(sec.questions||[]).map((q,qi)=>notesQuestionHtml(q,si,qi)).join('')}
     </div>`).join('');
   notesApplyVisibility();
 }
+// A grid's rows: its own list, or - when rowsFrom is set - the rows of an
+// earlier grid answered with the chosen value (e.g. only the "Yes" rows).
+function notesRowsOf(q){
+  if(!q.rowsFrom || !q.rowsFrom.id) return q.rows||[];
+  let src = null;
+  notesCtx.schema.SECTIONS.forEach(s=>(s.questions||[]).forEach(x=>{ if(x.id===q.rowsFrom.id) src = x; }));
+  if(!src) return [];
+  const ans = notesCtx.answers[src.id];
+  if(!ans || typeof ans!=='object' || Array.isArray(ans)) return [];
+  const want = q.rowsFrom.value;
+  return notesRowsOf(src).filter(r => src.type==='choicegrid' ? ans[r]===want : (Array.isArray(ans[r]) && ans[r].includes(want)));
+}
+// ---- Add-rows table (rowtable): answer = array of { columnId: value } ----
+function notesTableRows(q){
+  const v = notesCtx.answers[q.id];
+  return Array.isArray(v) && v.length ? v : [{}];
+}
+function notesTableHtml(q, si, qi){
+  const cols = q.tableColumns || [];
+  const rows = notesTableRows(q);
+  const yn = (ri, c, val) => ['Yes','No'].map(o=>`<label class="choice-option" style="padding:8px 12px;"><input type="radio" name="tb_${si}_${qi}_${ri}_${c.id}" ${val===o?'checked':''} onchange="notesTableSet(${si},${qi},${ri},'${escapeHtml(c.id)}','${o}',true)"> <span>${o}</span></label>`).join('');
+  return `<div class="rt-wrap">${rows.map((row,ri)=>`<div class="rt-row">
+      <div class="rt-row-head"><strong>Row ${ri+1}</strong>
+        <button type="button" class="btn secondary" style="width:auto;padding:6px 12px;" onclick="notesTableDel(${si},${qi},${ri})">Remove row</button></div>
+      <div class="rt-fields">${cols.map(c=>{
+        const val = row[c.id];
+        let ctl;
+        if(c.type==='number') ctl = `<input type="number" inputmode="decimal" value="${escapeHtml(val===undefined?'':val)}" oninput="notesTableSet(${si},${qi},${ri},'${escapeHtml(c.id)}',this.value,false)">`;
+        else if(c.type==='yesno' || c.type==='yesnotext') ctl = `<div class="choice-group" style="flex-direction:row;flex-wrap:wrap;">${yn(ri, c, val)}</div>`
+          + (c.type==='yesnotext' && val==='Yes' ? `<textarea rows="2" style="margin-top:8px;" placeholder="${escapeHtml(c.textLabel||'Details')}" aria-label="${escapeHtml(c.label)}: ${escapeHtml(c.textLabel||'Details')}" oninput="notesTableSet(${si},${qi},${ri},'${escapeHtml(c.id)}__text',this.value,false)">${escapeHtml(row[c.id+'__text']||'')}</textarea>` : '');
+        else ctl = `<input type="text" value="${escapeHtml(val===undefined?'':val)}" oninput="notesTableSet(${si},${qi},${ri},'${escapeHtml(c.id)}',this.value,false)">`;
+        return `<div class="rt-field"><label class="qlabel">${escapeHtml(c.label)}</label>${ctl}</div>`;
+      }).join('')}</div>
+    </div>`).join('')}
+    <button type="button" class="btn secondary" onclick="notesTableAdd(${si},${qi})">+ Add row</button></div>`;
+}
+function notesTableRerender(si, qi){
+  const q = notesQ(si, qi);
+  const el = $(`#notesBody .nt-q[data-si="${si}"][data-qi="${qi}"]`);
+  if(el) el.outerHTML = notesQuestionHtml(q, si, qi);
+  notesApplyVisibility();
+}
+window.notesTableAdd = function(si, qi){
+  const q = notesQ(si, qi);
+  const rows = notesTableRows(q).slice();
+  rows.push({});
+  notesCtx.answers[q.id] = rows;
+  notesTableRerender(si, qi);
+};
+window.notesTableDel = function(si, qi, ri){
+  const q = notesQ(si, qi);
+  const rows = notesTableRows(q).slice();
+  rows.splice(ri, 1);
+  notesCtx.answers[q.id] = rows.length ? rows : [{}];
+  notesTableRerender(si, qi);
+};
+window.notesTableSet = function(si, qi, ri, colId, value, rerender){
+  const q = notesQ(si, qi);
+  const rows = notesTableRows(q).slice();
+  rows[ri] = Object.assign({}, rows[ri] || {});
+  const col = (q.tableColumns||[]).find(c=>c.id===colId);
+  rows[ri][colId] = (col && col.type==='number') ? (value==='' ? '' : Number(value)) : value;
+  notesCtx.answers[q.id] = rows;
+  if(rerender) notesTableRerender(si, qi);
+};
 function notesQuestionHtml(q, si, qi){
   const id = `nq_${si}_${qi}`;
   const v = notesCtx.answers[q.id];
-  const label = `<label${['radio','checkboxes'].includes(q.type)?'':` for="${id}"`}>${escapeHtml(q.label||'')}${q.required?' *':''}</label>`;
+  const isChoice = ['radio','checkboxes'].includes(q.type);
+  const label = `<label class="qlabel"${isChoice?'':` for="${id}"`}>${escapeHtml(q.label||'')}${q.required?'<span class="required-mark">*</span>':''}</label>`;
+  const esc = o => JSON.stringify(o).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
   let input = '';
   if(q.type==='textarea'){
     input = `<textarea id="${id}" rows="4" oninput="notesSet(${si},${qi},this.value)">${escapeHtml(v||'')}</textarea>`;
   } else if(q.type==='select'){
     input = `<select id="${id}" onchange="notesSet(${si},${qi},this.value)"><option value="">— Select —</option>${(q.options||[]).map(o=>`<option value="${escapeHtml(o)}"${v===o?' selected':''}>${escapeHtml(o)}</option>`).join('')}</select>`;
   } else if(q.type==='radio'){
-    input = (q.options||[]).map((o,oi)=>`<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin:4px 0;"><input type="radio" name="${id}" ${v===o?'checked':''} onchange="notesSet(${si},${qi},${JSON.stringify(o).replace(/&/g,'&amp;').replace(/"/g,'&quot;')})"> ${escapeHtml(o)}</label>`).join('');
+    input = `<div class="choice-group">${(q.options||[]).map(o=>`<label class="choice-option"><input type="radio" name="${id}" ${v===o?'checked':''} onchange="notesSet(${si},${qi},${esc(o)})"> <span>${escapeHtml(o)}</span></label>`).join('')}</div>`
+      + (q.textBox ? `<div class="nt-radio-text" data-si="${si}" data-qi="${qi}" hidden style="margin-top:12px;"><label class="qlabel">${escapeHtml(q.textBox.label||'Please explain')}</label><textarea rows="3" oninput="notesSetRadioText(${si},${qi},this.value)">${escapeHtml(notesCtx.answers[q.id+'__text']||'')}</textarea></div>` : '');
   } else if(q.type==='checkboxes'){
     const arr = Array.isArray(v) ? v : [];
     const other = arr.find(x=>String(x).startsWith('__other__:'));
-    input = (q.options||[]).map((o,oi)=>`<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin:4px 0;"><input type="checkbox" ${arr.includes(o)?'checked':''} onchange="notesToggle(${si},${qi},${oi},this.checked)"> ${escapeHtml(o)}</label>`).join('')
-      + (q.otherOption ? `<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin:4px 0;"><input type="checkbox" ${other!==undefined?'checked':''} onchange="notesOtherToggle(${si},${qi},this.checked,this)"> Other:
-          <input type="text" style="flex:1;" value="${escapeHtml(other?String(other).slice(10):'')}" oninput="notesOtherText(${si},${qi},this.value)"></label>` : '');
+    input = `<div class="choice-group">${(q.options||[]).map((o,oi)=>`<label class="choice-option"><input type="checkbox" ${arr.includes(o)?'checked':''} onchange="notesToggle(${si},${qi},${oi},this.checked)"> <span>${escapeHtml(o)}</span></label>`).join('')}`
+      + (q.otherOption ? `<label class="choice-option"><input type="checkbox" ${other!==undefined?'checked':''} onchange="notesOtherToggle(${si},${qi},this.checked,this)"> <span>Other:</span>
+          <input type="text" class="other-text" value="${escapeHtml(other?String(other).slice(10):'')}" oninput="notesOtherText(${si},${qi},this.value)"></label>` : '')
+      + `</div>`;
+  } else if(q.type===TABLE_TYPE){
+    input = notesTableHtml(q, si, qi);
+  } else if(GRID_TYPES.includes(q.type)){
+    const rows = notesRowsOf(q), cols = q.columns||[];
+    const ans = (v && typeof v==='object' && !Array.isArray(v)) ? v : {};
+    const isRadio = q.type==='choicegrid';
+    input = `<div class="grid-wrap"><table class="nt-grid"><thead><tr><th></th>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((r,ri)=>`<tr><th scope="row">${escapeHtml(r)}</th>${cols.map((c,ci)=>{
+      const on = isRadio ? ans[r]===c : (Array.isArray(ans[r]) && ans[r].includes(c));
+      return `<td><input type="${isRadio?'radio':'checkbox'}" name="${id}_${ri}" ${on?'checked':''} aria-label="${escapeHtml(r)}: ${escapeHtml(c)}" onchange="notesGridSet(${si},${qi},${ri},${ci},this.checked)"></td>`;
+    }).join('')}</tr>`).join('')}</tbody></table></div>`
+      + (q.withNotes ? `<label class="qlabel" style="margin-top:14px;">${escapeHtml(q.notesLabel||'Notes')}</label><textarea rows="3" oninput="notesSetGridNotes(${si},${qi},this.value)">${escapeHtml(notesCtx.answers[q.id+'__notes']||'')}</textarea>` : '');
   } else {
     const type = q.type==='email' ? 'email' : q.type==='number' ? 'number' : 'text';
     input = `<input id="${id}" type="${type}" ${q.min!==undefined?`min="${q.min}"`:''} ${q.max!==undefined?`max="${q.max}"`:''} value="${escapeHtml(v===undefined?'':v)}" oninput="notesSet(${si},${qi},this.value)">`;
   }
-  return `<div class="field nt-q" data-si="${si}" data-qi="${qi}">${label}${input}</div>`;
+  return `<div class="nt-q" data-si="${si}" data-qi="${qi}">${label}${input}</div>`;
 }
 function notesQ(si,qi){ return notesCtx.schema.SECTIONS[si].questions[qi]; }
 window.notesSet = function(si, qi, value){
@@ -5605,6 +6059,55 @@ window.notesToggle = function(si, qi, oi, checked){
   notesCtx.answers[q.id] = arr;
   notesApplyVisibility();
 };
+// Grid answers are objects: { rowLabel: column } for a multiple choice grid,
+// { rowLabel: [columns] } for a checkbox grid.
+window.notesGridSet = function(si, qi, ri, ci, checked){
+  const q = notesQ(si,qi), row = notesRowsOf(q)[ri], col = q.columns[ci];
+  const cur = notesCtx.answers[q.id];
+  const a = (cur && typeof cur==='object' && !Array.isArray(cur)) ? cur : {};
+  if(q.type==='choicegrid'){ a[row] = col; }
+  else {
+    const arr = Array.isArray(a[row]) ? a[row].slice() : [];
+    const i = arr.indexOf(col);
+    if(checked && i<0) arr.push(col);
+    if(!checked && i>=0) arr.splice(i,1);
+    if(arr.length) a[row] = arr; else delete a[row];
+  }
+  if(q.limitPerColumn && checked){
+    notesRowsOf(q).forEach(r2=>{
+      if(r2===row) return;
+      if(q.type==='choicegrid'){ if(a[r2]===col) delete a[r2]; }
+      else if(Array.isArray(a[r2])){ a[r2] = a[r2].filter(c=>c!==col); if(!a[r2].length) delete a[r2]; }
+    });
+  }
+  notesCtx.answers[q.id] = a;
+  if(q.limitPerColumn){
+    const el = $(`#notesBody .nt-q[data-si="${si}"][data-qi="${qi}"]`);
+    if(el) el.outerHTML = notesQuestionHtml(q, si, qi);
+  }
+  // Any grid that pulls its rows from this one must re-render with the new rows.
+  notesCtx.schema.SECTIONS.forEach((sec, s2)=>(sec.questions||[]).forEach((x, q2)=>{
+    if(x.rowsFrom && x.rowsFrom.id===q.id){
+      const el2 = $(`#notesBody .nt-q[data-si="${s2}"][data-qi="${q2}"]`);
+      if(el2) el2.outerHTML = notesQuestionHtml(x, s2, q2);
+    }
+  }));
+  notesApplyVisibility();
+};
+window.notesSetGridNotes = function(si, qi, text){
+  notesCtx.answers[notesQ(si,qi).id + '__notes'] = text;
+};
+window.notesSetRadioText = function(si, qi, text){
+  notesCtx.answers[notesQ(si,qi).id + '__text'] = text;
+};
+// The radio's text box: "always" shows it once any answer is chosen;
+// "when" only while the chosen answer is the configured one.
+function notesRadioTextVisible(q){
+  if(!q.textBox) return false;
+  const a = notesCtx.answers[q.id];
+  if(a===undefined || a===null || a==='') return false;
+  return q.textBox.mode==='always' || a===q.textBox.value;
+}
 window.notesOtherToggle = function(si, qi, checked, el){
   const q = notesQ(si,qi);
   const arr = (Array.isArray(notesCtx.answers[q.id]) ? notesCtx.answers[q.id] : []).filter(x=>!String(x).startsWith('__other__:'));
@@ -5625,10 +6128,14 @@ function notesApplyVisibility(){
   notesCtx.schema.SECTIONS.forEach((sec,si)=>{
     const secEl = $(`#notesBody .nt-sec[data-si="${si}"]`);
     if(!secEl) return;
-    secEl.hidden = !FPHM.evalCond(sec.visibleIf, a);
+    secEl.hidden = !notesEvalCond(sec.visibleIf, a);
     (sec.questions||[]).forEach((q,qi)=>{
       const qEl = secEl.querySelector(`.nt-q[data-qi="${qi}"]`);
-      if(qEl) qEl.hidden = !FPHM.evalCond(q.visibleIf, a);
+      if(qEl){
+        qEl.hidden = !notesEvalCond(q.visibleIf, a) || (!!q.rowsFrom && notesRowsOf(q).length===0);
+        const tb = qEl.querySelector('.nt-radio-text');
+        if(tb) tb.hidden = !notesRadioTextVisible(q);
+      }
     });
   });
 }
@@ -5636,13 +6143,53 @@ function notesApplyVisibility(){
 function notesVisibleAnswers(){
   const a = notesCtx.answers, out = {}, missing = [];
   notesCtx.schema.SECTIONS.forEach(sec=>{
-    if(!FPHM.evalCond(sec.visibleIf, a)) return;
+    if(!notesEvalCond(sec.visibleIf, a)) return;
     (sec.questions||[]).forEach(q=>{
-      if(!FPHM.evalCond(q.visibleIf, a)) return;
+      if(!notesEvalCond(q.visibleIf, a)) return;
       const v = a[q.id];
+      if(q.type===TABLE_TYPE){
+        // Keep only known columns; the "Yes" text only when the answer is Yes;
+        // rows with nothing filled in are dropped. Required = at least one row.
+        const cols = q.tableColumns || [];
+        const cleaned = (Array.isArray(v) ? v : []).map(r=>{
+          const o = {};
+          cols.forEach(c=>{
+            const x = r[c.id];
+            if(x!==undefined && x!==null && String(x).trim()!=='') o[c.id] = x;
+            if(c.type==='yesnotext' && x==='Yes'){
+              const tx = r[c.id + '__text'];
+              if(tx && String(tx).trim()) o[c.id + '__text'] = String(tx);
+            }
+          });
+          return o;
+        }).filter(o=>Object.keys(o).length);
+        if(!cleaned.length){ if(q.required) missing.push(q.label + ' (add at least one row)'); return; }
+        out[q.id] = cleaned;
+        return;
+      }
+      if(GRID_TYPES.includes(q.type)){
+        // Keep only rows/columns that still exist; required = every row answered.
+        const rows = notesRowsOf(q), cols = q.columns||[];
+        const src = (v && typeof v==='object' && !Array.isArray(v)) ? v : {};
+        const clean = {};
+        rows.forEach(r=>{
+          if(q.type==='choicegrid'){ if(cols.includes(src[r])) clean[r] = src[r]; }
+          else if(Array.isArray(src[r])){ const keep = src[r].filter(c=>cols.includes(c)); if(keep.length) clean[r] = keep; }
+        });
+        if(q.rowsFrom && rows.length===0) return;
+        if(q.required && rows.some(r=>!(r in clean))){ missing.push(q.label + ' (every row)'); return; }
+        if(Object.keys(clean).length) out[q.id] = clean;
+        const gn = a[q.id + '__notes'];
+        if(q.withNotes && gn && String(gn).trim()) out[q.id + '__notes'] = String(gn);
+        return;
+      }
       const blank = v===undefined || v===null || v==='' || (Array.isArray(v) && v.length===0);
       if(blank){ if(q.required) missing.push(q.label); return; }
       out[q.id] = v;
+      if(q.type==='radio' && notesRadioTextVisible(q)){
+        const rt = a[q.id + '__text'];
+        if(rt && String(rt).trim()) out[q.id + '__text'] = String(rt);
+      }
     });
   });
   return { answers: out, missing };
@@ -5661,7 +6208,21 @@ function notesRecord(answers){
     answers
   };
 }
+// Preview of the form as currently edited (including unsaved changes) - no
+// session, nothing is saved, answers are throwaway.
+window.openNotesPreview = function(){
+  notesCtx = { preview: true, session: null, existing: null, formVersion: 'draft',
+    schema: JSON.parse(JSON.stringify(notesDraft)), answers: {} };
+  $('#notesTitle').textContent = 'Preview: Session Notes';
+  $('#notesSub').textContent = 'This is how the form looks right now, including unsaved changes. Nothing you enter here is saved.';
+  $('#notesMsg').hidden = true;
+  $('#btnNotesDownload').hidden = true;
+  $('#btnNotesSave').hidden = true;
+  renderNotesForm();
+  $('#notesModal').classList.add('open');
+};
 window.saveSessionNotes = async function(){
+  if(notesCtx && notesCtx.preview) return;
   const msg = $('#notesMsg');
   const { answers, missing } = notesVisibleAnswers();
   if(missing.length){
@@ -6179,6 +6740,54 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 19, 2026', version: '2026-10-19.2', items: [
+    'Changed: an intake form now follows the person. Once it is linked on any of their sessions, every session for that recipient (first, follow-ups, upcoming, tentative) shows it, with no need to relink. Linking a different form replaces the old one for the whole person, and Unlink removes it from all their sessions.'
+  ]},
+  { date: 'Oct 19, 2026', version: '2026-10-19.1', items: [
+    'Fixed: a scheduled session that is not attached to a slot (shown as its own card on Schedule & Planning) now shows its intake form - View / Link controls and the match suggestion - the same as a booked slot card does. Previously those cards never showed the intake form even when one was linked.'
+  ]},
+  { date: 'Oct 17, 2026', version: '2026-10-17.1', items: [
+    'New: Add-rows table question type for Session Notes. The minister adds and removes rows with buttons; you design the columns in the editor - text, number, Yes/No, or Yes/No that opens a text box when Yes. New tables start with Spirit, Underlings, Ground, Leader (text box on Yes) and Removed, all editable.'
+  ]},
+  { date: 'Oct 16, 2026', version: '2026-10-16.4', items: [
+    'New: a multiple choice (radio) question can show a text box - either whenever an answer is chosen, or only for one specific answer - with its own label. Set it in the question editor under Text box.'
+  ]},
+  { date: 'Oct 16, 2026', version: '2026-10-16.3', items: [
+    'New: Sort A to Z / Z to A buttons under every list you type in the question editors - the choices of a radio, dropdown or checkbox question, and the rows and columns of a grid - so you can enter them in any order and sort with one tap.'
+  ]},
+];
+// Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
+// five most recent versions; at each promotion, anything beyond the newest
+// five moves here rather than being deleted - see the block comment above
+// for the maintenance rule.
+const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 16, 2026', version: '2026-10-16.2', items: [
+    'New: a grid question can pull its rows from an earlier grid question - only the rows answered with a chosen value (e.g. just the Yes ones) are shown, and the question stays hidden if there are none. Any grid can also have an optional text box below it, with its own label.'
+  ]},
+  { date: 'Oct 16, 2026', version: '2026-10-16.1', items: [
+    'Changed: on phones, the question editors (Session Notes and Intake Questions) put the move/delete buttons of each section and question on their own row above the title, and the title, questions and answers use the full width; the pinned Save/Discard/Preview buttons shrink to one row. Wider screens keep the existing layout.'
+  ]},
+  { date: 'Oct 15, 2026', version: '2026-10-15.4', items: [
+    'New: two Session Notes question types - Multiple choice grid (one answer per row) and Checkbox grid (any number per row). Set the rows and columns in the editor, optionally limit to one response per column, and mark Required to need an answer in every row. Available in Session Notes only (not the public intake form).'
+  ]},
+  { date: 'Oct 15, 2026', version: '2026-10-15.2', items: [
+    'Changed: sections are now visually separated - in the question editors each section sits in its own bordered block with a bold side rule, and the Session Notes form now has the same look as the public intake form: each section is a card with a serif heading, section intro text in a tinted callout, and choices as bordered boxes that highlight when ticked.'
+  ]},
+  { date: 'Oct 15, 2026', version: '2026-10-15.1', items: [
+    'Changed: in the question editors (Session Notes and Intake Questions), the Save changes / Discard / Preview buttons stay pinned under the tab bar while you scroll, so they are always in reach.'
+  ]},
+  { date: 'Oct 14, 2026', version: '2026-10-14.5', items: [
+    'Fixed: a "show only if" set to "equals" a choice of a checkbox question never showed, because a checkbox answer is a list. In Session Notes it now treats equals as includes; picking a checkbox question in the editor sets the condition to includes automatically.'
+  ]},
+  { date: 'Oct 14, 2026', version: '2026-10-14.4', items: [
+    'Fixed: a "show only if" on a choice/checkbox question could look like it had a value selected (the first choice) while actually storing none, so the question never appeared. Choosing the question now stores its first choice, an unset value shows "Select a value…", and saving is blocked with a message if a condition has no value. If you already have such a condition, re-select its value and save.'
+  ]},
+  { date: 'Oct 14, 2026', version: '2026-10-14.3', items: [
+    'New: in the question editors (Session Notes and Intake Questions), each question has a Section picker so it can be moved to another section. It lands at the end of that section, and you are warned if a "show only if" now points at a question that comes later.'
+  ]},
+  { date: 'Oct 14, 2026', version: '2026-10-14.2', items: [
+    'New: Settings > Session Notes has a Preview form button that opens the form exactly as currently edited - unsaved changes included, branching working - without saving or opening a session. Nothing entered in the preview is saved.'
+  ]},
   { date: 'Oct 12, 2026', version: '2026-10-12.1', items: [
     'New: removing a booked session (Remove Booking, or deleting a scheduled session) whose ministers were already notified on WhatsApp now asks "Send cancellation" / "Don\'t send". Sending uses a new WhatsApp template, prayer_session_canceled, which must be approved in WhatsApp Manager and the notify Worker redeployed before it will deliver - until then the send reports a failure and nothing else changes.'
   ]},
@@ -6194,12 +6803,6 @@ const CHANGE_LOG = [
   { date: 'Oct 8, 2026', version: '2026-10-08.1', items: [
     'New: an intake form can now be linked (or changed/unlinked) on a Tentative slot, not only once the session is Booked - the same Link / Search & link controls now show on the Tentative card. The link carries over when the session is booked.'
   ]},
-];
-// Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
-// five most recent versions; at each promotion, anything beyond the newest
-// five moves here rather than being deleted - see the block comment above
-// for the maintenance rule.
-const CHANGE_LOG_ARCHIVE = [
   { date: 'Oct 7, 2026', version: '2026-10-07.2', items: [
     'Changed: Add custom slot now fills the End time automatically, 2.5 hours after the Start time you pick (you can still change it).'
   ]},
