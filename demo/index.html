@@ -1150,7 +1150,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-16.2";
+const APP_VERSION = "2026-10-16.3";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -5364,6 +5364,22 @@ function renderSectionEditor(sec, sIdx, opened){
 // Grid question editor: rows typed in, or pulled from an earlier grid
 // question (only the rows that were answered with a chosen value there),
 // columns, one-per-column limit, and an optional free-text box below.
+// "Sort A→Z / Z→A" buttons under any typed list (choices, grid rows, grid
+// columns) - type the entries in any order, then tidy them with one tap.
+function sortButtonsHtml(sIdx, qIdx, field){
+  return `<div class="toolbar" style="flex-direction:row;flex-wrap:wrap;gap:6px;margin:4px 0 0;">
+    <button type="button" class="btn secondary" style="width:auto;padding:6px 12px;" onclick="sortQuestionList(${sIdx},${qIdx},'${field}',1)">Sort A&rarr;Z</button>
+    <button type="button" class="btn secondary" style="width:auto;padding:6px 12px;" onclick="sortQuestionList(${sIdx},${qIdx},'${field}',-1)">Sort Z&rarr;A</button>
+  </div>`;
+}
+window.sortQuestionList = function(sIdx, qIdx, field, dir){
+  const q = D().SECTIONS[sIdx].questions[qIdx];
+  if(!Array.isArray(q[field])) return;
+  // numeric-aware and case-insensitive, so "2" comes before "10" and "apple" with "Banana".
+  q[field] = q[field].slice().sort((a,b)=>dir*String(a).localeCompare(String(b), undefined, {numeric:true, sensitivity:'base'}));
+  edSetDirty(true);
+  renderFormEditor();
+};
 function gridEditorHtml(q, sIdx, qIdx){
   const sources = questionsBefore(sIdx, qIdx).filter(x=>GRID_TYPES.includes(x.type));
   const fromMode = !!q.rowsFrom;
@@ -5376,7 +5392,8 @@ function gridEditorHtml(q, sIdx, qIdx){
   let rowsPart;
   if(!fromMode){
     rowsPart = `<div class="field"><label>Rows (one per line)</label>
-      <textarea rows="4" oninput="updateGridList(${sIdx},${qIdx},'rows',this.value)">${escapeHtml((q.rows||[]).join('\n'))}</textarea></div>`;
+      <textarea rows="4" oninput="updateGridList(${sIdx},${qIdx},'rows',this.value)">${escapeHtml((q.rows||[]).join('\n'))}</textarea>
+      ${sortButtonsHtml(sIdx, qIdx, 'rows')}</div>`;
   } else {
     rowsPart = `<div class="field-row">
       <div class="field"><label>Take rows from</label>
@@ -5393,7 +5410,8 @@ function gridEditorHtml(q, sIdx, qIdx){
   }
   return `${modeSel}${rowsPart}
     <div class="field"><label>Columns (one per line)</label>
-      <textarea rows="4" oninput="updateGridList(${sIdx},${qIdx},'columns',this.value)">${escapeHtml((q.columns||[]).join('\n'))}</textarea></div>
+      <textarea rows="4" oninput="updateGridList(${sIdx},${qIdx},'columns',this.value)">${escapeHtml((q.columns||[]).join('\n'))}</textarea>
+      ${sortButtonsHtml(sIdx, qIdx, 'columns')}</div>
     <div class="field"><label style="display:flex;align-items:center;gap:6px;font-weight:400;">
       <input type="checkbox" ${q.limitPerColumn?'checked':''} onchange="updateQuestionField(${sIdx},${qIdx},'limitPerColumn',this.checked)"> Limit to one response per column
     </label></div>
@@ -5453,6 +5471,7 @@ function renderQuestionEditor(q, sIdx, qIdx, sec, opened){
     ${GRID_TYPES.includes(q.type) ? gridEditorHtml(q, sIdx, qIdx) : ''}
     ${hasOptions ? `<div class="field"><label>Choices (one per line)</label>
       <textarea rows="4" oninput="updateQuestionOptions(${sIdx},${qIdx},this.value)">${escapeHtml((q.options||[]).join('\n'))}</textarea>
+      ${sortButtonsHtml(sIdx, qIdx, 'options')}
     </div>` : ''}
     ${q.type==='checkboxes' ? `<div class="field">
       <label style="display:flex;align-items:center;gap:6px;font-weight:400;">
@@ -6481,6 +6500,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 16, 2026', version: '2026-10-16.3', items: [
+    'New: Sort A to Z / Z to A buttons under every list you type in the question editors - the choices of a radio, dropdown or checkbox question, and the rows and columns of a grid - so you can enter them in any order and sort with one tap.'
+  ]},
   { date: 'Oct 16, 2026', version: '2026-10-16.2', items: [
     'New: a grid question can pull its rows from an earlier grid question - only the rows answered with a chosen value (e.g. just the Yes ones) are shown, and the question stays hidden if there are none. Any grid can also have an optional text box below it, with its own label.'
   ]},
@@ -6493,15 +6515,15 @@ const CHANGE_LOG = [
   { date: 'Oct 15, 2026', version: '2026-10-15.2', items: [
     'Changed: sections are now visually separated - in the question editors each section sits in its own bordered block with a bold side rule, and the Session Notes form now has the same look as the public intake form: each section is a card with a serif heading, section intro text in a tinted callout, and choices as bordered boxes that highlight when ticked.'
   ]},
-  { date: 'Oct 15, 2026', version: '2026-10-15.1', items: [
-    'Changed: in the question editors (Session Notes and Intake Questions), the Save changes / Discard / Preview buttons stay pinned under the tab bar while you scroll, so they are always in reach.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 15, 2026', version: '2026-10-15.1', items: [
+    'Changed: in the question editors (Session Notes and Intake Questions), the Save changes / Discard / Preview buttons stay pinned under the tab bar while you scroll, so they are always in reach.'
+  ]},
   { date: 'Oct 14, 2026', version: '2026-10-14.5', items: [
     'Fixed: a "show only if" set to "equals" a choice of a checkbox question never showed, because a checkbox answer is a list. In Session Notes it now treats equals as includes; picking a checkbox question in the editor sets the condition to includes automatically.'
   ]},
