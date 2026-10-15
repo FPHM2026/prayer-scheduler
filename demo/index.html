@@ -464,6 +464,12 @@
     .overview-filters .date-pair{flex:none;}
   }
 
+  /* Question editors: Save / Discard / Preview stay pinned just under the tab
+     bar while scrolling. --nav-h is the tab bar's real height (it wraps to
+     two rows on narrow screens), kept current by syncNavHeight(). */
+  .editor-sticky{position:sticky;top:var(--nav-h,0px);z-index:15;background:var(--bg);padding:8px 0 6px;margin-bottom:8px;border-bottom:1px solid var(--border);}
+  .editor-sticky .toolbar{margin-bottom:4px;}
+  .editor-sticky .errbox{margin:6px 0 0;}
   .subtabs{display:flex;gap:20px;margin:4px 0 16px;border-bottom:1px solid var(--border);}
   .subtabs button{background:none;border:none;border-bottom:3px solid transparent;padding:8px 2px;font-weight:700;font-size:var(--fs-sm);color:var(--muted);cursor:pointer;}
   .subtabs button:hover{color:var(--gold-dark);}
@@ -788,13 +794,15 @@
     <div id="intakeQuestionsHost" hidden>
     <div id="intakeQuestionsView">
       <p class="helptext" id="formEditorHelp">Edit the intake questionnaire's sections, questions and wording. Changes take effect for anyone opening the public form as soon as you save — no deploy needed.</p>
-      <div class="toolbar no-print">
+      <div class="editor-sticky no-print" id="formEditorSticky">
+      <div class="toolbar">
         <button class="btn" id="btnFormEditorSave">Save changes</button>
         <button class="btn secondary" id="btnFormEditorDiscard">Discard unsaved changes</button>
         <button class="btn secondary" id="btnFormEditorPreview" hidden>Preview form</button>
         <span id="formEditorDirtyBadge" class="tag" style="display:none;">Unsaved changes</span>
       </div>
       <p class="errbox" role="alert" id="formEditorMsg" hidden></p>
+      </div>
       <div id="formEditorIntro"></div>
       <div id="formEditorSections"></div>
       <div class="toolbar" style="margin-top:16px;">
@@ -1093,7 +1101,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-14.5";
+const APP_VERSION = "2026-10-15.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1768,10 +1776,17 @@ function wireSearchClear(inputId){
   });
   toggle();
 }
+function syncNavHeight(){
+  const nav = document.querySelector('nav[aria-label="Primary"]');
+  if(nav) document.documentElement.style.setProperty('--nav-h', nav.offsetHeight + 'px');
+}
 let appWired = false;
 function wireApp(){
   if(appWired) return;
   appWired = true;
+  syncNavHeight();
+  window.addEventListener('resize', syncNavHeight);
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(syncNavHeight);
   document.querySelectorAll('nav[aria-label="Primary"] button').forEach(b=>b.addEventListener('click', ()=>switchTab(b.dataset.tab)));
   $('#btnRefresh').addEventListener('click', ()=>withLoading($('#btnRefresh'), 'Refreshing…', loadAll));
   $('#btnRefreshData').addEventListener('click', refreshDataKeepingPlace);
@@ -6264,6 +6279,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 15, 2026', version: '2026-10-15.1', items: [
+    'Changed: in the question editors (Session Notes and Intake Questions), the Save changes / Discard / Preview buttons stay pinned under the tab bar while you scroll, so they are always in reach.'
+  ]},
   { date: 'Oct 14, 2026', version: '2026-10-14.5', items: [
     'Fixed: a "show only if" set to "equals" a choice of a checkbox question never showed, because a checkbox answer is a list. In Session Notes it now treats equals as includes; picking a checkbox question in the editor sets the condition to includes automatically.'
   ]},
@@ -6276,15 +6294,15 @@ const CHANGE_LOG = [
   { date: 'Oct 14, 2026', version: '2026-10-14.2', items: [
     'New: Settings > Session Notes has a Preview form button that opens the form exactly as currently edited - unsaved changes included, branching working - without saving or opening a session. Nothing entered in the preview is saved.'
   ]},
-  { date: 'Oct 12, 2026', version: '2026-10-12.1', items: [
-    'New: removing a booked session (Remove Booking, or deleting a scheduled session) whose ministers were already notified on WhatsApp now asks "Send cancellation" / "Don\'t send". Sending uses a new WhatsApp template, prayer_session_canceled, which must be approved in WhatsApp Manager and the notify Worker redeployed before it will deliver - until then the send reports a failure and nothing else changes.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 12, 2026', version: '2026-10-12.1', items: [
+    'New: removing a booked session (Remove Booking, or deleting a scheduled session) whose ministers were already notified on WhatsApp now asks "Send cancellation" / "Don\'t send". Sending uses a new WhatsApp template, prayer_session_canceled, which must be approved in WhatsApp Manager and the notify Worker redeployed before it will deliver - until then the send reports a failure and nothing else changes.'
+  ]},
   { date: 'Oct 8, 2026', version: '2026-10-08.4', items: [
     'Changed: clicking View on a linked or suggested intake form (e.g. from a Tentative or Booked card, or the waiting list) now opens it with a "Back to [that tab]" button that returns you to where you were, at the same scroll position, instead of dropping you on the Intake Forms list.'
   ]},
