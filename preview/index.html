@@ -1185,7 +1185,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-21.2";
+const APP_VERSION = "2026-10-21.3";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -4985,7 +4985,7 @@ async function importSelectedMsfForms(){
   if(!chosen.length) return;
   const dupes = chosen.filter(r => r.match && r.match.kind === 'exact');
   const warn = dupes.length ? ` ${dupes.length} of these already ${dupes.length===1?'has':'have'} a form in the app (${dupes.map(r=>r.name).join(', ')}), so importing makes a second copy.` : '';
-  if(!(await askConfirm(`Import ${chosen.length} intake form${chosen.length===1?'':'s'} as Submitted?${warn}`))) return;
+  if(!(await askConfirm(`Import ${chosen.length} intake form${chosen.length===1?'':'s'} as Submitted?${warn}`, {confirmLabel:'Import', danger:false}))) return;
   for(const r of chosen){
     try{
       await createItem('intake', {
@@ -7064,6 +7064,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 21, 2026', version: '2026-10-21.3', items: [
+    'Fixed: the confirmation box on Intake Forms > Import now has a green Import button instead of a red Delete button. Nothing was ever deleted - it was only the wrong label.'
+  ]},
   { date: 'Oct 21, 2026', version: '2026-10-21.2', items: [
     'New (temporary): Intake Forms has an Import sub-tab for bringing in forms filled out on the old Microsoft Form. Choose the Excel export, tick the people you want, and press Import. Each one arrives under Unlinked as a Submitted form. People already in the app are marked "Already in the app", and anyone sharing an email with an existing form is flagged. Each row also lists anything to check, like answers saved under Other.'
   ]},
