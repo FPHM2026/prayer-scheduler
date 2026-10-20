@@ -316,6 +316,13 @@
   .ans-q{font-weight:700;font-size:calc(var(--fs-xs) * var(--ans-scale,1));color:var(--muted);}
   .ans-a{font-size:calc(var(--fs-sm) * var(--ans-scale,1));white-space:pre-wrap;}
   #intakeDetail{--ans-scale:1;}
+  /* TEMPORARY: Microsoft Forms import list (Intake Forms > Import). */
+  .msf-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:#fff;}
+  .msf-row.msf-done{opacity:.6;}
+  .msf-check{display:flex;align-items:center;gap:10px;cursor:pointer;min-height:44px;}
+  .msf-check input{width:20px;height:20px;flex:0 0 auto;}
+  .msf-notes{flex:1 1 100%;font-size:var(--fs-xs);}
+  .msf-notes ul{margin:6px 0 0;padding-left:20px;}
   /* Open / Copy link row: Open left, Copy right, both plain text links. */
   .intake-linkrow{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px 16px;margin-bottom:12px;}
   .intake-linkrow a,.intake-linkrow .link-btn{font-size:var(--fs-md);font-weight:600;}
@@ -844,11 +851,29 @@
       <button data-intakestatus="InProgress">In progress</button>
       <button data-intakestatus="Archived">Archived</button>
       <button data-intakestatus="Questions">Edit Questions</button>
+      <button data-intakestatus="Import">Import</button>
     </nav>
     <div class="search-wrap" id="intakeSearchWrap" style="margin:12px 0;"><input id="intakeSearch" placeholder="Search by name or email" aria-label="Search intake forms"><button type="button" class="search-clear" aria-label="Clear search" hidden>&times;</button></div>
     <div id="intakeGroups"></div>
     <div class="no-results" id="intakeNoResults" hidden>No intake forms here yet.</div>
     <div id="intakeDetail" hidden></div>
+
+    <!-- TEMPORARY: import old Microsoft Forms responses - see MSF_COLS. -->
+    <div id="intakeImportHost" hidden>
+      <p class="helptext">Bring in intake forms people filled out on the old Microsoft Form. Choose the Excel export from Microsoft Forms, tick the people you want, then Import. Each one arrives under Unlinked as a Submitted form, with no signature (Microsoft Forms didn't collect one). People already in the app are marked so you don't add them twice.</p>
+      <div class="toolbar">
+        <button type="button" class="btn secondary" onclick="$('#msfFile').click()">Choose spreadsheet (.xlsx)</button>
+        <input type="file" id="msfFile" accept=".xlsx" hidden>
+      </div>
+      <p class="errbox" role="alert" id="msfMsg" hidden></p>
+      <div id="msfActions" class="toolbar" hidden>
+        <span class="helptext" id="msfSummary" style="flex:1 1 100%;margin:0;"></span>
+        <button type="button" class="btn secondary" id="btnMsfSelectNew">Select all not yet in the app</button>
+        <button type="button" class="btn secondary" id="btnMsfSelectNone">Clear selection</button>
+        <button type="button" class="btn" id="btnMsfImport" disabled>Import selected forms</button>
+      </div>
+      <div id="msfList"></div>
+    </div>
 
     <div id="intakeQuestionsHost" hidden>
     <div id="intakeQuestionsView">
@@ -1160,7 +1185,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-21.1";
+const APP_VERSION = "2026-10-21.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1882,6 +1907,10 @@ function wireApp(){
     renderIntake();
   }));
   $('#intakeSearch').addEventListener('input', renderIntake);
+  $('#msfFile').addEventListener('change', e => { onMsfFileChosen(e.target.files[0]); e.target.value = ''; });
+  $('#btnMsfSelectNew').addEventListener('click', () => { msfRows.forEach(r => { if(!r.done) r.selected = !r.match; }); renderMsfImport(); });
+  $('#btnMsfSelectNone').addEventListener('click', () => { msfRows.forEach(r => { r.selected = false; }); renderMsfImport(); });
+  $('#btnMsfImport').addEventListener('click', () => withLoading($('#btnMsfImport'), 'Importing…', importSelectedMsfForms).then(renderMsfImport));
   wireSearchClear('intakeSearch');
   $('#btnOpenIntakeForm').href = absoluteIntakeUrl();
   $('#btnCopyIntakeLink').addEventListener('click', copyIntakeLink);
@@ -4761,6 +4790,219 @@ async function copyIntakeLink(){
 // "submitted would become unlinked and any intake that has been linked
 // would be under the linked [tab]". In-progress and Archived are
 // unaffected - linking only ever applies to Submitted forms in practice.
+/* =========================================================================
+   TEMPORARY (added 2026-10-20): import old Microsoft Forms intake responses.
+   Staff pick the MS Forms Excel export (.xlsx); each row becomes a Submitted
+   IntakeResponses item, the same shape the public form writes (no signature
+   - MS Forms never collected one). The MS Forms export has duplicate and
+   space-padded headers ("Please explain" x15), so columns are mapped by
+   POSITION, with a header spot-check that refuses a file laid out
+   differently. Delete this block, the "Import" sub-tab button,
+   #intakeImportHost, the .msf-* CSS and the msf* listeners in wireUp once
+   the old forms are all in.
+   ========================================================================= */
+const MSF_COLS = {6:'name',7:'age',8:'sex',9:'occupation',10:'countryOfBirth',12:'email',
+  13:'prayerFor',14:'priorPrayerMinistry',15:'anythingElse',16:'underMedicalCare',17:'inCounselling',
+  18:'parentsWantedYou',19:'adopted',20:'primaryCaregiver',24:'homeSecurity',25:'homeSecurityExplain',26:'hasSiblings',27:'siblingsInfo',
+  28:'motherLiving',30:'motherRelationship',31:'fatherLiving',33:'fatherRelationship',34:'parentsModeledJesus',
+  35:'otherParentalFigures',36:'otherParentalFiguresExplain',37:'maritalStatus',
+  39:'m_spouseName',40:'m_spouseAge',41:'m_spouseAgeAtMarriage',42:'m_ageAtMarriage',43:'m_separatedOrDivorced',
+  44:'cl_partnerName',45:'cl_partnerAge',46:'cl_partnerAgeAtMoveIn',47:'cl_ageAtMoveIn',48:'cl_separatedOrDivorced',
+  52:'s_everMarried',53:'s_previousMarriages',
+  57:'d_spouseName',58:'d_spouseAge',59:'d_spouseAgeAtMarriage',60:'d_ageAtMarriage',61:'d_whoInitiated',62:'d_initiatedExplain',63:'d_previouslyMarried',64:'d_previousMarriages',
+  65:'hasChildren',66:'childrenInfo',67:'lostPregnancy',68:'lostPregnancyExplain',69:'abortion',
+  70:'physicalHealth',71:'mentalHealth',72:'suicideHistory',73:'familyHealthPatterns',74:'familyHealthPatternsExplain',
+  75:'committedToJesus',76:'relationshipWithJesus',77:'emotionallyHonestWithGod',79:'prayRegularly',80:'prayingDifficult',81:'prayingDifficultExplain',
+  82:'readBibleFrequency',83:'attendsChurch',84:'whatChurch',85:'childhoodChurch',86:'childhoodChurchDenomination',87:'baptized',88:'recentChristianChanges',
+  89:'nonChristianReligions',90:'christianCults',91:'occultNewAge',92:'occultObjects',93:'occultObjectsExplain',94:'secretSocieties',95:'ceremoniesCovenants',96:'ceremoniesCovenantsExplain',
+  97:'supernaturalEncounter',98:'supernaturalEncounterExplain',99:'supernaturalSymptoms',100:'curseSpoken',101:'pronouncerRelationship',102:'curseSpokenExplain',
+  103:'violence',104:'socialWounds',105:'negativeEmotions',106:'addictions',
+  107:'pronouncementBySomeoneElse',108:'pronouncementText',109:'pronouncementBySelf',110:'pronouncementSelfText',111:'innerVowMade',112:'innerVowText',
+  113:'unconfessedSin',114:'unconfessedSinExplain',115:'needToForgive',116:'needToForgiveExplain',117:'notForgivenSelf',118:'notForgivenSelfExplain',119:'angryAtGod',120:'angryAtGodExplain'};
+// The Married and Common-law pages' last three questions land in columns
+// whose headers are identical to each other - which page they belong to
+// depends on the marital status answer.
+const MSF_COLS_BY_STATUS = {
+  'Married':    {49:'m_whoInitiated',50:'m_initiatedExplain',51:'m_previousMarriages'},
+  'Common-law': {54:'cl_whoInitiated',55:'cl_initiatedExplain',56:'cl_previousMarriages'}
+};
+// MS Forms stores this column next to the curse question, but its answers
+// ("Mother", "First husband, previous boss") are the pronouncement
+// follow-up - hence 101 -> pronouncerRelationship above.
+const MSF_HEADER_CHECK = {2:'completion time',6:'name',12:'email',37:'marital status',70:'physical health',103:'violence',119:'do you blame god'};
+let msfRows = [];        // parsed, mapped rows from the chosen file
+let msfFileName = '';
+
+function msfNorm(v){ return String(v==null?'':v).replace(/ /g,' ').replace(/\s+/g,' ').trim(); }
+function msfKey(v){ return msfNorm(v).replace(/[‘’]/g,"'").toLowerCase(); }
+// Excel date serial -> the same wall-clock time in the browser's timezone
+// (MS Forms exports completion times as local times).
+function msfExcelDate(v){
+  if(typeof v !== 'number'){ const d = new Date(v); return isNaN(d) ? null : d; }
+  const u = new Date(Math.round((v - 25569) * 86400000));
+  return new Date(u.getUTCFullYear(), u.getUTCMonth(), u.getUTCDate(), u.getUTCHours(), u.getUTCMinutes(), u.getUTCSeconds());
+}
+function msfRowToResponses(row, questions, header){
+  const responses = {}, notes = [];
+  const cols = Object.assign({}, MSF_COLS, MSF_COLS_BY_STATUS[msfNorm(row[37])] || {});
+  // A column with no fixed mapping (e.g. "How old were you when she
+  // passed?") still imports if staff have since added a question with
+  // that exact wording in Edit Questions.
+  const mapped = new Set(Object.values(cols));
+  const byLabel = {};
+  Object.values(questions).forEach(q => { if(!mapped.has(q.id)) byLabel[msfKey(q.label).replace(/[?.:]+$/,'')] = q.id; });
+  row.forEach((v, i) => {
+    if(i < 5 || v === null || v === undefined || msfNorm(v) === '') return;
+    const id = cols[i] || byLabel[msfKey(header[i]).replace(/[?.:]+$/,'')];
+    if(!id){
+      notes.push(`Not imported - no question "${msfNorm(header[i])}" on the current form: "${msfNorm(v).slice(0,80)}"`);
+      return;
+    }
+    const q = questions[id];
+    if(!q){ responses[id] = msfNorm(v); notes.push(`Saved, but won't show (question "${id}" isn't on the current form): "${msfNorm(v).slice(0,80)}"`); return; }
+    if(q.type === 'checkboxes'){
+      // MS Forms joins choices with ";" - so a typed-in Other answer that
+      // itself contains ";" arrives in pieces. Unmatched neighbours are
+      // glued back together into one answer.
+      const picked = [], extra = [];
+      String(v).split(';').map(msfNorm).filter(Boolean).forEach(p => {
+        const hit = (q.options||[]).find(o => msfKey(o) === msfKey(p));
+        if(hit) picked.push(hit); else extra.push(p);
+      });
+      if(extra.length){
+        const text = extra.join('; ');
+        if(q.otherOption){ notes.push(`${q.label}: "${text}" saved as Other`); picked.push('__other__:' + text); }
+        else { notes.push(`${q.label}: "${text}" isn't a listed choice - saved as written`); picked.push(text); }
+      }
+      responses[id] = picked;
+    } else if(q.type === 'radio' || q.type === 'select'){
+      const p = msfNorm(v);
+      const hit = (q.options||[]).find(o => msfKey(o) === msfKey(p));
+      const otherQ = questions[id + 'Other'];
+      if(hit) responses[id] = hit;
+      else if(otherQ && (q.options||[]).includes('Other')){
+        // e.g. Marital status "Widow" -> Other + "Please specify: Widow"
+        responses[id] = 'Other'; responses[otherQ.id] = p;
+        notes.push(`${q.label}: "${p}" saved as Other`);
+      } else {
+        responses[id] = p;
+        notes.push(`${q.label}: "${p}" isn't a listed choice - saved as written`);
+      }
+    } else if(q.type === 'number'){
+      const n = Number(v);
+      responses[id] = isNaN(n) ? msfNorm(v) : n;
+    } else {
+      responses[id] = q.type === 'textarea' ? String(v).replace(/ /g,' ').trim() : msfNorm(v);
+    }
+  });
+  return { responses, notes };
+}
+// Existing form for this person? Same name AND email = already imported;
+// same email only = a family member sharing an address, or a renamed form
+// - flagged so staff can decide.
+function msfExistingMatch(name, email){
+  const n = msfKey(name), e = msfKey(email);
+  const exact = intakeResponses.find(i => msfKey(i.recipName) === n && (!e || msfKey(i.recipEmail) === e));
+  if(exact) return { kind:'exact', form: exact };
+  const sameEmail = e && intakeResponses.find(i => msfKey(i.recipEmail) === e);
+  if(sameEmail) return { kind:'email', form: sameEmail };
+  return null;
+}
+function loadSheetJs(){
+  if(window.XLSX) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('Could not load the spreadsheet reader. Check your internet connection and try again.'));
+    document.head.appendChild(s);
+  });
+}
+function msfParseRows(rows){
+  const header = rows[0] || [];
+  const bad = Object.entries(MSF_HEADER_CHECK).filter(([i, text]) => !msfKey(header[i]).startsWith(text));
+  if(bad.length) throw new Error(`This doesn't look like the Microsoft Forms intake export - expected column ${+bad[0][0]+1} to be "${bad[0][1]}", found "${msfNorm(header[bad[0][0]])||'(blank)'}".`);
+  const questions = {};
+  window.FPHM_INTAKE_CONFIG.SECTIONS.forEach(s => s.questions.forEach(q => { questions[q.id] = q; }));
+  return rows.slice(1).filter(r => r && msfNorm(r[6])).map((r, idx) => {
+    const { responses, notes } = msfRowToResponses(r, questions, header);
+    return { key: idx, name: msfNorm(r[6]), email: msfNorm(r[12]), completed: msfExcelDate(r[2]),
+             responses, notes, match: msfExistingMatch(r[6], r[12]), selected: false, done: false, error: '' };
+  });
+}
+async function onMsfFileChosen(file){
+  const msg = $('#msfMsg');
+  msg.hidden = true;
+  if(!file) return;
+  try{
+    await loadSheetJs();
+    const wb = XLSX.read(await file.arrayBuffer(), { type:'array' });
+    const sheet = wb.Sheets[wb.SheetNames.includes('Data') ? 'Data' : wb.SheetNames[0]];
+    msfRows = msfParseRows(XLSX.utils.sheet_to_json(sheet, { header:1, defval:null, raw:true }));
+    msfFileName = file.name;
+  }catch(e){
+    msfRows = [];
+    msg.textContent = e.message;
+    msg.hidden = false;
+  }
+  renderMsfImport();
+}
+function msfDateLabel(d){
+  if(!d) return '';
+  return fmtShort(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+}
+function renderMsfImport(){
+  const box = $('#msfList');
+  if(!msfRows.length){ box.innerHTML = ''; $('#msfActions').hidden = true; return; }
+  $('#msfActions').hidden = false;
+  const sel = msfRows.filter(r => r.selected && !r.done).length;
+  $('#btnMsfImport').disabled = !sel;
+  $('#btnMsfImport').textContent = sel ? `Import ${sel} selected form${sel===1?'':'s'}` : 'Import selected forms';
+  $('#msfSummary').textContent = `${msfFileName}: ${msfRows.length} forms, ${msfRows.filter(r=>r.match&&r.match.kind==='exact').length} already in the app.`;
+  box.innerHTML = msfRows.map(r => {
+    const when = msfDateLabel(r.completed);
+    let status = '';
+    if(r.done) status = '<span class="tag completed">Imported</span>';
+    else if(r.match && r.match.kind==='exact') status = '<span class="tag">Already in the app</span>';
+    else if(r.match) status = `<span class="tag first">Same email as ${escapeHtml(r.match.form.recipName||'another form')}</span>`;
+    const err = r.error ? `<span class="tag" style="background:var(--danger-bg);color:var(--danger);">${escapeHtml(r.error)}</span>` : '';
+    const notes = r.notes.length ? `<details class="msf-notes"><summary>${r.notes.length} thing${r.notes.length===1?'':'s'} to check</summary><ul>${r.notes.map(n=>`<li>${escapeHtml(n)}</li>`).join('')}</ul></details>` : '';
+    return `<div class="msf-row${r.done?' msf-done':''}">
+      <label class="msf-check"><input type="checkbox" ${r.selected?'checked':''} ${r.done?'disabled':''} onchange="msfToggle(${r.key}, this.checked)">
+        <span><strong>${escapeHtml(r.name)}</strong><br><span class="helptext">${escapeHtml(r.email)}${when?' - '+escapeHtml(when):''}</span></span></label>
+      <div>${status}${err}</div>
+      ${notes}
+    </div>`;
+  }).join('');
+}
+window.msfToggle = function(key, on){
+  const r = msfRows.find(x => x.key === key);
+  if(r) r.selected = on;
+  renderMsfImport();
+};
+async function importSelectedMsfForms(){
+  const chosen = msfRows.filter(r => r.selected && !r.done);
+  if(!chosen.length) return;
+  const dupes = chosen.filter(r => r.match && r.match.kind === 'exact');
+  const warn = dupes.length ? ` ${dupes.length} of these already ${dupes.length===1?'has':'have'} a form in the app (${dupes.map(r=>r.name).join(', ')}), so importing makes a second copy.` : '';
+  if(!(await askConfirm(`Import ${chosen.length} intake form${chosen.length===1?'':'s'} as Submitted?${warn}`))) return;
+  for(const r of chosen){
+    try{
+      await createItem('intake', {
+        Title: r.name, Token: crypto.randomUUID(), RecipientName: r.name, RecipientEmail: r.email,
+        Status: 'Submitted', ResponsesJSON: JSON.stringify(r.responses), SignatureDataUrl: '',
+        SubmittedAt: (r.completed || new Date()).toISOString()
+      });
+      r.done = true; r.selected = false; r.error = '';
+    }catch(e){
+      r.error = 'Failed: ' + (e.message || e);
+    }
+    renderMsfImport();
+  }
+  await loadAll();
+  msfRows.forEach(r => { if(!r.done) r.match = msfExistingMatch(r.name, r.email); });
+  renderMsfImport();
+}
 function renderIntake(){
   const box = $('#intakeGroups'); const noResults = $('#intakeNoResults');
   // "Edit Questions" is a fifth sub-tab, not a status: it swaps the form
@@ -4768,9 +5010,16 @@ function renderIntake(){
   // editor's own render (renderFormEditor()) runs from renderAll()
   // regardless of visibility, so nothing else needs to know about it.
   const editingQuestions = intakeSubStatus === 'Questions';
+  const importing = intakeSubStatus === 'Import';
   $('#intakeQuestionsHost').hidden = !editingQuestions;
-  $('#intakeSearchWrap').hidden = editingQuestions;
-  $('#intakeHelptext').hidden = editingQuestions;
+  $('#intakeImportHost').hidden = !importing;
+  $('#intakeSearchWrap').hidden = editingQuestions || importing;
+  $('#intakeHelptext').hidden = editingQuestions || importing;
+  if(importing){
+    box.innerHTML = '';
+    noResults.hidden = true;
+    return;
+  }
   if(editingQuestions){
     box.innerHTML = '';
     noResults.hidden = true;
@@ -6815,6 +7064,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 21, 2026', version: '2026-10-21.2', items: [
+    'New (temporary): Intake Forms has an Import sub-tab for bringing in forms filled out on the old Microsoft Form. Choose the Excel export, tick the people you want, and press Import. Each one arrives under Unlinked as a Submitted form. People already in the app are marked "Already in the app", and anyone sharing an email with an existing form is flagged. Each row also lists anything to check, like answers saved under Other.'
+  ]},
   { date: 'Oct 21, 2026', version: '2026-10-21.1', items: [
     'New: in an add-rows table, a Yes / No column with a text box can now be set to show that text box for Yes, for No, or for either answer (it used to be Yes only).'
   ]},
