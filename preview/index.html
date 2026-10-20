@@ -1185,7 +1185,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-21.3";
+const APP_VERSION = "2026-10-21.4";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -4842,6 +4842,17 @@ function msfExcelDate(v){
   const u = new Date(Math.round((v - 25569) * 86400000));
   return new Date(u.getUTCFullYear(), u.getUTCMonth(), u.getUTCDate(), u.getUTCHours(), u.getUTCMinutes(), u.getUTCSeconds());
 }
+// A follow-up question added later in Edit Questions gets a generated id
+// (e.g. "question_7"), not the name this mapping uses - so a mapped
+// "...Explain" id that isn't on the live form is matched to whichever live
+// question is shown only when its parent question is answered
+// (homeSecurityExplain -> the question whose visibleIf points at homeSecurity).
+function msfFindLiveQuestion(id, questions){
+  if(questions[id]) return questions[id];
+  const parent = id.replace(/Explain$/, '');
+  if(parent === id) return null;
+  return Object.values(questions).find(q => q.visibleIf && q.visibleIf.id === parent) || null;
+}
 function msfRowToResponses(row, questions, header){
   const responses = {}, notes = [];
   const cols = Object.assign({}, MSF_COLS, MSF_COLS_BY_STATUS[msfNorm(row[37])] || {});
@@ -4858,8 +4869,9 @@ function msfRowToResponses(row, questions, header){
       notes.push(`Not imported - no question "${msfNorm(header[i])}" on the current form: "${msfNorm(v).slice(0,80)}"`);
       return;
     }
-    const q = questions[id];
+    const q = msfFindLiveQuestion(id, questions);
     if(!q){ responses[id] = msfNorm(v); notes.push(`Saved, but won't show (question "${id}" isn't on the current form): "${msfNorm(v).slice(0,80)}"`); return; }
+    const qid = q.id;   // may differ from the mapped id - see msfFindLiveQuestion
     if(q.type === 'checkboxes'){
       // MS Forms joins choices with ";" - so a typed-in Other answer that
       // itself contains ";" arrives in pieces. Unmatched neighbours are
@@ -4874,25 +4886,25 @@ function msfRowToResponses(row, questions, header){
         if(q.otherOption){ notes.push(`${q.label}: "${text}" saved as Other`); picked.push('__other__:' + text); }
         else { notes.push(`${q.label}: "${text}" isn't a listed choice - saved as written`); picked.push(text); }
       }
-      responses[id] = picked;
+      responses[qid] = picked;
     } else if(q.type === 'radio' || q.type === 'select'){
       const p = msfNorm(v);
       const hit = (q.options||[]).find(o => msfKey(o) === msfKey(p));
-      const otherQ = questions[id + 'Other'];
-      if(hit) responses[id] = hit;
+      const otherQ = questions[qid + 'Other'];
+      if(hit) responses[qid] = hit;
       else if(otherQ && (q.options||[]).includes('Other')){
         // e.g. Marital status "Widow" -> Other + "Please specify: Widow"
-        responses[id] = 'Other'; responses[otherQ.id] = p;
+        responses[qid] = 'Other'; responses[otherQ.id] = p;
         notes.push(`${q.label}: "${p}" saved as Other`);
       } else {
-        responses[id] = p;
+        responses[qid] = p;
         notes.push(`${q.label}: "${p}" isn't a listed choice - saved as written`);
       }
     } else if(q.type === 'number'){
       const n = Number(v);
-      responses[id] = isNaN(n) ? msfNorm(v) : n;
+      responses[qid] = isNaN(n) ? msfNorm(v) : n;
     } else {
-      responses[id] = q.type === 'textarea' ? String(v).replace(/ /g,' ').trim() : msfNorm(v);
+      responses[qid] = q.type === 'textarea' ? String(v).replace(/ /g,' ').trim() : msfNorm(v);
     }
   });
   return { responses, notes };
@@ -7064,6 +7076,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 21, 2026', version: '2026-10-21.4', items: [
+    'Fixed: Intake Forms > Import now puts the answer to "Please explain" (after "Was there a sense of security and harmony in your home...?") into the Please explain question you added in Edit Questions, instead of saving it where it would not show.'
+  ]},
   { date: 'Oct 21, 2026', version: '2026-10-21.3', items: [
     'Fixed: the confirmation box on Intake Forms > Import now has a green Import button instead of a red Delete button. Nothing was ever deleted - it was only the wrong label.'
   ]},
