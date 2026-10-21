@@ -58,3 +58,30 @@ curl -X POST https://fphm-intake-func.<your-subdomain>.workers.dev/api/intake/st
 ```
 Should return `{"token":"..."}`. Check the `IntakeResponses` SharePoint
 list for a new "New intake" item.
+
+## Push notifications (added 2026-10-21)
+
+The same Worker also sends phone notifications to ministers when they're
+booked on a session. One-time setup, in this order:
+
+1. **Create the SharePoint list.** On the FreedomPrayer site, create a
+   list named exactly `PushSubscriptions` with two columns besides Title:
+   - `MinisterId` (Number)
+   - `SubscriptionJSON` (Multiple lines of text, **Plain text**)
+   Ministers don't need any permission on it; only this Worker touches it.
+2. **Make the push keys** (from this `cloudflare-worker/` folder):
+   ```bash
+   npx web-push generate-vapid-keys
+   ```
+   It prints a Public Key and a Private Key.
+3. **Store them as Worker secrets:**
+   ```bash
+   npx wrangler secret put VAPID_PUBLIC_KEY
+   npx wrangler secret put VAPID_PRIVATE_KEY
+   ```
+   Paste each key when asked. Keep the same keys from then on: changing
+   them silently breaks every phone that already turned notifications on.
+4. **Deploy:** `npx wrangler deploy`
+5. **Check it:** open
+   `https://fphm-intake-func.ajjamoore.workers.dev/api/push/key` in a
+   browser. It should show `{"publicKey":"..."}`.

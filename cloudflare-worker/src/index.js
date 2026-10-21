@@ -26,6 +26,15 @@
        2026-09-26 so a visitor can delete their own form given only their
        own token; InProgress only, 403 once Submitted (see the handler's
        own comment).
+
+   Minister push notifications (added 2026-10-21) - see the "Push
+   notifications" section further down for the full picture:
+     GET  /api/push/key         -> { publicKey } (VAPID, for the portal)
+     POST /api/push/subscribe   { subscription } + Bearer <Graph token>
+     POST /api/push/unsubscribe { endpoint }     + Bearer <Graph token>
+     POST /api/push/test        {}               + Bearer <Graph token>
+     POST /api/push/session     { sessionId, ministerIds?, kind?, when }
+                                                 + Bearer <Graph token>
 ========================================================================= */
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
@@ -36,8 +45,8 @@ function corsHeaders(env, request) {
   const allowOrigin = allowed.includes(origin) ? origin : allowed[0] || "*";
   return {
     "Access-Control-Allow-Origin": allowOrigin,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Max-Age": "86400"
   };
 }
@@ -315,6 +324,272 @@ async function handleSchema(env) {
   return schema;
 }
 
+/* =========================================================================
+   PUSH NOTIFICATIONS (added 2026-10-21)
+
+   Ministers turn on notifications once in the portal; the portal sends
+   its browser push subscription here, and we keep it in the
+   PushSubscriptions SharePoint list (Title = minister name, MinisterId
+   Number, SubscriptionJSON plain-text multiline). When an admin books a
+   session in the Scheduler, the Scheduler calls /api/push/session and we
+   push to every subscribed device of the ministers on that session.
+
+   Who is calling: every push route except /key needs the caller's own
+   Microsoft Graph token (the one the Scheduler/portal already hold). We
+   check it by calling Graph /me with it - Graph itself validates the
+   signature - and require the token's tenant to be ours. Subscribe/
+   unsubscribe/test then match that sign-in to a minister's SignInEmail,
+   so nobody can register a device as somebody else. /session only ever
+   pushes a real session's details to that session's own team.
+
+   Web Push itself (RFC 8291 payload encryption + RFC 8292 VAPID) is done
+   by hand with WebCrypto below - no npm dependency. VAPID_PUBLIC_KEY and
+   VAPID_PRIVATE_KEY are Worker secrets (see DEPLOY.md), VAPID_SUBJECT a
+   plain var in wrangler.toml.
+========================================================================= */
+const PUSH_LIST = "PushSubscriptions";
+const te = new TextEncoder();
+
+function b64uToBytes(s) {
+  s = String(s).replace(/-/g, "+").replace(/_/g, "/");
+  while (s.length % 4) s += "=";
+  return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+}
+function bytesToB64u(buf) {
+  let s = "";
+  for (const b of new Uint8Array(buf)) s += String.fromCharCode(b);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function concatBytes(...parts) {
+  const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+  let i = 0;
+  for (const p of parts) { out.set(p, i); i += p.length; }
+  return out;
+}
+async function hkdf(salt, ikm, info, length) {
+  const key = await crypto.subtle.importKey("raw", ikm, "HKDF", false, ["deriveBits"]);
+  return new Uint8Array(await crypto.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt, info }, key, length * 8));
+}
+
+// RFC 8291 "aes128gcm" encryption of one payload for one subscription.
+async function encryptPushPayload(subscription, plaintext) {
+  const uaPublic = b64uToBytes(subscription.keys.p256dh);
+  const authSecret = b64uToBytes(subscription.keys.auth);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const local = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+  const localPublic = new Uint8Array(await crypto.subtle.exportKey("raw", local.publicKey));
+  const uaKey = await crypto.subtle.importKey("raw", uaPublic, { name: "ECDH", namedCurve: "P-256" }, false, []);
+  const shared = new Uint8Array(await crypto.subtle.deriveBits({ name: "ECDH", public: uaKey }, local.privateKey, 256));
+  const ikm = await hkdf(authSecret, shared, concatBytes(te.encode("WebPush: info\0"), uaPublic, localPublic), 32);
+  const cek = await hkdf(salt, ikm, te.encode("Content-Encoding: aes128gcm\0"), 16);
+  const nonce = await hkdf(salt, ikm, te.encode("Content-Encoding: nonce\0"), 12);
+  const aesKey = await crypto.subtle.importKey("raw", cek, "AES-GCM", false, ["encrypt"]);
+  // One record: the payload plus the 0x02 "last record" delimiter.
+  const cipher = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce }, aesKey, concatBytes(plaintext, new Uint8Array([2]))));
+  const rs = new Uint8Array(4);
+  new DataView(rs.buffer).setUint32(0, 4096);
+  return concatBytes(salt, rs, new Uint8Array([localPublic.length]), localPublic, cipher);
+}
+
+// RFC 8292 VAPID header for one push service origin.
+async function vapidAuthorization(env, endpoint) {
+  const header = bytesToB64u(te.encode(JSON.stringify({ typ: "JWT", alg: "ES256" })));
+  const claims = bytesToB64u(te.encode(JSON.stringify({
+    aud: new URL(endpoint).origin,
+    exp: Math.floor(Date.now() / 1000) + 12 * 3600,
+    sub: env.VAPID_SUBJECT || "https://fphm2026.github.io/prayer-scheduler/"
+  })));
+  const pub = b64uToBytes(env.VAPID_PUBLIC_KEY);
+  const key = await crypto.subtle.importKey("jwk", {
+    kty: "EC", crv: "P-256", d: env.VAPID_PRIVATE_KEY,
+    x: bytesToB64u(pub.slice(1, 33)), y: bytesToB64u(pub.slice(33, 65)), ext: true
+  }, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, te.encode(header + "." + claims));
+  return `vapid t=${header}.${claims}.${bytesToB64u(sig)}, k=${env.VAPID_PUBLIC_KEY}`;
+}
+
+// Returns the push service's HTTP status; 404/410 mean the subscription is
+// gone for good (app removed, permission revoked) and should be deleted.
+async function sendPush(env, subscription, message) {
+  const body = await encryptPushPayload(subscription, te.encode(JSON.stringify(message)));
+  const res = await fetch(subscription.endpoint, {
+    method: "POST",
+    headers: {
+      Authorization: await vapidAuthorization(env, subscription.endpoint),
+      "Content-Encoding": "aes128gcm",
+      "Content-Type": "application/octet-stream",
+      TTL: "86400",
+      Urgency: "high"
+    },
+    body
+  });
+  return res.status;
+}
+
+function requirePushConfigured(env) {
+  if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) {
+    return { __status: 503, error: "Push notifications aren't set up on the Worker yet (missing VAPID keys)." };
+  }
+  return null;
+}
+
+// The caller's identity, from their own Graph token. Graph validates the
+// token; we additionally require it to come from our own tenant.
+async function callerFromRequest(env, request) {
+  const auth = request.headers.get("Authorization") || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  if (!token) return null;
+  try {
+    const claims = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    if (claims.tid !== env.TENANT_ID) return null;
+  } catch (e) {
+    return null;
+  }
+  const res = await fetch("https://graph.microsoft.com/v1.0/me?$select=userPrincipalName,mail", {
+    headers: { Authorization: "Bearer " + token }
+  });
+  if (!res.ok) return null;
+  const me = await res.json();
+  return { upn: (me.userPrincipalName || me.mail || "").trim().toLowerCase() };
+}
+
+async function listAllItems(env, listName) {
+  const siteId = await resolveSiteId(env);
+  const listId = await resolveListId(env, listName);
+  let url = `/sites/${siteId}/lists/${listId}/items?$expand=fields&$top=999`;
+  const items = [];
+  while (url) {
+    const resp = await graphFetch(env, url);
+    items.push(...resp.value);
+    url = resp["@odata.nextLink"] ? resp["@odata.nextLink"].replace("https://graph.microsoft.com/v1.0", "") : null;
+  }
+  return items;
+}
+
+async function ministerForCaller(env, request) {
+  const caller = await callerFromRequest(env, request);
+  if (!caller) return { error: { __status: 401, error: "Please sign in again." } };
+  const ministers = await listAllItems(env, "PrayerMinisters");
+  const m = ministers.find((i) => (i.fields.SignInEmail || "").trim().toLowerCase() === caller.upn);
+  if (!m) return { error: { __status: 403, error: "Your sign-in isn't on the minister roster." } };
+  return { minister: { id: parseInt(m.id, 10), name: m.fields.Title || "" } };
+}
+
+async function pushSubscriptions(env) {
+  const items = await listAllItems(env, PUSH_LIST);
+  return items.map((i) => {
+    let sub = null;
+    try { sub = JSON.parse(i.fields.SubscriptionJSON || "null"); } catch (e) {}
+    return { itemId: i.id, ministerId: parseInt(i.fields.MinisterId, 10), sub };
+  }).filter((x) => x.sub && x.sub.endpoint && x.sub.keys);
+}
+
+async function pushListItem(env, method, itemId, fields) {
+  const siteId = await resolveSiteId(env);
+  const listId = await resolveListId(env, PUSH_LIST);
+  if (method === "POST") {
+    return graphFetch(env, `/sites/${siteId}/lists/${listId}/items`, { method, body: JSON.stringify({ fields }) });
+  }
+  if (method === "PATCH") {
+    return graphFetch(env, `/sites/${siteId}/lists/${listId}/items/${itemId}/fields`, { method, body: JSON.stringify(fields) });
+  }
+  return graphFetch(env, `/sites/${siteId}/lists/${listId}/items/${itemId}`, { method: "DELETE" });
+}
+
+// Sends one message to many subscriptions, deleting any the push service
+// says are gone. Returns how many were delivered.
+async function pushToSubscriptions(env, subs, message) {
+  let sent = 0;
+  await Promise.all(subs.map(async (s) => {
+    try {
+      const status = await sendPush(env, s.sub, message);
+      if (status >= 200 && status < 300) sent++;
+      else if (status === 404 || status === 410) await pushListItem(env, "DELETE", s.itemId).catch(() => {});
+    } catch (e) {
+      // One bad subscription shouldn't stop the rest.
+    }
+  }));
+  return sent;
+}
+
+async function handlePushKey(env) {
+  if (!env.VAPID_PUBLIC_KEY) return { __status: 503, error: "not configured" };
+  return { publicKey: env.VAPID_PUBLIC_KEY };
+}
+
+async function handlePushSubscribe(env, request) {
+  const notReady = requirePushConfigured(env);
+  if (notReady) return notReady;
+  const body = await request.json().catch(() => ({}));
+  const sub = body.subscription;
+  if (!sub || !sub.endpoint || !sub.keys || !sub.keys.p256dh || !sub.keys.auth) return { __status: 400, error: "subscription required" };
+  const { minister, error } = await ministerForCaller(env, request);
+  if (error) return error;
+  const clean = { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } };
+  const fields = { Title: minister.name, MinisterId: minister.id, SubscriptionJSON: JSON.stringify(clean) };
+  const existing = (await pushSubscriptions(env)).find((s) => s.sub.endpoint === sub.endpoint);
+  if (existing) await pushListItem(env, "PATCH", existing.itemId, fields);
+  else await pushListItem(env, "POST", null, fields);
+  return { ok: true };
+}
+
+async function handlePushUnsubscribe(env, request) {
+  const body = await request.json().catch(() => ({}));
+  if (!body.endpoint) return { __status: 400, error: "endpoint required" };
+  const { minister, error } = await ministerForCaller(env, request);
+  if (error) return error;
+  const mine = (await pushSubscriptions(env)).filter((s) => s.sub.endpoint === body.endpoint && s.ministerId === minister.id);
+  for (const s of mine) await pushListItem(env, "DELETE", s.itemId);
+  return { ok: true };
+}
+
+async function handlePushTest(env, request) {
+  const notReady = requirePushConfigured(env);
+  if (notReady) return notReady;
+  const { minister, error } = await ministerForCaller(env, request);
+  if (error) return error;
+  const subs = (await pushSubscriptions(env)).filter((s) => s.ministerId === minister.id);
+  const sent = await pushToSubscriptions(env, subs, {
+    title: "Notifications are working",
+    body: "You'll get a notification like this when you're booked for a prayer session.",
+    tag: "fphm-test"
+  });
+  return { ok: true, sent };
+}
+
+// Called by the Scheduler right after a session is saved. Recipient name
+// and team come from SharePoint, not the caller; `when` is the admin's
+// own browser-formatted date/time (the Worker runs in UTC and doesn't
+// know the church's time zone), trimmed to a sane length.
+async function handlePushSession(env, request) {
+  const notReady = requirePushConfigured(env);
+  if (notReady) return notReady;
+  const caller = await callerFromRequest(env, request);
+  if (!caller) return { __status: 401, error: "Please sign in again." };
+  const body = await request.json().catch(() => ({}));
+  const sessionId = parseInt(body.sessionId, 10);
+  if (!sessionId) return { __status: 400, error: "sessionId required" };
+  const siteId = await resolveSiteId(env);
+  const listId = await resolveListId(env, "PrayerSessions");
+  const item = await graphFetch(env, `/sites/${siteId}/lists/${listId}/items/${sessionId}?$expand=fields`);
+  const f = item.fields || {};
+  if (f.Status !== "Scheduled" || !f.SessionDate) return { ok: true, sent: 0, skipped: "not a scheduled session" };
+  const assigned = String(f.AssignedMinisterIDs || "").replace(/<[^>]*>/g, "").split(",").map((x) => parseInt(x.trim(), 10)).filter((x) => !isNaN(x));
+  const only = Array.isArray(body.ministerIds) ? new Set(body.ministerIds.map((x) => parseInt(x, 10))) : null;
+  const targets = new Set(assigned.filter((id) => !only || only.has(id)));
+  if (!targets.size) return { ok: true, sent: 0 };
+  const subs = (await pushSubscriptions(env)).filter((s) => targets.has(s.ministerId));
+  if (!subs.length) return { ok: true, sent: 0 };
+  const when = String(body.when || "").slice(0, 80);
+  const recipient = String(f.RecipientName || "a recipient").slice(0, 80);
+  const sent = await pushToSubscriptions(env, subs, {
+    title: body.kind === "changed" ? "Prayer session time changed" : "You've been booked for a prayer session",
+    body: when ? `${recipient} · ${when}` : recipient,
+    tag: "fphm-session-" + sessionId
+  });
+  return { ok: true, sent };
+}
+
 const ROUTES = {
   "/api/intake/start": handleStart,
   "/api/intake/load": handleLoad,
@@ -322,9 +597,14 @@ const ROUTES = {
   "/api/intake/submit": handleSubmit,
   "/api/intake/schema": handleSchema,
   "/api/intake/find-duplicate": handleFindDuplicate,
-  "/api/intake/delete": handleDelete
+  "/api/intake/delete": handleDelete,
+  "/api/push/key": handlePushKey,
+  "/api/push/subscribe": handlePushSubscribe,
+  "/api/push/unsubscribe": handlePushUnsubscribe,
+  "/api/push/test": handlePushTest,
+  "/api/push/session": handlePushSession
 };
-const GET_ROUTES = new Set(["/api/intake/schema"]);
+const GET_ROUTES = new Set(["/api/intake/schema", "/api/push/key"]);
 
 export default {
   async fetch(request, env, ctx) {

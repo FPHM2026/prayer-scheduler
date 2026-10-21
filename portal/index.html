@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>My FPHM Schedule</title>
+<!-- Installable app + push notifications (added 2026-10-21) - see sw.js
+     and the PUSH section of the script below. -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#aa5a3c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="FPHM">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
@@ -72,6 +79,10 @@
   @media (min-width:640px){ main{padding:20px 20px 60px;} }
   .panel{display:none;} .panel.active{display:block;}
 
+  .push-card{background:var(--card);border:1px solid #e3dccb;border-left:4px solid var(--gold);border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;font-size:var(--fs-sm);}
+  .push-card .push-text{flex:1 1 240px;}
+  .push-card .push-actions{display:flex;flex-wrap:wrap;gap:8px;}
+  .push-card.on{border-left-color:#4a7c59;}
   .toolbar{display:flex;flex-direction:column;align-items:stretch;gap:10px;margin-bottom:14px;}
   .toolbar > *{width:100%;}
   .search-row{margin-bottom:10px;}
@@ -309,6 +320,7 @@
 
   <div id="portalContent" style="display:none;">
     <section class="panel active" id="panel-schedule">
+      <div class="push-card" id="pushCard" hidden></div>
       <div class="toolbar">
         <div class="search-wrap"><input id="search" placeholder="Search by recipient..." aria-label="Search your sessions by recipient"><button type="button" class="search-clear" aria-label="Clear search" hidden>&times;</button></div>
         <select id="range" aria-label="Filter sessions by date range"><option>Upcoming</option><option>All</option><option>Past</option></select>
@@ -431,8 +443,17 @@ let account = null;
 let siteId = null;
 let listIds = {};
 
+// True when opened from the Home Screen as an installed app.
+const IS_STANDALONE = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+
 async function init(){
   await msalReady;
+  // Finishes a redirect sign-in (installed-app mode, see the sign-in button).
+  // Skipped inside a sign-in popup so it can't swallow the popup's response.
+  if(!window.opener) try{
+    const redirectResult = await msalInstance.handleRedirectPromise();
+    if(redirectResult && redirectResult.account) msalInstance.setActiveAccount(redirectResult.account);
+  }catch(e){ document.getElementById('signinMsg').textContent = 'Sign-in failed: ' + e.message; }
   const accounts = msalInstance.getAllAccounts();
   if(accounts.length > 0){
     // Prefer the account last chosen over the first cached one (see the admin
@@ -477,6 +498,7 @@ document.getElementById('btnSignIn').addEventListener('click', async ()=>{
   btn.disabled = true;
   btn.textContent = 'Signing in…';
   try{
+    if(IS_STANDALONE){ await msalInstance.loginRedirect({ scopes: GRAPH_SCOPES }); return; }
     const result = await msalInstance.loginPopup({ scopes: GRAPH_SCOPES });
     account = result.account;
     msalInstance.setActiveAccount(account);
@@ -496,7 +518,12 @@ document.getElementById('btnSignIn').addEventListener('click', async ()=>{
 async function getToken(){
   const req = { scopes: GRAPH_SCOPES, account };
   try{ return (await msalInstance.acquireTokenSilent(req)).accessToken; }
-  catch(e){ return (await msalInstance.acquireTokenPopup(req)).accessToken; }
+  catch(e){
+    // Popups are unreliable inside an installed Home Screen app (iOS
+    // especially), so sign in by redirect there instead.
+    if(IS_STANDALONE){ await msalInstance.acquireTokenRedirect(req); return new Promise(()=>{}); }
+    return (await msalInstance.acquireTokenPopup(req)).accessToken;
+  }
 }
 async function afterSignIn(){
   try{
@@ -540,6 +567,7 @@ async function afterSignIn(){
   try{
     await loadAll();
     wireApp();
+    initPush();
   }catch(e){
     document.getElementById('loadError').innerHTML = `<div class="errbox" role="alert">Could not load your schedule: ${e.message}. If this keeps happening, check with the scheduling admin that your account has been added to the Ministers group in SharePoint.</div>`;
   }
@@ -1273,6 +1301,134 @@ function wireSearchClear(inputId){
   toggle();
 }
 let appWired = false;
+
+/* =========================================================================
+   PUSH NOTIFICATIONS (added 2026-10-21)
+
+   A minister turns notifications on once per device here. The browser's
+   push subscription goes to the intake Worker (cloudflare-worker/, routes
+   /api/push/*), which keeps it in the PushSubscriptions SharePoint list
+   and pushes to it when an admin books this minister on a session. The
+   Worker identifies the minister from their own Graph token, so a device
+   can only ever be registered to whoever is signed in on it.
+
+   iPhone/iPad only allow web push from an installed Home Screen app
+   (iOS 16.4+), so in plain Safari the card explains how to install
+   instead of offering a button that can't work. The card stays hidden
+   entirely until the Worker answers /api/push/key, so nothing shows
+   before push has been set up there.
+========================================================================= */
+const PUSH_API = "https://fphm-intake-func.ajjamoore.workers.dev/api/push";
+let pushPublicKey = null;
+let pushBusy = false;
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const PUSH_SUPPORTED = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(e=>console.warn('Service worker not registered:', e.message));
+}
+
+async function pushApi(path, body){
+  const token = await getToken();
+  const res = await fetch(PUSH_API + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify(body || {})
+  });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+  return data;
+}
+function urlB64ToUint8(s){
+  s = s.replace(/-/g,'+').replace(/_/g,'/');
+  while(s.length % 4) s += '=';
+  return Uint8Array.from(atob(s), c=>c.charCodeAt(0));
+}
+async function currentPushSubscription(){
+  if(!PUSH_SUPPORTED) return null;
+  const reg = await navigator.serviceWorker.ready;
+  return reg.pushManager.getSubscription();
+}
+async function initPush(){
+  try{
+    const res = await fetch(PUSH_API + '/key');
+    if(!res.ok) return;
+    pushPublicKey = (await res.json()).publicKey || null;
+  }catch(e){ return; }
+  if(!pushPublicKey) return;
+  // Re-send an existing subscription quietly, in case the browser rotated
+  // it or it was registered before a roster change.
+  try{
+    const sub = await currentPushSubscription();
+    if(sub && Notification.permission === 'granted') pushApi('/subscribe', { subscription: sub.toJSON() }).catch(()=>{});
+  }catch(e){}
+  renderPushCard();
+}
+async function renderPushCard(msg){
+  const card = $('#pushCard');
+  if(!pushPublicKey){ card.hidden = true; return; }
+  let text, actions = '', on = false;
+  if(!PUSH_SUPPORTED){
+    if(IS_IOS && !IS_STANDALONE){
+      text = `<strong>Get a notification when you're booked.</strong> On iPhone, first add this page to your Home Screen: tap the Share button, then <em>Add to Home Screen</em>. Open My FPHM Schedule from your Home Screen and turn notifications on there.`;
+    } else {
+      card.hidden = true; return;
+    }
+  } else if(Notification.permission === 'denied'){
+    text = `Notifications are blocked for this app. To get notified when you're booked, allow notifications for it in your phone or browser settings, then come back here.`;
+  } else {
+    const sub = await currentPushSubscription().catch(()=>null);
+    if(sub && Notification.permission === 'granted'){
+      on = true;
+      text = `<strong>Notifications are on</strong> for this device. You'll get one when you're booked for a session.`;
+      actions = `<button class="btn secondary" type="button" onclick="testPush()">Send a test</button><button class="btn secondary" type="button" onclick="disablePush()">Turn off</button>`;
+    } else {
+      text = `<strong>Get a notification when you're booked</strong> for a prayer session, right on this device.`;
+      actions = `<button class="btn" type="button" onclick="enablePush()">Turn on notifications</button>`;
+    }
+  }
+  card.classList.toggle('on', on);
+  card.innerHTML = `<div class="push-text">${text}${msg ? `<div class="helptext" style="margin-top:4px;" role="status">${escapeHtml(msg)}</div>` : ''}</div>${actions ? `<div class="push-actions">${actions}</div>` : ''}`;
+  card.hidden = false;
+}
+window.enablePush = async function(){
+  if(pushBusy) return;
+  pushBusy = true;
+  try{
+    const permission = await Notification.requestPermission();
+    if(permission !== 'granted'){ await renderPushCard(permission === 'denied' ? '' : 'Notifications were not turned on.'); return; }
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToUint8(pushPublicKey) });
+    await pushApi('/subscribe', { subscription: sub.toJSON() });
+    await renderPushCard('Done. Tap "Send a test" to check it works.');
+  }catch(e){
+    await renderPushCard('Could not turn on notifications: ' + e.message);
+  }finally{ pushBusy = false; }
+};
+window.disablePush = async function(){
+  if(pushBusy) return;
+  pushBusy = true;
+  try{
+    const sub = await currentPushSubscription();
+    if(sub){
+      await pushApi('/unsubscribe', { endpoint: sub.endpoint }).catch(()=>{});
+      await sub.unsubscribe();
+    }
+    await renderPushCard('Notifications are off for this device.');
+  }catch(e){
+    await renderPushCard('Could not turn off notifications: ' + e.message);
+  }finally{ pushBusy = false; }
+};
+window.testPush = async function(){
+  try{
+    const r = await pushApi('/test');
+    await renderPushCard(r.sent ? 'Test sent. It should arrive in a few seconds.' : 'No devices found for you. Try turning notifications off and on again.');
+  }catch(e){
+    await renderPushCard('Test failed: ' + e.message);
+  }
+};
+
 function wireApp(){
   if(appWired) return;
   appWired = true;

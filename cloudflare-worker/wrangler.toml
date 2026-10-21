@@ -15,3 +15,8 @@ LIST_NAME = "IntakeResponses"
 # Both origins point at the same GitHub Pages account, kept separate in
 # case the standalone FPHM Intake Form site is still live when you deploy.
 ALLOWED_ORIGINS = "https://fphm2026.github.io"
+
+# Push notifications (added 2026-10-21): who push services should contact
+# about our pushes. VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY are secrets, set
+# with `wrangler secret put` - see DEPLOY.md "Push notifications".
+VAPID_SUBJECT = "https://fphm2026.github.io/prayer-scheduler/"
