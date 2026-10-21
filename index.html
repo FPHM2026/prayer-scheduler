@@ -1193,7 +1193,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-21.7";
+const APP_VERSION = "2026-10-21.8";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -5059,10 +5059,14 @@ function renderIntake(){
   // regardless of visibility, so nothing else needs to know about it.
   const editingQuestions = intakeSubStatus === 'Questions';
   const importing = intakeSubStatus === 'Import';
-  $('#intakeQuestionsHost').hidden = !editingQuestions;
-  $('#intakeImportHost').hidden = !importing;
-  $('#intakeSearchWrap').hidden = editingQuestions || importing;
-  $('#intakeHelptext').hidden = editingQuestions || importing;
+  // While one form is open (openIntakeDetail), keep the Import and Edit
+  // Questions tools hidden even if that was the sub-tab last chosen - a
+  // re-render (e.g. after saving a redaction) must not bring them back.
+  const viewing = intakeDetailId != null;
+  $('#intakeQuestionsHost').hidden = !editingQuestions || viewing;
+  $('#intakeImportHost').hidden = !importing || viewing;
+  $('#intakeSearchWrap').hidden = editingQuestions || importing || viewing;
+  $('#intakeHelptext').hidden = editingQuestions || importing || viewing;
   if(importing){
     box.innerHTML = '';
     noResults.hidden = true;
@@ -5166,7 +5170,7 @@ window.openIntakeDetail = function(id){
   const i = intakeResponses.find(x=>x.id===id);
   if(!i) return;
   intakeDetailId = id;
-  ['intakeGroups','intakeSubtabs','intakeSearch','intakeHelptext','intakeNoResults'].forEach(id=>{ const el=$('#'+id); if(el) el.hidden = true; });
+  ['intakeGroups','intakeSubtabs','intakeSearchWrap','intakeHelptext','intakeNoResults','intakeImportHost','intakeQuestionsHost'].forEach(id=>{ const el=$('#'+id); if(el) el.hidden = true; });
   const detail = $('#intakeDetail');
   detail.hidden = false;
   detail.innerHTML = `
@@ -5380,7 +5384,7 @@ window.closeIntakeDetail = function(){
   redactPanelOpen = false;
   const ret = intakeReturn; intakeReturn = null;
   intakeDetailId = null;
-  ['intakeGroups','intakeSubtabs','intakeSearch','intakeHelptext'].forEach(id=>{ const el=$('#'+id); if(el) el.hidden = false; });
+  ['intakeGroups','intakeSubtabs'].forEach(id=>{ const el=$('#'+id); if(el) el.hidden = false; });
   const detail = $('#intakeDetail');
   detail.hidden = true;
   detail.innerHTML = '';
@@ -7288,6 +7292,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 21, 2026', version: '2026-10-21.8', items: [
+    'Fixed: opening an intake form no longer shows the spreadsheet import buttons (Choose spreadsheet, Import selected forms) underneath it. They now only appear on the Import sub-tab of Intake Forms.'
+  ]},
   { date: 'Oct 21, 2026', version: '2026-10-21.7', items: [
     'Changed: the WhatsApp group now carries forward for a returning recipient. A new session, a follow-up, or booking someone from the waiting list pre-fills Group created and the group link from their most recent session that has one (you can still change it). Ministers notified is not carried over, so each session still gets its own tap of the notify button.'
   ]},
@@ -7300,15 +7307,15 @@ const CHANGE_LOG = [
   { date: 'Oct 21, 2026', version: '2026-10-21.4', items: [
     'Fixed: Intake Forms > Import now puts the answer to "Please explain" (after "Was there a sense of security and harmony in your home...?") into the Please explain question you added in Edit Questions, instead of saving it where it would not show.'
   ]},
-  { date: 'Oct 21, 2026', version: '2026-10-21.3', items: [
-    'Fixed: the confirmation box on Intake Forms > Import now has a green Import button instead of a red Delete button. Nothing was ever deleted - it was only the wrong label.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 21, 2026', version: '2026-10-21.3', items: [
+    'Fixed: the confirmation box on Intake Forms > Import now has a green Import button instead of a red Delete button. Nothing was ever deleted - it was only the wrong label.'
+  ]},
   { date: 'Oct 21, 2026', version: '2026-10-21.2', items: [
     'New (temporary): Intake Forms has an Import sub-tab for bringing in forms filled out on the old Microsoft Form. Choose the Excel export, tick the people you want, and press Import. Each one arrives under Unlinked as a Submitted form. People already in the app are marked "Already in the app", and anyone sharing an email with an existing form is flagged. Each row also lists anything to check, like answers saved under Other.'
   ]},
