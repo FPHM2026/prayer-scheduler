@@ -1,6 +1,6 @@
 {
-  "name": "My FPHM Schedule",
-  "short_name": "FPHM",
+  "name": "My FPHM",
+  "short_name": "My FPHM",
   "description": "Your prayer sessions and time off.",
   "start_url": "./",
   "scope": "./",

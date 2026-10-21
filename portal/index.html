@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>My FPHM Schedule</title>
+<title>My FPHM</title>
 <!-- Installable app + push notifications (added 2026-10-21) - see sw.js
      and the PUSH section of the script below. -->
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="theme-color" content="#aa5a3c">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="FPHM">
+<meta name="apple-mobile-web-app-title" content="My FPHM">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
@@ -336,14 +336,14 @@
 <body>
 
 <div id="signinScreen">
-  <h1>My FPHM Schedule</h1>
+  <h1>My FPHM</h1>
   <p class="helptext" id="signinMsg">Sign in with your Microsoft 365 account to see your schedule and manage your time off.</p>
   <button class="btn" id="btnSignIn" style="margin-top:16px;">Sign in with Microsoft</button>
 </div>
 
 <div id="appRoot">
 <header>
-  <h1>My FPHM Schedule</h1>
+  <h1>My FPHM</h1>
   <div style="display:flex;align-items:center;gap:12px;margin-left:auto;">
     <span class="who" id="whoami"></span>
     <button class="btn secondary" id="btnRefresh" type="button" style="padding:8px 14px;min-height:36px;" onclick="refreshPortalData()">Refresh</button>
@@ -1479,7 +1479,7 @@ async function renderPushCard(msg){
   let inner;
   if(!PUSH_SUPPORTED){
     if(IS_IOS && !IS_STANDALONE){
-      inner = `<div class="helptext">To get phone notifications on iPhone, tap Share, then <em>Add to Home Screen</em>, and open My FPHM Schedule from your Home Screen.</div>`;
+      inner = `<div class="helptext">To get phone notifications on iPhone, tap Share, then <em>Add to Home Screen</em>, and open My FPHM from your Home Screen.</div>`;
     } else { section.hidden = true; return; }
   } else if(Notification.permission === 'denied'){
     inner = `<div class="helptext">Phone notifications are blocked for this app. Allow them in your phone or browser settings to turn them on.</div>`;

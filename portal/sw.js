@@ -10,7 +10,7 @@ self.addEventListener('push', (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch (e) {}
   event.waitUntil(Promise.all([
-    self.registration.showNotification(data.title || 'My FPHM Schedule', {
+    self.registration.showNotification(data.title || 'My FPHM', {
       body: data.body || '',
       tag: data.tag || undefined,
       icon: 'icons/icon-192.png',
