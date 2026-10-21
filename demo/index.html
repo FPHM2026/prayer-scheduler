@@ -316,6 +316,27 @@
   .ans-q{font-weight:700;font-size:calc(var(--fs-xs) * var(--ans-scale,1));color:var(--muted);}
   .ans-a{font-size:calc(var(--fs-sm) * var(--ans-scale,1));white-space:pre-wrap;}
   #intakeDetail{--ans-scale:1;}
+  /* Redactions: staff see the words highlighted; ministers see a block. */
+  mark.ans-redacted-mark{background:#fde68a;color:inherit;border-radius:3px;padding:0 2px;box-shadow:inset 0 -2px 0 #d97706;}
+  .redact-panel{border:1px solid var(--border);border-radius:8px;padding:16px;margin:16px 0;background:#fff;}
+  .redact-panel h3{margin:0 0 8px;}
+  .redact-panel h4{margin:16px 0 8px;}
+  .redact-list{display:flex;flex-direction:column;gap:8px;margin-bottom:8px;}
+  .redact-item{display:flex;align-items:center;justify-content:space-between;gap:8px 16px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;}
+  label.redact-item{justify-content:flex-start;cursor:pointer;}
+  .redact-item input{width:20px;height:20px;flex:0 0 auto;}
+  .redact-howto{background:#fdf6e3;border-left:4px solid var(--gold);padding:8px 16px;border-radius:4px;margin:8px 0;}
+  #intakeDetail .rw{cursor:pointer;border-radius:3px;}
+  #intakeDetail .rw:hover{background:#f1ede4;}
+  #intakeDetail .rw.rw-picked{background:var(--danger);color:#fff;}
+  .redact-pickbar{position:fixed;left:0;right:0;bottom:0;z-index:50;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding:8px 16px;background:#fff;border-top:1px solid var(--border);box-shadow:0 -4px 12px rgba(0,0,0,.12);}
+  /* TEMPORARY: Microsoft Forms import list (Intake Forms > Import). */
+  .msf-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:#fff;}
+  .msf-row.msf-done{opacity:.6;}
+  .msf-check{display:flex;align-items:center;gap:10px;cursor:pointer;min-height:44px;}
+  .msf-check input{width:20px;height:20px;flex:0 0 auto;}
+  .msf-notes{flex:1 1 100%;font-size:var(--fs-xs);}
+  .msf-notes ul{margin:6px 0 0;padding-left:20px;}
   /* Open / Copy link row: Open left, Copy right, both plain text links. */
   .intake-linkrow{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px 16px;margin-bottom:12px;}
   .intake-linkrow a,.intake-linkrow .link-btn{font-size:var(--fs-md);font-weight:600;}
@@ -844,11 +865,29 @@
       <button data-intakestatus="InProgress">In progress</button>
       <button data-intakestatus="Archived">Archived</button>
       <button data-intakestatus="Questions">Edit Questions</button>
+      <button data-intakestatus="Import">Import</button>
     </nav>
     <div class="search-wrap" id="intakeSearchWrap" style="margin:12px 0;"><input id="intakeSearch" placeholder="Search by name or email" aria-label="Search intake forms"><button type="button" class="search-clear" aria-label="Clear search" hidden>&times;</button></div>
     <div id="intakeGroups"></div>
     <div class="no-results" id="intakeNoResults" hidden>No intake forms here yet.</div>
     <div id="intakeDetail" hidden></div>
+
+    <!-- TEMPORARY: import old Microsoft Forms responses - see MSF_COLS. -->
+    <div id="intakeImportHost" hidden>
+      <p class="helptext">Bring in intake forms people filled out on the old Microsoft Form. Choose the Excel export from Microsoft Forms, tick the people you want, then Import. Each one arrives under Unlinked as a Submitted form, with no signature (Microsoft Forms didn't collect one). People already in the app are marked so you don't add them twice.</p>
+      <div class="toolbar">
+        <button type="button" class="btn secondary" onclick="$('#msfFile').click()">Choose spreadsheet (.xlsx)</button>
+        <input type="file" id="msfFile" accept=".xlsx" hidden>
+      </div>
+      <p class="errbox" role="alert" id="msfMsg" hidden></p>
+      <div id="msfActions" class="toolbar" hidden>
+        <span class="helptext" id="msfSummary" style="flex:1 1 100%;margin:0;"></span>
+        <button type="button" class="btn secondary" id="btnMsfSelectNew">Select all not yet in the app</button>
+        <button type="button" class="btn secondary" id="btnMsfSelectNone">Clear selection</button>
+        <button type="button" class="btn" id="btnMsfImport" disabled>Import selected forms</button>
+      </div>
+      <div id="msfList"></div>
+    </div>
 
     <div id="intakeQuestionsHost" hidden>
     <div id="intakeQuestionsView">
@@ -1011,6 +1050,7 @@
         <input type="checkbox" id="waCreated" style="width:auto;min-height:auto;"> WhatsApp group created for this session
       </label>
       <input id="waLink" placeholder="Paste the group invite link (optional)" style="margin-top:6px;">
+      <p class="helptext" id="waCarryNote" hidden style="margin:4px 0 0;"></p>
     </div>
     <div class="modal-actions" style="justify-content:space-between;">
       <button class="btn secondary" id="btnCancel">Cancel</button>
@@ -1160,7 +1200,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-21.1";
+const APP_VERSION = "2026-10-21.7";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1864,6 +1904,7 @@ function wireApp(){
   $('#recipGender').addEventListener('change', renderMinisterList);
   $('#genderPref').addEventListener('change', renderMinisterList);
   $('#recipName').addEventListener('input', ()=>{ renderRecipientHistory(); renderConflictCheck(); renderRecipNameSuggestions(); });
+  $('#waLink').addEventListener('input', ()=>setWaCarryNote(false));
   $('#btnSave').addEventListener('click', ()=>withLoading($('#btnSave'), 'Saving…', onSaveSession));
   $('#btnAddLocation').addEventListener('click', ()=>{ $('#newLocationName').value=''; $('#locModalMsg').innerHTML=''; $('#locationModal').classList.add('open'); $('#newLocationName').focus(); });
   $('#btnLocCancel').addEventListener('click', ()=>$('#locationModal').classList.remove('open'));
@@ -1882,6 +1923,10 @@ function wireApp(){
     renderIntake();
   }));
   $('#intakeSearch').addEventListener('input', renderIntake);
+  $('#msfFile').addEventListener('change', e => { onMsfFileChosen(e.target.files[0]); e.target.value = ''; });
+  $('#btnMsfSelectNew').addEventListener('click', () => { msfRows.forEach(r => { if(!r.done) r.selected = !r.match; }); renderMsfImport(); });
+  $('#btnMsfSelectNone').addEventListener('click', () => { msfRows.forEach(r => { r.selected = false; }); renderMsfImport(); });
+  $('#btnMsfImport').addEventListener('click', () => withLoading($('#btnMsfImport'), 'Importing…', importSelectedMsfForms).then(renderMsfImport));
   wireSearchClear('intakeSearch');
   $('#btnOpenIntakeForm').href = absoluteIntakeUrl();
   $('#btnCopyIntakeLink').addEventListener('click', copyIntakeLink);
@@ -3566,6 +3611,11 @@ function openModal(existing, followFrom, opts){
   $('#sessPriority').checked = existing ? !!existing.priority : false;
   $('#waCreated').checked = existing ? !!existing.waCreated : false;
   $('#waLink').value = existing ? (existing.waLink||'') : '';
+  setWaCarryNote(false);
+  if((!existing || existing.status==='Waiting') && !opts.preset && !$('#waLink').value){
+    const wa = personWaInfo($('#recipName').value, existing ? existing.id : null);
+    if(wa){ $('#waCreated').checked = true; $('#waLink').value = wa.waLink; setWaCarryNote(true); }
+  }
   populateLocationSelect();
   // A brand-new session (no existing record, no follow-up source) defaults
   // to whatever location is configured in Settings as the default, rather
@@ -3666,6 +3716,24 @@ let recipNameMatches = [];
 // selectedMinisters from its own correct source and must not be overridden
 // just because the recipient name happens to match past records).
 let historyExpanded = false;
+// The WhatsApp group belongs to the person and their team, not to one session,
+// so a new session pre-fills the group from their most recent session that
+// has a link (any status, never a Drop-in/Training). "Ministers notified" is
+// NOT carried: each session is announced with its own tap of the notify button.
+function personWaInfo(name, excludeId){
+  const key = String(name||'').trim().toLowerCase();
+  if(!key) return null;
+  const hit = sessions
+    .filter(s=>s.id!==excludeId && s.waLink && s.apptType!=='Drop-in' && s.apptType!=='Training'
+      && String(s.recipName||'').trim().toLowerCase()===key)
+    .sort((a,b)=>(b.date||b.added||'').localeCompare(a.date||a.added||''))[0];
+  return hit ? { waLink: hit.waLink } : null;
+}
+function setWaCarryNote(on){
+  const n = $('#waCarryNote');
+  n.hidden = !on;
+  if(on) n.textContent = 'Carried over from their last session. Change it if this session needs a different group.';
+}
 let historyAutoName = null;
 let historyAutoApplyOk = false;
 let historyDetailsAutoOk = false;
@@ -3747,6 +3815,10 @@ function renderRecipientHistory(){
       if(allMatches[0].recipContact) $('#recipContact').value = allMatches[0].recipContact;
       if(allMatches[0].recipGender) $('#recipGender').value = allMatches[0].recipGender;
       $('#genderPref').value = allMatches[0].genderPref || 'Mixed';
+      if(!$('#waLink').value){
+        const wa = personWaInfo(name, editingId);
+        if(wa){ $('#waCreated').checked = true; $('#waLink').value = wa.waLink; setWaCarryNote(true); }
+      }
       renderMinisterList();
     }
   }
@@ -4761,6 +4833,231 @@ async function copyIntakeLink(){
 // "submitted would become unlinked and any intake that has been linked
 // would be under the linked [tab]". In-progress and Archived are
 // unaffected - linking only ever applies to Submitted forms in practice.
+/* =========================================================================
+   TEMPORARY (added 2026-10-20): import old Microsoft Forms intake responses.
+   Staff pick the MS Forms Excel export (.xlsx); each row becomes a Submitted
+   IntakeResponses item, the same shape the public form writes (no signature
+   - MS Forms never collected one). The MS Forms export has duplicate and
+   space-padded headers ("Please explain" x15), so columns are mapped by
+   POSITION, with a header spot-check that refuses a file laid out
+   differently. Delete this block, the "Import" sub-tab button,
+   #intakeImportHost, the .msf-* CSS and the msf* listeners in wireUp once
+   the old forms are all in.
+   ========================================================================= */
+const MSF_COLS = {6:'name',7:'age',8:'sex',9:'occupation',10:'countryOfBirth',12:'email',
+  13:'prayerFor',14:'priorPrayerMinistry',15:'anythingElse',16:'underMedicalCare',17:'inCounselling',
+  18:'parentsWantedYou',19:'adopted',20:'primaryCaregiver',24:'homeSecurity',25:'homeSecurityExplain',26:'hasSiblings',27:'siblingsInfo',
+  28:'motherLiving',30:'motherRelationship',31:'fatherLiving',33:'fatherRelationship',34:'parentsModeledJesus',
+  35:'otherParentalFigures',36:'otherParentalFiguresExplain',37:'maritalStatus',
+  39:'m_spouseName',40:'m_spouseAge',41:'m_spouseAgeAtMarriage',42:'m_ageAtMarriage',43:'m_separatedOrDivorced',
+  44:'cl_partnerName',45:'cl_partnerAge',46:'cl_partnerAgeAtMoveIn',47:'cl_ageAtMoveIn',48:'cl_separatedOrDivorced',
+  52:'s_everMarried',53:'s_previousMarriages',
+  57:'d_spouseName',58:'d_spouseAge',59:'d_spouseAgeAtMarriage',60:'d_ageAtMarriage',61:'d_whoInitiated',62:'d_initiatedExplain',63:'d_previouslyMarried',64:'d_previousMarriages',
+  65:'hasChildren',66:'childrenInfo',67:'lostPregnancy',68:'lostPregnancyExplain',69:'abortion',
+  70:'physicalHealth',71:'mentalHealth',72:'suicideHistory',73:'familyHealthPatterns',74:'familyHealthPatternsExplain',
+  75:'committedToJesus',76:'relationshipWithJesus',77:'emotionallyHonestWithGod',79:'prayRegularly',80:'prayingDifficult',81:'prayingDifficultExplain',
+  82:'readBibleFrequency',83:'attendsChurch',84:'whatChurch',85:'childhoodChurch',86:'childhoodChurchDenomination',87:'baptized',88:'recentChristianChanges',
+  89:'nonChristianReligions',90:'christianCults',91:'occultNewAge',92:'occultObjects',93:'occultObjectsExplain',94:'secretSocieties',95:'ceremoniesCovenants',96:'ceremoniesCovenantsExplain',
+  97:'supernaturalEncounter',98:'supernaturalEncounterExplain',99:'supernaturalSymptoms',100:'curseSpoken',101:'pronouncerRelationship',102:'curseSpokenExplain',
+  103:'violence',104:'socialWounds',105:'negativeEmotions',106:'addictions',
+  107:'pronouncementBySomeoneElse',108:'pronouncementText',109:'pronouncementBySelf',110:'pronouncementSelfText',111:'innerVowMade',112:'innerVowText',
+  113:'unconfessedSin',114:'unconfessedSinExplain',115:'needToForgive',116:'needToForgiveExplain',117:'notForgivenSelf',118:'notForgivenSelfExplain',119:'angryAtGod',120:'angryAtGodExplain'};
+// The Married and Common-law pages' last three questions land in columns
+// whose headers are identical to each other - which page they belong to
+// depends on the marital status answer.
+const MSF_COLS_BY_STATUS = {
+  'Married':    {49:'m_whoInitiated',50:'m_initiatedExplain',51:'m_previousMarriages'},
+  'Common-law': {54:'cl_whoInitiated',55:'cl_initiatedExplain',56:'cl_previousMarriages'}
+};
+// MS Forms stores this column next to the curse question, but its answers
+// ("Mother", "First husband, previous boss") are the pronouncement
+// follow-up - hence 101 -> pronouncerRelationship above.
+const MSF_HEADER_CHECK = {2:'completion time',6:'name',12:'email',37:'marital status',70:'physical health',103:'violence',119:'do you blame god'};
+let msfRows = [];        // parsed, mapped rows from the chosen file
+let msfFileName = '';
+
+function msfNorm(v){ return String(v==null?'':v).replace(/ /g,' ').replace(/\s+/g,' ').trim(); }
+function msfKey(v){ return msfNorm(v).replace(/[‘’]/g,"'").toLowerCase(); }
+// Excel date serial -> the same wall-clock time in the browser's timezone
+// (MS Forms exports completion times as local times).
+function msfExcelDate(v){
+  if(typeof v !== 'number'){ const d = new Date(v); return isNaN(d) ? null : d; }
+  const u = new Date(Math.round((v - 25569) * 86400000));
+  return new Date(u.getUTCFullYear(), u.getUTCMonth(), u.getUTCDate(), u.getUTCHours(), u.getUTCMinutes(), u.getUTCSeconds());
+}
+// A follow-up question added later in Edit Questions gets a generated id
+// (e.g. "question_7"), not the name this mapping uses - so a mapped
+// "...Explain" id that isn't on the live form is matched to whichever live
+// question is shown only when its parent question is answered
+// (homeSecurityExplain -> the question whose visibleIf points at homeSecurity).
+function msfFindLiveQuestion(id, questions){
+  if(questions[id]) return questions[id];
+  const parent = id.replace(/Explain$/, '');
+  if(parent === id) return null;
+  return Object.values(questions).find(q => q.visibleIf && q.visibleIf.id === parent) || null;
+}
+function msfRowToResponses(row, questions, header){
+  const responses = {}, notes = [];
+  const cols = Object.assign({}, MSF_COLS, MSF_COLS_BY_STATUS[msfNorm(row[37])] || {});
+  // A column with no fixed mapping (e.g. "How old were you when she
+  // passed?") still imports if staff have since added a question with
+  // that exact wording in Edit Questions.
+  const mapped = new Set(Object.values(cols));
+  const byLabel = {};
+  Object.values(questions).forEach(q => { if(!mapped.has(q.id)) byLabel[msfKey(q.label).replace(/[?.:]+$/,'')] = q.id; });
+  row.forEach((v, i) => {
+    if(i < 5 || v === null || v === undefined || msfNorm(v) === '') return;
+    const id = cols[i] || byLabel[msfKey(header[i]).replace(/[?.:]+$/,'')];
+    if(!id){
+      notes.push(`Not imported - no question "${msfNorm(header[i])}" on the current form: "${msfNorm(v).slice(0,80)}"`);
+      return;
+    }
+    const q = msfFindLiveQuestion(id, questions);
+    if(!q){ responses[id] = msfNorm(v); notes.push(`Saved, but won't show (question "${id}" isn't on the current form): "${msfNorm(v).slice(0,80)}"`); return; }
+    const qid = q.id;   // may differ from the mapped id - see msfFindLiveQuestion
+    if(q.type === 'checkboxes'){
+      // MS Forms joins choices with ";" - so a typed-in Other answer that
+      // itself contains ";" arrives in pieces. Unmatched neighbours are
+      // glued back together into one answer.
+      const picked = [], extra = [];
+      String(v).split(';').map(msfNorm).filter(Boolean).forEach(p => {
+        const hit = (q.options||[]).find(o => msfKey(o) === msfKey(p));
+        if(hit) picked.push(hit); else extra.push(p);
+      });
+      if(extra.length){
+        const text = extra.join('; ');
+        if(q.otherOption){ notes.push(`${q.label}: "${text}" saved as Other`); picked.push('__other__:' + text); }
+        else { notes.push(`${q.label}: "${text}" isn't a listed choice - saved as written`); picked.push(text); }
+      }
+      responses[qid] = picked;
+    } else if(q.type === 'radio' || q.type === 'select'){
+      const p = msfNorm(v);
+      const hit = (q.options||[]).find(o => msfKey(o) === msfKey(p));
+      const otherQ = questions[qid + 'Other'];
+      if(hit) responses[qid] = hit;
+      else if(otherQ && (q.options||[]).includes('Other')){
+        // e.g. Marital status "Widow" -> Other + "Please specify: Widow"
+        responses[qid] = 'Other'; responses[otherQ.id] = p;
+        notes.push(`${q.label}: "${p}" saved as Other`);
+      } else {
+        responses[qid] = p;
+        notes.push(`${q.label}: "${p}" isn't a listed choice - saved as written`);
+      }
+    } else if(q.type === 'number'){
+      const n = Number(v);
+      responses[qid] = isNaN(n) ? msfNorm(v) : n;
+    } else {
+      responses[qid] = q.type === 'textarea' ? String(v).replace(/ /g,' ').trim() : msfNorm(v);
+    }
+  });
+  return { responses, notes };
+}
+// Existing form for this person? Same name AND email = already imported;
+// same email only = a family member sharing an address, or a renamed form
+// - flagged so staff can decide.
+function msfExistingMatch(name, email){
+  const n = msfKey(name), e = msfKey(email);
+  const exact = intakeResponses.find(i => msfKey(i.recipName) === n && (!e || msfKey(i.recipEmail) === e));
+  if(exact) return { kind:'exact', form: exact };
+  const sameEmail = e && intakeResponses.find(i => msfKey(i.recipEmail) === e);
+  if(sameEmail) return { kind:'email', form: sameEmail };
+  return null;
+}
+function loadSheetJs(){
+  if(window.XLSX) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('Could not load the spreadsheet reader. Check your internet connection and try again.'));
+    document.head.appendChild(s);
+  });
+}
+function msfParseRows(rows){
+  const header = rows[0] || [];
+  const bad = Object.entries(MSF_HEADER_CHECK).filter(([i, text]) => !msfKey(header[i]).startsWith(text));
+  if(bad.length) throw new Error(`This doesn't look like the Microsoft Forms intake export - expected column ${+bad[0][0]+1} to be "${bad[0][1]}", found "${msfNorm(header[bad[0][0]])||'(blank)'}".`);
+  const questions = {};
+  window.FPHM_INTAKE_CONFIG.SECTIONS.forEach(s => s.questions.forEach(q => { questions[q.id] = q; }));
+  return rows.slice(1).filter(r => r && msfNorm(r[6])).map((r, idx) => {
+    const { responses, notes } = msfRowToResponses(r, questions, header);
+    return { key: idx, name: msfNorm(r[6]), email: msfNorm(r[12]), completed: msfExcelDate(r[2]),
+             responses, notes, match: msfExistingMatch(r[6], r[12]), selected: false, done: false, error: '' };
+  });
+}
+async function onMsfFileChosen(file){
+  const msg = $('#msfMsg');
+  msg.hidden = true;
+  if(!file) return;
+  try{
+    await loadSheetJs();
+    const wb = XLSX.read(await file.arrayBuffer(), { type:'array' });
+    const sheet = wb.Sheets[wb.SheetNames.includes('Data') ? 'Data' : wb.SheetNames[0]];
+    msfRows = msfParseRows(XLSX.utils.sheet_to_json(sheet, { header:1, defval:null, raw:true }));
+    msfFileName = file.name;
+  }catch(e){
+    msfRows = [];
+    msg.textContent = e.message;
+    msg.hidden = false;
+  }
+  renderMsfImport();
+}
+function msfDateLabel(d){
+  if(!d) return '';
+  return fmtShort(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+}
+function renderMsfImport(){
+  const box = $('#msfList');
+  if(!msfRows.length){ box.innerHTML = ''; $('#msfActions').hidden = true; return; }
+  $('#msfActions').hidden = false;
+  const sel = msfRows.filter(r => r.selected && !r.done).length;
+  $('#btnMsfImport').disabled = !sel;
+  $('#btnMsfImport').textContent = sel ? `Import ${sel} selected form${sel===1?'':'s'}` : 'Import selected forms';
+  $('#msfSummary').textContent = `${msfFileName}: ${msfRows.length} forms, ${msfRows.filter(r=>r.match&&r.match.kind==='exact').length} already in the app.`;
+  box.innerHTML = msfRows.map(r => {
+    const when = msfDateLabel(r.completed);
+    let status = '';
+    if(r.done) status = '<span class="tag completed">Imported</span>';
+    else if(r.match && r.match.kind==='exact') status = '<span class="tag">Already in the app</span>';
+    else if(r.match) status = `<span class="tag first">Same email as ${escapeHtml(r.match.form.recipName||'another form')}</span>`;
+    const err = r.error ? `<span class="tag" style="background:var(--danger-bg);color:var(--danger);">${escapeHtml(r.error)}</span>` : '';
+    const notes = r.notes.length ? `<details class="msf-notes"><summary>${r.notes.length} thing${r.notes.length===1?'':'s'} to check</summary><ul>${r.notes.map(n=>`<li>${escapeHtml(n)}</li>`).join('')}</ul></details>` : '';
+    return `<div class="msf-row${r.done?' msf-done':''}">
+      <label class="msf-check"><input type="checkbox" ${r.selected?'checked':''} ${r.done?'disabled':''} onchange="msfToggle(${r.key}, this.checked)">
+        <span><strong>${escapeHtml(r.name)}</strong><br><span class="helptext">${escapeHtml(r.email)}${when?' - '+escapeHtml(when):''}</span></span></label>
+      <div>${status}${err}</div>
+      ${notes}
+    </div>`;
+  }).join('');
+}
+window.msfToggle = function(key, on){
+  const r = msfRows.find(x => x.key === key);
+  if(r) r.selected = on;
+  renderMsfImport();
+};
+async function importSelectedMsfForms(){
+  const chosen = msfRows.filter(r => r.selected && !r.done);
+  if(!chosen.length) return;
+  const dupes = chosen.filter(r => r.match && r.match.kind === 'exact');
+  const warn = dupes.length ? ` ${dupes.length} of these already ${dupes.length===1?'has':'have'} a form in the app (${dupes.map(r=>r.name).join(', ')}), so importing makes a second copy.` : '';
+  if(!(await askConfirm(`Import ${chosen.length} intake form${chosen.length===1?'':'s'} as Submitted?${warn}`, {confirmLabel:'Import', danger:false}))) return;
+  for(const r of chosen){
+    try{
+      await createItem('intake', {
+        Title: r.name, Token: crypto.randomUUID(), RecipientName: r.name, RecipientEmail: r.email,
+        Status: 'Submitted', ResponsesJSON: JSON.stringify(r.responses), SignatureDataUrl: '',
+        SubmittedAt: (r.completed || new Date()).toISOString()
+      });
+      r.done = true; r.selected = false; r.error = '';
+    }catch(e){
+      r.error = 'Failed: ' + (e.message || e);
+    }
+    renderMsfImport();
+  }
+  await loadAll();
+  msfRows.forEach(r => { if(!r.done) r.match = msfExistingMatch(r.name, r.email); });
+  renderMsfImport();
+}
 function renderIntake(){
   const box = $('#intakeGroups'); const noResults = $('#intakeNoResults');
   // "Edit Questions" is a fifth sub-tab, not a status: it swaps the form
@@ -4768,9 +5065,16 @@ function renderIntake(){
   // editor's own render (renderFormEditor()) runs from renderAll()
   // regardless of visibility, so nothing else needs to know about it.
   const editingQuestions = intakeSubStatus === 'Questions';
+  const importing = intakeSubStatus === 'Import';
   $('#intakeQuestionsHost').hidden = !editingQuestions;
-  $('#intakeSearchWrap').hidden = editingQuestions;
-  $('#intakeHelptext').hidden = editingQuestions;
+  $('#intakeImportHost').hidden = !importing;
+  $('#intakeSearchWrap').hidden = editingQuestions || importing;
+  $('#intakeHelptext').hidden = editingQuestions || importing;
+  if(importing){
+    box.innerHTML = '';
+    noResults.hidden = true;
+    return;
+  }
   if(editingQuestions){
     box.innerHTML = '';
     noResults.hidden = true;
@@ -4876,6 +5180,7 @@ window.openIntakeDetail = function(id){
     <div class="toolbar no-print">
       <button type="button" class="btn secondary" onclick="closeIntakeDetail()">&larr; ${intakeReturn ? 'Back to '+escapeHtml(intakeReturn.label) : 'Back to list'}</button>
       <button type="button" class="btn" onclick="window.print()">Print / Save as PDF</button>
+      ${i.status !== 'InProgress' ? `<button type="button" class="btn secondary" onclick="toggleRedactPanel(${i.id})">${redactPanelOpen ? 'Close redaction' : 'Redact personal info'}</button>` : ''}
     </div>
     <div class="intake-namerow">
       <h2>${escapeHtml(i.recipName||'(name not yet entered)')}</h2>
@@ -4885,10 +5190,184 @@ window.openIntakeDetail = function(id){
       </div>
     </div>
     <p class="helptext">${escapeHtml(i.recipEmail||'')} — ${i.status==='Submitted' ? 'Submitted '+fmtShort((i.submittedAt||'').split('T')[0]) : i.status==='InProgress' ? 'In progress' : 'Archived'}</p>
-    ${FPHM.renderResponsesHtml(i.responses)}
+    ${redactPanelOpen && i.status !== 'InProgress' ? `<div id="redactPanel" class="redact-panel no-print">${redactPanelHtml(i)}</div>
+      <div id="redactPickBar" class="redact-pickbar no-print" hidden>
+        <button type="button" class="btn" id="btnRedactPicked" onclick="redactPickedWords(${i.id})">Redact chosen words</button>
+        <button type="button" class="btn secondary" onclick="clearRedactPicks()">Clear</button>
+      </div>` : ''}
+    ${FPHM.renderResponsesHtml(i.responses, { redact: 'mark' })}
     ${i.signatureDataUrl ? `<h3>Signature</h3><img src="${i.signatureDataUrl}" alt="Signature" style="max-width:300px;border:1px solid var(--border);border-radius:8px;background:#fff;">` : ''}
   `;
   applyIntakeTextSize();
+  if(redactPanelOpen && i.status !== 'InProgress') wireRedactWords();
+};
+// ---- Redact personal info (added 2026-10-21) -----------------------------
+// Staff mark words in a submitted form's answers as personal info; the
+// minister portal shows a block in their place (FPHM.renderResponsesHtml
+// with {redact:'hide'}), this staff view highlights them ({redact:'mark'}).
+// Stored inside ResponsesJSON as responses._redactions =
+// { questionId: ["phrase", ...] } - no SharePoint change. The app suggests
+// likely PII (FPHM.suggestRedactions) but never applies anything without a
+// staff click. Hidden from ministers' screens only: the portal still
+// downloads the full answers, same as the hidden email address.
+let redactPanelOpen = false;
+function intakeQuestionLabel(qid){
+  for(const s of window.FPHM_INTAKE_CONFIG.SECTIONS) for(const q of s.questions) if(q.id === qid) return q.label;
+  return qid;
+}
+function currentRedactions(i){
+  const r = (i.responses && i.responses._redactions) || {};
+  const copy = {};
+  Object.keys(r).forEach(k => { if(Array.isArray(r[k]) && r[k].length) copy[k] = r[k].slice(); });
+  return copy;
+}
+function redactPanelHtml(i){
+  const red = currentRedactions(i);
+  const sugg = FPHM.suggestRedactions(i.responses);
+  const redCount = Object.values(red).reduce((n, a) => n + a.length, 0);
+  const suggHtml = sugg.length
+    ? `<div class="redact-list">${sugg.map((x, k) => `
+        <label class="redact-item"><input type="checkbox" class="redact-sugg" data-k="${k}" checked>
+          <span><strong>${escapeHtml(x.phrase)}</strong><br><span class="helptext">${escapeHtml(x.reason)} &middot; ${escapeHtml(intakeQuestionLabel(x.qid))}</span></span></label>`).join('')}
+      </div>
+      <div class="toolbar"><button type="button" class="btn" onclick="redactCheckedSuggestions(${i.id})">Redact checked suggestions</button></div>`
+    : `<p class="helptext">No suggestions right now - nothing else looks like an email, phone number, address or name. Check the answers yourself too; the app can't catch everything.</p>`;
+  const redHtml = redCount
+    ? `<div class="redact-list">${Object.entries(red).flatMap(([qid, arr]) => arr.map((ph, k) => `
+        <div class="redact-item"><span><strong>${escapeHtml(ph)}</strong><br><span class="helptext">${escapeHtml(intakeQuestionLabel(qid))}</span></span>
+          <button type="button" class="btn secondary" onclick="removeRedaction(${i.id}, '${escapeHtml(qid)}', ${k})">Remove</button></div>`)).join('')}
+      </div>`
+    : `<p class="helptext">Nothing redacted yet.</p>`;
+  return `
+    <h3>Redact personal info</h3>
+    <p class="helptext">Prayer ministers will see &#9608;&#9608;&#9608;&#9608;&#9608;&#9608; in place of redacted words. You still see them here, highlighted. </p>
+    <p class="redact-howto"><strong>To hide other words:</strong> tap them in the answers below - each one you tap turns red. Tap again to un-choose. Then press the <strong>Redact chosen words</strong> bar at the bottom of the screen.</p>
+    <p class="errbox" role="alert" id="redactMsg" hidden></p>
+    <h4>Suggested (${sugg.length})</h4>
+    ${suggHtml}
+    <h4>Redacted (${redCount})</h4>
+    ${redHtml}`;
+}
+window.toggleRedactPanel = function(id){
+  redactPanelOpen = !redactPanelOpen;
+  openIntakeDetail(id);
+};
+async function saveRedactions(i, red){
+  const responses = Object.assign({}, i.responses);
+  if(Object.keys(red).length) responses._redactions = red; else delete responses._redactions;
+  await updateItem('intake', i.id, { ResponsesJSON: JSON.stringify(responses) });
+  i.responses = responses;
+  const y = window.scrollY;
+  openIntakeDetail(i.id);
+  window.scrollTo(0, y);
+}
+function redactMsg(text){
+  const m = $('#redactMsg');
+  if(!m) return;
+  m.textContent = text; m.hidden = !text;
+}
+// Tap-to-choose (replaced drag-to-select 2026-10-21 - dragging a text
+// selection was hard to discover and unreliable on touch screens). While
+// the redact panel is open, every word in the answers becomes tappable;
+// chosen words turn red, and a bar pinned to the bottom of the screen
+// redacts them. Neighbouring chosen words in one answer become a single
+// phrase ("Gary Smith"), anything not touching becomes its own phrase.
+function wireRedactWords(){
+  document.querySelectorAll('#intakeDetail .ans-a').forEach(a => {
+    const walker = document.createTreeWalker(a, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while(walker.nextNode()){
+      const n = walker.currentNode;
+      if(!n.parentElement.closest('mark') && n.textContent.trim()) nodes.push(n);
+    }
+    nodes.forEach(n => {
+      const frag = document.createDocumentFragment();
+      n.textContent.split(/(\s+)/).forEach(part => {
+        if(!part) return;
+        if(/^\s+$/.test(part)){ frag.appendChild(document.createTextNode(part)); return; }
+        const w = document.createElement('span');
+        w.className = 'rw';
+        w.textContent = part;
+        frag.appendChild(w);
+      });
+      n.parentNode.replaceChild(frag, n);
+    });
+  });
+  updateRedactPickBar();
+}
+function updateRedactPickBar(){
+  const bar = $('#redactPickBar');
+  if(!bar) return;
+  const n = document.querySelectorAll('#intakeDetail .rw.rw-picked').length;
+  bar.hidden = !n;
+  $('#btnRedactPicked').textContent = `Redact ${n} chosen word${n===1?'':'s'}`;
+}
+document.addEventListener('click', e => {
+  const w = e.target.closest && e.target.closest('#intakeDetail .rw');
+  if(!w) return;
+  w.classList.toggle('rw-picked');
+  updateRedactPickBar();
+});
+window.clearRedactPicks = function(){
+  document.querySelectorAll('#intakeDetail .rw-picked').forEach(w => w.classList.remove('rw-picked'));
+  updateRedactPickBar();
+};
+// Strip punctuation that's stuck to the end words ("Smith." -> "Smith").
+function trimPhrase(t){ return t.replace(/^[\s"'(\[\u201c\u2018]+|[\s"'.,;:!?)\]\u201d\u2019]+$/g, ''); }
+window.redactPickedWords = async function(id){
+  const i = intakeResponses.find(x => x.id === id);
+  if(!i) return;
+  const red = currentRedactions(i);
+  let added = 0;
+  document.querySelectorAll('#intakeDetail .ans-a').forEach(a => {
+    const qid = a.closest('.ans-row').dataset.qid;
+    const words = [...a.querySelectorAll('.rw')];
+    let run = [];
+    const flush = () => {
+      const phrase = trimPhrase(run.map(w => w.textContent).join(' '));
+      run = [];
+      if(phrase.length < 1) return;
+      red[qid] = red[qid] || [];
+      if(FPHM.isRedacted(phrase, red[qid])) return;
+      red[qid].push(phrase);
+      added++;
+    };
+    // Two chosen words join one phrase only if nothing but spaces sits
+    // between them (an unchosen word, a line break or already-redacted
+    // text in between starts a new phrase).
+    const prevNode = w => {
+      let n = w.previousSibling;
+      while(n && n.nodeType === 3 && !n.textContent.trim()) n = n.previousSibling;
+      return n;
+    };
+    words.forEach(w => {
+      if(!w.classList.contains('rw-picked')){ if(run.length) flush(); return; }
+      if(run.length && prevNode(w) !== run[run.length-1]) flush();
+      run.push(w);
+    });
+    if(run.length) flush();
+  });
+  if(!added) return redactMsg('Those words are already redacted.');
+  await saveRedactions(i, red);
+};
+window.redactCheckedSuggestions = async function(id){
+  const i = intakeResponses.find(x => x.id === id);
+  if(!i) return;
+  const sugg = FPHM.suggestRedactions(i.responses);
+  const picked = [...document.querySelectorAll('#redactPanel .redact-sugg:checked')].map(c => sugg[+c.dataset.k]).filter(Boolean);
+  if(!picked.length) return redactMsg('Tick at least one suggestion first.');
+  const red = currentRedactions(i);
+  picked.forEach(x => { (red[x.qid] = red[x.qid] || []).push(x.phrase); });
+  await saveRedactions(i, red);
+};
+window.removeRedaction = async function(id, qid, k){
+  const i = intakeResponses.find(x => x.id === id);
+  if(!i) return;
+  const red = currentRedactions(i);
+  if(!red[qid]) return;
+  red[qid].splice(k, 1);
+  if(!red[qid].length) delete red[qid];
+  await saveRedactions(i, red);
 };
 // On-screen text size for the intake answers (screen only - print has its
 // own fixed sizes). Remembered per browser; storage may be unavailable.
@@ -4905,6 +5384,7 @@ window.changeIntakeTextSize = function(dir){
   applyIntakeTextSize();
 };
 window.closeIntakeDetail = function(){
+  redactPanelOpen = false;
   const ret = intakeReturn; intakeReturn = null;
   intakeDetailId = null;
   ['intakeGroups','intakeSubtabs','intakeSearch','intakeHelptext'].forEach(id=>{ const el=$('#'+id); if(el) el.hidden = false; });
@@ -6815,6 +7295,30 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 21, 2026', version: '2026-10-21.7', items: [
+    'Changed: the WhatsApp group now carries forward for a returning recipient. A new session, a follow-up, or booking someone from the waiting list pre-fills Group created and the group link from their most recent session that has one (you can still change it). Ministers notified is not carried over, so each session still gets its own tap of the notify button.'
+  ]},
+  { date: 'Oct 21, 2026', version: '2026-10-21.6', items: [
+    'Changed: redacting your own words on an intake form is now tap-to-choose. With Redact personal info open, tap words in the answers (they turn red), then press the Redact chosen words bar at the bottom of the screen. Tap a word again to un-choose it.'
+  ]},
+  { date: 'Oct 21, 2026', version: '2026-10-21.5', items: [
+    'New: open a submitted intake form and press Redact personal info to hide words from prayer ministers. The app suggests likely personal info (emails, phone numbers, addresses, spouse and children\'s names) for you to tick, or select any words in an answer and press Redact selected words. Ministers see a black block in their place; you still see the words, highlighted, and can Remove a redaction any time.'
+  ]},
+  { date: 'Oct 21, 2026', version: '2026-10-21.4', items: [
+    'Fixed: Intake Forms > Import now puts the answer to "Please explain" (after "Was there a sense of security and harmony in your home...?") into the Please explain question you added in Edit Questions, instead of saving it where it would not show.'
+  ]},
+  { date: 'Oct 21, 2026', version: '2026-10-21.3', items: [
+    'Fixed: the confirmation box on Intake Forms > Import now has a green Import button instead of a red Delete button. Nothing was ever deleted - it was only the wrong label.'
+  ]},
+];
+// Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
+// five most recent versions; at each promotion, anything beyond the newest
+// five moves here rather than being deleted - see the block comment above
+// for the maintenance rule.
+const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 21, 2026', version: '2026-10-21.2', items: [
+    'New (temporary): Intake Forms has an Import sub-tab for bringing in forms filled out on the old Microsoft Form. Choose the Excel export, tick the people you want, and press Import. Each one arrives under Unlinked as a Submitted form. People already in the app are marked "Already in the app", and anyone sharing an email with an existing form is flagged. Each row also lists anything to check, like answers saved under Other.'
+  ]},
   { date: 'Oct 21, 2026', version: '2026-10-21.1', items: [
     'New: in an add-rows table, a Yes / No column with a text box can now be set to show that text box for Yes, for No, or for either answer (it used to be Yes only).'
   ]},
@@ -6830,12 +7334,6 @@ const CHANGE_LOG = [
   { date: 'Oct 17, 2026', version: '2026-10-17.1', items: [
     'New: Add-rows table question type for Session Notes. The minister adds and removes rows with buttons; you design the columns in the editor - text, number, Yes/No, or Yes/No that opens a text box when Yes. New tables start with Spirit, Underlings, Ground, Leader (text box on Yes) and Removed, all editable.'
   ]},
-];
-// Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
-// five most recent versions; at each promotion, anything beyond the newest
-// five moves here rather than being deleted - see the block comment above
-// for the maintenance rule.
-const CHANGE_LOG_ARCHIVE = [
   { date: 'Oct 16, 2026', version: '2026-10-16.4', items: [
     'New: a multiple choice (radio) question can show a text box - either whenever an answer is chosen, or only for one specific answer - with its own label. Set it in the question editor under Text box.'
   ]},
