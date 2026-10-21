@@ -346,6 +346,7 @@
   <h1>My FPHM Schedule</h1>
   <div style="display:flex;align-items:center;gap:12px;">
     <span class="who" id="whoami"></span>
+    <button class="btn secondary" id="btnRefresh" type="button" style="padding:8px 14px;min-height:36px;" onclick="refreshPortalData()">Refresh</button>
     <button class="btn secondary" id="btnSignOut" style="padding:8px 14px;min-height:36px;">Sign Out</button>
   </div>
 </header>
@@ -374,7 +375,11 @@
     </section>
 
     <section class="panel" id="panel-completed">
-      <p class="helptext">Grouped by recipient — most recently completed first.</p>
+      <nav class="msg-tabs" aria-label="Group completed sessions">
+        <button type="button" data-completedby="recipient" class="active" aria-current="page">By recipient</button>
+        <button type="button" data-completedby="date">By date</button>
+      </nav>
+      <p class="helptext" id="completedHelp">Grouped by recipient — most recently completed first.</p>
       <div class="stats-collapse" id="completedStatsCollapse">
         <button class="stats-toggle" onclick="toggleStatsCollapse(this)" aria-expanded="true">
           <span class="chevron"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>
@@ -1073,9 +1078,10 @@ function renderSchedule(){
 /* =========================================================================
    COMPLETED SESSIONS — same as the main app, filtered to my own
 ========================================================================= */
-function completedSessionRow(s){
+function completedSessionRow(s, withName){
   return `<div class="sess-row">
     <div>
+      ${withName ? `<div class="group-name">${escapeHtml(s.recipName)}</div>` : ''}
       <div>
         <span class="tag ${sessionNumberOf(s)===1?'first':''}">Session #${sessionNumberOf(s)}</span>
         <span class="tag completed">Completed</span>
@@ -1086,6 +1092,7 @@ function completedSessionRow(s){
     </div>
   </div>`;
 }
+let completedBy = 'recipient';
 function renderCompleted(){
   const q = $('#completedSearch').value.trim().toLowerCase();
   const box = $('#completedGroups'); const noResults = $('#completedNoResults');
@@ -1099,6 +1106,43 @@ function renderCompleted(){
     if(!byRecip.has(key)) byRecip.set(key, { key, name: s.recipName.trim(), sessions: [] });
     byRecip.get(key).sessions.push(s);
   });
+
+  document.querySelectorAll('[data-completedby]').forEach(b=>{
+    const active = b.dataset.completedby === completedBy;
+    b.classList.toggle('active', active);
+    if(active) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
+  });
+  $('#completedHelp').textContent = completedBy === 'date'
+    ? 'Grouped by month — newest first.'
+    : 'Grouped by recipient — most recently completed first.';
+
+  if(completedBy === 'date'){
+    // One card per month, newest first, each listing that month's sessions
+    // with the recipient's name on every row.
+    const byMonth = new Map();
+    done.filter(s=> !q || s.recipName.toLowerCase().includes(q))
+      .sort((a,b)=> (b.date+b.time).localeCompare(a.date+a.time))
+      .forEach(s=>{
+        const key = 'month-' + s.date.slice(0,7);
+        if(!byMonth.has(key)) byMonth.set(key, []);
+        byMonth.get(key).push(s);
+      });
+    noResults.hidden = byMonth.size>0;
+    let first = true;
+    box.innerHTML = [...byMonth.entries()].map(([key, list])=>{
+      const d = new Date(list[0].date+'T00:00');
+      const label = d.toLocaleDateString(undefined,{month:'long',year:'numeric'});
+      // Newest month starts open so the latest sessions are one tap away.
+      const wasOpen = opened.has(key) ? opened.get(key) : first;
+      first = false;
+      const recips = new Set(list.map(s=>s.recipName.trim().toLowerCase())).size;
+      return groupRow(key, d.toLocaleDateString(undefined,{month:'short'}), label, `${list.length} completed`,
+        `${recips} recipient${recips===1?'':'s'}`,
+        list.map(s=>completedSessionRow(s, true)).join(''), wasOpen);
+    }).join('');
+    renderCompletedStats();
+    return;
+  }
 
   const groups = [...byRecip.values()].map(g=>{
     const list = g.sessions.slice().sort((a,b)=> (b.date+b.time).localeCompare(a.date+a.time));
@@ -1580,7 +1624,7 @@ function renderMessages(){
   const opened = openState(list);
   const unread = messageTab === 'unread';
   const shown = myMessages.filter(m => unread ? !m.read : m.read);
-  document.querySelectorAll('.msg-tabs button').forEach(b=>{
+  document.querySelectorAll('[data-msgtab]').forEach(b=>{
     const active = b.dataset.msgtab === messageTab;
     b.classList.toggle('active', active);
     if(active) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
@@ -1674,6 +1718,21 @@ window.dismissMessages = async function(ids, prompt){
     alert('Could not dismiss: ' + e.message);
   }
 };
+// Header Refresh button: reloads sessions, time off and messages in place,
+// keeping the current tab (renderers never switch tabs).
+window.refreshPortalData = async function(){
+  const btn = $('#btnRefresh');
+  if(btn.disabled) return;
+  btn.disabled = true; btn.textContent = 'Refreshing…';
+  try{
+    await Promise.all([loadAll(), loadMessages()]);
+    btn.textContent = 'Updated';
+    setTimeout(()=>{ btn.textContent = 'Refresh'; }, 1500);
+  }catch(e){
+    btn.textContent = 'Refresh';
+    alert('Could not refresh: ' + e.message);
+  }finally{ btn.disabled = false; }
+};
 let messagesWired = false;
 function initMessages(){
   loadMessages().then(()=>{
@@ -1682,7 +1741,7 @@ function initMessages(){
   });
   if(messagesWired) return;
   messagesWired = true;
-  document.querySelectorAll('.msg-tabs button').forEach(b=>b.addEventListener('click', ()=>{ messageTab = b.dataset.msgtab; renderMessages(); }));
+  document.querySelectorAll('[data-msgtab]').forEach(b=>b.addEventListener('click', ()=>{ messageTab = b.dataset.msgtab; renderMessages(); }));
   // Pick up new messages when the app comes back to the foreground.
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'visible' && account) loadMessages(); });
   if('serviceWorker' in navigator){
@@ -1698,6 +1757,7 @@ function wireApp(){
   wireSearchClear('search');
   $('#range').addEventListener('change', renderSchedule);
   $('#completedSearch').addEventListener('input', renderCompleted);
+  document.querySelectorAll('[data-completedby]').forEach(b=>b.addEventListener('click', ()=>{ completedBy = b.dataset.completedby; renderCompleted(); }));
   wireSearchClear('completedSearch');
   $('#btnAddBlackout').addEventListener('click', ()=>openBlackoutModal());
   $('#blackoutRange').addEventListener('change', renderBlackouts);
