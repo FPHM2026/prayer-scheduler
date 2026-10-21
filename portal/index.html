@@ -375,11 +375,6 @@
     </section>
 
     <section class="panel" id="panel-completed">
-      <nav class="msg-tabs" aria-label="Group completed sessions">
-        <button type="button" data-completedby="recipient" class="active" aria-current="page">By recipient</button>
-        <button type="button" data-completedby="date">By date</button>
-      </nav>
-      <p class="helptext" id="completedHelp">Grouped by recipient — most recently completed first.</p>
       <div class="stats-collapse" id="completedStatsCollapse">
         <button class="stats-toggle" onclick="toggleStatsCollapse(this)" aria-expanded="true">
           <span class="chevron"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>
@@ -387,6 +382,10 @@
         </button>
         <div class="stats-body"><div class="stats-body-inner" id="completedStats"></div></div>
       </div>
+      <nav class="msg-tabs" aria-label="Group completed sessions">
+        <button type="button" data-completedby="recipient" class="active" aria-current="page">By recipient</button>
+        <button type="button" data-completedby="date">By date</button>
+      </nav>
       <div class="search-row"><div class="search-wrap"><input id="completedSearch" placeholder="Search by recipient..." aria-label="Search completed sessions by recipient"><button type="button" class="search-clear" aria-label="Clear search" hidden>&times;</button></div></div>
       <div id="completedGroups"></div>
       <div class="no-results" id="completedNoResults" hidden>No completed sessions match your search.</div>
@@ -1112,9 +1111,6 @@ function renderCompleted(){
     b.classList.toggle('active', active);
     if(active) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
   });
-  $('#completedHelp').textContent = completedBy === 'date'
-    ? 'Grouped by month — newest first.'
-    : 'Grouped by recipient — most recently completed first.';
 
   if(completedBy === 'date'){
     // One card per month, newest first, each listing that month's sessions
