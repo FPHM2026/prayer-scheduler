@@ -38,6 +38,7 @@
                                                  + Bearer <Graph token>
      POST /api/messages/list    {}               + Bearer <Graph token>
      POST /api/messages/read    { ids?: [] }     + Bearer <Graph token>
+     POST /api/messages/delete  { ids: [] }      + Bearer <Graph token>
        (added 2026-10-21) the portal's Messages tab - every session
        notification is also saved per minister, so one missed on the
        phone (or never pushed, if they haven't turned push on) still
@@ -692,6 +693,22 @@ async function handleMessagesRead(env, request) {
   return { ok: true, marked: items.length };
 }
 
+// Deletes only the caller's own messages; ids belonging to anyone else are ignored.
+async function handleMessagesDelete(env, request) {
+  const body = await request.json().catch(() => ({}));
+  const { minister, error } = await ministerForCaller(env, request);
+  if (error) return error;
+  if (!Array.isArray(body.ids) || !body.ids.length) return { __status: 400, error: "ids required" };
+  const wanted = new Set(body.ids.map((x) => parseInt(x, 10)));
+  const items = (await myMessageItems(env, minister.id)).filter((i) => wanted.has(parseInt(i.id, 10)));
+  const siteId = await resolveSiteId(env);
+  const listId = await resolveListId(env, MESSAGES_LIST);
+  await Promise.all(items.map((i) =>
+    graphFetch(env, `/sites/${siteId}/lists/${listId}/items/${i.id}`, { method: "DELETE" })
+  ));
+  return { ok: true, deleted: items.length };
+}
+
 const ROUTES = {
   "/api/intake/start": handleStart,
   "/api/intake/load": handleLoad,
@@ -706,7 +723,8 @@ const ROUTES = {
   "/api/push/test": handlePushTest,
   "/api/push/session": handlePushSession,
   "/api/messages/list": handleMessagesList,
-  "/api/messages/read": handleMessagesRead
+  "/api/messages/read": handleMessagesRead,
+  "/api/messages/delete": handleMessagesDelete
 };
 const GET_ROUTES = new Set(["/api/intake/schema", "/api/push/key"]);
 

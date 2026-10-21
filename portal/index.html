@@ -82,8 +82,15 @@
   .nav-badge{display:inline-block;min-width:20px;height:20px;line-height:20px;padding:0 4px;margin-left:8px;border-radius:10px;background:var(--primary);color:var(--on-primary);font-size:12px;font-weight:800;text-align:center;vertical-align:middle;}
   /* Messages: one accordion card per recipient, same shell as the session
      cards (.group / .group-row), newest message in the summary row. */
-  .group.msg.unread{border-left:4px solid var(--primary);}
-  .group.msg .group-count.new{background:var(--primary);color:var(--on-primary);}
+  .group.msg .group-row{-webkit-tap-highlight-color:transparent;}
+  .group.msg .group-row:hover{background:none;}
+  .group.msg .group-row{padding-bottom:4px;}
+  .msg-tabs{display:flex;gap:24px;margin:0 0 16px;border-bottom:1px solid var(--border);}
+  .msg-tabs button{background:none;border:none;border-bottom:3px solid transparent;padding:8px 2px;font-family:inherit;font-weight:700;font-size:var(--fs-sm);color:var(--muted);cursor:pointer;min-height:44px;}
+  .msg-tabs button.active{color:var(--navy);border-bottom-color:var(--primary);}
+  .msg-actions{display:flex;justify-content:flex-end;gap:8px;padding:0 10px 8px;}
+  .msg-actions .link-btn{font-size:var(--fs-sm);}
+  .msg-older .msg-actions{padding:0;}
   .msg-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:4px;}
   .msg-chip{display:inline-block;border-radius:12px;padding:2px 10px;font-size:var(--fs-xs);font-weight:700;white-space:nowrap;}
   .msg-chip.booked{background:#e3f1e6;color:#2f6b3f;}
@@ -366,12 +373,16 @@
 
     <section class="panel" id="panel-messages">
       <div class="push-row" id="pushRow" hidden></div>
+      <nav class="msg-tabs" aria-label="Show messages">
+        <button type="button" data-msgtab="unread" class="active" aria-current="page">Unread</button>
+        <button type="button" data-msgtab="read">Read</button>
+      </nav>
       <div class="toolbar">
         <button class="btn secondary" type="button" id="btnMarkAllRead" onclick="markAllMessagesRead()" hidden>Mark all as read</button>
       </div>
       <p class="helptext">Grouped by recipient, newest first. Tap a card to see earlier messages. They stay here even if you missed them on your phone.</p>
       <div id="messageList"></div>
-      <div class="no-results" id="messagesEmpty" hidden>No messages yet. You'll see one here whenever you're booked for a session.</div>
+      <div class="no-results" id="messagesEmpty" hidden></div>
     </section>
 
     <section class="panel" id="panel-blackouts">
@@ -1481,7 +1492,6 @@ async function loadMessages(){
   }
   $('#navMessages').hidden = false;
   renderMessages();
-  if($('#panel-messages').classList.contains('active')) markAllMessagesRead();
 }
 function unreadCount(){ return myMessages.filter(m=>!m.read).length; }
 function updateMessageBadge(){
@@ -1512,57 +1522,98 @@ function messageParts(m){
   const parts = String(m.body||'').split(' · ');
   return parts.length > 1 ? { recip: parts[0], detail: parts.slice(1).join(' · ') } : { recip: '', detail: m.body||'' };
 }
-function messageLineHtml(m){
-  const k = messageKind(m), { detail } = messageParts(m);
+function messageWhen(m){
   const d = new Date(m.created);
-  const when = isNaN(d) ? '' : `${d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})} · ${fmtTime(d)}`;
-  return `<span class="msg-line"><span class="msg-chip ${k.cls}">${escapeHtml(k.label)}</span><span class="msg-detail">${escapeHtml(detail)}</span></span>
+  return isNaN(d) ? '' : `${d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})} · ${fmtTime(d)}`;
+}
+function messageChipHtml(m){
+  const k = messageKind(m);
+  return `<span class="msg-chip ${k.cls}">${escapeHtml(k.label)}</span>`;
+}
+function messageDetailHtml(m){
+  const when = messageWhen(m);
+  return `<span class="msg-detail">${escapeHtml(messageParts(m).detail)}</span>
     ${when ? `<span class="msg-received">Sent ${escapeHtml(when)}</span>` : ''}`;
 }
-function renderMessages(highlight){
+function messageActionsHtml(ids, withMarkRead){
+  const arg = escapeHtml(JSON.stringify(ids));
+  return `<div class="msg-actions">
+    ${withMarkRead ? `<button type="button" class="link-btn" onclick='markMessagesRead(${arg})'>Mark as read</button>` : ''}
+    <button type="button" class="link-btn" onclick='deleteMessages(${arg})'>Delete</button>
+  </div>`;
+}
+let messageTab = 'unread';
+function renderMessages(){
   updateMessageBadge();
   const list = $('#messageList');
   const opened = openState(list);
-  $('#messagesEmpty').hidden = myMessages.length > 0;
-  $('#btnMarkAllRead').hidden = !unreadCount();
+  const unread = messageTab === 'unread';
+  const shown = myMessages.filter(m => unread ? !m.read : m.read);
+  document.querySelectorAll('.msg-tabs button').forEach(b=>{
+    const active = b.dataset.msgtab === messageTab;
+    b.classList.toggle('active', active);
+    if(active) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
+    if(b.dataset.msgtab === 'unread'){ const n = unreadCount(); b.textContent = n ? `Unread (${n})` : 'Unread'; }
+  });
+  const empty = $('#messagesEmpty');
+  empty.hidden = shown.length > 0;
+  empty.textContent = unread
+    ? (myMessages.length ? "You're all caught up. Earlier messages are under Read." : "No messages yet. You'll see one here whenever you're booked for a session.")
+    : 'No read messages yet.';
+  $('#btnMarkAllRead').hidden = !(unread && shown.length);
   // myMessages is newest first, so each group's first entry is its newest
   // and groups come out in newest-first order too.
   const groups = new Map();
-  myMessages.forEach(m=>{
+  shown.forEach(m=>{
     const key = messageParts(m).recip || 'Other';
     if(!groups.has(key)) groups.set(key, []);
     groups.get(key).push(m);
   });
-  const isNew = m => !m.read || (highlight && highlight.has(m.id));
   list.innerHTML = [...groups.entries()].map(([recip, msgs])=>{
     const newest = msgs[0], older = msgs.slice(1);
-    const anyNew = msgs.some(isNew);
     const key = 'msg-' + recip;
     const wasOpen = opened.get(key) || false;
-    const count = `${msgs.length} message${msgs.length===1?'':'s'}`;
-    return `<div class="group msg${anyNew?' unread':''}${wasOpen?' open':''}" data-key="${escapeHtml(key)}">
+    return `<div class="group msg${wasOpen?' open':''}" data-key="${escapeHtml(key)}">
       <button class="group-row" ${older.length ? `onclick="this.closest('.group').classList.toggle('open')" aria-expanded="${wasOpen}"` : 'style="cursor:default;"'}>
         <span class="group-main">
           <span class="group-name-row">
             <span class="group-name">${escapeHtml(recip)}</span>
-            <span class="group-count">${count}</span>
-            ${anyNew ? '<span class="group-count new">New</span>' : ''}
+            ${messageChipHtml(newest)}
           </span>
-          ${messageLineHtml(newest)}
+          ${messageDetailHtml(newest)}
         </span>
         ${older.length ? `<span class="group-chevron">${ICONS.chevron}</span>` : ''}
       </button>
-      ${older.length ? `<div class="group-body"><div class="group-body-inner">${older.map(m=>`<div class="msg-older">${messageLineHtml(m)}</div>`).join('')}</div></div>` : ''}
+      ${messageActionsHtml(unread ? msgs.map(m=>m.id) : [newest.id], unread)}
+      ${older.length ? `<div class="group-body"><div class="group-body-inner">${older.map(m=>`<div class="msg-older"><span class="msg-line">${messageChipHtml(m)}${messageDetailHtml(m)}</span>${unread ? '' : messageActionsHtml([m.id], false)}</div>`).join('')}</div></div>` : ''}
     </div>`;
   }).join('');
 }
-window.markAllMessagesRead = async function(){
-  const unreadIds = new Set(myMessages.filter(m=>!m.read).map(m=>m.id));
-  if(!unreadIds.size) return;
-  myMessages.forEach(m=>{ m.read = true; });
-  renderMessages(unreadIds);
-  try{ await messagesApi('/read', { ids: [...unreadIds] }); }
+window.markMessagesRead = async function(ids){
+  const want = new Set(ids);
+  const changed = myMessages.filter(m=>!m.read && want.has(m.id)).map(m=>m.id);
+  if(!changed.length) return;
+  myMessages.forEach(m=>{ if(want.has(m.id)) m.read = true; });
+  renderMessages();
+  try{ await messagesApi('/read', { ids: changed }); }
   catch(e){ console.warn('Could not mark messages read:', e.message); }
+};
+window.markAllMessagesRead = function(){
+  return markMessagesRead(myMessages.filter(m=>!m.read).map(m=>m.id));
+};
+window.deleteMessages = async function(ids){
+  const n = ids.length;
+  if(!(await askConfirm(n > 1 ? `Delete these ${n} messages?` : 'Delete this message?'))) return;
+  const want = new Set(ids);
+  const before = myMessages;
+  myMessages = myMessages.filter(m=>!want.has(m.id));
+  renderMessages();
+  try{ await messagesApi('/delete', { ids }); }
+  catch(e){
+    myMessages = before;
+    renderMessages();
+    alert('Could not delete: ' + e.message);
+  }
 };
 let messagesWired = false;
 function initMessages(){
@@ -1572,6 +1623,7 @@ function initMessages(){
   });
   if(messagesWired) return;
   messagesWired = true;
+  document.querySelectorAll('.msg-tabs button').forEach(b=>b.addEventListener('click', ()=>{ messageTab = b.dataset.msgtab; renderMessages(); }));
   // Pick up new messages when the app comes back to the foreground.
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'visible' && account) loadMessages(); });
   if('serviceWorker' in navigator){
@@ -1615,7 +1667,7 @@ function switchTab(tab){
     if(active) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
   });
   document.querySelectorAll('main .panel').forEach(p=>p.classList.toggle('active', p.id==='panel-'+tab));
-  if(tab === 'messages') markAllMessagesRead();
+  if(tab === 'messages'){ messageTab = unreadCount() ? 'unread' : 'read'; renderMessages(); }
 }
 
 init();
