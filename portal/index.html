@@ -394,6 +394,7 @@
       </nav>
       <div class="toolbar">
         <button class="btn secondary" type="button" id="btnMarkAllRead" onclick="markAllMessagesRead()" hidden>Mark all as read</button>
+        <button class="btn secondary" type="button" id="btnDeleteAllRead" onclick="deleteAllReadMessages()" hidden>Delete all</button>
       </div>
       <div id="messageList"></div>
       <div class="no-results" id="messagesEmpty" hidden></div>
@@ -1591,6 +1592,7 @@ function renderMessages(){
     ? (myMessages.length ? "You're all caught up. Earlier messages are under Read." : "No messages yet. You'll see one here whenever you're booked for a session.")
     : 'No read messages yet.';
   $('#btnMarkAllRead').hidden = !(unread && shown.length);
+  $('#btnDeleteAllRead').hidden = unread || !shown.length;
   // myMessages is newest first, so each group's first entry is its newest
   // and groups come out in newest-first order too.
   const groups = new Map();
@@ -1641,9 +1643,13 @@ window.markMessagesRead = async function(ids){
 window.markAllMessagesRead = function(){
   return markMessagesRead(myMessages.filter(m=>!m.read).map(m=>m.id));
 };
-window.dismissMessages = async function(ids){
+window.deleteAllReadMessages = function(){
+  const ids = myMessages.filter(m=>m.read).map(m=>m.id);
+  if(ids.length) return dismissMessages(ids, (ids.length === 1 ? 'Delete your 1 read message?' : `Delete all ${ids.length} read messages?`) + " This can't be undone.");
+};
+window.dismissMessages = async function(ids, prompt){
   const n = ids.length;
-  if(!(await askConfirm(n > 1 ? `Dismiss these ${n} messages?` : 'Dismiss this message?'))) return;
+  if(!(await askConfirm(prompt || (n > 1 ? `Dismiss these ${n} messages?` : 'Dismiss this message?')))) return;
   const want = new Set(ids);
   const before = myMessages;
   myMessages = myMessages.filter(m=>!want.has(m.id));
