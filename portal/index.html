@@ -136,6 +136,8 @@
   .ans-row{display:flex;flex-direction:column;margin-bottom:10px;}
   .ans-q{font-weight:700;font-size:calc(var(--fs-xs) * var(--ans-scale,1));color:var(--muted);}
   .ans-a{font-size:calc(var(--fs-sm) * var(--ans-scale,1));white-space:pre-wrap;}
+  /* Words staff redacted as personal info (see FPHM.renderResponsesHtml). */
+  .ans-redacted{display:inline-block;background:var(--text);color:var(--text);border-radius:2px;letter-spacing:-1px;user-select:none;}
   /* Intake view: fills the whole viewport, header (name, text-size and Close
      buttons) stays pinned while the answers scroll underneath. */
   #intakeViewModal{padding:0;align-items:stretch;}
@@ -775,7 +777,7 @@ window.openIntakeView = function(id){
   intakeViewingId = id;
   $('#intakeViewTitle').textContent = i.recipName || '(name not yet entered)';
   $('#intakeViewMeta').textContent = `Submitted ${fmtShort((i.submittedAt||'').split('T')[0])}`;
-  $('#intakeViewBody').innerHTML = FPHM.renderResponsesHtml(responsesWithoutEmail(i.responses)) +
+  $('#intakeViewBody').innerHTML = FPHM.renderResponsesHtml(responsesWithoutEmail(i.responses), { redact: 'hide' }) +
     (i.signatureDataUrl ? `<h3>Signature</h3><img src="${i.signatureDataUrl}" alt="Signature" style="max-width:280px;border:1px solid var(--border);border-radius:8px;background:#fff;">` : '');
   applyIntakeTextSize();
   $('#intakeViewModal').classList.add('open');
@@ -810,7 +812,7 @@ window.printIntakeView = function(){
   $('#intakePrintArea').innerHTML = `
     <h1>${escapeHtml(i.recipName || '(name not yet entered)')}</h1>
     <p>Submitted ${escapeHtml(fmtShort((i.submittedAt||'').split('T')[0]))}</p>
-    ${FPHM.renderResponsesHtml(responsesWithoutEmail(i.responses))}
+    ${FPHM.renderResponsesHtml(responsesWithoutEmail(i.responses), { redact: 'hide' })}
     <section class="ans-section">
       <h2>${escapeHtml(liability.title)}</h2>
       <div class="legal-text rich-text">${FPHM.liabilityBodyHtml(liability.body)}</div>

@@ -95,10 +95,21 @@ const FPHM = (function () {
     return String(val);
   }
 
-  // Renders every answered question (regardless of current visibility —
+  // Renders every answered question (regardless of current visibility -
   // if it has an answer, it was relevant when it was answered) as HTML,
   // grouped by section. Used for the print/PDF view and the staff view.
-  function renderResponsesHtml(responses) {
+  //
+  // Redactions (added 2026-10-21): staff can mark words in an answer as
+  // personal info. They're stored alongside the answers as
+  // responses._redactions = { <questionId>: ["phrase", ...] } (a key no
+  // question can have, so the public form and validation ignore it).
+  // opts.redact = 'hide' (minister portal) replaces each phrase with a
+  // block; 'mark' (staff view) highlights it instead; omitted = plain text.
+  // Each .ans-row carries data-qid so the staff view can tell which answer
+  // a text selection came from.
+  function renderResponsesHtml(responses, opts) {
+    const mode = (opts && opts.redact) || "";
+    const redactions = (responses && responses._redactions) || {};
     let html = "";
     for (const section of currentSections()) {
       const rows = section.questions
@@ -106,15 +117,108 @@ const FPHM = (function () {
           !(Array.isArray(responses[q.id]) && responses[q.id].length === 0))
         .map(
           (q) =>
-            `<div class="ans-row"><div class="ans-q">${escapeHtml(q.label)}</div><div class="ans-a">${escapeHtml(
-              formatAnswer(q, responses[q.id])
-            ).replace(/\n/g, "<br>")}</div></div>`
+            `<div class="ans-row" data-qid="${escapeHtml(q.id)}"><div class="ans-q">${escapeHtml(q.label)}</div><div class="ans-a">${answerTextHtml(
+              formatAnswer(q, responses[q.id]), mode ? redactions[q.id] : null, mode
+            )}</div></div>`
         )
         .join("");
       if (!rows) continue;
       html += `<section class="ans-section"><h3>${escapeHtml(section.title)}</h3>${rows}</section>`;
     }
     return html;
+  }
+
+  // ---- redaction ----------------------------------------------------
+  // A phrase matches case-insensitively and with any run of whitespace
+  // standing in for a space, so a phrase picked from the rendered page
+  // (where line breaks became <br>) still matches the stored answer.
+  function redactionRegex(phrases) {
+    const parts = (phrases || [])
+      .map((p) => String(p).trim())
+      .filter(Boolean)
+      .sort((a, b) => b.length - a.length)
+      .map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+"));
+    return parts.length ? new RegExp(parts.join("|"), "gi") : null;
+  }
+  const REDACTED_BLOCK = "\u2588\u2588\u2588\u2588\u2588\u2588";
+  function answerTextHtml(text, phrases, mode) {
+    const re = mode ? redactionRegex(phrases) : null;
+    const plain = (t) => escapeHtml(t).replace(/\n/g, "<br>");
+    if (!re) return plain(text);
+    let out = "", last = 0, m;
+    while ((m = re.exec(text))) {
+      out += plain(text.slice(last, m.index));
+      out += mode === "hide"
+        ? `<span class="ans-redacted" aria-label="Redacted">${REDACTED_BLOCK}</span>`
+        : `<mark class="ans-redacted-mark" title="Hidden from prayer ministers">${plain(m[0])}</mark>`;
+      last = m.index + m[0].length;
+    }
+    return out + plain(text.slice(last));
+  }
+  function isRedacted(text, phrases) {
+    const re = redactionRegex(phrases);
+    return !!re && re.test(text);
+  }
+
+  // Likely personal info, offered to staff for review - never applied
+  // automatically. Deliberately skips the Name and Email answers (ministers
+  // need the name; the portal already hides the email).
+  const NAME_FIELDS = ["m_spouseName", "cl_partnerName", "d_spouseName"];
+  const RELATION_WORDS = "husband|wife|son|daughter|brother|sister|mother|mom|mum|father|dad|uncle|aunt|auntie|cousin|nephew|niece|friend|boyfriend|girlfriend|fianc[eé]e?|partner|ex|ex-husband|ex-wife|grandmother|grandfather|grandma|grandpa|stepdad|stepmom|stepfather|stepmother|pastor|boss|teacher|coach|named|called";
+  const CHILD_STOPWORDS = new Set(("I My Male Female Boy Girl Son Daughter Sons Daughters Living Deceased Alive Passed Died Yes No Age Aged Years Year Months Month Old " +
+    "The And Both All One Two Three Four Five She He They Her His Their We Our Is Are Was Were Not Still Has Have Had Married Single Twins Stillborn Miscarriage " +
+    "January February March April May June July August September October November December").split(" "));
+  function suggestRedactions(responses) {
+    const out = [];
+    const redactions = responses._redactions || {};
+    const seen = new Set();
+    const add = (qid, phrase, reason) => {
+      phrase = String(phrase).trim().replace(/[.,;:]+$/, "");
+      if (phrase.length < 2) return;
+      const key = qid + "\u0000" + phrase.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push({ qid, phrase, reason });
+    };
+    const knownNames = [];
+    NAME_FIELDS.forEach((id) => { if (typeof responses[id] === "string" && responses[id].trim()) knownNames.push(responses[id].trim()); });
+    for (const section of currentSections()) {
+      for (const q of section.questions) {
+        if (q.id === "name" || q.id === "email") continue;
+        const val = responses[q.id];
+        if (val === undefined || val === null || val === "") continue;
+        if (typeof val !== "string" && !Array.isArray(val)) continue;
+        const text = formatAnswer(q, val);
+        if (!text) continue;
+        const already = redactions[q.id] || [];
+        const tryAdd = (phrase, reason) => { if (!isRedacted(phrase, already)) add(q.id, phrase, reason); };
+        if (NAME_FIELDS.includes(q.id)) tryAdd(text, "Name");
+        const patterns = [
+          [/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, "Email address"],
+          [/(?:\+?1[\s.-]?)?\(?\b\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b/g, "Phone number"],
+          [/\b[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z][ -]?\d[ABCEGHJ-NPRSTV-Z]\d\b/gi, "Postal code"],
+          [/\b\d{1,5}\s+(?:[A-Z][\w'-]*\s+){1,3}(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Crescent|Cres|Boulevard|Blvd|Court|Ct|Lane|Ln|Way|Place|Pl|Circle|Cir|Trail|Parkway|Pkwy|Line|Concession|Highway|Hwy|Terrace|Square|Gate)\b\.?/g, "Street address"],
+          [/\bhttps?:\/\/\S+|\bwww\.\S+/gi, "Web address"],
+          [new RegExp("\\b(?:my|our|her|his|their|a|an)\\s+(?:" + RELATION_WORDS + ")\\s+((?:[A-Z][a-z'\u2019-]+)(?:\\s+[A-Z][a-z'\u2019-]+)?)", "g"), "Possible name"]
+        ];
+        for (const [re, reason] of patterns) {
+          let m;
+          while ((m = re.exec(text))) tryAdd(m[1] || m[0], reason);
+        }
+        knownNames.forEach((n) => {
+          if (NAME_FIELDS.includes(q.id)) return;
+          const re = redactionRegex([n]);
+          let m;
+          while ((m = re.exec(text))) tryAdd(m[0], "Name");
+        });
+        if (q.id === "childrenInfo") {
+          const re = /\b[A-Z][a-z'\u2019-]{1,}\b/g;
+          let m;
+          while ((m = re.exec(text))) if (!CHILD_STOPWORDS.has(m[0])) tryAdd(m[0], "Possible child's name");
+        }
+      }
+    }
+    return out;
   }
 
   function escapeHtml(str) {
@@ -302,6 +406,8 @@ const FPHM = (function () {
     validateAll,
     formatAnswer,
     renderResponsesHtml,
+    suggestRedactions,
+    isRedacted,
     escapeHtml,
     isHtmlBody,
     introBodyHtml,

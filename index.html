@@ -312,6 +312,15 @@
   .ans-q{font-weight:700;font-size:calc(var(--fs-xs) * var(--ans-scale,1));color:var(--muted);}
   .ans-a{font-size:calc(var(--fs-sm) * var(--ans-scale,1));white-space:pre-wrap;}
   #intakeDetail{--ans-scale:1;}
+  /* Redactions: staff see the words highlighted; ministers see a block. */
+  mark.ans-redacted-mark{background:#fde68a;color:inherit;border-radius:3px;padding:0 2px;box-shadow:inset 0 -2px 0 #d97706;}
+  .redact-panel{border:1px solid var(--border);border-radius:8px;padding:16px;margin:16px 0;background:#fff;}
+  .redact-panel h3{margin:0 0 8px;}
+  .redact-panel h4{margin:16px 0 8px;}
+  .redact-list{display:flex;flex-direction:column;gap:8px;margin-bottom:8px;}
+  .redact-item{display:flex;align-items:center;justify-content:space-between;gap:8px 16px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;}
+  label.redact-item{justify-content:flex-start;cursor:pointer;}
+  .redact-item input{width:20px;height:20px;flex:0 0 auto;}
   /* TEMPORARY: Microsoft Forms import list (Intake Forms > Import). */
   .msf-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:#fff;}
   .msf-row.msf-done{opacity:.6;}
@@ -1178,7 +1187,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-21.4";
+const APP_VERSION = "2026-10-21.5";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -5130,6 +5139,7 @@ window.openIntakeDetail = function(id){
     <div class="toolbar no-print">
       <button type="button" class="btn secondary" onclick="closeIntakeDetail()">&larr; ${intakeReturn ? 'Back to '+escapeHtml(intakeReturn.label) : 'Back to list'}</button>
       <button type="button" class="btn" onclick="window.print()">Print / Save as PDF</button>
+      ${i.status !== 'InProgress' ? `<button type="button" class="btn secondary" onclick="toggleRedactPanel(${i.id})">${redactPanelOpen ? 'Close redaction' : 'Redact personal info'}</button>` : ''}
     </div>
     <div class="intake-namerow">
       <h2>${escapeHtml(i.recipName||'(name not yet entered)')}</h2>
@@ -5139,10 +5149,113 @@ window.openIntakeDetail = function(id){
       </div>
     </div>
     <p class="helptext">${escapeHtml(i.recipEmail||'')} — ${i.status==='Submitted' ? 'Submitted '+fmtShort((i.submittedAt||'').split('T')[0]) : i.status==='InProgress' ? 'In progress' : 'Archived'}</p>
-    ${FPHM.renderResponsesHtml(i.responses)}
+    ${redactPanelOpen && i.status !== 'InProgress' ? `<div id="redactPanel" class="redact-panel no-print">${redactPanelHtml(i)}</div>` : ''}
+    ${FPHM.renderResponsesHtml(i.responses, { redact: 'mark' })}
     ${i.signatureDataUrl ? `<h3>Signature</h3><img src="${i.signatureDataUrl}" alt="Signature" style="max-width:300px;border:1px solid var(--border);border-radius:8px;background:#fff;">` : ''}
   `;
   applyIntakeTextSize();
+};
+// ---- Redact personal info (added 2026-10-21) -----------------------------
+// Staff mark words in a submitted form's answers as personal info; the
+// minister portal shows a block in their place (FPHM.renderResponsesHtml
+// with {redact:'hide'}), this staff view highlights them ({redact:'mark'}).
+// Stored inside ResponsesJSON as responses._redactions =
+// { questionId: ["phrase", ...] } - no SharePoint change. The app suggests
+// likely PII (FPHM.suggestRedactions) but never applies anything without a
+// staff click. Hidden from ministers' screens only: the portal still
+// downloads the full answers, same as the hidden email address.
+let redactPanelOpen = false;
+function intakeQuestionLabel(qid){
+  for(const s of window.FPHM_INTAKE_CONFIG.SECTIONS) for(const q of s.questions) if(q.id === qid) return q.label;
+  return qid;
+}
+function currentRedactions(i){
+  const r = (i.responses && i.responses._redactions) || {};
+  const copy = {};
+  Object.keys(r).forEach(k => { if(Array.isArray(r[k]) && r[k].length) copy[k] = r[k].slice(); });
+  return copy;
+}
+function redactPanelHtml(i){
+  const red = currentRedactions(i);
+  const sugg = FPHM.suggestRedactions(i.responses);
+  const redCount = Object.values(red).reduce((n, a) => n + a.length, 0);
+  const suggHtml = sugg.length
+    ? `<div class="redact-list">${sugg.map((x, k) => `
+        <label class="redact-item"><input type="checkbox" class="redact-sugg" data-k="${k}" checked>
+          <span><strong>${escapeHtml(x.phrase)}</strong><br><span class="helptext">${escapeHtml(x.reason)} &middot; ${escapeHtml(intakeQuestionLabel(x.qid))}</span></span></label>`).join('')}
+      </div>
+      <div class="toolbar"><button type="button" class="btn" onclick="redactCheckedSuggestions(${i.id})">Redact checked suggestions</button></div>`
+    : `<p class="helptext">No suggestions right now - nothing else looks like an email, phone number, address or name. Check the answers yourself too; the app can't catch everything.</p>`;
+  const redHtml = redCount
+    ? `<div class="redact-list">${Object.entries(red).flatMap(([qid, arr]) => arr.map((ph, k) => `
+        <div class="redact-item"><span><strong>${escapeHtml(ph)}</strong><br><span class="helptext">${escapeHtml(intakeQuestionLabel(qid))}</span></span>
+          <button type="button" class="btn secondary" onclick="removeRedaction(${i.id}, '${escapeHtml(qid)}', ${k})">Remove</button></div>`)).join('')}
+      </div>`
+    : `<p class="helptext">Nothing redacted yet.</p>`;
+  return `
+    <h3>Redact personal info</h3>
+    <p class="helptext">Prayer ministers will see &#9608;&#9608;&#9608;&#9608;&#9608;&#9608; in place of redacted words. You still see them here, highlighted. To redact something yourself, select the words in any answer below, then press Redact selected words.</p>
+    <div class="toolbar"><button type="button" class="btn" onmousedown="event.preventDefault()" onclick="redactSelection(${i.id})">Redact selected words</button></div>
+    <p class="errbox" role="alert" id="redactMsg" hidden></p>
+    <h4>Suggested (${sugg.length})</h4>
+    ${suggHtml}
+    <h4>Redacted (${redCount})</h4>
+    ${redHtml}`;
+}
+window.toggleRedactPanel = function(id){
+  redactPanelOpen = !redactPanelOpen;
+  openIntakeDetail(id);
+};
+async function saveRedactions(i, red){
+  const responses = Object.assign({}, i.responses);
+  if(Object.keys(red).length) responses._redactions = red; else delete responses._redactions;
+  await updateItem('intake', i.id, { ResponsesJSON: JSON.stringify(responses) });
+  i.responses = responses;
+  const y = window.scrollY;
+  openIntakeDetail(i.id);
+  window.scrollTo(0, y);
+}
+function redactMsg(text){
+  const m = $('#redactMsg');
+  if(!m) return;
+  m.textContent = text; m.hidden = !text;
+}
+window.redactSelection = async function(id){
+  const i = intakeResponses.find(x => x.id === id);
+  if(!i) return;
+  const sel = window.getSelection();
+  const text = sel ? sel.toString().replace(/\s+/g, ' ').trim() : '';
+  if(text.length < 2) return redactMsg('Select some words in an answer first, then press Redact selected words.');
+  const el = n => (n && n.nodeType === 3 ? n.parentElement : n);
+  const a = el(sel.anchorNode) && el(sel.anchorNode).closest('#intakeDetail .ans-a');
+  const b = el(sel.focusNode) && el(sel.focusNode).closest('#intakeDetail .ans-a');
+  if(!a || a !== b) return redactMsg('Select words inside a single answer (not the question, and not across two answers).');
+  const qid = a.closest('.ans-row').dataset.qid;
+  const red = currentRedactions(i);
+  red[qid] = red[qid] || [];
+  if(FPHM.isRedacted(text, red[qid])) return redactMsg('That is already redacted.');
+  red[qid].push(text);
+  sel.removeAllRanges();
+  await withLoading(null, '', () => saveRedactions(i, red));
+};
+window.redactCheckedSuggestions = async function(id){
+  const i = intakeResponses.find(x => x.id === id);
+  if(!i) return;
+  const sugg = FPHM.suggestRedactions(i.responses);
+  const picked = [...document.querySelectorAll('#redactPanel .redact-sugg:checked')].map(c => sugg[+c.dataset.k]).filter(Boolean);
+  if(!picked.length) return redactMsg('Tick at least one suggestion first.');
+  const red = currentRedactions(i);
+  picked.forEach(x => { (red[x.qid] = red[x.qid] || []).push(x.phrase); });
+  await saveRedactions(i, red);
+};
+window.removeRedaction = async function(id, qid, k){
+  const i = intakeResponses.find(x => x.id === id);
+  if(!i) return;
+  const red = currentRedactions(i);
+  if(!red[qid]) return;
+  red[qid].splice(k, 1);
+  if(!red[qid].length) delete red[qid];
+  await saveRedactions(i, red);
 };
 // On-screen text size for the intake answers (screen only - print has its
 // own fixed sizes). Remembered per browser; storage may be unavailable.
@@ -5159,6 +5272,7 @@ window.changeIntakeTextSize = function(dir){
   applyIntakeTextSize();
 };
 window.closeIntakeDetail = function(){
+  redactPanelOpen = false;
   const ret = intakeReturn; intakeReturn = null;
   intakeDetailId = null;
   ['intakeGroups','intakeSubtabs','intakeSearch','intakeHelptext'].forEach(id=>{ const el=$('#'+id); if(el) el.hidden = false; });
@@ -7069,6 +7183,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 21, 2026', version: '2026-10-21.5', items: [
+    'New: open a submitted intake form and press Redact personal info to hide words from prayer ministers. The app suggests likely personal info (emails, phone numbers, addresses, spouse and children\'s names) for you to tick, or select any words in an answer and press Redact selected words. Ministers see a black block in their place; you still see the words, highlighted, and can Remove a redaction any time.'
+  ]},
   { date: 'Oct 21, 2026', version: '2026-10-21.4', items: [
     'Fixed: Intake Forms > Import now puts the answer to "Please explain" (after "Was there a sense of security and harmony in your home...?") into the Please explain question you added in Edit Questions, instead of saving it where it would not show.'
   ]},
@@ -7081,6 +7198,12 @@ const CHANGE_LOG = [
   { date: 'Oct 21, 2026', version: '2026-10-21.1', items: [
     'New: in an add-rows table, a Yes / No column with a text box can now be set to show that text box for Yes, for No, or for either answer (it used to be Yes only).'
   ]},
+];
+// Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
+// five most recent versions; at each promotion, anything beyond the newest
+// five moves here rather than being deleted - see the block comment above
+// for the maintenance rule.
+const CHANGE_LOG_ARCHIVE = [
   { date: 'Oct 20, 2026', version: '2026-10-20.1', items: [
     'Fixed: a long section in the question editors was cut off and could not be scrolled to - open sections now grow to fit all their questions. New: each column of an add-rows table can be set to show only when an earlier question has a certain answer; hidden columns are left out of the saved note.'
   ]},
@@ -7093,12 +7216,6 @@ const CHANGE_LOG = [
   { date: 'Oct 17, 2026', version: '2026-10-17.1', items: [
     'New: Add-rows table question type for Session Notes. The minister adds and removes rows with buttons; you design the columns in the editor - text, number, Yes/No, or Yes/No that opens a text box when Yes. New tables start with Spirit, Underlings, Ground, Leader (text box on Yes) and Removed, all editable.'
   ]},
-];
-// Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
-// five most recent versions; at each promotion, anything beyond the newest
-// five moves here rather than being deleted - see the block comment above
-// for the maintenance rule.
-const CHANGE_LOG_ARCHIVE = [
   { date: 'Oct 16, 2026', version: '2026-10-16.4', items: [
     'New: a multiple choice (radio) question can show a text box - either whenever an answer is chosen, or only for one specific answer - with its own label. Set it in the question editor under Text box.'
   ]},
