@@ -80,14 +80,12 @@
   .panel{display:none;} .panel.active{display:block;}
 
   .nav-badge{display:inline-block;min-width:20px;height:20px;line-height:20px;padding:0 4px;margin-left:8px;border-radius:10px;background:var(--primary);color:var(--on-primary);font-size:12px;font-weight:800;text-align:center;vertical-align:middle;}
-  .msg-list{display:flex;flex-direction:column;gap:8px;}
-  .msg{background:var(--card);border:1px solid #e3dccb;border-radius:8px;padding:12px 16px;}
-  .msg.unread{border-left:4px solid var(--primary);}
-  .msg-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;}
-  .msg-title{font-weight:700;}
-  .msg.unread .msg-title::before{content:"";display:inline-block;width:8px;height:8px;border-radius:4px;background:var(--primary);margin-right:8px;vertical-align:middle;}
-  .msg-time{font-size:var(--fs-xs);color:var(--muted);white-space:nowrap;}
-  .msg-body{margin-top:4px;font-size:var(--fs-sm);}
+  /* Message cards reuse the session cards' look (.group / .group-row etc.) */
+  .group.msg .group-row{cursor:default;}
+  .group.msg .group-row:hover{background:none;}
+  .group.msg.unread{border-left:4px solid var(--primary);}
+  .group.msg .group-count.new{background:var(--primary);color:var(--on-primary);}
+  .msg-detail{font-size:var(--fs-base);color:var(--text);margin-top:4px;}
   .push-row[hidden],.nav-badge[hidden]{display:none;}
   .push-row{margin-bottom:16px;font-size:var(--fs-sm);}
   .push-toggle{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;min-height:44px;}
@@ -365,7 +363,7 @@
         <button class="btn secondary" type="button" id="btnMarkAllRead" onclick="markAllMessagesRead()" hidden>Mark all as read</button>
       </div>
       <p class="helptext">Notifications about your sessions, newest first. They stay here even if you missed them on your phone.</p>
-      <div class="msg-list" id="messageList"></div>
+      <div id="messageList"></div>
       <div class="no-results" id="messagesEmpty" hidden>No messages yet. You'll see one here whenever you're booked for a session.</div>
     </section>
 
@@ -1500,9 +1498,22 @@ function renderMessages(highlight){
     const d = new Date(m.created);
     const when = isNaN(d) ? '' : `${d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})} · ${fmtTime(d)}`;
     const unread = !m.read || (highlight && highlight.has(m.id));
-    return `<div class="msg${unread?' unread':''}">
-      <div class="msg-head"><span class="msg-title">${escapeHtml(m.title)}</span><span class="msg-time">${escapeHtml(when)}</span></div>
-      ${m.body ? `<div class="msg-body">${escapeHtml(m.body)}</div>` : ''}
+    // Body is "Recipient · session date/time" - the recipient's initials
+    // stand in for the avatar, same as on the session cards.
+    const parts = String(m.body||'').split(' · ');
+    const recip = parts.length > 1 ? parts[0] : '';
+    return `<div class="group msg${unread?' unread':''}">
+      <div class="group-row">
+        <span class="group-avatar" aria-hidden="true">${escapeHtml(recip ? initials(recip) : '!')}</span>
+        <span class="group-main">
+          <span class="group-name-row">
+            <span class="group-name">${escapeHtml(m.title)}</span>
+            ${unread ? '<span class="group-count new">New</span>' : ''}
+          </span>
+          ${m.body ? `<span class="msg-detail" style="display:block;">${escapeHtml(m.body)}</span>` : ''}
+          <span class="group-summary" style="display:block;">${escapeHtml(when)}</span>
+        </span>
+      </div>
     </div>`;
   }).join('');
 }
