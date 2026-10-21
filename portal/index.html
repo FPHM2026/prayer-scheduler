@@ -1608,10 +1608,10 @@ function renderMessages(){
     const ids = msgs.map(m=>m.id);
     const toggle = `onclick="const g=this.closest('.group');g.classList.toggle('open');g.querySelectorAll('[aria-expanded]').forEach(b=>b.setAttribute('aria-expanded',g.classList.contains('open')))" aria-expanded="${wasOpen}"`;
     const earlier = `${older.length} earlier message${older.length===1?'':'s'}`;
-    const foot = (older.length || unread) ? `<div class="msg-foot">
+    const foot = `<div class="msg-foot">
         ${older.length ? `<button type="button" class="msg-expand" ${toggle}><span class="when-closed">Show ${earlier}</span><span class="when-open">Hide ${earlier}</span>${ICONS.chevron}</button>` : '<span></span>'}
-        ${unread ? `<button type="button" class="link-btn" onclick='markMessagesRead(${escapeHtml(JSON.stringify(ids))})'>Mark as read</button>` : ''}
-      </div>` : '';
+        <button type="button" class="link-btn" onclick='${unread ? 'markMessagesRead' : 'markMessagesUnread'}(${escapeHtml(JSON.stringify(ids))})'>${unread ? 'Mark as read' : 'Mark as unread'}</button>
+      </div>`;
     return `<div class="group msg${foot?' has-foot':''}${wasOpen?' open':''}" data-key="${escapeHtml(key)}">
       <div class="msg-head">
         <button class="group-row" ${older.length ? toggle : 'style="cursor:default;"'}>
@@ -1639,6 +1639,19 @@ window.markMessagesRead = async function(ids){
   renderMessages();
   try{ await messagesApi('/read', { ids: changed }); }
   catch(e){ console.warn('Could not mark messages read:', e.message); }
+};
+window.markMessagesUnread = async function(ids){
+  const want = new Set(ids);
+  const changed = myMessages.filter(m=>m.read && want.has(m.id)).map(m=>m.id);
+  if(!changed.length) return;
+  myMessages.forEach(m=>{ if(want.has(m.id)) m.read = false; });
+  renderMessages();
+  try{ await messagesApi('/read', { ids: changed, unread: true }); }
+  catch(e){
+    myMessages.forEach(m=>{ if(want.has(m.id)) m.read = true; });
+    renderMessages();
+    alert('Could not mark as unread: ' + e.message);
+  }
 };
 window.markAllMessagesRead = function(){
   return markMessagesRead(myMessages.filter(m=>!m.read).map(m=>m.id));

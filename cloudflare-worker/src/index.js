@@ -37,7 +37,7 @@
                                   recipientName? (canceled/removed only) }
                                                  + Bearer <Graph token>
      POST /api/messages/list    {}               + Bearer <Graph token>
-     POST /api/messages/read    { ids?: [] }     + Bearer <Graph token>
+     POST /api/messages/read    { ids?: [], unread?: true }  + Bearer <Graph token>
      POST /api/messages/delete  { ids: [] }      + Bearer <Graph token>
        (added 2026-10-21) the portal's Messages tab - every session
        notification is also saved per minister, so one missed on the
@@ -682,13 +682,16 @@ async function handleMessagesRead(env, request) {
   const body = await request.json().catch(() => ({}));
   const { minister, error } = await ministerForCaller(env, request);
   if (error) return error;
+  // unread: true flips messages back to unread (only for the ids given).
+  const markRead = !body.unread;
   const wanted = Array.isArray(body.ids) ? new Set(body.ids.map((x) => parseInt(x, 10))) : null;
+  if (!markRead && !wanted) return { __status: 400, error: "ids required" };
   const items = (await myMessageItems(env, minister.id))
-    .filter((i) => !i.fields.IsRead && (!wanted || wanted.has(parseInt(i.id, 10))));
+    .filter((i) => !!i.fields.IsRead !== markRead && (!wanted || wanted.has(parseInt(i.id, 10))));
   const siteId = await resolveSiteId(env);
   const listId = await resolveListId(env, MESSAGES_LIST);
   await Promise.all(items.map((i) =>
-    graphFetch(env, `/sites/${siteId}/lists/${listId}/items/${i.id}/fields`, { method: "PATCH", body: JSON.stringify({ IsRead: true }) })
+    graphFetch(env, `/sites/${siteId}/lists/${listId}/items/${i.id}/fields`, { method: "PATCH", body: JSON.stringify({ IsRead: markRead }) })
   ));
   return { ok: true, marked: items.length };
 }
