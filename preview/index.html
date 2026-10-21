@@ -1205,7 +1205,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-21.11";
+const APP_VERSION = "2026-10-21.12";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1353,6 +1353,8 @@ let listIds = {};
 // unreliable there (iOS especially), so sign-in uses redirects instead -
 // same as the minister portal.
 const IS_STANDALONE = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+// Lets Chrome offer "Install app" (sw.js does nothing else).
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(e=>console.warn('Service worker not registered:', e.message));
 async function init(){
   await msalReady;
   // Finishes a redirect sign-in. Skipped inside a sign-in popup so it can't
@@ -7395,6 +7397,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 21, 2026', version: '2026-10-21.12', items: [
+    'Fixed: Chrome on Android phones and tablets now offers Install app for the Scheduler (open the ⋮ menu, then Install app).'
+  ]},
   { date: 'Oct 21, 2026', version: '2026-10-21.11', items: [
     'New: the Scheduler can be installed as an app. On iPhone open it in Safari, tap Share, then Add to Home Screen; on Android or a computer use the browser\'s Install option. It gets its own dark "FPHM Admin" icon so you can tell it apart from the minister portal. Sign in once from the installed app to check it works.',
     'New: a Send app notification button on each booked session card (under the WhatsApp line). It sends that session\'s team a "booked" phone notification and adds it to their portal Messages, then tells you how many devices it reached. Handy for testing.'
@@ -7408,15 +7413,15 @@ const CHANGE_LOG = [
   { date: 'Oct 21, 2026', version: '2026-10-21.8', items: [
     'Fixed: opening an intake form no longer shows the spreadsheet import buttons (Choose spreadsheet, Import selected forms) underneath it. They now only appear on the Import sub-tab of Intake Forms.'
   ]},
-  { date: 'Oct 21, 2026', version: '2026-10-21.7', items: [
-    'Changed: the WhatsApp group now carries forward for a returning recipient. A new session, a follow-up, or booking someone from the waiting list pre-fills Group created and the group link from their most recent session that has one (you can still change it). Ministers notified is not carried over, so each session still gets its own tap of the notify button.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 21, 2026', version: '2026-10-21.7', items: [
+    'Changed: the WhatsApp group now carries forward for a returning recipient. A new session, a follow-up, or booking someone from the waiting list pre-fills Group created and the group link from their most recent session that has one (you can still change it). Ministers notified is not carried over, so each session still gets its own tap of the notify button.'
+  ]},
   { date: 'Oct 21, 2026', version: '2026-10-21.6', items: [
     'Changed: redacting your own words on an intake form is now tap-to-choose. With Redact personal info open, tap words in the answers (they turn red), then press the Redact chosen words bar at the bottom of the screen. Tap a word again to un-choose it.'
   ]},
