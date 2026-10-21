@@ -101,7 +101,10 @@
   .msg-older{padding:12px 4px;border-bottom:1px solid #f1ede4;}
   .msg-older:last-child{border-bottom:none;}
   .push-row[hidden],.nav-badge[hidden]{display:none;}
-  .push-row{margin-bottom:16px;font-size:var(--fs-sm);}
+  .settings-section{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;}
+  .settings-section h2{font-family:'Playfair Display',Georgia,serif;font-size:var(--fs-lg);color:var(--text);margin:0 0 8px;}
+  .settings-section .helptext{margin:0 0 8px;}
+  .push-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:var(--fs-sm);}
   .push-toggle{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;min-height:44px;}
   .push-toggle input{position:absolute;opacity:0;width:1px;height:1px;}
   .push-toggle .track{position:relative;width:40px;height:24px;border-radius:12px;background:#c9c1b1;transition:background .15s;flex:0 0 auto;}
@@ -339,6 +342,7 @@
   <button data-tab="completed">Completed Sessions</button>
   <button data-tab="blackouts">Blackout Dates</button>
   <button data-tab="messages" id="navMessages" hidden>Messages<span class="nav-badge" id="msgBadge" hidden></span></button>
+  <button data-tab="settings" id="navSettings" hidden>Settings</button>
 </nav>
 <main>
   <div id="loadError"></div>
@@ -372,7 +376,6 @@
     </section>
 
     <section class="panel" id="panel-messages">
-      <div class="push-row" id="pushRow" hidden></div>
       <nav class="msg-tabs" aria-label="Show messages">
         <button type="button" data-msgtab="unread" class="active" aria-current="page">Unread</button>
         <button type="button" data-msgtab="read">Read</button>
@@ -380,9 +383,17 @@
       <div class="toolbar">
         <button class="btn secondary" type="button" id="btnMarkAllRead" onclick="markAllMessagesRead()" hidden>Mark all as read</button>
       </div>
-      <p class="helptext">Grouped by recipient, newest first. Tap a card to see earlier messages. They stay here even if you missed them on your phone.</p>
       <div id="messageList"></div>
       <div class="no-results" id="messagesEmpty" hidden></div>
+    </section>
+
+    <section class="panel" id="panel-settings">
+      <div class="settings-section" id="pushSection" hidden>
+        <h2>Phone notifications</h2>
+        <p class="helptext">Get an alert on this phone when you're booked for a session, a session time changes, or a session is canceled. Turn it on separately on each device you use.</p>
+        <div class="push-row" id="pushRow"></div>
+        <div id="pushStatus" class="helptext" role="status"></div>
+      </div>
     </section>
 
     <section class="panel" id="panel-blackouts">
@@ -1409,24 +1420,34 @@ async function initPush(){
 // The on/off switch at the top of the Messages tab. Messages still arrive
 // in the tab either way; the switch is only about phone notifications.
 async function renderPushCard(msg){
-  const row = $('#pushRow');
-  if(!pushPublicKey){ row.hidden = true; return; }
+  const section = $('#pushSection'), row = $('#pushRow');
+  if(!pushPublicKey){ section.hidden = true; return; }
   let inner;
   if(!PUSH_SUPPORTED){
     if(IS_IOS && !IS_STANDALONE){
       inner = `<div class="helptext">To get phone notifications on iPhone, tap Share, then <em>Add to Home Screen</em>, and open My FPHM Schedule from your Home Screen.</div>`;
-    } else { row.hidden = true; return; }
+    } else { section.hidden = true; return; }
   } else if(Notification.permission === 'denied'){
     inner = `<div class="helptext">Phone notifications are blocked for this app. Allow them in your phone or browser settings to turn them on.</div>`;
   } else {
     const sub = await currentPushSubscription().catch(()=>null);
     const on = !!(sub && Notification.permission === 'granted');
-    inner = `<label class="push-toggle"><input type="checkbox" role="switch" ${on?'checked':''} onchange="this.checked ? enablePush() : disablePush()"><span class="track" aria-hidden="true"></span>Phone notifications</label>`;
+    inner = `<label class="push-toggle"><input type="checkbox" role="switch" ${on?'checked':''} onchange="this.checked ? enablePush() : disablePush()"><span class="track" aria-hidden="true"></span>${on ? 'On' : 'Off'}</label>`
+      + (on ? `<button class="btn secondary" type="button" onclick="testPush()">Send a test</button>` : '');
   }
-  row.innerHTML = inner + (msg ? `<div class="helptext" role="status">${escapeHtml(msg)}</div>` : '');
-  row.hidden = false;
-  $('#navMessages').hidden = false;
+  row.innerHTML = inner;
+  $('#pushStatus').textContent = msg || '';
+  section.hidden = false;
+  $('#navSettings').hidden = false;
 }
+window.testPush = async function(){
+  try{
+    const r = await pushApi('/test');
+    await renderPushCard(r.sent ? 'Test sent. It should arrive in a few seconds.' : 'No devices found for you. Try turning notifications off and on again.');
+  }catch(e){
+    await renderPushCard('Test failed: ' + e.message);
+  }
+};
 window.enablePush = async function(){
   if(pushBusy) return;
   pushBusy = true;
@@ -1667,7 +1688,7 @@ function switchTab(tab){
     if(active) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
   });
   document.querySelectorAll('main .panel').forEach(p=>p.classList.toggle('active', p.id==='panel-'+tab));
-  if(tab === 'messages'){ messageTab = unreadCount() ? 'unread' : 'read'; renderMessages(); }
+  if(tab === 'messages'){ messageTab = 'unread'; renderMessages(); }
 }
 
 init();
