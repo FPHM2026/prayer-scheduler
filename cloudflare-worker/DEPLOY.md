@@ -85,3 +85,17 @@ booked on a session. One-time setup, in this order:
 5. **Check it:** open
    `https://fphm-intake-func.ajjamoore.workers.dev/api/push/key` in a
    browser. It should show `{"publicKey":"..."}`.
+
+## Minister messages (added 2026-10-21)
+
+The portal's Messages tab keeps every session notification so a minister
+who missed it on their phone still sees it. One-time setup: on the
+FreedomPrayer site, create a list named exactly `MinisterMessages` with
+these columns besides Title:
+- `MinisterId` (Number)
+- `Body` (Multiple lines of text, **Plain text**)
+- `SessionId` (Number)
+- `IsRead` (Yes/No, default No)
+
+Ministers need no permission on it. Then `npx wrangler deploy`. Until the
+list exists, pushes still go out and the portal simply hides the tab.

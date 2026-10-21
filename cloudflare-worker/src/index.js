@@ -35,6 +35,12 @@
      POST /api/push/test        {}               + Bearer <Graph token>
      POST /api/push/session     { sessionId, ministerIds?, kind?, when }
                                                  + Bearer <Graph token>
+     POST /api/messages/list    {}               + Bearer <Graph token>
+     POST /api/messages/read    { ids?: [] }     + Bearer <Graph token>
+       (added 2026-10-21) the portal's Messages tab - every session
+       notification is also saved per minister, so one missed on the
+       phone (or never pushed, if they haven't turned push on) still
+       shows up in the app. See "Minister messages" below.
 ========================================================================= */
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
@@ -578,16 +584,85 @@ async function handlePushSession(env, request) {
   const only = Array.isArray(body.ministerIds) ? new Set(body.ministerIds.map((x) => parseInt(x, 10))) : null;
   const targets = new Set(assigned.filter((id) => !only || only.has(id)));
   if (!targets.size) return { ok: true, sent: 0 };
-  const subs = (await pushSubscriptions(env)).filter((s) => targets.has(s.ministerId));
-  if (!subs.length) return { ok: true, sent: 0 };
   const when = String(body.when || "").slice(0, 80);
   const recipient = String(f.RecipientName || "a recipient").slice(0, 80);
-  const sent = await pushToSubscriptions(env, subs, {
+  const message = {
     title: body.kind === "changed" ? "Prayer session time changed" : "You've been booked for a prayer session",
     body: when ? `${recipient} · ${when}` : recipient,
     tag: "fphm-session-" + sessionId
-  });
+  };
+  // Saved for every minister on the list, pushed or not. A missing
+  // MinisterMessages list must never stop the push itself.
+  await Promise.all([...targets].map((ministerId) =>
+    saveMinisterMessage(env, ministerId, message.title, message.body, sessionId).catch(() => {})
+  ));
+  const subs = (await pushSubscriptions(env)).filter((s) => targets.has(s.ministerId));
+  if (!subs.length) return { ok: true, sent: 0 };
+  const sent = await pushToSubscriptions(env, subs, message);
   return { ok: true, sent };
+}
+
+/* =========================================================================
+   MINISTER MESSAGES (added 2026-10-21)
+
+   The portal's Messages tab. Each session notification is also stored in
+   the MinisterMessages SharePoint list (Title = message title, MinisterId
+   Number, Body plain-text multiline, SessionId Number, IsRead Yes/No) -
+   only this Worker reads or writes it, so ministers need no permission on
+   it. A minister only ever sees and marks their own, matched from their
+   Graph token the same way as the push routes.
+========================================================================= */
+const MESSAGES_LIST = "MinisterMessages";
+
+async function saveMinisterMessage(env, ministerId, title, body, sessionId) {
+  const siteId = await resolveSiteId(env);
+  const listId = await resolveListId(env, MESSAGES_LIST);
+  return graphFetch(env, `/sites/${siteId}/lists/${listId}/items`, {
+    method: "POST",
+    body: JSON.stringify({ fields: { Title: title, MinisterId: ministerId, Body: body, SessionId: sessionId || null, IsRead: false } })
+  });
+}
+
+async function myMessageItems(env, ministerId) {
+  const siteId = await resolveSiteId(env);
+  const listId = await resolveListId(env, MESSAGES_LIST);
+  const resp = await graphFetch(
+    env,
+    `/sites/${siteId}/lists/${listId}/items?$expand=fields&$top=999&$filter=fields/MinisterId eq ${parseInt(ministerId, 10)}`,
+    { headers: { Prefer: "HonorNonIndexedQueriesWarningMayFailRandomly" } }
+  );
+  return resp.value;
+}
+
+async function handleMessagesList(env, request) {
+  const { minister, error } = await ministerForCaller(env, request);
+  if (error) return error;
+  const items = await myMessageItems(env, minister.id);
+  const messages = items.map((i) => ({
+    id: parseInt(i.id, 10),
+    title: i.fields.Title || "",
+    body: i.fields.Body || "",
+    sessionId: i.fields.SessionId ? parseInt(i.fields.SessionId, 10) : null,
+    read: !!i.fields.IsRead,
+    created: i.createdDateTime
+  })).sort((a, b) => String(b.created).localeCompare(String(a.created))).slice(0, 100);
+  return { messages };
+}
+
+// Marks the caller's own messages read: the given ids, or all unread ones.
+async function handleMessagesRead(env, request) {
+  const body = await request.json().catch(() => ({}));
+  const { minister, error } = await ministerForCaller(env, request);
+  if (error) return error;
+  const wanted = Array.isArray(body.ids) ? new Set(body.ids.map((x) => parseInt(x, 10))) : null;
+  const items = (await myMessageItems(env, minister.id))
+    .filter((i) => !i.fields.IsRead && (!wanted || wanted.has(parseInt(i.id, 10))));
+  const siteId = await resolveSiteId(env);
+  const listId = await resolveListId(env, MESSAGES_LIST);
+  await Promise.all(items.map((i) =>
+    graphFetch(env, `/sites/${siteId}/lists/${listId}/items/${i.id}/fields`, { method: "PATCH", body: JSON.stringify({ IsRead: true }) })
+  ));
+  return { ok: true, marked: items.length };
 }
 
 const ROUTES = {
@@ -602,7 +677,9 @@ const ROUTES = {
   "/api/push/subscribe": handlePushSubscribe,
   "/api/push/unsubscribe": handlePushUnsubscribe,
   "/api/push/test": handlePushTest,
-  "/api/push/session": handlePushSession
+  "/api/push/session": handlePushSession,
+  "/api/messages/list": handleMessagesList,
+  "/api/messages/read": handleMessagesRead
 };
 const GET_ROUTES = new Set(["/api/intake/schema", "/api/push/key"]);
 
