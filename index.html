@@ -1043,6 +1043,7 @@
         <input type="checkbox" id="waCreated" style="width:auto;min-height:auto;"> WhatsApp group created for this session
       </label>
       <input id="waLink" placeholder="Paste the group invite link (optional)" style="margin-top:6px;">
+      <p class="helptext" id="waCarryNote" hidden style="margin:4px 0 0;"></p>
     </div>
     <div class="modal-actions" style="justify-content:space-between;">
       <button class="btn secondary" id="btnCancel">Cancel</button>
@@ -1192,7 +1193,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-21.6";
+const APP_VERSION = "2026-10-21.7";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1896,6 +1897,7 @@ function wireApp(){
   $('#recipGender').addEventListener('change', renderMinisterList);
   $('#genderPref').addEventListener('change', renderMinisterList);
   $('#recipName').addEventListener('input', ()=>{ renderRecipientHistory(); renderConflictCheck(); renderRecipNameSuggestions(); });
+  $('#waLink').addEventListener('input', ()=>setWaCarryNote(false));
   $('#btnSave').addEventListener('click', ()=>withLoading($('#btnSave'), 'Saving…', onSaveSession));
   $('#btnAddLocation').addEventListener('click', ()=>{ $('#newLocationName').value=''; $('#locModalMsg').innerHTML=''; $('#locationModal').classList.add('open'); $('#newLocationName').focus(); });
   $('#btnLocCancel').addEventListener('click', ()=>$('#locationModal').classList.remove('open'));
@@ -3602,6 +3604,11 @@ function openModal(existing, followFrom, opts){
   $('#sessPriority').checked = existing ? !!existing.priority : false;
   $('#waCreated').checked = existing ? !!existing.waCreated : false;
   $('#waLink').value = existing ? (existing.waLink||'') : '';
+  setWaCarryNote(false);
+  if((!existing || existing.status==='Waiting') && !opts.preset && !$('#waLink').value){
+    const wa = personWaInfo($('#recipName').value, existing ? existing.id : null);
+    if(wa){ $('#waCreated').checked = true; $('#waLink').value = wa.waLink; setWaCarryNote(true); }
+  }
   populateLocationSelect();
   // A brand-new session (no existing record, no follow-up source) defaults
   // to whatever location is configured in Settings as the default, rather
@@ -3702,6 +3709,24 @@ let recipNameMatches = [];
 // selectedMinisters from its own correct source and must not be overridden
 // just because the recipient name happens to match past records).
 let historyExpanded = false;
+// The WhatsApp group belongs to the person and their team, not to one session,
+// so a new session pre-fills the group from their most recent session that
+// has a link (any status, never a Drop-in/Training). "Ministers notified" is
+// NOT carried: each session is announced with its own tap of the notify button.
+function personWaInfo(name, excludeId){
+  const key = String(name||'').trim().toLowerCase();
+  if(!key) return null;
+  const hit = sessions
+    .filter(s=>s.id!==excludeId && s.waLink && s.apptType!=='Drop-in' && s.apptType!=='Training'
+      && String(s.recipName||'').trim().toLowerCase()===key)
+    .sort((a,b)=>(b.date||b.added||'').localeCompare(a.date||a.added||''))[0];
+  return hit ? { waLink: hit.waLink } : null;
+}
+function setWaCarryNote(on){
+  const n = $('#waCarryNote');
+  n.hidden = !on;
+  if(on) n.textContent = 'Carried over from their last session. Change it if this session needs a different group.';
+}
 let historyAutoName = null;
 let historyAutoApplyOk = false;
 let historyDetailsAutoOk = false;
@@ -3783,6 +3808,10 @@ function renderRecipientHistory(){
       if(allMatches[0].recipContact) $('#recipContact').value = allMatches[0].recipContact;
       if(allMatches[0].recipGender) $('#recipGender').value = allMatches[0].recipGender;
       $('#genderPref').value = allMatches[0].genderPref || 'Mixed';
+      if(!$('#waLink').value){
+        const wa = personWaInfo(name, editingId);
+        if(wa){ $('#waCreated').checked = true; $('#waLink').value = wa.waLink; setWaCarryNote(true); }
+      }
       renderMinisterList();
     }
   }
@@ -7259,6 +7288,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 21, 2026', version: '2026-10-21.7', items: [
+    'Changed: the WhatsApp group now carries forward for a returning recipient. A new session, a follow-up, or booking someone from the waiting list pre-fills Group created and the group link from their most recent session that has one (you can still change it). Ministers notified is not carried over, so each session still gets its own tap of the notify button.'
+  ]},
   { date: 'Oct 21, 2026', version: '2026-10-21.6', items: [
     'Changed: redacting your own words on an intake form is now tap-to-choose. With Redact personal info open, tap words in the answers (they turn red), then press the Redact chosen words bar at the bottom of the screen. Tap a word again to un-choose it.'
   ]},
@@ -7271,15 +7303,15 @@ const CHANGE_LOG = [
   { date: 'Oct 21, 2026', version: '2026-10-21.3', items: [
     'Fixed: the confirmation box on Intake Forms > Import now has a green Import button instead of a red Delete button. Nothing was ever deleted - it was only the wrong label.'
   ]},
-  { date: 'Oct 21, 2026', version: '2026-10-21.2', items: [
-    'New (temporary): Intake Forms has an Import sub-tab for bringing in forms filled out on the old Microsoft Form. Choose the Excel export, tick the people you want, and press Import. Each one arrives under Unlinked as a Submitted form. People already in the app are marked "Already in the app", and anyone sharing an email with an existing form is flagged. Each row also lists anything to check, like answers saved under Other.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 21, 2026', version: '2026-10-21.2', items: [
+    'New (temporary): Intake Forms has an Import sub-tab for bringing in forms filled out on the old Microsoft Form. Choose the Excel export, tick the people you want, and press Import. Each one arrives under Unlinked as a Submitted form. People already in the app are marked "Already in the app", and anyone sharing an email with an existing form is flagged. Each row also lists anything to check, like answers saved under Other.'
+  ]},
   { date: 'Oct 21, 2026', version: '2026-10-21.1', items: [
     'New: in an add-rows table, a Yes / No column with a text box can now be set to show that text box for Yes, for No, or for either answer (it used to be Yes only).'
   ]},
