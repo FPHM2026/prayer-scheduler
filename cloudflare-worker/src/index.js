@@ -33,7 +33,8 @@
      POST /api/push/subscribe   { subscription } + Bearer <Graph token>
      POST /api/push/unsubscribe { endpoint }     + Bearer <Graph token>
      POST /api/push/test        {}               + Bearer <Graph token>
-     POST /api/push/session     { sessionId, ministerIds?, kind?, when }
+     POST /api/push/session     { sessionId, ministerIds?, kind?, when,
+                                  recipientName? (canceled/removed only) }
                                                  + Bearer <Graph token>
      POST /api/messages/list    {}               + Bearer <Graph token>
      POST /api/messages/read    { ids?: [] }     + Bearer <Graph token>
@@ -563,33 +564,59 @@ async function handlePushTest(env, request) {
   return { ok: true, sent };
 }
 
-// Called by the Scheduler right after a session is saved. Recipient name
-// and team come from SharePoint, not the caller; `when` is the admin's
-// own browser-formatted date/time (the Worker runs in UTC and doesn't
-// know the church's time zone), trimmed to a sane length.
+// Called by the Scheduler after a session is saved or removed.
+//   kind "booked"/"changed" (default): recipient and team come from the
+//     saved session in SharePoint, not the caller; ministerIds optionally
+//     narrows it to some of that team.
+//   kind "canceled" (session removed) / "removed" (minister taken off the
+//     team): the session no longer holds that team (or no longer exists),
+//     so the caller supplies ministerIds and recipientName. Only an admin
+//     can call this - a signed-in minister is refused - so a minister
+//     can't send fake cancellations to others.
+// `when` is the admin's own browser-formatted date/time (the Worker runs
+// in UTC and doesn't know the church's time zone), trimmed to a sane length.
+const SESSION_TITLES = {
+  booked: "You've been booked for a prayer session",
+  changed: "Prayer session time changed",
+  canceled: "Prayer session canceled",
+  removed: "You've been taken off a prayer session"
+};
 async function handlePushSession(env, request) {
   const notReady = requirePushConfigured(env);
   if (notReady) return notReady;
   const caller = await callerFromRequest(env, request);
   if (!caller) return { __status: 401, error: "Please sign in again." };
+  const ministers = await listAllItems(env, "PrayerMinisters");
+  if (ministers.some((m) => (m.fields.SignInEmail || "").trim().toLowerCase() === caller.upn)) {
+    return { __status: 403, error: "Only the scheduling admin can send session notifications." };
+  }
   const body = await request.json().catch(() => ({}));
-  const sessionId = parseInt(body.sessionId, 10);
-  if (!sessionId) return { __status: 400, error: "sessionId required" };
-  const siteId = await resolveSiteId(env);
-  const listId = await resolveListId(env, "PrayerSessions");
-  const item = await graphFetch(env, `/sites/${siteId}/lists/${listId}/items/${sessionId}?$expand=fields`);
-  const f = item.fields || {};
-  if (f.Status !== "Scheduled" || !f.SessionDate) return { ok: true, sent: 0, skipped: "not a scheduled session" };
-  const assigned = String(f.AssignedMinisterIDs || "").replace(/<[^>]*>/g, "").split(",").map((x) => parseInt(x.trim(), 10)).filter((x) => !isNaN(x));
-  const only = Array.isArray(body.ministerIds) ? new Set(body.ministerIds.map((x) => parseInt(x, 10))) : null;
-  const targets = new Set(assigned.filter((id) => !only || only.has(id)));
+  const kind = SESSION_TITLES[body.kind] ? body.kind : "booked";
+  const sessionId = parseInt(body.sessionId, 10) || null;
+  const requested = Array.isArray(body.ministerIds) ? body.ministerIds.map((x) => parseInt(x, 10)).filter((x) => !isNaN(x)) : null;
+  let targets, recipient;
+  if (kind === "canceled" || kind === "removed") {
+    const known = new Set(ministers.map((m) => parseInt(m.id, 10)));
+    targets = new Set((requested || []).filter((id) => known.has(id)));
+    recipient = String(body.recipientName || "a recipient").slice(0, 80);
+  } else {
+    if (!sessionId) return { __status: 400, error: "sessionId required" };
+    const siteId = await resolveSiteId(env);
+    const listId = await resolveListId(env, "PrayerSessions");
+    const item = await graphFetch(env, `/sites/${siteId}/lists/${listId}/items/${sessionId}?$expand=fields`);
+    const f = item.fields || {};
+    if (f.Status !== "Scheduled" || !f.SessionDate) return { ok: true, sent: 0, skipped: "not a scheduled session" };
+    const assigned = String(f.AssignedMinisterIDs || "").replace(/<[^>]*>/g, "").split(",").map((x) => parseInt(x.trim(), 10)).filter((x) => !isNaN(x));
+    const only = requested ? new Set(requested) : null;
+    targets = new Set(assigned.filter((id) => !only || only.has(id)));
+    recipient = String(f.RecipientName || "a recipient").slice(0, 80);
+  }
   if (!targets.size) return { ok: true, sent: 0 };
   const when = String(body.when || "").slice(0, 80);
-  const recipient = String(f.RecipientName || "a recipient").slice(0, 80);
   const message = {
-    title: body.kind === "changed" ? "Prayer session time changed" : "You've been booked for a prayer session",
+    title: SESSION_TITLES[kind],
     body: when ? `${recipient} · ${when}` : recipient,
-    tag: "fphm-session-" + sessionId
+    tag: "fphm-session-" + (sessionId || "x") + "-" + kind
   };
   // Saved for every minister on the list, pushed or not. A missing
   // MinisterMessages list must never stop the push itself.
