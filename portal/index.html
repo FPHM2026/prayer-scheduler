@@ -59,7 +59,11 @@
   header{max-width:1100px;margin:0 auto;background:var(--cream);color:var(--navy);padding:10px 14px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid rgba(0,0,0,.06);}
   header h1,#signinScreen h1{margin:0;font-size:17px;font-family:'Playfair Display',Georgia,serif;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:var(--gold-dark);}
   #signinScreen h1{font-size:var(--fs-xl);letter-spacing:.03em;}
-  header .who{font-size:var(--fs-xs);color:var(--navy);}
+  /* Header buttons with a caption under each - same layout as the admin
+     Scheduler's header (see its .hdr-actions comment). */
+  .hdr-actions{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;justify-content:flex-end;margin-left:auto;}
+  .hdr-action{display:inline-flex;flex-direction:column;align-items:stretch;gap:4px;}
+  .hdr-caption{font-size:var(--fs-2xs);color:var(--muted);white-space:nowrap;text-align:center;min-height:1.2em;}
   #btnSignOut{background:var(--navy);color:#fff;border-color:var(--navy);}
   #btnSignOut:hover:not(:disabled){background:var(--navy-dark);border-color:var(--navy-dark);}
 
@@ -344,10 +348,15 @@
 <div id="appRoot">
 <header>
   <h1>My FPHM</h1>
-  <div style="display:flex;align-items:center;gap:12px;margin-left:auto;">
-    <span class="who" id="whoami"></span>
-    <button class="btn secondary" id="btnRefresh" type="button" style="padding:8px 14px;min-height:36px;" onclick="refreshPortalData()">Refresh</button>
-    <button class="btn secondary" id="btnSignOut" style="padding:8px 14px;min-height:36px;">Sign Out</button>
+  <div class="hdr-actions">
+    <div class="hdr-action">
+      <button class="btn secondary" id="btnRefresh" type="button" style="padding:8px 14px;min-height:36px;display:inline-flex;align-items:center;justify-content:center;gap:4px;" onclick="refreshPortalData()"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg><span id="btnRefreshLabel">Refresh Data</span></button>
+      <span class="hdr-caption" id="lastRefreshed"></span>
+    </div>
+    <div class="hdr-action">
+      <button class="btn secondary" id="btnSignOut" style="padding:8px 14px;min-height:36px;">Sign Out</button>
+      <span class="hdr-caption" id="whoami"></span>
+    </div>
   </div>
 </header>
 <nav aria-label="Primary">
@@ -629,7 +638,7 @@ async function afterSignIn(){
   }
   document.getElementById('signinScreen').style.display = 'none';
   document.getElementById('appRoot').style.display = 'block';
-  document.getElementById('whoami').textContent = account.name || account.username;
+  document.getElementById('whoami').textContent = 'Signed in as ' + (account.name || account.username);
   // Microsoft has no single "sign out or switch user" prompt, so the button
   // opens this app's own two-choice dialog; see doSignOut().
   document.getElementById('btnSignOut').onclick = ()=>{ document.getElementById('signOutModal').classList.add('open'); };
@@ -747,6 +756,7 @@ async function loadAll(){
     renderCompleted();
     renderBlackouts();
   }
+  $('#lastRefreshed').textContent = 'Data as of ' + fmtTime(new Date());
 }
 function toHM(iso){
   if(!iso) return '';
@@ -1717,17 +1727,14 @@ window.dismissMessages = async function(ids, prompt){
 // Header Refresh button: reloads sessions, time off and messages in place,
 // keeping the current tab (renderers never switch tabs).
 window.refreshPortalData = async function(){
-  const btn = $('#btnRefresh');
+  const btn = $('#btnRefresh'), label = $('#btnRefreshLabel');
   if(btn.disabled) return;
-  btn.disabled = true; btn.textContent = 'Refreshing…';
+  btn.disabled = true; label.textContent = 'Refreshing…';
   try{
     await Promise.all([loadAll(), loadMessages()]);
-    btn.textContent = 'Updated';
-    setTimeout(()=>{ btn.textContent = 'Refresh'; }, 1500);
   }catch(e){
-    btn.textContent = 'Refresh';
     alert('Could not refresh: ' + e.message);
-  }finally{ btn.disabled = false; }
+  }finally{ btn.disabled = false; label.textContent = 'Refresh Data'; }
 };
 let messagesWired = false;
 function initMessages(){
