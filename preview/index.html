@@ -325,6 +325,11 @@
   .redact-item{display:flex;align-items:center;justify-content:space-between;gap:8px 16px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;}
   label.redact-item{justify-content:flex-start;cursor:pointer;}
   .redact-item input{width:20px;height:20px;flex:0 0 auto;}
+  .redact-howto{background:#fdf6e3;border-left:4px solid var(--gold);padding:8px 16px;border-radius:4px;margin:8px 0;}
+  #intakeDetail .rw{cursor:pointer;border-radius:3px;}
+  #intakeDetail .rw:hover{background:#f1ede4;}
+  #intakeDetail .rw.rw-picked{background:var(--danger);color:#fff;}
+  .redact-pickbar{position:fixed;left:0;right:0;bottom:0;z-index:50;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding:8px 16px;background:#fff;border-top:1px solid var(--border);box-shadow:0 -4px 12px rgba(0,0,0,.12);}
   /* TEMPORARY: Microsoft Forms import list (Intake Forms > Import). */
   .msf-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:#fff;}
   .msf-row.msf-done{opacity:.6;}
@@ -1194,7 +1199,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-21.5";
+const APP_VERSION = "2026-10-21.6";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -5156,11 +5161,16 @@ window.openIntakeDetail = function(id){
       </div>
     </div>
     <p class="helptext">${escapeHtml(i.recipEmail||'')} — ${i.status==='Submitted' ? 'Submitted '+fmtShort((i.submittedAt||'').split('T')[0]) : i.status==='InProgress' ? 'In progress' : 'Archived'}</p>
-    ${redactPanelOpen && i.status !== 'InProgress' ? `<div id="redactPanel" class="redact-panel no-print">${redactPanelHtml(i)}</div>` : ''}
+    ${redactPanelOpen && i.status !== 'InProgress' ? `<div id="redactPanel" class="redact-panel no-print">${redactPanelHtml(i)}</div>
+      <div id="redactPickBar" class="redact-pickbar no-print" hidden>
+        <button type="button" class="btn" id="btnRedactPicked" onclick="redactPickedWords(${i.id})">Redact chosen words</button>
+        <button type="button" class="btn secondary" onclick="clearRedactPicks()">Clear</button>
+      </div>` : ''}
     ${FPHM.renderResponsesHtml(i.responses, { redact: 'mark' })}
     ${i.signatureDataUrl ? `<h3>Signature</h3><img src="${i.signatureDataUrl}" alt="Signature" style="max-width:300px;border:1px solid var(--border);border-radius:8px;background:#fff;">` : ''}
   `;
   applyIntakeTextSize();
+  if(redactPanelOpen && i.status !== 'InProgress') wireRedactWords();
 };
 // ---- Redact personal info (added 2026-10-21) -----------------------------
 // Staff mark words in a submitted form's answers as personal info; the
@@ -5201,8 +5211,8 @@ function redactPanelHtml(i){
     : `<p class="helptext">Nothing redacted yet.</p>`;
   return `
     <h3>Redact personal info</h3>
-    <p class="helptext">Prayer ministers will see &#9608;&#9608;&#9608;&#9608;&#9608;&#9608; in place of redacted words. You still see them here, highlighted. To redact something yourself, select the words in any answer below, then press Redact selected words.</p>
-    <div class="toolbar"><button type="button" class="btn" onmousedown="event.preventDefault()" onclick="redactSelection(${i.id})">Redact selected words</button></div>
+    <p class="helptext">Prayer ministers will see &#9608;&#9608;&#9608;&#9608;&#9608;&#9608; in place of redacted words. You still see them here, highlighted. </p>
+    <p class="redact-howto"><strong>To hide other words:</strong> tap them in the answers below - each one you tap turns red. Tap again to un-choose. Then press the <strong>Redact chosen words</strong> bar at the bottom of the screen.</p>
     <p class="errbox" role="alert" id="redactMsg" hidden></p>
     <h4>Suggested (${sugg.length})</h4>
     ${suggHtml}
@@ -5227,23 +5237,89 @@ function redactMsg(text){
   if(!m) return;
   m.textContent = text; m.hidden = !text;
 }
-window.redactSelection = async function(id){
+// Tap-to-choose (replaced drag-to-select 2026-10-21 - dragging a text
+// selection was hard to discover and unreliable on touch screens). While
+// the redact panel is open, every word in the answers becomes tappable;
+// chosen words turn red, and a bar pinned to the bottom of the screen
+// redacts them. Neighbouring chosen words in one answer become a single
+// phrase ("Gary Smith"), anything not touching becomes its own phrase.
+function wireRedactWords(){
+  document.querySelectorAll('#intakeDetail .ans-a').forEach(a => {
+    const walker = document.createTreeWalker(a, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while(walker.nextNode()){
+      const n = walker.currentNode;
+      if(!n.parentElement.closest('mark') && n.textContent.trim()) nodes.push(n);
+    }
+    nodes.forEach(n => {
+      const frag = document.createDocumentFragment();
+      n.textContent.split(/(\s+)/).forEach(part => {
+        if(!part) return;
+        if(/^\s+$/.test(part)){ frag.appendChild(document.createTextNode(part)); return; }
+        const w = document.createElement('span');
+        w.className = 'rw';
+        w.textContent = part;
+        frag.appendChild(w);
+      });
+      n.parentNode.replaceChild(frag, n);
+    });
+  });
+  updateRedactPickBar();
+}
+function updateRedactPickBar(){
+  const bar = $('#redactPickBar');
+  if(!bar) return;
+  const n = document.querySelectorAll('#intakeDetail .rw.rw-picked').length;
+  bar.hidden = !n;
+  $('#btnRedactPicked').textContent = `Redact ${n} chosen word${n===1?'':'s'}`;
+}
+document.addEventListener('click', e => {
+  const w = e.target.closest && e.target.closest('#intakeDetail .rw');
+  if(!w) return;
+  w.classList.toggle('rw-picked');
+  updateRedactPickBar();
+});
+window.clearRedactPicks = function(){
+  document.querySelectorAll('#intakeDetail .rw-picked').forEach(w => w.classList.remove('rw-picked'));
+  updateRedactPickBar();
+};
+// Strip punctuation that's stuck to the end words ("Smith." -> "Smith").
+function trimPhrase(t){ return t.replace(/^[\s"'(\[\u201c\u2018]+|[\s"'.,;:!?)\]\u201d\u2019]+$/g, ''); }
+window.redactPickedWords = async function(id){
   const i = intakeResponses.find(x => x.id === id);
   if(!i) return;
-  const sel = window.getSelection();
-  const text = sel ? sel.toString().replace(/\s+/g, ' ').trim() : '';
-  if(text.length < 2) return redactMsg('Select some words in an answer first, then press Redact selected words.');
-  const el = n => (n && n.nodeType === 3 ? n.parentElement : n);
-  const a = el(sel.anchorNode) && el(sel.anchorNode).closest('#intakeDetail .ans-a');
-  const b = el(sel.focusNode) && el(sel.focusNode).closest('#intakeDetail .ans-a');
-  if(!a || a !== b) return redactMsg('Select words inside a single answer (not the question, and not across two answers).');
-  const qid = a.closest('.ans-row').dataset.qid;
   const red = currentRedactions(i);
-  red[qid] = red[qid] || [];
-  if(FPHM.isRedacted(text, red[qid])) return redactMsg('That is already redacted.');
-  red[qid].push(text);
-  sel.removeAllRanges();
-  await withLoading(null, '', () => saveRedactions(i, red));
+  let added = 0;
+  document.querySelectorAll('#intakeDetail .ans-a').forEach(a => {
+    const qid = a.closest('.ans-row').dataset.qid;
+    const words = [...a.querySelectorAll('.rw')];
+    let run = [];
+    const flush = () => {
+      const phrase = trimPhrase(run.map(w => w.textContent).join(' '));
+      run = [];
+      if(phrase.length < 1) return;
+      red[qid] = red[qid] || [];
+      if(FPHM.isRedacted(phrase, red[qid])) return;
+      red[qid].push(phrase);
+      added++;
+    };
+    // Two chosen words join one phrase only if nothing but spaces sits
+    // between them (an unchosen word, a line break or already-redacted
+    // text in between starts a new phrase).
+    const prevNode = w => {
+      let n = w.previousSibling;
+      while(n && n.nodeType === 3 && !n.textContent.trim()) n = n.previousSibling;
+      return n;
+    };
+    words.forEach(w => {
+      if(!w.classList.contains('rw-picked')){ if(run.length) flush(); return; }
+      if(run.length && prevNode(w) !== run[run.length-1]) flush();
+      run.push(w);
+    });
+    if(run.length) flush();
+  });
+  if(!added) return redactMsg('Those words are already redacted.');
+  await saveRedactions(i, red);
 };
 window.redactCheckedSuggestions = async function(id){
   const i = intakeResponses.find(x => x.id === id);
@@ -7190,6 +7266,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 21, 2026', version: '2026-10-21.6', items: [
+    'Changed: redacting your own words on an intake form is now tap-to-choose. With Redact personal info open, tap words in the answers (they turn red), then press the Redact chosen words bar at the bottom of the screen. Tap a word again to un-choose it.'
+  ]},
   { date: 'Oct 21, 2026', version: '2026-10-21.5', items: [
     'New: open a submitted intake form and press Redact personal info to hide words from prayer ministers. The app suggests likely personal info (emails, phone numbers, addresses, spouse and children\'s names) for you to tick, or select any words in an answer and press Redact selected words. Ministers see a black block in their place; you still see the words, highlighted, and can Remove a redaction any time.'
   ]},
@@ -7202,15 +7281,15 @@ const CHANGE_LOG = [
   { date: 'Oct 21, 2026', version: '2026-10-21.2', items: [
     'New (temporary): Intake Forms has an Import sub-tab for bringing in forms filled out on the old Microsoft Form. Choose the Excel export, tick the people you want, and press Import. Each one arrives under Unlinked as a Submitted form. People already in the app are marked "Already in the app", and anyone sharing an email with an existing form is flagged. Each row also lists anything to check, like answers saved under Other.'
   ]},
-  { date: 'Oct 21, 2026', version: '2026-10-21.1', items: [
-    'New: in an add-rows table, a Yes / No column with a text box can now be set to show that text box for Yes, for No, or for either answer (it used to be Yes only).'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 21, 2026', version: '2026-10-21.1', items: [
+    'New: in an add-rows table, a Yes / No column with a text box can now be set to show that text box for Yes, for No, or for either answer (it used to be Yes only).'
+  ]},
   { date: 'Oct 20, 2026', version: '2026-10-20.1', items: [
     'Fixed: a long section in the question editors was cut off and could not be scrolled to - open sections now grow to fit all their questions. New: each column of an add-rows table can be set to show only when an earlier question has a certain answer; hidden columns are left out of the saved note.'
   ]},
