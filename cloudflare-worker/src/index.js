@@ -36,6 +36,11 @@
      POST /api/push/session     { sessionId, ministerIds?, kind?, when,
                                   recipientName? (canceled/removed only) }
                                                  + Bearer <Graph token>
+     POST /api/push/admin/subscribe   { subscription } + Bearer <Graph token>
+     POST /api/push/admin/unsubscribe { endpoint }     + Bearer <Graph token>
+     POST /api/push/admin/test        { endpoint }     + Bearer <Graph token>
+       (added 2026-10-22) admins' devices, notified when an intake form
+       is submitted - see "Admin notifications" below.
      POST /api/messages/list    {}               + Bearer <Graph token>
      POST /api/messages/read    { ids?: [], unread?: true }  + Bearer <Graph token>
      POST /api/messages/delete  { ids: [] }      + Bearer <Graph token>
@@ -224,11 +229,12 @@ async function handleSave(env, request) {
   return { ok: true };
 }
 
-async function handleSubmit(env, request) {
+async function handleSubmit(env, request, ctx) {
   const body = await request.json();
   if (!body.token) return { __status: 400, error: "token required" };
   const item = await findItemByToken(env, body.token);
   if (!item) return { __status: 404, error: "not found" };
+  const firstSubmit = item.fields.Status !== "Submitted" && item.fields.Status !== "Archived";
   const responses = body.responses || {};
   const fields = {
     ResponsesJSON: JSON.stringify(responses),
@@ -242,6 +248,10 @@ async function handleSubmit(env, request) {
   }
   if (responses.email) fields.RecipientEmail = String(responses.email);
   await updateItem(env, item.id, fields);
+  // Tell the admins (added 2026-10-22). Runs after the response is sent,
+  // so the recipient never waits on it and a push failure can't fail
+  // their submit. Only the first submit notifies, not a re-submit.
+  if (firstSubmit && ctx) ctx.waitUntil(notifyAdminsOfIntake(env, item.id, fields.RecipientName || item.fields.RecipientName).catch(() => {}));
   return { ok: true };
 }
 
@@ -631,6 +641,96 @@ async function handlePushSession(env, request) {
 }
 
 /* =========================================================================
+   ADMIN NOTIFICATIONS (added 2026-10-22)
+
+   Admins turn on notifications in the Scheduler (Settings > Notifications)
+   and get one when a recipient submits an intake form. Their devices are
+   kept in the same PushSubscriptions list as the ministers', with
+   MinisterId 0 (no real minister has id 0) and Title "Admin: <sign-in>",
+   so no new SharePoint list is needed and minister pushes, which filter by
+   a real MinisterId, never reach an admin device.
+
+   Who counts as an admin: a sign-in from our tenant that is NOT on the
+   minister roster AND whose own Graph token can open the IntakeResponses
+   list. The second check keeps other church staff in the tenant, who have
+   no access to the site, from signing up for recipients' names.
+========================================================================= */
+const ADMIN_MINISTER_ID = 0;
+
+async function adminForCaller(env, request) {
+  const caller = await callerFromRequest(env, request);
+  if (!caller || !caller.upn) return { error: { __status: 401, error: "Please sign in again." } };
+  const ministers = await listAllItems(env, "PrayerMinisters");
+  if (ministers.some((m) => (m.fields.SignInEmail || "").trim().toLowerCase() === caller.upn)) {
+    return { error: { __status: 403, error: "Admin notifications are for the scheduling admins." } };
+  }
+  const { siteId, listId } = await resolveSiteAndList(env);
+  const res = await fetch(`https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}?$select=id`, {
+    headers: { Authorization: request.headers.get("Authorization") }
+  });
+  if (!res.ok) return { error: { __status: 403, error: "Your sign-in can't open the intake forms." } };
+  return { admin: { upn: caller.upn, title: "Admin: " + caller.upn } };
+}
+
+async function adminSubscriptions(env) {
+  return (await pushSubscriptions(env)).filter((s) => s.ministerId === ADMIN_MINISTER_ID);
+}
+
+async function handleAdminSubscribe(env, request) {
+  const notReady = requirePushConfigured(env);
+  if (notReady) return notReady;
+  const body = await request.json().catch(() => ({}));
+  const sub = body.subscription;
+  if (!sub || !sub.endpoint || !sub.keys || !sub.keys.p256dh || !sub.keys.auth) return { __status: 400, error: "subscription required" };
+  const { admin, error } = await adminForCaller(env, request);
+  if (error) return error;
+  const clean = { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } };
+  const fields = { Title: admin.title, MinisterId: ADMIN_MINISTER_ID, SubscriptionJSON: JSON.stringify(clean) };
+  const existing = (await pushSubscriptions(env)).find((s) => s.sub.endpoint === sub.endpoint);
+  if (existing) await pushListItem(env, "PATCH", existing.itemId, fields);
+  else await pushListItem(env, "POST", null, fields);
+  return { ok: true };
+}
+
+async function handleAdminUnsubscribe(env, request) {
+  const body = await request.json().catch(() => ({}));
+  if (!body.endpoint) return { __status: 400, error: "endpoint required" };
+  const { error } = await adminForCaller(env, request);
+  if (error) return error;
+  const mine = (await adminSubscriptions(env)).filter((s) => s.sub.endpoint === body.endpoint);
+  for (const s of mine) await pushListItem(env, "DELETE", s.itemId);
+  return { ok: true };
+}
+
+// Tests only the device that asked, so one admin's test never buzzes another's phone.
+async function handleAdminTest(env, request) {
+  const notReady = requirePushConfigured(env);
+  if (notReady) return notReady;
+  const body = await request.json().catch(() => ({}));
+  const { error } = await adminForCaller(env, request);
+  if (error) return error;
+  const subs = (await adminSubscriptions(env)).filter((s) => s.sub.endpoint === body.endpoint);
+  const sent = await pushToSubscriptions(env, subs, {
+    title: "Notifications are working",
+    body: "You'll get a notification like this when a new intake form is submitted.",
+    tag: "fphm-admin-test"
+  });
+  return { ok: true, sent };
+}
+
+async function notifyAdminsOfIntake(env, intakeId, recipientName) {
+  if (requirePushConfigured(env)) return;
+  const subs = await adminSubscriptions(env);
+  if (!subs.length) return;
+  await pushToSubscriptions(env, subs, {
+    title: "New intake form received",
+    body: String(recipientName || "A new recipient").slice(0, 80) + " submitted their intake form.",
+    tag: "fphm-intake-" + intakeId,
+    intakeId: parseInt(intakeId, 10)
+  });
+}
+
+/* =========================================================================
    MINISTER MESSAGES (added 2026-10-21)
 
    The portal's Messages tab. Each session notification is also stored in
@@ -725,6 +825,9 @@ const ROUTES = {
   "/api/push/unsubscribe": handlePushUnsubscribe,
   "/api/push/test": handlePushTest,
   "/api/push/session": handlePushSession,
+  "/api/push/admin/subscribe": handleAdminSubscribe,
+  "/api/push/admin/unsubscribe": handleAdminUnsubscribe,
+  "/api/push/admin/test": handleAdminTest,
   "/api/messages/list": handleMessagesList,
   "/api/messages/read": handleMessagesRead,
   "/api/messages/delete": handleMessagesDelete
@@ -746,7 +849,7 @@ export default {
     if (request.method !== allowedMethod) return jsonResponse({ error: "method not allowed" }, 405, cors);
 
     try {
-      const result = await handler(env, request);
+      const result = await handler(env, request, ctx);
       const status = result.__status || 200;
       if (result.__status) delete result.__status;
       return jsonResponse(result, status, cors);
