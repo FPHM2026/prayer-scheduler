@@ -569,6 +569,16 @@
   .subtabs button:hover{color:var(--gold-dark);}
   .subtabs button.active{color:var(--navy);border-bottom-color:var(--primary);}
 
+  /* Admin Messages tab (added 2026-10-22) */
+  .nav-badge{display:inline-block;min-width:20px;height:20px;line-height:20px;padding:0 4px;margin-left:8px;border-radius:10px;background:var(--primary);color:var(--on-primary);font-size:12px;font-weight:800;text-align:center;vertical-align:middle;}
+  .nav-badge[hidden]{display:none;}
+  .admin-msg{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:8px;}
+  .admin-msg.unread{border-left:4px solid var(--primary);}
+  .admin-msg-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .admin-msg-name{font-weight:700;font-size:var(--fs-md);}
+  .admin-msg-chip{display:inline-block;border-radius:12px;padding:2px 10px;font-size:var(--fs-xs);font-weight:700;white-space:nowrap;background:#e3f1e6;color:#2f6b3f;}
+  .admin-msg-when{font-size:var(--fs-xs);color:var(--muted);margin-top:4px;}
+  .admin-msg-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:8px;}
   .no-results{padding:32px 16px;text-align:center;color:var(--muted);font-size:var(--fs-sm);}
 
   .prospect-card{background:var(--card);border:1px solid var(--border);border-left:4px solid transparent;border-radius:8px;padding:14px;margin-bottom:10px;box-shadow:var(--shadow-sm);}
@@ -723,6 +733,7 @@
   <button data-tab="blackouts">Blackout Dates</button>
   <button data-tab="intake">Intake Forms</button>
   <button data-tab="reports">Reports</button>
+  <button data-tab="messages" id="navMessages" hidden>Messages<span class="nav-badge" id="msgBadge" hidden></span></button>
   <button data-tab="settings">Settings</button>
   <!-- Moved to the end of the tab list 2026-09-27, at the user's request -
        previously kept first (and the default-active tab) specifically so
@@ -733,6 +744,19 @@
 </nav>
 <main>
 <div id="loadError"></div>
+
+  <section class="panel" id="panel-messages">
+    <nav class="subtabs" aria-label="Show messages" id="adminMsgSubtabs">
+      <button type="button" class="active" data-msgtab="unread">Unread</button>
+      <button type="button" data-msgtab="read">Read</button>
+    </nav>
+    <div class="toolbar">
+      <button class="btn secondary" type="button" id="btnMarkAllRead" onclick="markAllAdminMessagesRead()" hidden>Mark all as read</button>
+      <button class="btn secondary" type="button" id="btnDeleteAllRead" onclick="deleteAllReadAdminMessages()" hidden>Delete all</button>
+    </div>
+    <div id="adminMessageList"></div>
+    <div class="no-results" id="adminMessagesEmpty" hidden></div>
+  </section>
 
   <section class="panel" id="panel-changes">
     <p class="helptext" id="changesHelptext">The five most recent versions. Newest first.</p>
@@ -1224,7 +1248,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-22.2";
+const APP_VERSION = "2026-10-22.3";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1394,6 +1418,119 @@ window.testAdminPush = async function(){
     await renderAdminPush('Test failed: ' + e.message);
   }
 };
+/* ---- Admin Messages tab (added 2026-10-22) ----
+   The admins' shared inbox, kept by the intake Worker
+   (/api/messages/admin/*): one message per submitted intake form, saved
+   whether or not anyone has phone alerts on. Read/unread and deletes are
+   shared by all admins. The tab stays hidden until the Worker answers. */
+const ADMIN_MESSAGES_API = "https://fphm-intake-func.ajjamoore.workers.dev/api/messages/admin";
+let adminMessages = [];
+let adminMessageTab = 'unread';
+async function adminMessagesApi(path, body){
+  const token = await getToken();
+  const res = await fetch(ADMIN_MESSAGES_API + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify(body || {})
+  });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+  return data;
+}
+async function loadAdminMessages(){
+  try{ adminMessages = (await adminMessagesApi('/list')).messages || []; }
+  catch(e){ console.warn('Messages unavailable:', e.message); return; }
+  $('#navMessages').hidden = false;
+  renderAdminMessages();
+}
+function renderAdminMessages(){
+  const n = adminMessages.filter(m=>!m.read).length;
+  const badge = $('#msgBadge');
+  badge.hidden = !n;
+  badge.textContent = n > 99 ? '99+' : String(n);
+  $('#navMessages').setAttribute('aria-label', n ? `Messages, ${n} unread` : 'Messages');
+  try{
+    if(n && navigator.setAppBadge) navigator.setAppBadge(n);
+    else if(!n && navigator.clearAppBadge) navigator.clearAppBadge();
+  }catch(e){}
+  const unread = adminMessageTab === 'unread';
+  document.querySelectorAll('#adminMsgSubtabs [data-msgtab]').forEach(b=>{
+    b.classList.toggle('active', b.dataset.msgtab === adminMessageTab);
+    if(b.dataset.msgtab === 'unread') b.textContent = n ? `Unread (${n})` : 'Unread';
+  });
+  const shown = adminMessages.filter(m => unread ? !m.read : m.read);
+  const empty = $('#adminMessagesEmpty');
+  empty.hidden = shown.length > 0;
+  empty.textContent = unread
+    ? (adminMessages.length ? "You're all caught up. Earlier messages are under Read." : "No messages yet. You'll see one here whenever a new intake form is submitted.")
+    : 'No read messages yet.';
+  $('#btnMarkAllRead').hidden = !(unread && shown.length);
+  $('#btnDeleteAllRead').hidden = unread || !shown.length;
+  $('#adminMessageList').innerHTML = shown.map(m=>{
+    const d = new Date(m.created);
+    const when = isNaN(d) ? '' : `${d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})} · ${fmtTime(d)}`;
+    return `<div class="admin-msg${m.read?'':' unread'}">
+      <div class="admin-msg-top"><span class="admin-msg-name">${escapeHtml(m.body || 'Unnamed')}</span><span class="admin-msg-chip">New intake form</span></div>
+      ${when ? `<div class="admin-msg-when">Received ${escapeHtml(when)}</div>` : ''}
+      <div class="admin-msg-actions">
+        ${m.sessionId ? `<button type="button" class="btn" onclick="openAdminMessage(${m.id})">Open form</button>` : ''}
+        <button type="button" class="link-btn" onclick="setAdminMessagesRead([${m.id}], ${m.read ? 'false' : 'true'})">${m.read ? 'Mark as unread' : 'Mark as read'}</button>
+        <button type="button" class="link-btn" onclick="deleteAdminMessages([${m.id}])">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+window.setAdminMessagesRead = async function(ids, read){
+  const want = new Set(ids);
+  const changed = adminMessages.filter(m=>want.has(m.id) && m.read !== read).map(m=>m.id);
+  if(!changed.length) return;
+  adminMessages.forEach(m=>{ if(want.has(m.id)) m.read = read; });
+  renderAdminMessages();
+  try{ await adminMessagesApi('/read', read ? { ids: changed } : { ids: changed, unread: true }); }
+  catch(e){
+    adminMessages.forEach(m=>{ if(changed.includes(m.id)) m.read = !read; });
+    renderAdminMessages();
+    alert('Could not update: ' + e.message);
+  }
+};
+window.markAllAdminMessagesRead = function(){
+  return setAdminMessagesRead(adminMessages.filter(m=>!m.read).map(m=>m.id), true);
+};
+window.deleteAllReadAdminMessages = function(){
+  const ids = adminMessages.filter(m=>m.read).map(m=>m.id);
+  if(ids.length) return deleteAdminMessages(ids, (ids.length === 1 ? 'Delete the 1 read message?' : `Delete all ${ids.length} read messages?`) + " This only removes the message, not the intake form.");
+};
+window.deleteAdminMessages = async function(ids, prompt){
+  if(!(await askConfirm(prompt || 'Delete this message? This only removes the message, not the intake form.'))) return;
+  const want = new Set(ids);
+  const before = adminMessages;
+  adminMessages = adminMessages.filter(m=>!want.has(m.id));
+  renderAdminMessages();
+  try{ await adminMessagesApi('/delete', { ids }); }
+  catch(e){
+    adminMessages = before;
+    renderAdminMessages();
+    alert('Could not delete: ' + e.message);
+  }
+};
+// Open form marks the message read and shows the intake form, fetching
+// fresh data first if the form arrived after the last load.
+window.openAdminMessage = async function(id){
+  const m = adminMessages.find(x=>x.id===id);
+  if(!m) return;
+  setAdminMessagesRead([id], true);
+  if(!intakeResponses.some(x=>x.id===m.sessionId)){ try{ await loadAll(); }catch(e){} }
+  showIntakeForm(m.sessionId);
+};
+let adminMessagesWired = false;
+function initAdminMessages(){
+  loadAdminMessages();
+  if(adminMessagesWired) return;
+  adminMessagesWired = true;
+  document.querySelectorAll('#adminMsgSubtabs [data-msgtab]').forEach(b=>b.addEventListener('click', ()=>{ adminMessageTab = b.dataset.msgtab; renderAdminMessages(); }));
+  // New messages when the app comes back to the foreground.
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'visible' && account) loadAdminMessages(); });
+}
 function showIntakeForm(id){
   const i = intakeResponses.find(x=>x.id===id);
   if(!i){ showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Intake form not found</div><div>Try Refresh Data.</div>`); return; }
@@ -1418,9 +1555,11 @@ function openIntakeFromLink(){
 }
 // A tapped notification with the app already open: fetch the new form, then show it.
 if('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', async (e)=>{
+  if(e.data && e.data.type === 'push' && account){ loadAdminMessages(); return; }
   if(!e.data || e.data.type !== 'open-intake' || !account) return;
   const id = parseInt(e.data.intakeId, 10);
   if(!id) return;
+  loadAdminMessages().then(()=>{ adminMessages.filter(m=>m.sessionId===id && !m.read).forEach(m=>setAdminMessagesRead([m.id], true)); });
   if(!intakeResponses.some(x=>x.id===id) && !document.querySelector('.modal-bg.open')){
     try{ await loadAll(); }catch(err){}
   }
@@ -1647,6 +1786,7 @@ async function afterSignIn(){
     wireApp();
     openIntakeFromLink();
     initAdminPush();
+    initAdminMessages();
   }catch(e){
     document.getElementById('loadError').innerHTML = `<div class="errbox" role="alert">Could not load data: ${e.message}. Check the SharePoint site URL in setup and that your admin has granted consent for Sites.ReadWrite.All.</div>`;
   }
@@ -1924,7 +2064,7 @@ async function refreshDataKeepingPlace(){
     return;
   }
   try{
-    await withLoading($('#btnRefreshData'), 'Refreshing…', loadAll);
+    await withLoading($('#btnRefreshData'), 'Refreshing…', ()=>Promise.all([loadAll(), loadAdminMessages()]));
   }catch(e){
     showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Couldn't refresh</div><div>${escapeHtml(e.message||'Unknown error')}</div>`);
   }
@@ -2223,6 +2363,7 @@ function switchTab(tab){
     if(active) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
   });
   document.querySelectorAll('main .panel').forEach(p=>p.classList.toggle('active', p.id==='panel-'+tab));
+  if(tab === 'messages'){ adminMessageTab = 'unread'; renderAdminMessages(); }
 }
 
 /* ---- SCHEDULE ---- */
@@ -7556,6 +7697,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 22, 2026', version: '2026-10-22.3', items: [
+    'New: a Messages tab for admins, next to Settings. Each new intake form that is submitted adds a message with the person\'s name and when it arrived, even if phone notifications are off. Open form shows the intake form and marks the message read. There are Unread and Read tabs, Mark as read / Mark as unread, Delete on each message, and Delete all on the Read tab. Deleting a message never deletes the intake form. The tab shows a count of unread messages. Messages are shared by all admins, so marking one read marks it read for everyone. Only forms submitted from now on appear. The tab shows up once the notification service has been updated.'
+  ]},
   { date: 'Oct 22, 2026', version: '2026-10-22.2', items: [
     'New: phone notifications for admins when a new intake form comes in. Go to Settings, then Notifications, turn the switch on and tap Send a test. Then submit a test intake form: you should get "New intake form received" with the person\'s name, and tapping it opens that form. Turn it on separately on each device. On iPhone it only works from the Scheduler installed on the Home Screen. The Notifications tab appears once the notification service has been updated.'
   ]},
@@ -7569,16 +7713,16 @@ const CHANGE_LOG = [
     'New: the Scheduler can be installed as an app. On iPhone open it in Safari, tap Share, then Add to Home Screen; on Android or a computer use the browser\'s Install option. It gets its own dark "FPHM Admin" icon so you can tell it apart from the minister portal. Sign in once from the installed app to check it works.',
     'New: a Send app notification button on each booked session card (under the WhatsApp line). It sends that session\'s team a "booked" phone notification and adds it to their portal Messages, then tells you how many devices it reached. Handy for testing.'
   ]},
-  { date: 'Oct 21, 2026', version: '2026-10-21.10', items: [
-    'New: ministers are now told when a session is called off. Removing a booked session (Remove Booking, or deleting it) sends each minister on the team a "Prayer session canceled" notification, and it shows in their portal Messages. Taking a minister off a session\'s team sends that person a "taken off a prayer session" notice. Drop-in, Training and past sessions never notify. The WhatsApp cancellation prompt is unchanged.'
-  ]},
+
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
-  { date: 'Oct 21, 2026', version: '2026-10-21.9', items: [
+  { date: 'Oct 21, 2026', version: '2026-10-21.10', items: [
+    'New: ministers are now told when a session is called off. Removing a booked session (Remove Booking, or deleting it) sends each minister on the team a "Prayer session canceled" notification, and it shows in their portal Messages. Taking a minister off a session\'s team sends that person a "taken off a prayer session" notice. Drop-in, Training and past sessions never notify. The WhatsApp cancellation prompt is unchanged.'
+  ]},  { date: 'Oct 21, 2026', version: '2026-10-21.9', items: [
     'New: phone notifications for ministers. Booking a session (including from the waiting list) now automatically sends a notification to each minister on the team who has turned notifications on in their portal. Changing the date or time notifies the whole team again; adding a minister to an existing session notifies just that person. Drop-in, Training and past sessions never notify. The WhatsApp button still works as before.'
   ]},
   { date: 'Oct 21, 2026', version: '2026-10-21.8', items: [

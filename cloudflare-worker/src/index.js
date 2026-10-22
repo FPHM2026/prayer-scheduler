@@ -44,6 +44,9 @@
      POST /api/messages/list    {}               + Bearer <Graph token>
      POST /api/messages/read    { ids?: [], unread?: true }  + Bearer <Graph token>
      POST /api/messages/delete  { ids: [] }      + Bearer <Graph token>
+     POST /api/messages/admin/list|read|delete  (same bodies) - the
+       admins' shared inbox in the Scheduler (added 2026-10-22): one entry
+       per submitted intake form, MinisterId 0, SessionId = intake form id.
        (added 2026-10-21) the portal's Messages tab - every session
        notification is also saved per minister, so one missed on the
        phone (or never pushed, if they haven't turned push on) still
@@ -718,15 +721,22 @@ async function handleAdminTest(env, request) {
   return { ok: true, sent };
 }
 
+// Saves the admins' Messages-tab entry (added 2026-10-22: MinisterMessages
+// row with MinisterId 0, Body = recipient name, SessionId = the intake
+// form's id) and pushes to every admin device. A missing list never stops
+// the push, and no push setup never stops the message.
 async function notifyAdminsOfIntake(env, intakeId, recipientName) {
+  const id = parseInt(intakeId, 10);
+  const name = String(recipientName || "A new recipient").slice(0, 80);
+  await saveMinisterMessage(env, ADMIN_MINISTER_ID, "New intake form received", name, id).catch(() => {});
   if (requirePushConfigured(env)) return;
   const subs = await adminSubscriptions(env);
   if (!subs.length) return;
   await pushToSubscriptions(env, subs, {
     title: "New intake form received",
-    body: String(recipientName || "A new recipient").slice(0, 80) + " submitted their intake form.",
-    tag: "fphm-intake-" + intakeId,
-    intakeId: parseInt(intakeId, 10)
+    body: name + " submitted their intake form.",
+    tag: "fphm-intake-" + id,
+    intakeId: id
   });
 }
 
@@ -762,10 +772,20 @@ async function myMessageItems(env, ministerId) {
   return resp.value;
 }
 
-async function handleMessagesList(env, request) {
+// The admins share one inbox (MinisterId 0); each minister has their own.
+async function messageOwnerForCaller(env, request, admin) {
+  if (admin) {
+    const { error } = await adminForCaller(env, request);
+    return error ? { error } : { ownerId: ADMIN_MINISTER_ID };
+  }
   const { minister, error } = await ministerForCaller(env, request);
+  return error ? { error } : { ownerId: minister.id };
+}
+
+async function messagesList(env, request, admin) {
+  const { ownerId, error } = await messageOwnerForCaller(env, request, admin);
   if (error) return error;
-  const items = await myMessageItems(env, minister.id);
+  const items = await myMessageItems(env, ownerId);
   const messages = items.map((i) => ({
     id: parseInt(i.id, 10),
     title: i.fields.Title || "",
@@ -778,15 +798,15 @@ async function handleMessagesList(env, request) {
 }
 
 // Marks the caller's own messages read: the given ids, or all unread ones.
-async function handleMessagesRead(env, request) {
+async function messagesRead(env, request, admin) {
   const body = await request.json().catch(() => ({}));
-  const { minister, error } = await ministerForCaller(env, request);
+  const { ownerId, error } = await messageOwnerForCaller(env, request, admin);
   if (error) return error;
   // unread: true flips messages back to unread (only for the ids given).
   const markRead = !body.unread;
   const wanted = Array.isArray(body.ids) ? new Set(body.ids.map((x) => parseInt(x, 10))) : null;
   if (!markRead && !wanted) return { __status: 400, error: "ids required" };
-  const items = (await myMessageItems(env, minister.id))
+  const items = (await myMessageItems(env, ownerId))
     .filter((i) => !!i.fields.IsRead !== markRead && (!wanted || wanted.has(parseInt(i.id, 10))));
   const siteId = await resolveSiteId(env);
   const listId = await resolveListId(env, MESSAGES_LIST);
@@ -797,13 +817,13 @@ async function handleMessagesRead(env, request) {
 }
 
 // Deletes only the caller's own messages; ids belonging to anyone else are ignored.
-async function handleMessagesDelete(env, request) {
+async function messagesDelete(env, request, admin) {
   const body = await request.json().catch(() => ({}));
-  const { minister, error } = await ministerForCaller(env, request);
+  const { ownerId, error } = await messageOwnerForCaller(env, request, admin);
   if (error) return error;
   if (!Array.isArray(body.ids) || !body.ids.length) return { __status: 400, error: "ids required" };
   const wanted = new Set(body.ids.map((x) => parseInt(x, 10)));
-  const items = (await myMessageItems(env, minister.id)).filter((i) => wanted.has(parseInt(i.id, 10)));
+  const items = (await myMessageItems(env, ownerId)).filter((i) => wanted.has(parseInt(i.id, 10)));
   const siteId = await resolveSiteId(env);
   const listId = await resolveListId(env, MESSAGES_LIST);
   await Promise.all(items.map((i) =>
@@ -811,6 +831,13 @@ async function handleMessagesDelete(env, request) {
   ));
   return { ok: true, deleted: items.length };
 }
+
+const handleMessagesList = (env, request) => messagesList(env, request, false);
+const handleMessagesRead = (env, request) => messagesRead(env, request, false);
+const handleMessagesDelete = (env, request) => messagesDelete(env, request, false);
+const handleAdminMessagesList = (env, request) => messagesList(env, request, true);
+const handleAdminMessagesRead = (env, request) => messagesRead(env, request, true);
+const handleAdminMessagesDelete = (env, request) => messagesDelete(env, request, true);
 
 const ROUTES = {
   "/api/intake/start": handleStart,
@@ -830,7 +857,10 @@ const ROUTES = {
   "/api/push/admin/test": handleAdminTest,
   "/api/messages/list": handleMessagesList,
   "/api/messages/read": handleMessagesRead,
-  "/api/messages/delete": handleMessagesDelete
+  "/api/messages/delete": handleMessagesDelete,
+  "/api/messages/admin/list": handleAdminMessagesList,
+  "/api/messages/admin/read": handleAdminMessagesRead,
+  "/api/messages/admin/delete": handleAdminMessagesDelete
 };
 const GET_ROUTES = new Set(["/api/intake/schema", "/api/push/key"]);
 
