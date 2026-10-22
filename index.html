@@ -1198,7 +1198,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-21.12";
+const APP_VERSION = "2026-10-22.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1297,10 +1297,9 @@ window.sendAppNotification = async function(id){
 };
 // Tells a removed session's team it's off (push + portal message). Call
 // with the session as it was BEFORE removal - removing it clears its team
-// and date. Skips group events and sessions already in the past.
+// and date. Skips sessions already in the past.
 function pushSessionCanceled(s){
   if(!s || s.status!=='Scheduled' || !s.date || !s.time) return;
-  if(s.apptType==='Drop-in' || s.apptType==='Training') return;
   const start = new Date(s.date+'T'+s.time);
   if(!(start>new Date())) return;
   const ids = ministerIdsOf(s);
@@ -2196,7 +2195,7 @@ function waSectionHtml(s){
   return `<button type="button" class="wa-note ${s.waCreated?'on':''}" aria-pressed="${s.waCreated?'true':'false'}" onclick="toggleWa(${s.id})" style="cursor:pointer;background:none;border:none;padding:4px 0;font-family:inherit;">${ICONS.chat} ${s.waCreated?'WhatsApp group created':'No WhatsApp group yet — tap to mark created'}</button>
     ${s.waCreated && s.waLink ? ` · <a href="${escapeHtml(s.waLink)}" target="_blank" rel="noopener">open chat</a>` : ''}
     ${s.waCreated && s.waLink && s.ministers.length ? `<br><button type="button" class="wa-note ${s.waNotified?'on':''}" onclick="notifyMinistersWhatsApp(${s.id})" style="cursor:pointer;background:none;border:none;padding:4px 0;font-family:inherit;">${ICONS.chat} ${s.waNotified?'Ministers notified — tap to re-send':'Notify ministers via WhatsApp'}</button>` : ''}
-    ${s.status==='Scheduled' && s.ministers.length && s.apptType!=='Drop-in' && s.apptType!=='Training' ? `<br><button type="button" class="wa-note" onclick="sendAppNotification(${s.id})" style="cursor:pointer;background:none;border:none;padding:4px 0;font-family:inherit;">${ICONS.bell} Send app notification</button>` : ''}`;
+    ${s.status==='Scheduled' && s.ministers.length ? `<br><button type="button" class="wa-note" onclick="sendAppNotification(${s.id})" style="cursor:pointer;background:none;border:none;padding:4px 0;font-family:inherit;">${ICONS.bell} Send app notification</button>` : ''}`;
 }
 // Normalizes a minister's free-typed Phone field to E.164 for the WhatsApp
 // API. Assumes US numbers (10 digits, or 11 starting with a leading 1) since
@@ -4390,8 +4389,9 @@ async function onSaveSession(){
     hideConflictToast();
     // Push the team: everyone on a new booking (including one booked from
     // the waiting list) or when the date/time moved; only newly added
-    // ministers on any other edit. Group events and past dates never push.
-    if(status==='Scheduled' && apptType!=='Drop-in' && apptType!=='Training' && start>new Date()){
+    // ministers on any other edit. Past dates never push. Drop-ins and
+    // Training push too (2026-10-22, at the user's request).
+    if(status==='Scheduled' && start>new Date()){
       const prev = editingId ? sessions.find(x=>x.id===editingId) : null;
       if(!prev || prev.status==='Waiting'){
         pushNotifyMinisters(sessionId, null, 'booked', start);
@@ -7390,6 +7390,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 22, 2026', version: '2026-10-22.1', items: [
+    'Changed: Sunday Drop-In and Training sessions now send phone notifications too, the same as regular sessions. Ministers on the team are told when one is booked, when its date or time changes, when they are added or taken off, and when it is removed. The Send app notification button also shows on Drop-In and Training cards.'
+  ]},
   { date: 'Oct 21, 2026', version: '2026-10-21.12', items: [
     'Fixed: Chrome on Android phones and tablets now offers Install app for the Scheduler (open the ⋮ menu, then Install app).'
   ]},
@@ -7403,15 +7406,15 @@ const CHANGE_LOG = [
   { date: 'Oct 21, 2026', version: '2026-10-21.9', items: [
     'New: phone notifications for ministers. Booking a session (including from the waiting list) now automatically sends a notification to each minister on the team who has turned notifications on in their portal. Changing the date or time notifies the whole team again; adding a minister to an existing session notifies just that person. Drop-in, Training and past sessions never notify. The WhatsApp button still works as before.'
   ]},
-  { date: 'Oct 21, 2026', version: '2026-10-21.8', items: [
-    'Fixed: opening an intake form no longer shows the spreadsheet import buttons (Choose spreadsheet, Import selected forms) underneath it. They now only appear on the Import sub-tab of Intake Forms.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 21, 2026', version: '2026-10-21.8', items: [
+    'Fixed: opening an intake form no longer shows the spreadsheet import buttons (Choose spreadsheet, Import selected forms) underneath it. They now only appear on the Import sub-tab of Intake Forms.'
+  ]},
   { date: 'Oct 21, 2026', version: '2026-10-21.7', items: [
     'Changed: the WhatsApp group now carries forward for a returning recipient. A new session, a follow-up, or booking someone from the waiting list pre-fills Group created and the group link from their most recent session that has one (you can still change it). Ministers notified is not carried over, so each session still gets its own tap of the notify button.'
   ]},
