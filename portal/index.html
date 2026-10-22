@@ -99,7 +99,10 @@
   .msg-older{display:flex;align-items:flex-start;gap:8px;}
   .msg-older .msg-line{flex:1;min-width:0;}
   .msg-older .msg-dismiss{margin:-8px -8px 0 0;}
-  .msg-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 10px 8px 18px;}
+  .msg-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 10px 0 18px;}
+  .msg-foot .msg-received{margin-top:0;}
+  .msg-expand-row{padding:0 18px 8px;}
+  .group.msg.has-foot .msg-foot:last-child{padding-bottom:8px;}
   .msg-foot .link-btn{font-size:var(--fs-sm);}
   .msg-expand{display:inline-flex;align-items:center;gap:4px;background:none;border:none;padding:8px 0;min-height:44px;font-family:inherit;font-size:var(--fs-sm);font-weight:700;color:var(--gold-dark);cursor:pointer;-webkit-tap-highlight-color:transparent;}
   .msg-expand svg{width:16px;height:16px;transition:transform .2s ease;}
@@ -1615,8 +1618,8 @@ function messageChipHtml(m){
   const k = messageKind(m);
   return `<span class="msg-chip ${k.cls}">${escapeHtml(k.label)}</span>`;
 }
-function messageDetailHtml(m){
-  const when = messageWhen(m);
+function messageDetailHtml(m, noWhen){
+  const when = noWhen ? '' : messageWhen(m);
   return `<span class="msg-detail">${escapeHtml(messageParts(m).detail)}</span>
     ${when ? `<span class="msg-received">Sent ${escapeHtml(when)}</span>` : ''}`;
 }
@@ -1658,10 +1661,14 @@ function renderMessages(){
     const ids = msgs.map(m=>m.id);
     const toggle = `onclick="const g=this.closest('.group');g.classList.toggle('open');g.querySelectorAll('[aria-expanded]').forEach(b=>b.setAttribute('aria-expanded',g.classList.contains('open')))" aria-expanded="${wasOpen}"`;
     const earlier = `${older.length} earlier message${older.length===1?'':'s'}`;
+    // Newest message's sent time on the left, Mark as read/unread on the
+    // right; the Show/Hide earlier link (if any) sits on its own row below.
+    const newestWhen = messageWhen(newest);
     const foot = `<div class="msg-foot">
-        ${older.length ? `<button type="button" class="msg-expand" ${toggle}><span class="when-closed">Show ${earlier}</span><span class="when-open">Hide ${earlier}</span>${ICONS.chevron}</button>` : '<span></span>'}
+        <span class="msg-received">${newestWhen ? 'Sent ' + escapeHtml(newestWhen) : ''}</span>
         <button type="button" class="link-btn" onclick='${unread ? 'markMessagesRead' : 'markMessagesUnread'}(${escapeHtml(JSON.stringify(ids))})'>${unread ? 'Mark as read' : 'Mark as unread'}</button>
-      </div>`;
+      </div>
+      ${older.length ? `<div class="msg-expand-row"><button type="button" class="msg-expand" ${toggle}><span class="when-closed">Show ${earlier}</span><span class="when-open">Hide ${earlier}</span>${ICONS.chevron}</button></div>` : ''}`;
     return `<div class="group msg${foot?' has-foot':''}${wasOpen?' open':''}" data-key="${escapeHtml(key)}">
       <div class="msg-head">
         <button class="group-row" ${older.length ? toggle : 'style="cursor:default;"'}>
@@ -1671,7 +1678,7 @@ function renderMessages(){
               ${messageChipHtml(newest)}
               <span class="group-count">${msgs.length} message${msgs.length===1?'':'s'}</span>
             </span>
-            ${messageDetailHtml(newest)}
+            ${messageDetailHtml(newest, true)}
           </span>
         </button>
         ${dismissBtnHtml(ids, msgs.length > 1 ? `Dismiss all ${msgs.length} messages about ${recip}` : `Dismiss message about ${recip}`)}
