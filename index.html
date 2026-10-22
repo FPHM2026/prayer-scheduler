@@ -404,6 +404,15 @@
   /* ---- Settings: one card per distinct setting group ---- */
   .settings-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:16px;box-shadow:var(--shadow-sm);}
   .settings-card h2{font-size:var(--fs-lg);margin:0 0 4px;color:var(--navy);}
+  /* Admin push switch (Settings > Notifications), same look as the portal's. */
+  .push-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-size:var(--fs-sm);}
+  .push-toggle{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;min-height:44px;}
+  .push-toggle input{position:absolute;opacity:0;width:1px;height:1px;}
+  .push-toggle .track{position:relative;width:40px;height:24px;border-radius:12px;background:#c9c1b1;transition:background .15s;flex:0 0 auto;}
+  .push-toggle .track::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:10px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:left .15s;}
+  .push-toggle input:checked + .track{background:#4a7c59;}
+  .push-toggle input:checked + .track::after{left:18px;}
+  .push-toggle input:focus-visible + .track{outline:2px solid var(--navy);outline-offset:2px;}
   .settings-card .helptext{margin-bottom:14px;}
   .settings-card:last-child{margin-bottom:0;}
 
@@ -934,6 +943,7 @@
       <button data-settingsview="locations">Locations</button>
       <button data-settingsview="defaultlocation">Sessions</button>
       <button data-settingsview="notes">Session Notes</button>
+      <button data-settingsview="notifications" id="settingsNotificationsTab" hidden>Notifications</button>
     </nav>
 
     <div class="settings-subview active" id="settingsTimeWindowsView">
@@ -974,6 +984,15 @@
     <div class="settings-subview" id="settingsNotesView">
       <div class="errbox" id="notesSetupMsg" hidden style="margin:16px 0;"></div>
       <div id="notesQuestionsHost" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="settings-subview" id="settingsNotificationsView">
+      <div class="settings-card" style="margin-top:16px;">
+        <h2>New intake forms</h2>
+        <p class="helptext">Get an alert on this device when a recipient submits an intake form. Tapping it opens the form. Turn it on separately on each phone or computer you use.</p>
+        <div class="push-row" id="adminPushRow"></div>
+        <p class="helptext" id="adminPushStatus" role="status"></p>
+      </div>
     </div>
 
     <div class="settings-subview" id="settingsDefaultLocationView">
@@ -1198,7 +1217,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-22.1";
+const APP_VERSION = "2026-10-22.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1264,6 +1283,142 @@ const WHATSAPP_NOTIFY = {
 // automatic on save - no button. Fails silently (console only) so a Worker
 // that isn't set up yet never gets in the way of saving a session.
 const PUSH_NOTIFY_URL = "https://fphm-intake-func.ajjamoore.workers.dev/api/push/session";
+
+/* ---- Admin notifications for new intake forms (added 2026-10-22) ----
+   Settings > Notifications turns them on for this device. The intake
+   Worker (/api/push/admin/*) keeps the device and pushes to it when a
+   recipient submits a form; sw.js shows it, and tapping it opens the form
+   here (?intake=<id> on a fresh window, a postMessage to an open one).
+   The sub-tab stays hidden until the Worker answers /api/push/key. */
+const ADMIN_PUSH_API = "https://fphm-intake-func.ajjamoore.workers.dev/api/push";
+const ADMIN_PUSH_SUPPORTED = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const IS_IOS_DEVICE = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+let adminPushKey = null;
+let adminPushBusy = false;
+async function adminPushApi(path, body){
+  const token = await getToken();
+  const res = await fetch(ADMIN_PUSH_API + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify(body || {})
+  });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+  return data;
+}
+function b64ToUint8(s){
+  s = s.replace(/-/g,'+').replace(/_/g,'/');
+  while(s.length % 4) s += '=';
+  return Uint8Array.from(atob(s), c=>c.charCodeAt(0));
+}
+async function adminPushSubscription(){
+  if(!ADMIN_PUSH_SUPPORTED) return null;
+  const reg = await navigator.serviceWorker.ready;
+  return reg.pushManager.getSubscription();
+}
+async function initAdminPush(){
+  try{
+    const res = await fetch(ADMIN_PUSH_API + '/key');
+    if(!res.ok) return;
+    adminPushKey = (await res.json()).publicKey || null;
+  }catch(e){ return; }
+  if(!adminPushKey) return;
+  $('#settingsNotificationsTab').hidden = false;
+  // Re-send an existing subscription quietly, in case the browser rotated it.
+  try{
+    const sub = await adminPushSubscription();
+    if(sub && Notification.permission === 'granted') adminPushApi('/admin/subscribe', { subscription: sub.toJSON() }).catch(()=>{});
+  }catch(e){}
+}
+async function renderAdminPush(msg){
+  const row = $('#adminPushRow');
+  if(!row) return;
+  let inner;
+  if(!ADMIN_PUSH_SUPPORTED){
+    inner = IS_IOS_DEVICE && !IS_STANDALONE
+      ? `<div class="helptext">To get notifications on iPhone, tap Share, then <em>Add to Home Screen</em>, and open the Scheduler from your Home Screen.</div>`
+      : `<div class="helptext">This browser can't show notifications.</div>`;
+  } else if(Notification.permission === 'denied'){
+    inner = `<div class="helptext">Notifications are blocked for this app. Allow them in your phone or browser settings to turn them on.</div>`;
+  } else {
+    const sub = await adminPushSubscription().catch(()=>null);
+    const on = !!(sub && Notification.permission === 'granted');
+    inner = `<label class="push-toggle"><input type="checkbox" role="switch" ${on?'checked':''} onchange="this.checked ? enableAdminPush() : disableAdminPush()"><span class="track" aria-hidden="true"></span>${on ? 'On' : 'Off'}</label>`
+      + (on ? `<button class="btn secondary" type="button" onclick="testAdminPush()">Send a test</button>` : '');
+  }
+  row.innerHTML = inner;
+  $('#adminPushStatus').textContent = msg || '';
+}
+window.enableAdminPush = async function(){
+  if(adminPushBusy) return;
+  adminPushBusy = true;
+  try{
+    const permission = await Notification.requestPermission();
+    if(permission !== 'granted'){ await renderAdminPush(permission === 'denied' ? '' : 'Notifications were not turned on.'); return; }
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToUint8(adminPushKey) });
+    await adminPushApi('/admin/subscribe', { subscription: sub.toJSON() });
+    await renderAdminPush('');
+  }catch(e){
+    await renderAdminPush('Could not turn on notifications: ' + e.message);
+  }finally{ adminPushBusy = false; }
+};
+window.disableAdminPush = async function(){
+  if(adminPushBusy) return;
+  adminPushBusy = true;
+  try{
+    const sub = await adminPushSubscription();
+    if(sub){
+      await adminPushApi('/admin/unsubscribe', { endpoint: sub.endpoint }).catch(()=>{});
+      await sub.unsubscribe();
+    }
+    await renderAdminPush('');
+  }catch(e){
+    await renderAdminPush('Could not turn off notifications: ' + e.message);
+  }finally{ adminPushBusy = false; }
+};
+window.testAdminPush = async function(){
+  try{
+    const sub = await adminPushSubscription();
+    const r = await adminPushApi('/admin/test', { endpoint: sub ? sub.endpoint : '' });
+    await renderAdminPush(r.sent ? 'Test sent. It should arrive in a few seconds.' : 'This device isn\'t registered. Try turning notifications off and on again.');
+  }catch(e){
+    await renderAdminPush('Test failed: ' + e.message);
+  }
+};
+function showIntakeForm(id){
+  const i = intakeResponses.find(x=>x.id===id);
+  if(!i){ showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Intake form not found</div><div>Try Refresh Data.</div>`); return; }
+  // Never close a form the admin is in the middle of.
+  if(document.querySelector('.modal-bg.open')){
+    showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">New intake form: ${escapeHtml(i.recipName||'unnamed')}</div><div>Close the open window, then find it on the Intake Forms tab.</div>`);
+    return;
+  }
+  switchTab('intake');
+  closeIntakeDetail();
+  openIntakeDetail(id);
+}
+// A tapped notification on a closed app opens ?intake=<id>.
+function openIntakeFromLink(){
+  const params = new URLSearchParams(location.search);
+  const id = parseInt(params.get('intake'), 10);
+  if(!id) return;
+  params.delete('intake');
+  const qs = params.toString();
+  history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
+  showIntakeForm(id);
+}
+// A tapped notification with the app already open: fetch the new form, then show it.
+if('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', async (e)=>{
+  if(!e.data || e.data.type !== 'open-intake' || !account) return;
+  const id = parseInt(e.data.intakeId, 10);
+  if(!id) return;
+  if(!intakeResponses.some(x=>x.id===id) && !document.querySelector('.modal-bg.open')){
+    try{ await loadAll(); }catch(err){}
+  }
+  showIntakeForm(id);
+});
 async function pushNotifyMinisters(sessionId, ministerIds, kind, start, recipientName){
   try{
     const token = await getToken();
@@ -1483,6 +1638,8 @@ async function afterSignIn(){
   try{
     await loadAll();
     wireApp();
+    openIntakeFromLink();
+    initAdminPush();
   }catch(e){
     document.getElementById('loadError').innerHTML = `<div class="errbox" role="alert">Could not load data: ${e.message}. Check the SharePoint site URL in setup and that your admin has granted consent for Sites.ReadWrite.All.</div>`;
   }
@@ -4080,7 +4237,9 @@ function switchSettingsSub(view){
   $('#settingsLocationsView').classList.toggle('active', view==='locations');
   $('#settingsDefaultLocationView').classList.toggle('active', view==='defaultlocation');
   $('#settingsNotesView').classList.toggle('active', view==='notes');
+  $('#settingsNotificationsView').classList.toggle('active', view==='notifications');
   if(view==='notes') showNotesEditor();
+  if(view==='notifications') renderAdminPush();
 }
 function upcomingCountFor(ministerId){
   const now = new Date();
@@ -7390,6 +7549,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 22, 2026', version: '2026-10-22.2', items: [
+    'New: phone notifications for admins when a new intake form comes in. Go to Settings, then Notifications, turn the switch on and tap Send a test. Then submit a test intake form: you should get "New intake form received" with the person\'s name, and tapping it opens that form. Turn it on separately on each device. On iPhone it only works from the Scheduler installed on the Home Screen. The Notifications tab appears once the notification service has been updated.'
+  ]},
   { date: 'Oct 22, 2026', version: '2026-10-22.1', items: [
     'Changed: Sunday Drop-In and Training sessions now send phone notifications too, the same as regular sessions. Ministers on the team are told when one is booked, when its date or time changes, when they are added or taken off, and when it is removed. The Send app notification button also shows on Drop-In and Training cards.'
   ]},
@@ -7403,15 +7565,15 @@ const CHANGE_LOG = [
   { date: 'Oct 21, 2026', version: '2026-10-21.10', items: [
     'New: ministers are now told when a session is called off. Removing a booked session (Remove Booking, or deleting it) sends each minister on the team a "Prayer session canceled" notification, and it shows in their portal Messages. Taking a minister off a session\'s team sends that person a "taken off a prayer session" notice. Drop-in, Training and past sessions never notify. The WhatsApp cancellation prompt is unchanged.'
   ]},
-  { date: 'Oct 21, 2026', version: '2026-10-21.9', items: [
-    'New: phone notifications for ministers. Booking a session (including from the waiting list) now automatically sends a notification to each minister on the team who has turned notifications on in their portal. Changing the date or time notifies the whole team again; adding a minister to an existing session notifies just that person. Drop-in, Training and past sessions never notify. The WhatsApp button still works as before.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 21, 2026', version: '2026-10-21.9', items: [
+    'New: phone notifications for ministers. Booking a session (including from the waiting list) now automatically sends a notification to each minister on the team who has turned notifications on in their portal. Changing the date or time notifies the whole team again; adding a minister to an existing session notifies just that person. Drop-in, Training and past sessions never notify. The WhatsApp button still works as before.'
+  ]},
   { date: 'Oct 21, 2026', version: '2026-10-21.8', items: [
     'Fixed: opening an intake form no longer shows the spreadsheet import buttons (Choose spreadsheet, Import selected forms) underneath it. They now only appear on the Import sub-tab of Intake Forms.'
   ]},
