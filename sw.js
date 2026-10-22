@@ -11,13 +11,17 @@ self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim(
 self.addEventListener('push', (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch (e) {}
-  event.waitUntil(self.registration.showNotification(data.title || 'FPHM Admin', {
-    body: data.body || '',
-    tag: data.tag || undefined,
-    icon: 'icons/icon-192.png',
-    badge: 'icons/icon-192.png',
-    data: { intakeId: data.intakeId || null }
-  }));
+  event.waitUntil(Promise.all([
+    self.registration.showNotification(data.title || 'FPHM Admin', {
+      body: data.body || '',
+      tag: data.tag || undefined,
+      icon: 'icons/icon-192.png',
+      badge: 'icons/icon-192.png',
+      data: { intakeId: data.intakeId || null }
+    }),
+    // Lets an open Scheduler refresh its Messages tab right away.
+    self.clients.matchAll({ type: 'window' }).then((wins) => wins.forEach((w) => w.postMessage({ type: 'push' })))
+  ]));
 });
 
 self.addEventListener('notificationclick', (event) => {
