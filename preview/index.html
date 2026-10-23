@@ -245,6 +245,14 @@
   .followup-hit{padding:10px 4px;cursor:pointer;color:var(--gold);text-decoration:underline;font-size:var(--fs-sm);min-height:44px;}
   .sameday-box{background:#f5f0e6;border:1px solid #e6dcc7;border-radius:6px;padding:10px 12px;font-size:var(--fs-sm);margin:8px 0;}
   .sameday-box .title{font-weight:700;font-size:var(--fs-xs);color:var(--navy);margin-bottom:4px;}
+  .minister-row-right{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+  .minister-row-right .role-toggle,.minister-row-right .flag{margin-left:0;}
+  .load-chip{font-size:var(--fs-2xs);font-weight:600;border-radius:10px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums;background:#f1ede4;color:var(--muted);}
+  .load-chip.light{background:var(--ok-bg);color:var(--ok);}
+  .load-chip.heavy{background:#fdf1dc;color:#8a5a00;}
+  .load-chip small{font-weight:400;font-size:inherit;}
+  .load-sort-row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:0 0 8px;}
+  .load-sort-btn{font-family:inherit;font-size:var(--fs-xs);border:1px solid var(--border);background:#fff;color:var(--navy);border-radius:14px;padding:4px 12px;cursor:pointer;}
   .workload-badge{margin-left:auto;font-size:var(--fs-2xs);color:var(--muted);background:#f1ede4;border-radius:10px;padding:3px 9px;}
   #dayLabel{display:block;margin-top:4px;}
   .slot-btn{background:#fff;border:1px solid var(--navy);color:var(--navy);border-radius:16px;padding:6px 14px;font-size:var(--fs-xs);cursor:pointer;margin:6px 6px 0 0;min-height:36px;}
@@ -1248,7 +1256,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-22.3";
+const APP_VERSION = "2026-10-23.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3559,7 +3567,8 @@ function renderManualPicker(sl, c){
     if(c.genderPref==='Same-sex' && c.recipGender && m.gender!==c.recipGender) return false;
     return true;
   });
-  const rows = pool.map(m=>{
+  const lp = loadPickerSetup(pool, 'manual');
+  const rows = lp.head + lp.list.map(m=>{
     const sel = manualTeam.find(x=>x.id===m.id);
     const checked = !!sel;
     const conflict = busy.has(m.id);
@@ -3568,11 +3577,14 @@ function renderManualPicker(sl, c){
         <span class="dot" aria-hidden="true">${checked?ICONS.check:''}</span>
         <span>${escapeHtml(m.name)}${m.gender?` <span class="helptext" style="display:inline;">(${m.gender})</span>`:''}</span>
       </button>
+      <div class="minister-row-right">
       ${conflict?'<span class="flag">⚠ already booked this time</span>':''}
+      ${loadChipHtml(lp.loads.get(m.id), lp.avg)}
       ${checked?`<div class="role-toggle" role="group" aria-label="Role for ${escapeHtml(m.name)}">
         <button type="button" class="role-btn ${sel.role==='Lead'?'active':''}" aria-pressed="${sel.role==='Lead'?'true':'false'}" onclick="setManualRole(${m.id},'Lead')">Lead</button>
         <button type="button" class="role-btn ${sel.role!=='Lead'?'active':''}" aria-pressed="${sel.role!=='Lead'?'true':'false'}" onclick="setManualRole(${m.id},'Support')">Support</button>
       </div>`:''}
+      </div>
     </div>`;
   }).join('');
   const genderNote = c.genderPref==='Same-sex' && c.recipGender ? ` — showing ${escapeHtml(c.recipGender)} ministers only, and only those not blacked out this date` : ' — showing ministers not blacked out this date';
@@ -4389,35 +4401,82 @@ function switchSettingsSub(view){
   if(view==='notes') showNotesEditor();
   if(view==='notifications') renderAdminPush();
 }
-function upcomingCountFor(ministerId){
-  const now = new Date();
-  return sessions.filter(s=>{
-    if(s.status==='Waiting') return false;
-    if(editingId && s.id===editingId) return false;
-    if(!ministerIdsOf(s).includes(ministerId)) return false;
-    return new Date(s.date+'T'+s.time) >= now;
-  }).length;
+// Load-balancing chip on both team pickers. Counts real commitments in
+// the next LOAD_WINDOW_DAYS: Scheduled sessions plus Tentative slots the
+// minister is proposed on. Drop-in/Training are left out - everyone is on
+// those, so they'd add the same number to every person. The session being
+// edited and the slot being booked are excluded so they don't count twice.
+const LOAD_WINDOW_DAYS = 28;
+function ministerLoad(ministerId){
+  const now = new Date(), cutoff = new Date(now.getTime() + LOAD_WINDOW_DAYS*86400000);
+  const dates = [];
+  sessions.forEach(s=>{
+    if(s.status!=='Scheduled') return;
+    if(s.apptType==='Drop-in' || s.apptType==='Training') return;
+    if(editingId && s.id===editingId) return;
+    if(!ministerIdsOf(s).includes(ministerId)) return;
+    dates.push(new Date(s.date+'T'+(s.time||'00:00')));
+  });
+  slots.forEach(sl=>{
+    if(sl.status!=='Tentative' || sl.id===pendingBookSlotId) return;
+    if(!sl.team.some(m=>m.id===ministerId)) return;
+    dates.push(new Date(sl.date+'T'+(sl.start||'00:00')));
+  });
+  const upcoming = dates.filter(d=>d>=now && d<=cutoff).sort((a,b)=>a-b);
+  return { count: upcoming.length, next: upcoming[0] || null };
+}
+// Green below the team average, amber 1.5+ above it, grey otherwise.
+// avg is computed over whichever pool the picker is showing.
+function loadChipHtml(load, avg){
+  const cls = load.count < avg ? 'light' : (load.count >= avg + 1.5 ? 'heavy' : '');
+  const next = load.next ? ` <small>· next ${load.next.toLocaleDateString('en-US',{month:'short',day:'numeric'})}</small>` : '';
+  return `<span class="load-chip ${cls}">${load.count} upcoming${next}</span>`;
+}
+// One button cycles A-Z -> fewest first -> most first -> back to A-Z.
+const PICKER_SORTS = { az:'Sort: A–Z', asc:'Sort: Fewest first', desc:'Sort: Most first' };
+let pickerSort = 'az';
+window.togglePickerSort = function(which){
+  pickerSort = pickerSort==='az' ? 'asc' : (pickerSort==='asc' ? 'desc' : 'az');
+  if(which==='manual') renderSlotWeeks(); else renderMinisterList();
+};
+// Returns the pool (sorted per pickerSort), each minister's load,
+// the team average and the header row (average + sort button).
+function loadPickerSetup(pool, which){
+  const loads = new Map(pool.map(m=>[m.id, ministerLoad(m.id)]));
+  const avg = pool.length ? [...loads.values()].reduce((a,l)=>a+l.count,0)/pool.length : 0;
+  const dir = pickerSort==='desc' ? -1 : 1;
+  const list = pool.slice().sort((a,b)=>
+    (pickerSort==='az' ? 0 : dir*(loads.get(a.id).count-loads.get(b.id).count)) || a.name.localeCompare(b.name));
+  const head = pool.length ? `<div class="load-sort-row">
+      <span class="helptext">Team average: ${avg.toFixed(1)} upcoming in the next 4 weeks</span>
+      <button type="button" class="load-sort-btn" title="Tap to change the order" onclick="togglePickerSort('${which}')">${PICKER_SORTS[pickerSort]}</button>
+    </div>` : '';
+  return { list, loads, avg, head };
 }
 function renderMinisterList(){
   const dateVal = $('#sessDate').value;
   const blackedOutNames = new Set(blackouts.filter(b=> dateVal && b.date<=dateVal && (b.endDate||b.date)>=dateVal).map(b=>b.ministerName));
   const box = $('#ministerList');
   const active = ministers.filter(m=>m.status==='Active');
-  box.innerHTML = active.map(m=>{
+  const lp = loadPickerSetup(active, 'modal');
+  box.innerHTML = lp.head + lp.list.map(m=>{
     const sel = selectedMinisters.find(x=>x.id===m.id);
     const checked = !!sel;
     const out = blackedOutNames.has(m.name);
-    const load = upcomingCountFor(m.id);
+    const load = lp.loads.get(m.id);
     return `<div class="minister-row ${checked?'checked':''}">
       <button type="button" class="minister-toggle" aria-pressed="${checked?'true':'false'}" onclick="toggleMinister(${m.id})">
         <span class="dot" aria-hidden="true">${checked?ICONS.check:''}</span>
         <span>${escapeHtml(m.name)}${m.gender?` <span class="helptext" style="display:inline;">(${m.gender})</span>`:''}</span>
       </button>
-      ${out?'<span class="flag">⚠ unavailable this date</span>':(checked?'':`<span class="workload-badge">${load} upcoming</span>`)}
+      <div class="minister-row-right">
+      ${out?'<span class="flag">⚠ unavailable this date</span>':''}
+      ${loadChipHtml(load, lp.avg)}
       ${checked?`<div class="role-toggle" role="group" aria-label="Role for ${escapeHtml(m.name)}">
         <button type="button" class="role-btn ${sel.role==='Lead'?'active':''}" aria-pressed="${sel.role==='Lead'?'true':'false'}" onclick="setRole(${m.id},'Lead')">Lead</button>
         <button type="button" class="role-btn ${sel.role!=='Lead'?'active':''}" aria-pressed="${sel.role!=='Lead'?'true':'false'}" onclick="setRole(${m.id},'Support')">Support</button>
       </div>`:''}
+      </div>
     </div>`;
   }).join('');
   $('#selCount').textContent = `${selectedMinisters.length} selected (choose 2 or more)`;
@@ -7697,6 +7756,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 23, 2026', version: '2026-10-23.1', items: [
+    'New: when picking a team, each prayer minister now shows how many sessions they have in the next 4 weeks and the date of their next one, for example "3 upcoming · next Oct 28". It counts booked sessions and Tentative slots, but not Drop-in or Training. The chip is green when they are below the team average and amber when they are well above it. A sort button above the list cycles between A–Z, Fewest first and Most first; tap it again to get back to A–Z. Check it in two places: the New Session form, and the "Choose the team" list when you claim a slot on Schedule & Planning. The count now stays visible after you select someone.'
+  ]},
   { date: 'Oct 22, 2026', version: '2026-10-22.3', items: [
     'New: a Messages tab for admins, next to Settings. Each new intake form that is submitted adds a message with the person\'s name and when it arrived, even if phone notifications are off. Open form shows the intake form and marks the message read. There are Unread and Read tabs, Mark as read / Mark as unread, Delete on each message, and Delete all on the Read tab. Deleting a message never deletes the intake form. The tab shows a count of unread messages. Messages are shared by all admins, so marking one read marks it read for everyone. Only forms submitted from now on appear. The tab shows up once the notification service has been updated.'
   ]},
