@@ -1256,7 +1256,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-23.1";
+const APP_VERSION = "2026-10-23.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -2273,8 +2273,8 @@ function wireApp(){
   $('#btnTraining').addEventListener('click', ()=>openModal(null, null, {forceKind:'session', preset:'training'}));
   $('#btnCancel').addEventListener('click', ()=>{ $('#sessionModal').classList.remove('open'); hideConflictToast(); pendingBookSlotId = null; });
   $('#sessDate').addEventListener('change', ()=>{ renderMinisterList(); updateEndPreview(); renderSameDay(); renderConflictCheck(); renderDayLabel(); renderSlotButtons(); });
-  $('#sessTime').addEventListener('change', ()=>{ autoSetEndTime(); renderSlotButtons(); renderConflictCheck(); });
-  $('#sessEndTime').addEventListener('change', ()=>{ updateEndPreview(); renderConflictCheck(); });
+  $('#sessTime').addEventListener('change', ()=>{ autoSetEndTime(); renderSlotButtons(); renderMinisterList(); });
+  $('#sessEndTime').addEventListener('change', ()=>{ updateEndPreview(); renderMinisterList(); });
   $('#sessLocation').addEventListener('change', renderConflictCheck);
   $('#apptType').addEventListener('change', updateGroupSessionFields);
   $('#recipGender').addEventListener('change', renderMinisterList);
@@ -3564,6 +3564,7 @@ function renderManualPicker(sl, c){
   const pool = ministers.filter(m=>{
     if(m.status!=='Active') return false;
     if(blackedOut.has(m.name)) return false;
+    if(busy.has(m.id)) return false;
     if(c.genderPref==='Same-sex' && c.recipGender && m.gender!==c.recipGender) return false;
     return true;
   });
@@ -3571,14 +3572,12 @@ function renderManualPicker(sl, c){
   const rows = lp.head + lp.list.map(m=>{
     const sel = manualTeam.find(x=>x.id===m.id);
     const checked = !!sel;
-    const conflict = busy.has(m.id);
     return `<div class="minister-row ${checked?'checked':''}">
       <button type="button" class="minister-toggle" aria-pressed="${checked?'true':'false'}" onclick="toggleManualMinister(${m.id})">
         <span class="dot" aria-hidden="true">${checked?ICONS.check:''}</span>
         <span>${escapeHtml(m.name)}${m.gender?` <span class="helptext" style="display:inline;">(${m.gender})</span>`:''}</span>
       </button>
       <div class="minister-row-right">
-      ${conflict?'<span class="flag">⚠ already booked this time</span>':''}
       ${loadChipHtml(lp.loads.get(m.id), lp.avg)}
       ${checked?`<div class="role-toggle" role="group" aria-label="Role for ${escapeHtml(m.name)}">
         <button type="button" class="role-btn ${sel.role==='Lead'?'active':''}" aria-pressed="${sel.role==='Lead'?'true':'false'}" onclick="setManualRole(${m.id},'Lead')">Lead</button>
@@ -3587,10 +3586,9 @@ function renderManualPicker(sl, c){
       </div>
     </div>`;
   }).join('');
-  const genderNote = c.genderPref==='Same-sex' && c.recipGender ? ` — showing ${escapeHtml(c.recipGender)} ministers only, and only those not blacked out this date` : ' — showing ministers not blacked out this date';
   return `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
-    <div class="helptext" style="margin:0 0 6px;">Choose the team${genderNote}:</div>
-    ${pool.length ? rows : `<div class="picker-empty">No available${c.genderPref==='Same-sex'&&c.recipGender ? ' '+escapeHtml(c.recipGender) : ''} ministers for this slot's date.</div>`}
+    <div class="helptext" style="margin:0 0 6px;">Choose the team:</div>
+    ${pool.length ? rows : `<div class="picker-empty">No available${c.genderPref==='Same-sex'&&c.recipGender ? ' '+escapeHtml(c.recipGender) : ''} ministers for this slot.</div>`}
     ${pool.length ? `<div class="helptext" style="margin:6px 0;">${manualTeam.length} selected (choose 2 or more)</div>` : ''}
     <button class="claim-btn" ${manualTeam.length<2?'disabled':''} onclick="claimSlotManual(${sl.id},${c.id})">Claim with this team</button>
   </div>`;
@@ -4453,11 +4451,33 @@ function loadPickerSetup(pool, which){
     </div>` : '';
   return { list, loads, avg, head };
 }
+// Minister ids on another session (any type) or Tentative/Booked/Drop-In
+// slot whose time overlaps the form's date + start/end. Empty until all
+// three are filled in.
+function modalBusyMinisterIds(){
+  const ids = new Set();
+  if(sessKind==='waiting') return ids;
+  const dateVal = $('#sessDate').value, t = $('#sessTime').value, et = $('#sessEndTime').value;
+  if(!dateVal || !t || !et) return ids;
+  const start = new Date(dateVal+'T'+t), end = new Date(dateVal+'T'+et);
+  if(!(end>start)) return ids;
+  sessions.forEach(s=>{
+    if(s.status==='Waiting' || s.date!==dateVal) return;
+    if(editingId && s.id===editingId) return;
+    const sS = new Date(s.date+'T'+s.time), sE = new Date(s.date+'T'+s.endTime);
+    if(start<sE && end>sS) ministerIdsOf(s).forEach(id=>ids.add(id));
+  });
+  busyMinisterIdsAt(dateVal, t, et, pendingBookSlotId).forEach(id=>ids.add(id));
+  return ids;
+}
 function renderMinisterList(){
   const dateVal = $('#sessDate').value;
   const blackedOutNames = new Set(blackouts.filter(b=> dateVal && b.date<=dateVal && (b.endDate||b.date)>=dateVal).map(b=>b.ministerName));
   const box = $('#ministerList');
-  const active = ministers.filter(m=>m.status==='Active');
+  // Hide anyone already on another session or slot that overlaps this
+  // time. Someone already selected stays visible so they can be removed.
+  const busy = modalBusyMinisterIds();
+  const active = ministers.filter(m=>m.status==='Active' && (!busy.has(m.id) || selectedMinisters.some(x=>x.id===m.id)));
   const lp = loadPickerSetup(active, 'modal');
   box.innerHTML = lp.head + lp.list.map(m=>{
     const sel = selectedMinisters.find(x=>x.id===m.id);
@@ -7756,6 +7776,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 23, 2026', version: '2026-10-23.2', items: [
+    'Changed: when picking a team, prayer ministers who are already booked at that time are now hidden instead of shown with a warning. This applies to the New Session form (once the date, start and end time are filled in) and to "Choose the team" when you claim a slot. Someone you had already selected stays in the list so you can take them off. The line under "Choose the team" no longer explains who is hidden.'
+  ]},
   { date: 'Oct 23, 2026', version: '2026-10-23.1', items: [
     'New: when picking a team, each prayer minister now shows how many sessions they have in the next 4 weeks and the date of their next one, for example "3 upcoming · next Oct 28". It counts booked sessions and Tentative slots, but not Drop-in or Training. The chip is green when they are below the team average and amber when they are well above it. A sort button above the list cycles between A–Z, Fewest first and Most first; tap it again to get back to A–Z. Check it in two places: the New Session form, and the "Choose the team" list when you claim a slot on Schedule & Planning. The count now stays visible after you select someone.'
   ]},
@@ -7768,15 +7791,15 @@ const CHANGE_LOG = [
   { date: 'Oct 22, 2026', version: '2026-10-22.1', items: [
     'Changed: Sunday Drop-In and Training sessions now send phone notifications too, the same as regular sessions. Ministers on the team are told when one is booked, when its date or time changes, when they are added or taken off, and when it is removed. The Send app notification button also shows on Drop-In and Training cards.'
   ]},
-  { date: 'Oct 21, 2026', version: '2026-10-21.12', items: [
-    'Fixed: Chrome on Android phones and tablets now offers Install app for the Scheduler (open the ⋮ menu, then Install app).'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 21, 2026', version: '2026-10-21.12', items: [
+    'Fixed: Chrome on Android phones and tablets now offers Install app for the Scheduler (open the ⋮ menu, then Install app).'
+  ]},
   { date: 'Oct 21, 2026', version: '2026-10-21.11', items: [
     'New: the Scheduler can be installed as an app. On iPhone open it in Safari, tap Share, then Add to Home Screen; on Android or a computer use the browser\'s Install option. It gets its own dark "FPHM Admin" icon so you can tell it apart from the minister portal. Sign in once from the installed app to check it works.',
     'New: a Send app notification button on each booked session card (under the WhatsApp line). It sends that session\'s team a "booked" phone notification and adds it to their portal Messages, then tells you how many devices it reached. Handy for testing.'
