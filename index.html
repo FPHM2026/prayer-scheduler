@@ -252,6 +252,14 @@
 
   /* ---- Form modals are bottom sheets: full width, slide up, capped at 90vh ---- */
   .modal-bg.sheet{align-items:flex-end;padding:0;}
+  /* Install guide: a full-screen in-app view, so the admin never leaves the Scheduler. */
+  .modal-bg.guide-full{padding:0;align-items:stretch;}
+  .modal-bg.guide-full .modal{max-width:none;width:100%;height:100%;max-height:none;border-radius:0;padding:0;display:flex;flex-direction:column;overflow:hidden;}
+  .guide-bar{display:flex;flex-wrap:nowrap;align-items:center;gap:8px 16px;padding:8px 16px;padding-top:calc(8px + env(safe-area-inset-top, 0px));padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));border-bottom:1px solid var(--border);background:var(--card);}
+  .guide-bar h2{flex:1 1 auto;min-width:0;margin:0;font-size:var(--fs-md);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .guide-bar-actions{display:flex;align-items:center;gap:8px 16px;flex:0 0 auto;}
+  .guide-bar-actions .helptext{margin:0;}
+  .guide-frame{flex:1 1 auto;width:100%;min-height:0;border:0;display:block;background:#faf8f4;}
   .modal-bg.sheet .modal{max-width:none;width:100%;max-height:90vh;border-radius:16px 16px 0 0;animation:sheetSlideUp .25s ease;}
   @keyframes sheetSlideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
 
@@ -875,7 +883,7 @@
       <button class="btn secondary" id="rosterSortBtn" onclick="toggleRosterSort()" style="display:inline-flex;align-items:center;gap:4px;" aria-label="Toggle sort order, currently by next appointment"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h11M3 12h7M3 17h4"/><path d="M17 5v14M17 5l-4 4M17 5l4 4"/></svg> Next Appointment</button>
     </div>
     <div class="intake-linkrow no-print">
-      <a href="https://fphm2026.github.io/prayer-scheduler/portal/install/" target="_blank" rel="noopener">Install guide for ministers</a>
+      <button class="link-btn" type="button" id="btnOpenInstallGuide">Install guide for ministers</button>
       <button class="link-btn" type="button" id="btnCopyInstallGuide">Copy Link to Install Guide</button>
       <span class="helptext" id="installGuideCopiedMsg" style="display:none;">Link copied!</span>
     </div>
@@ -1258,6 +1266,18 @@
      2026-09-29, at the user's request) - style="max-width:none" overrides
      the shared .modal class's 560px cap just for this one, since every
      other modal in the app should keep that cap. -->
+<div class="modal-bg guide-full" id="installGuideModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="installGuideTitle">
+    <div class="guide-bar">
+      <h2 id="installGuideTitle">Install guide</h2>
+      <div class="guide-bar-actions">
+        <button class="link-btn" type="button" id="btnCopyInstallGuideModal">Copy Link</button>
+        <button class="btn" type="button" id="btnCloseInstallGuide">Close</button>
+      </div>
+    </div>
+    <iframe class="guide-frame" id="installGuideFrame" title="Install guide for ministers"></iframe>
+  </div>
+</div>
 <div class="modal-bg" id="infoModal">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="infoModalTitle" style="max-width:none;">
     <h2 id="infoModalTitle"></h2>
@@ -1271,7 +1291,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-26.4";
+const APP_VERSION = "2026-10-26.5";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -2332,7 +2352,17 @@ function wireApp(){
   wireSearchClear('intakeSearch');
   $('#btnOpenIntakeForm').href = absoluteIntakeUrl();
   $('#btnCopyIntakeLink').addEventListener('click', copyIntakeLink);
-  $('#btnCopyInstallGuide').addEventListener('click', copyInstallGuideLink);
+  $('#btnCopyInstallGuide').addEventListener('click', ()=>copyInstallGuideLink('#installGuideCopiedMsg'));
+  $('#btnCopyInstallGuideModal').addEventListener('click', async (e)=>{
+    // No room for a separate "copied" note in the bar on a phone, so the button says it.
+    const btn = e.currentTarget;
+    try { await navigator.clipboard.writeText(INSTALL_GUIDE_URL); } catch (err) { window.prompt('Copy this link:', INSTALL_GUIDE_URL); return; }
+    btn.textContent = 'Copied!';
+    clearTimeout(btn._t);
+    btn._t = setTimeout(()=>{ btn.textContent = 'Copy Link'; }, 2500);
+  });
+  $('#btnOpenInstallGuide').addEventListener('click', openInstallGuide);
+  $('#btnCloseInstallGuide').addEventListener('click', ()=>$('#installGuideModal').classList.remove('open'));
   $('#btnFormEditorSave').addEventListener('click', ()=>withLoading($('#btnFormEditorSave'), 'Saving…', saveFormSchema));
   $('#btnFormEditorDiscard').addEventListener('click', discardFormSchemaChanges);
   $('#btnFormEditorAddSection').addEventListener('click', addFormSection);
@@ -5437,8 +5467,16 @@ function absoluteIntakeUrl(){
   return new URL(INTAKE_URL, window.location.href).href;
 }
 const INSTALL_GUIDE_URL = 'https://fphm2026.github.io/prayer-scheduler/portal/install/';
-async function copyInstallGuideLink(){
-  const msg = $('#installGuideCopiedMsg');
+// Shown inside the Scheduler rather than navigating away: in the installed
+// app, leaving the page reloads the Scheduler and drops you at sign-in.
+function openInstallGuide(){
+  const frame = $('#installGuideFrame');
+  if(!frame.getAttribute('src')) frame.src = INSTALL_GUIDE_URL;
+  $('#installGuideModal').classList.add('open');
+  $('#btnCloseInstallGuide').focus();
+}
+async function copyInstallGuideLink(msgSel){
+  const msg = $(msgSel);
   try {
     await navigator.clipboard.writeText(INSTALL_GUIDE_URL);
   } catch (e) {
@@ -7935,6 +7973,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 26, 2026', version: '2026-10-26.5', items: [
+    'Changed: "Install guide for ministers" on the Prayer Ministers tab now opens the guide full screen inside the Scheduler instead of leaving it. Close takes you straight back to the Prayer Ministers tab, still signed in. Copy Link at the top copies the guide\'s address to send to a minister. In the installed app, check that the guide opens and Close returns you to where you were.'
+  ]},
   { date: 'Oct 26, 2026', version: '2026-10-26.4', items: [
     'Changed: the "Install guide for ministers" link on the Prayer Ministers tab now opens a page on our own site (the My FPHM address followed by install/), so ministers can open it without any sign-in. Copy Link to Install Guide copies that address.'
   ]},
@@ -7947,15 +7988,15 @@ const CHANGE_LOG = [
   { date: 'Oct 26, 2026', version: '2026-10-26.1', items: [
     'New: the Prayer Ministers tab now shows who has phone notifications working. A box under Active / Inactive says how many active ministers have them on, with All, Needs help and On filters. Each minister gets a chip: On, Check (every device has notifications turned off, or hasn\'t opened My FPHM in 30 days, often an old phone) or Off (never turned on). Open a minister to see each device, like "iPhone · today". Device names and dates fill in as each minister next opens My FPHM; until then older devices show as "Apple device" or "Android or Chrome device". Choose Needs help to see who to follow up with.'
   ]},
-  { date: 'Oct 23, 2026', version: '2026-10-23.4', items: [
-    'Fixed: on a phone, the "+ Quick Add Slots" button on Schedule & Planning now fills the full width of the screen, like the buttons below it. The (i) on its right still explains what it does.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 23, 2026', version: '2026-10-23.4', items: [
+    'Fixed: on a phone, the "+ Quick Add Slots" button on Schedule & Planning now fills the full width of the screen, like the buttons below it. The (i) on its right still explains what it does.'
+  ]},
   { date: 'Oct 23, 2026', version: '2026-10-23.3', items: [
     'Fixed: on a phone, the "Completed sessions by month" chart on the Completed Sessions tab cut off the later months. The bars keep their size and you can now swipe the chart left and right to see every month.'
   ]},
