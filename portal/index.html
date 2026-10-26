@@ -310,7 +310,9 @@
   .trend-legend .legend-dot{width:9px;height:9px;border-radius:2px;display:inline-block;}
   .trend-legend .legend-dot.this{background:var(--primary);}
   .trend-legend .legend-dot.last{background:var(--muted-bar);margin-left:10px;}
-  .trend-bars{display:flex;align-items:flex-end;gap:10px;height:104px;}
+  /* Scrolls sideways on narrow screens so all 12 months stay full size. */
+  .trend-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;}
+  .trend-bars{display:flex;align-items:flex-end;gap:10px;height:104px;min-width:max-content;}
   .trend-bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;}
   .trend-bar-pair{display:flex;align-items:flex-end;justify-content:center;gap:3px;width:100%;flex-shrink:0;}
   .trend-bar-current{display:flex;flex-direction:column;align-items:center;flex-shrink:0;}
@@ -1276,7 +1278,7 @@ function renderCompletedStats(){
         <div class="trend-title">Completed sessions by month</div>
         <div class="trend-legend"><span class="legend-dot this"></span>${now.getFullYear()}<span class="legend-dot last"></span>${now.getFullYear()-1}</div>
       </div>
-      <div class="trend-bars">${bars}</div>
+      <div class="trend-scroll"><div class="trend-bars">${bars}</div></div>
     </div>`;
 }
 
