@@ -881,7 +881,12 @@
       <button class="btn" id="btnAddMinister">+ Add Minister</button>
       <button class="btn secondary" id="rosterSortBtn" onclick="toggleRosterSort()" style="display:inline-flex;align-items:center;gap:4px;" aria-label="Toggle sort order, currently by next appointment"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h11M3 12h7M3 17h4"/><path d="M17 5v14M17 5l-4 4M17 5l4 4"/></svg> Next Appointment</button>
     </div>
-    <p class="helptext">Grouped by minister — tap a name for their stats and upcoming sessions, or use the icons to manage them.</p>
+    <div class="intake-linkrow no-print">
+      <a href="https://claude.ai/artifact/KawDfyLbd1r1xCfjQ4XfKe" target="_blank" rel="noopener">Install guide for ministers</a>
+      <button class="link-btn" type="button" id="btnCopyInstallGuide">Copy Link to Install Guide</button>
+      <span class="helptext" id="installGuideCopiedMsg" style="display:none;">Link copied!</span>
+    </div>
+    <p class="helptext">Grouped by minister — tap a name for their stats and upcoming sessions, or use the icons to manage them. The install guide walks a minister through adding My FPHM to their home screen and turning notifications on — send them the link.</p>
     <div class="stats-collapse" id="overviewStatsCollapse">
       <button class="stats-toggle" onclick="toggleStatsCollapse(this)" aria-expanded="true">
         <span class="chevron"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>
@@ -1273,7 +1278,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-26.2";
+const APP_VERSION = "2026-10-26.3";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -2334,6 +2339,7 @@ function wireApp(){
   wireSearchClear('intakeSearch');
   $('#btnOpenIntakeForm').href = absoluteIntakeUrl();
   $('#btnCopyIntakeLink').addEventListener('click', copyIntakeLink);
+  $('#btnCopyInstallGuide').addEventListener('click', copyInstallGuideLink);
   $('#btnFormEditorSave').addEventListener('click', ()=>withLoading($('#btnFormEditorSave'), 'Saving…', saveFormSchema));
   $('#btnFormEditorDiscard').addEventListener('click', discardFormSchemaChanges);
   $('#btnFormEditorAddSection').addEventListener('click', addFormSection);
@@ -5437,6 +5443,20 @@ function renderBlackouts(){
 function absoluteIntakeUrl(){
   return new URL(INTAKE_URL, window.location.href).href;
 }
+const INSTALL_GUIDE_URL = 'https://claude.ai/artifact/KawDfyLbd1r1xCfjQ4XfKe';
+async function copyInstallGuideLink(){
+  const msg = $('#installGuideCopiedMsg');
+  try {
+    await navigator.clipboard.writeText(INSTALL_GUIDE_URL);
+  } catch (e) {
+    window.prompt('Copy this link:', INSTALL_GUIDE_URL);
+    return;
+  }
+  msg.style.display = '';
+  clearTimeout(copyInstallGuideLink._t);
+  copyInstallGuideLink._t = setTimeout(()=>{ msg.style.display = 'none'; }, 2500);
+}
+
 async function copyIntakeLink(){
   const url = absoluteIntakeUrl();
   const msg = $('#intakeLinkCopiedMsg');
@@ -7922,6 +7942,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 26, 2026', version: '2026-10-26.3', items: [
+    'New: an install guide you can send to prayer ministers. The Prayer Ministers tab has an "Install guide for ministers" link at the top, plus "Copy Link to Install Guide" so you can paste it into an email or text. The guide walks them through adding My FPHM to the home screen on iPhone/iPad (Safari) and Android (Chrome), turning notifications on in My FPHM Settings and sending themselves a test, and what to do when it does not work. It explains that on an iPhone notifications only work once My FPHM is on the home screen.'
+  ]},
   { date: 'Oct 26, 2026', version: '2026-10-26.2', items: [
     'New: old phones and tablets clear themselves out of the notification list. On the Prayer Ministers tab, a device that hasn\'t opened My FPHM in 90 days is removed automatically. Each device in a minister\'s "Phone notifications" list also has a Remove link so you can clear one yourself, for example right after someone gets a new phone. A removed device stops getting phone notifications until they turn them on again in My FPHM. Devices the phone company reports as no longer existing were already removed automatically.'
   ]},
@@ -7934,15 +7957,15 @@ const CHANGE_LOG = [
   { date: 'Oct 23, 2026', version: '2026-10-23.3', items: [
     'Fixed: on a phone, the "Completed sessions by month" chart on the Completed Sessions tab cut off the later months. The bars keep their size and you can now swipe the chart left and right to see every month.'
   ]},
-  { date: 'Oct 23, 2026', version: '2026-10-23.2', items: [
-    'Changed: when picking a team, prayer ministers who are already booked at that time are now hidden instead of shown with a warning. This applies to the New Session form (once the date, start and end time are filled in) and to "Choose the team" when you claim a slot. Someone you had already selected stays in the list so you can take them off. The line under "Choose the team" no longer explains who is hidden.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 23, 2026', version: '2026-10-23.2', items: [
+    'Changed: when picking a team, prayer ministers who are already booked at that time are now hidden instead of shown with a warning. This applies to the New Session form (once the date, start and end time are filled in) and to "Choose the team" when you claim a slot. Someone you had already selected stays in the list so you can take them off. The line under "Choose the team" no longer explains who is hidden.'
+  ]},
   { date: 'Oct 23, 2026', version: '2026-10-23.1', items: [
     'New: when picking a team, each prayer minister now shows how many sessions they have in the next 4 weeks and the date of their next one, for example "3 upcoming · next Oct 28". It counts booked sessions and Tentative slots, but not Drop-in or Training. The chip is green when they are below the team average and amber when they are well above it. A sort button above the list cycles between A–Z, Fewest first and Most first; tap it again to get back to A–Z. Check it in two places: the New Session form, and the "Choose the team" list when you claim a slot on Schedule & Planning. The count now stays visible after you select someone.'
   ]},
