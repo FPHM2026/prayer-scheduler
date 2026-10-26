@@ -22,6 +22,7 @@
   color-scheme:light;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{
   background:var(--bg); color:var(--text);
   font-family:var(--sans); font-size:16px; line-height:1.55;
@@ -251,6 +252,8 @@ footer{grid-column:1 / -1; margin-top:8px; color:var(--muted); font-size:.875rem
 // own pages, so a link opened from a text or email never shows it.
 (function(){
   var btn = document.getElementById('backBtn');
+  // Shown inside the Scheduler's own guide window, which has its own Close.
+  try { if (window.top !== window.self) return; } catch (e) { return; }
   var inApp = window.navigator.standalone === true ||
     (window.matchMedia && (matchMedia('(display-mode: standalone)').matches ||
                            matchMedia('(display-mode: fullscreen)').matches ||
