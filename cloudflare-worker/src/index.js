@@ -546,12 +546,51 @@ async function handlePushSubscribe(env, request) {
   if (!sub || !sub.endpoint || !sub.keys || !sub.keys.p256dh || !sub.keys.auth) return { __status: 400, error: "subscription required" };
   const { minister, error } = await ministerForCaller(env, request);
   if (error) return error;
-  const clean = { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } };
+  // device/lastSeen/blocked ride along in the same JSON (no new SharePoint
+  // columns) so the Scheduler's Prayer Ministers tab can show who has
+  // notifications working on which device. See handlePushCheckin.
+  const clean = {
+    endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth },
+    device: cleanDeviceLabel(body.device), lastSeen: new Date().toISOString(), blocked: false
+  };
   const fields = { Title: minister.name, MinisterId: minister.id, SubscriptionJSON: JSON.stringify(clean) };
-  const existing = (await pushSubscriptions(env)).find((s) => s.sub.endpoint === sub.endpoint);
+  const all = await pushSubscriptions(env);
+  const existing = all.find((s) => s.sub.endpoint === sub.endpoint);
   if (existing) await pushListItem(env, "PATCH", existing.itemId, fields);
   else await pushListItem(env, "POST", null, fields);
+  // The same device's previous subscription (the browser rotated it, or
+  // notifications were blocked and later turned back on) - drop it so the
+  // device isn't listed twice.
+  if (body.replaces && body.replaces !== sub.endpoint) {
+    for (const s of all.filter((x) => x.sub.endpoint === body.replaces && x.ministerId === minister.id)) {
+      await pushListItem(env, "DELETE", s.itemId).catch(() => {});
+    }
+  }
   return { ok: true };
+}
+
+function cleanDeviceLabel(s) {
+  return String(s || "").replace(/[^\w .()-]/g, "").trim().slice(0, 40);
+}
+
+// The portal calls this each time it opens on a device whose subscription
+// is gone or whose notifications are no longer allowed (the browser drops
+// the subscription when permission is revoked, so the portal remembers the
+// endpoint itself). Marks that device blocked and refreshes lastSeen, so
+// the Scheduler can flag the minister. A device that's still fine checks in
+// through /subscribe instead.
+async function handlePushCheckin(env, request) {
+  const body = await request.json().catch(() => ({}));
+  if (!body.endpoint) return { __status: 400, error: "endpoint required" };
+  const { minister, error } = await ministerForCaller(env, request);
+  if (error) return error;
+  const mine = (await pushSubscriptions(env)).filter((s) => s.sub.endpoint === body.endpoint && s.ministerId === minister.id);
+  for (const s of mine) {
+    const next = { ...s.sub, lastSeen: new Date().toISOString(), blocked: !!body.blocked };
+    if (body.device) next.device = cleanDeviceLabel(body.device);
+    await pushListItem(env, "PATCH", s.itemId, { SubscriptionJSON: JSON.stringify(next) });
+  }
+  return { ok: true, found: mine.length > 0 };
 }
 
 async function handlePushUnsubscribe(env, request) {
@@ -851,6 +890,7 @@ const ROUTES = {
   "/api/push/subscribe": handlePushSubscribe,
   "/api/push/unsubscribe": handlePushUnsubscribe,
   "/api/push/test": handlePushTest,
+  "/api/push/checkin": handlePushCheckin,
   "/api/push/session": handlePushSession,
   "/api/push/admin/subscribe": handleAdminSubscribe,
   "/api/push/admin/unsubscribe": handleAdminUnsubscribe,

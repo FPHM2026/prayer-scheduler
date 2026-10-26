@@ -192,6 +192,18 @@
   .tag.scheduled{background:#eef4fb;color:#2c5f8a;}
   .tag.active{background:var(--ok-bg);color:var(--ok);}
   .tag.inactive{background:#f1ede4;color:var(--muted);}
+  .tag.notif-on,.tag.notif-check,.tag.notif-off{white-space:nowrap;margin-right:0;}
+  .tag.notif-on{background:var(--ok-bg);color:var(--ok);}
+  .tag.notif-check{background:#fbf0d4;color:#7a5200;}
+  .tag.notif-off{background:var(--danger-bg);color:var(--danger);}
+  .notif-summary{border:1px solid #e8e0d3;background:var(--card);border-radius:8px;padding:16px;margin:0 0 16px;display:flex;flex-direction:column;gap:8px;}
+  .notif-summary-line{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-weight:600;color:var(--navy);}
+  .notif-filter{display:flex;gap:8px;flex-wrap:wrap;}
+  .notif-filter button{font:inherit;font-size:var(--fs-xs);border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:999px;padding:4px 16px;cursor:pointer;}
+  .notif-filter button.on{background:var(--navy);border-color:var(--navy);color:#fff;}
+  .notif-devs{padding:12px 4px;display:flex;flex-direction:column;gap:4px;font-size:var(--fs-sm);border-bottom:1px solid #f1ede4;}
+  .notif-devs-title{font-weight:700;color:var(--navy);}
+  .notif-dev.warn{color:#7a5200;}
   .tag.priority{background:var(--primary);color:var(--on-primary);}
   .tag.contacted{background:var(--ok-bg);color:var(--ok);}
 
@@ -886,6 +898,7 @@
       <button class="active" data-substatus="Active">Active</button>
       <button data-substatus="Inactive">Inactive</button>
     </nav>
+    <div id="overviewNotif" hidden></div>
     <div id="overviewGroups"></div>
     <div class="no-results" id="overviewNoResults" hidden>No ministers match your search.</div>
   </section>
@@ -1258,7 +1271,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-23.4";
+const APP_VERSION = "2026-10-26.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1636,7 +1649,8 @@ const LIST_NAMES = {
 // up separately and never make resolveSiteAndLists() throw.
 const OPTIONAL_LIST_NAMES = {
   notesSchema: "SessionNotesSchema",
-  notes: "SessionNotes"
+  notes: "SessionNotes",
+  pushSubs: "PushSubscriptions"
 };
 // Relative to this file's own location (preview/) - portal/ is a sibling of
 // the repo root, one level up from here.
@@ -1844,7 +1858,7 @@ async function resolveSiteAndLists(){
 
 async function listItems(key){
   const resp = await graphFetch(`/sites/${siteId}/lists/${listIds[key]}/items?$expand=fields&$top=999`);
-  return resp.value.map(i => ({ ...i.fields, id: parseInt(i.id, 10), _created: i.createdDateTime,
+  return resp.value.map(i => ({ ...i.fields, id: parseInt(i.id, 10), _created: i.createdDateTime, _modified: i.lastModifiedDateTime,
     _createdByEmail: ((i.createdBy && i.createdBy.user && i.createdBy.user.email) || '').trim().toLowerCase() }));
 }
 async function createItem(key, fields){
@@ -1896,6 +1910,11 @@ let editingMinisterId=null;
 let blackoutEditId=null;
 let overviewSortMode='default'; // 'default' (next appointment) | 'az'
 let overviewSubStatus='Active';
+let overviewNotifFilter='all'; // 'all' | 'help' | 'on' - Prayer Ministers notification filter
+// Ministers' phone-notification devices, from the PushSubscriptions list
+// the intake Worker keeps. null = list not readable, so the notification
+// status UI stays hidden. See MINISTER NOTIFICATION STATUS below.
+let pushDevices = null;
 let sessionNumberMap = new Map(); // session id -> chronological "Session #N" for that recipient
 
 async function loadAll(){
@@ -1940,6 +1959,11 @@ async function loadAll(){
     }
   } else if(!notesDraft){
     notesDraft = defaultNotesSchema();
+  }
+  pushDevices = null;
+  if(listIds.pushSubs){
+    try{ pushDevices = parsePushDevices(await listItems('pushSubs')); }
+    catch(e){ console.warn('Could not load notification devices:', e.message); }
   }
   // ResponsesJSON is the whole answers object, keyed by question id from
   // formConfig.js - parsed once here so every intake render just reads
@@ -4811,6 +4835,8 @@ function renderOverview(){
   const now = new Date();
   const box = $('#overviewGroups'); const noResults = $('#overviewNoResults');
   const opened = openState(box);
+  const showNotif = !!pushDevices && overviewSubStatus==='Active';
+  renderNotifSummary(showNotif);
 
   const rows = ministers
     .filter(m=>m.status===overviewSubStatus)
@@ -4834,6 +4860,7 @@ function renderOverview(){
       return {m, led, supported, hours, upcoming};
     })
     .filter(x=> !q || x.m.name.toLowerCase().includes(q))
+    .filter(x=> !showNotif || overviewNotifFilter==='all' || (overviewNotifFilter==='on') === (notifStatusFor(x.m.id).state==='on'))
     .sort((a,b)=>{
       if(overviewSortMode==='az') return a.m.name.localeCompare(b.m.name);
       if(!!a.upcoming.length !== !!b.upcoming.length) return a.upcoming.length ? -1 : 1;
@@ -4872,6 +4899,7 @@ function renderOverview(){
               <span class="group-name">${escapeHtml(m.name)}</span>
               <span class="group-count">${countLabel}</span>
               ${m.status==='Inactive' ? '<span class="tag inactive">Inactive</span>' : ''}
+              ${showNotif ? notifChipHtml(m.id) : ''}
             </span>
             <span class="group-summary">${summary}</span>
           </span>
@@ -4883,12 +4911,101 @@ function renderOverview(){
           <button class="icon-btn danger" onclick="deleteMinister(${m.id})" title="Delete" aria-label="Delete ${escapeHtml(m.name)}">${ICONS.trash}</button>
         </div>
       </div>
-      <div class="group-body"><div class="group-body-inner">${body}</div></div>
+      <div class="group-body"><div class="group-body-inner">${showNotif ? notifDevicesHtml(m.id) : ''}${body}</div></div>
     </div>`;
   }).join('');
+  if(showNotif && !rows.length && !q) noResults.textContent = overviewNotifFilter==='help' ? 'Everyone has notifications on.' : 'No ministers match this filter.';
+  else noResults.textContent = 'No ministers match your search.';
 
   renderOverviewStats();
 }
+/* =========================================================================
+   MINISTER NOTIFICATION STATUS (added 2026-10-26)
+
+   Shows which prayer ministers have phone notifications working, so an
+   admin can help anyone who doesn't (new phone, turned off in settings,
+   never set up). Reads the PushSubscriptions list directly - one item per
+   device, kept by the intake Worker. My FPHM saves each device's type and
+   "last opened" date on every open, and marks it blocked when
+   notifications were turned off on the phone (the Worker's /checkin).
+   Devices registered before that change have no type until they next open
+   the app, so the push service's host stands in for it.
+     On    = at least one device opened in the last 30 days, not blocked
+     Check = has devices, but every one is blocked or not opened in 30 days
+     Off   = no devices
+========================================================================= */
+const NOTIF_STALE_DAYS = 30;
+function parsePushDevices(items){
+  return items.map(i=>{
+    let sub = null;
+    try{ sub = JSON.parse(i.SubscriptionJSON || 'null'); }catch(e){}
+    const ministerId = parseInt(i.MinisterId, 10);
+    if(!sub || !sub.endpoint || !(ministerId > 0)) return null; // MinisterId 0 = an admin's own device
+    return {
+      id: i.id, ministerId,
+      label: sub.device || deviceFromEndpoint(sub.endpoint),
+      lastSeen: sub.lastSeen || i._modified || i._created || null,
+      blocked: !!sub.blocked
+    };
+  }).filter(Boolean);
+}
+function deviceFromEndpoint(endpoint){
+  let host = '';
+  try{ host = new URL(endpoint).hostname; }catch(e){}
+  if(/apple\.com$/.test(host)) return 'Apple device';
+  if(/googleapis\.com$/.test(host)) return 'Android or Chrome device';
+  if(/windows\.com$|microsoft\.com$/.test(host)) return 'Windows device';
+  if(/mozilla\.com$/.test(host)) return 'Firefox';
+  return 'Device';
+}
+function notifStatusFor(ministerId){
+  const cutoff = Date.now() - NOTIF_STALE_DAYS*86400000;
+  const devices = (pushDevices||[]).filter(d=>d.ministerId===ministerId).map(d=>{
+    const t = d.lastSeen ? Date.parse(d.lastSeen) : NaN;
+    return { ...d, stale: isNaN(t) || t < cutoff };
+  }).sort((a,b)=>String(b.lastSeen||'').localeCompare(String(a.lastSeen||'')));
+  const state = !devices.length ? 'off' : (devices.some(d=>!d.blocked && !d.stale) ? 'on' : 'check');
+  return { state, devices };
+}
+function notifWhen(iso){
+  const t = iso ? new Date(iso) : null;
+  if(!t || isNaN(t)) return 'last opened unknown';
+  const days = Math.floor((new Date().setHours(0,0,0,0) - new Date(t).setHours(0,0,0,0)) / 86400000);
+  if(days <= 0) return 'today';
+  if(days === 1) return 'yesterday';
+  return 'last opened ' + t.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+}
+const NOTIF_CHIPS = { on: '🔔 On', check: '🔔 Check', off: '🔕 Off' };
+function notifChipHtml(ministerId){
+  const s = notifStatusFor(ministerId).state;
+  return `<span class="tag notif-${s}" title="Phone notifications">${NOTIF_CHIPS[s]}</span>`;
+}
+function notifDevicesHtml(ministerId){
+  const { devices } = notifStatusFor(ministerId);
+  const lines = devices.length
+    ? devices.map(d=>`<div class="notif-dev${d.blocked||d.stale?' warn':''}">${escapeHtml(d.label)} · ${d.blocked ? 'notifications turned off on this device' : notifWhen(d.lastSeen)}${!d.blocked && d.stale ? ' (maybe an old device)' : ''}</div>`).join('')
+    : `<div class="notif-dev">No devices. They haven't turned notifications on in My FPHM. They still see messages in My FPHM's Messages tab.</div>`;
+  return `<div class="notif-devs"><div class="notif-devs-title">Phone notifications</div>${lines}</div>`;
+}
+function renderNotifSummary(show){
+  const box = $('#overviewNotif');
+  box.hidden = !show;
+  if(!show){ box.innerHTML = ''; return; }
+  const counts = { on:0, check:0, off:0 };
+  const active = ministers.filter(m=>m.status==='Active');
+  active.forEach(m=>counts[notifStatusFor(m.id).state]++);
+  const help = counts.check + counts.off;
+  const btn = (f, label) => `<button type="button" class="${overviewNotifFilter===f?'on':''}" aria-pressed="${overviewNotifFilter===f}" onclick="setNotifFilter('${f}')">${label}</button>`;
+  box.innerHTML = `<div class="notif-summary">
+    <div class="notif-summary-line">🔔 ${counts.on} of ${active.length} active minister${active.length===1?'':'s'} ${counts.on===1?'has':'have'} notifications on
+      ${counts.check ? `<span class="tag notif-check">${counts.check} to check</span>` : ''}
+      ${counts.off ? `<span class="tag notif-off">${counts.off} off</span>` : ''}</div>
+    <div class="notif-filter" role="group" aria-label="Filter by phone notifications">${btn('all','All')}${btn('help',`Needs help (${help})`)}${btn('on',`On (${counts.on})`)}</div>
+    <p class="helptext" style="margin:0;">"Check" means every device has notifications turned off or hasn't opened My FPHM in ${NOTIF_STALE_DAYS} days, often an old phone.</p>
+  </div>`;
+}
+window.setNotifFilter = function(f){ overviewNotifFilter = f; renderOverview(); };
+
 function shiftYear(dateStr, delta){
   if(!dateStr) return dateStr;
   const [y,m,d] = dateStr.split('-').map(Number);
@@ -7778,6 +7895,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 26, 2026', version: '2026-10-26.1', items: [
+    'New: the Prayer Ministers tab now shows who has phone notifications working. A box under Active / Inactive says how many active ministers have them on, with All, Needs help and On filters. Each minister gets a chip: On, Check (every device has notifications turned off, or hasn\'t opened My FPHM in 30 days, often an old phone) or Off (never turned on). Open a minister to see each device, like "iPhone · today". Device names and dates fill in as each minister next opens My FPHM; until then older devices show as "Apple device" or "Android or Chrome device". Choose Needs help to see who to follow up with.'
+  ]},
   { date: 'Oct 23, 2026', version: '2026-10-23.4', items: [
     'Fixed: on a phone, the "+ Quick Add Slots" button on Schedule & Planning now fills the full width of the screen, like the buttons below it. The (i) on its right still explains what it does.'
   ]},
@@ -7790,15 +7910,15 @@ const CHANGE_LOG = [
   { date: 'Oct 23, 2026', version: '2026-10-23.1', items: [
     'New: when picking a team, each prayer minister now shows how many sessions they have in the next 4 weeks and the date of their next one, for example "3 upcoming · next Oct 28". It counts booked sessions and Tentative slots, but not Drop-in or Training. The chip is green when they are below the team average and amber when they are well above it. A sort button above the list cycles between A–Z, Fewest first and Most first; tap it again to get back to A–Z. Check it in two places: the New Session form, and the "Choose the team" list when you claim a slot on Schedule & Planning. The count now stays visible after you select someone.'
   ]},
-  { date: 'Oct 22, 2026', version: '2026-10-22.3', items: [
-    'New: a Messages tab for admins, next to Settings. Each new intake form that is submitted adds a message with the person\'s name and when it arrived, even if phone notifications are off. Open form shows the intake form and marks the message read. There are Unread and Read tabs, Mark as read / Mark as unread, Delete on each message, and Delete all on the Read tab. Deleting a message never deletes the intake form. The tab shows a count of unread messages. Messages are shared by all admins, so marking one read marks it read for everyone. Only forms submitted from now on appear. The tab shows up once the notification service has been updated.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 22, 2026', version: '2026-10-22.3', items: [
+    'New: a Messages tab for admins, next to Settings. Each new intake form that is submitted adds a message with the person\'s name and when it arrived, even if phone notifications are off. Open form shows the intake form and marks the message read. There are Unread and Read tabs, Mark as read / Mark as unread, Delete on each message, and Delete all on the Read tab. Deleting a message never deletes the intake form. The tab shows a count of unread messages. Messages are shared by all admins, so marking one read marks it read for everyone. Only forms submitted from now on appear. The tab shows up once the notification service has been updated.'
+  ]},
   { date: 'Oct 22, 2026', version: '2026-10-22.2', items: [
     'New: phone notifications for admins when a new intake form comes in. Go to Settings, then Notifications, turn the switch on and tap Send a test. Then submit a test intake form: you should get "New intake form received" with the person\'s name, and tapping it opens that form. Turn it on separately on each device. On iPhone it only works from the Scheduler installed on the Home Screen. The Notifications tab appears once the notification service has been updated.'
   ]},

@@ -131,7 +131,15 @@
   mkIntake(recipients[44],'InProgress',1); mkIntake(recipients[45],'InProgress',2); mkIntake(recipients[46],'Submitted',60);
   intake[intake.length-1].fields.Status = 'Archived';
 
+  // Phone-notification devices (one per device; the Prayer Ministers tab
+  // shows On / Check / Off from these). Some ministers have none.
+  const pushSeed = [[0,'iPhone',0],[0,'iPad',6],[1,'Android phone',1],[3,'iPhone',45],[4,'Android phone',2,true],[5,'iPhone',0],[7,'Windows PC',3],[8,'iPhone',9]];
+  const pushSubs = pushSeed.filter(([mi])=>ministers[mi]).map(([mi,device,daysAgo,blocked],i)=>({ id:8000+i,
+    fields:{ Title: ministers[mi].fields.Title, MinisterId: ministers[mi].id,
+      SubscriptionJSON: JSON.stringify({ endpoint:`https://push.demo.example/${i}`, keys:{p256dh:'x',auth:'y'}, device, lastSeen: dt(addDays(today,-daysAgo),'09:00'), blocked: !!blocked }) } }));
+
   const lists = {
+    PushSubscriptions: pushSubs,
     PrayerMinisters: ministers,
     PrayerSessions: sessions,
     BlackoutDates: blackouts,
