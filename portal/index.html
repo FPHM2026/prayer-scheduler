@@ -99,12 +99,11 @@
   .msg-older{display:flex;align-items:flex-start;gap:8px;}
   .msg-older .msg-line{flex:1;min-width:0;}
   .msg-older .msg-dismiss{margin:-8px -8px 0 0;}
-  .msg-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 10px 0 18px;}
+  .msg-foot{display:flex;flex-direction:column;gap:8px;padding:8px 16px 0;}
+  .msg-foot .btn{width:100%;}
   .msg-foot .msg-received{margin-top:0;}
   .msg-expand-row{padding:0 18px 8px;}
   .group.msg.has-foot .msg-foot:last-child{padding-bottom:8px;}
-  .msg-foot .link-btn{font-size:var(--fs-sm);}
-  .msg-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;}
   .msg-older .link-btn{font-size:var(--fs-sm);padding:8px 0;min-height:0;}
   /* A session opened from a message briefly glows so it's easy to spot. */
   .sess-row.flash{animation:sessFlash 2.4s ease;}
@@ -1683,7 +1682,7 @@ function messageSession(m){
   return mySessions().find(s=>s.id===m.sessionId && s.status!=='Waiting') || null;
 }
 function viewSessionBtnHtml(m, cls){
-  return messageSession(m) ? `<button type="button" class="link-btn${cls?' '+cls:''}" onclick="viewMessageSession(${m.sessionId})">View session</button>` : '';
+  return messageSession(m) ? `<button type="button" class="${cls||'link-btn'}" onclick="viewMessageSession(${m.sessionId})">View session</button>` : '';
 }
 // Opens the session on Schedule (or Completed Sessions once it's done),
 // clearing anything that would hide it, then scrolls to it and makes it glow.
@@ -1750,15 +1749,14 @@ function renderMessages(){
     const ids = msgs.map(m=>m.id);
     const toggle = `onclick="const g=this.closest('.group');g.classList.toggle('open');g.querySelectorAll('[aria-expanded]').forEach(b=>b.setAttribute('aria-expanded',g.classList.contains('open')))" aria-expanded="${wasOpen}"`;
     const earlier = `${older.length} earlier message${older.length===1?'':'s'}`;
-    // Newest message's sent time on the left, Mark as read/unread on the
-    // right; the Show/Hide earlier link (if any) sits on its own row below.
+    // Full-width buttons stacked (View session, then Mark as read/unread),
+    // the newest message's sent time under them; the Show/Hide earlier link
+    // (if any) sits on its own row below.
     const newestWhen = messageWhen(newest);
     const foot = `<div class="msg-foot">
-        <span class="msg-received">${newestWhen ? 'Sent ' + escapeHtml(newestWhen) : ''}</span>
-        <span class="msg-actions">
-          ${viewSessionBtnHtml(newest)}
-          <button type="button" class="link-btn" onclick='${unread ? 'markMessagesRead' : 'markMessagesUnread'}(${escapeHtml(JSON.stringify(ids))})'>${unread ? 'Mark as read' : 'Mark as unread'}</button>
-        </span>
+        ${viewSessionBtnHtml(newest, 'btn')}
+        <button type="button" class="btn secondary" onclick='${unread ? 'markMessagesRead' : 'markMessagesUnread'}(${escapeHtml(JSON.stringify(ids))})'>${unread ? 'Mark as read' : 'Mark as unread'}</button>
+        ${newestWhen ? `<span class="msg-received">Sent ${escapeHtml(newestWhen)}</span>` : ''}
       </div>
       ${older.length ? `<div class="msg-expand-row"><button type="button" class="msg-expand" ${toggle}><span class="when-closed">Show ${earlier}</span><span class="when-open">Hide ${earlier}</span>${ICONS.chevron}</button></div>` : ''}`;
     return `<div class="group msg${foot?' has-foot':''}${wasOpen?' open':''}" data-key="${escapeHtml(key)}">
