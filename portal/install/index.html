@@ -119,7 +119,7 @@ footer{grid-column:1 / -1; margin-top:8px; color:var(--muted); font-size:.875rem
 
 <div class="band">
   <div class="wrap">
-    <button type="button" class="back" id="backBtn" hidden onclick="history.back()"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>Back</button>
+    <button type="button" class="back" id="backBtn" hidden><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>Back</button>
     <h1>Install My FPHM</h1>
     <p class="lede">My FPHM is the prayer minister app — your sessions, your time off, and your messages. Adding it to your home screen makes it open like a normal app, and it's what lets your phone send you notifications.</p>
     <p class="url"><span>The address</span><a href="../">FPHM2026.github.io/<wbr>prayer-scheduler/<wbr>portal/</a></p>
@@ -245,16 +245,29 @@ footer{grid-column:1 / -1; margin-top:8px; color:var(--muted); font-size:.875rem
 
 <script>
 // Opened from an installed app (FPHM Admin or My FPHM), this page shows inside
-// the app with no browser back button, so offer our own. Only when we came
-// from one of our own pages: a link opened from a text or email has no
-// referrer, so the button stays hidden there.
+// the app with no browser back button, so offer our own. Inside an installed
+// app is detected from the display mode (iPhone often sends no referrer
+// there); in a normal browser we only show it when we came from one of our
+// own pages, so a link opened from a text or email never shows it.
 (function(){
-  var ref = '';
-  try { ref = document.referrer ? new URL(document.referrer) : ''; } catch (e) {}
-  var fromOurSite = ref && ref.origin === location.origin &&
+  var btn = document.getElementById('backBtn');
+  var inApp = window.navigator.standalone === true ||
+    (window.matchMedia && (matchMedia('(display-mode: standalone)').matches ||
+                           matchMedia('(display-mode: fullscreen)').matches ||
+                           matchMedia('(display-mode: minimal-ui)').matches));
+  var ref = null;
+  try { ref = document.referrer ? new URL(document.referrer) : null; } catch (e) {}
+  var fromOurSite = !!ref && ref.origin === location.origin &&
     ref.pathname.indexOf('/prayer-scheduler/') === 0 &&
     ref.pathname.indexOf('/portal/install/') === -1;
-  if (fromOurSite && history.length > 1) document.getElementById('backBtn').hidden = false;
+  if (!inApp && !(fromOurSite && history.length > 1)) return;
+  btn.hidden = false;
+  btn.onclick = function(){
+    if (history.length > 1) { history.back(); return; }
+    // Nothing to go back to (opened as a fresh app window): go to the page we
+    // came from, else the Scheduler, which sends ministers on to My FPHM.
+    location.href = fromOurSite ? ref.href : '../../';
+  };
 })();
 </script>
 </body>
