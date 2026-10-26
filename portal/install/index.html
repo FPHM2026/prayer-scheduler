@@ -33,7 +33,16 @@ body{
   padding-left:max(16px, env(safe-area-inset-left, 0px));
   padding-right:max(16px, env(safe-area-inset-right, 0px));
 }
-.band .wrap{padding-block:32px}
+.band .wrap{padding-block:calc(32px + env(safe-area-inset-top, 0px)) 32px}
+.back{
+  display:inline-flex; align-items:center; gap:4px; min-height:44px;
+  margin:-8px 0 16px; padding:0 16px 0 12px;
+  border:1px solid var(--border); border-radius:20px; background:var(--card);
+  color:var(--charcoal); font:inherit; font-size:1rem; font-weight:500;
+  cursor:pointer;
+}
+.back:hover{background:var(--bg)}
+.back:focus-visible{outline:3px solid var(--charcoal); outline-offset:2px}
 main.wrap{padding-block:24px 40px; display:grid; grid-template-columns:minmax(0,1fr); gap:24px; align-items:start}
 h1{
   font-family:var(--display); font-weight:700;
@@ -89,7 +98,7 @@ footer{grid-column:1 / -1; margin-top:8px; color:var(--muted); font-size:.875rem
 @media (min-width:768px){
   body{font-size:17px}
   .wrap{max-width:60rem}
-  .band .wrap{padding-block:40px}
+  .band .wrap{padding-block:calc(40px + env(safe-area-inset-top, 0px)) 40px}
   h1{font-size:2.25rem}
   .lede{max-width:40rem; font-size:1.125rem}
   .band .url{max-width:40rem}
@@ -110,6 +119,7 @@ footer{grid-column:1 / -1; margin-top:8px; color:var(--muted); font-size:.875rem
 
 <div class="band">
   <div class="wrap">
+    <button type="button" class="back" id="backBtn" hidden onclick="history.back()"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>Back</button>
     <h1>Install My FPHM</h1>
     <p class="lede">My FPHM is the prayer minister app — your sessions, your time off, and your messages. Adding it to your home screen makes it open like a normal app, and it's what lets your phone send you notifications.</p>
     <p class="url"><span>The address</span><a href="../">FPHM2026.github.io/<wbr>prayer-scheduler/<wbr>portal/</a></p>
@@ -233,5 +243,11 @@ footer{grid-column:1 / -1; margin-top:8px; color:var(--muted); font-size:.875rem
 
 </main>
 
+<script>
+// Opened from an installed app (FPHM Admin or My FPHM), this page shows inside
+// the app with no browser back button, so offer our own whenever there is
+// somewhere to go back to.
+if (history.length > 1) document.getElementById('backBtn').hidden = false;
+</script>
 </body>
 </html>
