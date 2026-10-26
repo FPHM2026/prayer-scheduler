@@ -104,6 +104,11 @@
   .msg-expand-row{padding:0 18px 8px;}
   .group.msg.has-foot .msg-foot:last-child{padding-bottom:8px;}
   .msg-foot .link-btn{font-size:var(--fs-sm);}
+  .msg-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;}
+  .msg-older .link-btn{font-size:var(--fs-sm);padding:8px 0;min-height:0;}
+  /* A session opened from a message briefly glows so it's easy to spot. */
+  .sess-row.flash{animation:sessFlash 2.4s ease;}
+  @keyframes sessFlash{0%,40%{background:#f3e7e0;box-shadow:0 0 0 2px var(--gold-dark) inset;}100%{background:transparent;box-shadow:none;}}
   .msg-expand{display:inline-flex;align-items:center;gap:4px;background:none;border:none;padding:8px 0;min-height:44px;font-family:inherit;font-size:var(--fs-sm);font-weight:700;color:var(--gold-dark);cursor:pointer;-webkit-tap-highlight-color:transparent;}
   .msg-expand svg{width:16px;height:16px;transition:transform .2s ease;}
   .group.open .msg-expand svg{transform:rotate(180deg);}
@@ -758,6 +763,7 @@ async function loadAll(){
     renderSchedule();
     renderCompleted();
     renderBlackouts();
+    if(messagesReady) renderMessages();
   }
   $('#lastRefreshed').textContent = 'Data as of ' + fmtTime(new Date());
 }
@@ -1000,7 +1006,7 @@ function scheduleSessionRow(s){
       declineBtn = `<button class="btn secondary" style="width:100%;" onclick="setMyAttendance(${s.id},'declined')">I can't make it</button>`;
     }
   }
-  return `<div class="sess-row">
+  return `<div class="sess-row" data-sid="${s.id}">
     <div>
       <div>
         <span class="tag ${sessionNumberOf(s)===1?'first':''}">Session #${sessionNumberOf(s)}</span>
@@ -1091,7 +1097,7 @@ function renderSchedule(){
    COMPLETED SESSIONS — same as the main app, filtered to my own
 ========================================================================= */
 function completedSessionRow(s, withName){
-  return `<div class="sess-row">
+  return `<div class="sess-row" data-sid="${s.id}">
     <div>
       ${withName ? `<div class="group-name">${escapeHtml(s.recipName)}</div>` : ''}
       <div>
@@ -1626,6 +1632,45 @@ function messageDetailHtml(m, noWhen){
 function dismissBtnHtml(ids, label){
   return `<button type="button" class="msg-dismiss" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}" onclick='dismissMessages(${escapeHtml(JSON.stringify(ids))})'>${ICONS.close}</button>`;
 }
+// The session a message is about, if it's still on my schedule. A canceled
+// session, or one I was taken off, has none, so its message gets no link.
+function messageSession(m){
+  if(!m.sessionId || !me) return null;
+  return mySessions().find(s=>s.id===m.sessionId && s.status!=='Waiting') || null;
+}
+function viewSessionBtnHtml(m, cls){
+  return messageSession(m) ? `<button type="button" class="link-btn${cls?' '+cls:''}" onclick="viewMessageSession(${m.sessionId})">View session</button>` : '';
+}
+// Opens the session on Schedule (or Completed Sessions once it's done),
+// clearing anything that would hide it, then scrolls to it and makes it glow.
+window.viewMessageSession = function(sessionId){
+  const s = mySessions().find(x=>x.id===sessionId);
+  if(!s){ alert("That session isn't on your schedule any more."); return; }
+  const done = s.status === 'Completed';
+  if(done){
+    completedBy = 'recipient';
+    $('#completedSearch').value = '';
+    $('#completedSearch').dispatchEvent(new Event('input'));
+  } else {
+    $('#search').value = '';
+    $('#search').dispatchEvent(new Event('input'));
+    const past = new Date(s.date+'T'+s.endTime) < new Date();
+    const range = $('#range').value;
+    if((range==='Upcoming' && past) || (range==='Past' && !past)){ $('#range').value = 'All'; }
+  }
+  switchTab(done ? 'completed' : 'schedule');
+  if(done) renderCompleted(); else renderSchedule();
+  const box = done ? $('#completedGroups') : $('#scheduleGroups');
+  const row = box.querySelector(`.sess-row[data-sid="${sessionId}"]`);
+  if(!row) return;
+  const g = row.closest('.group');
+  if(g && !g.classList.contains('open')){
+    g.classList.add('open');
+    g.querySelector('.group-row')?.setAttribute('aria-expanded','true');
+  }
+  row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash');
+  setTimeout(()=>row.scrollIntoView({behavior:'smooth', block:'center'}), 50);
+};
 let messageTab = 'unread';
 function renderMessages(){
   updateMessageBadge();
@@ -1666,7 +1711,10 @@ function renderMessages(){
     const newestWhen = messageWhen(newest);
     const foot = `<div class="msg-foot">
         <span class="msg-received">${newestWhen ? 'Sent ' + escapeHtml(newestWhen) : ''}</span>
-        <button type="button" class="link-btn" onclick='${unread ? 'markMessagesRead' : 'markMessagesUnread'}(${escapeHtml(JSON.stringify(ids))})'>${unread ? 'Mark as read' : 'Mark as unread'}</button>
+        <span class="msg-actions">
+          ${viewSessionBtnHtml(newest)}
+          <button type="button" class="link-btn" onclick='${unread ? 'markMessagesRead' : 'markMessagesUnread'}(${escapeHtml(JSON.stringify(ids))})'>${unread ? 'Mark as read' : 'Mark as unread'}</button>
+        </span>
       </div>
       ${older.length ? `<div class="msg-expand-row"><button type="button" class="msg-expand" ${toggle}><span class="when-closed">Show ${earlier}</span><span class="when-open">Hide ${earlier}</span>${ICONS.chevron}</button></div>` : ''}`;
     return `<div class="group msg${foot?' has-foot':''}${wasOpen?' open':''}" data-key="${escapeHtml(key)}">
@@ -1684,7 +1732,7 @@ function renderMessages(){
         ${dismissBtnHtml(ids, msgs.length > 1 ? `Dismiss all ${msgs.length} messages about ${recip}` : `Dismiss message about ${recip}`)}
       </div>
       ${foot}
-      ${older.length ? `<div class="group-body"><div class="group-body-inner">${older.map(m=>`<div class="msg-older"><span class="msg-line">${messageChipHtml(m)}${messageDetailHtml(m)}</span>${dismissBtnHtml([m.id], 'Dismiss this message')}</div>`).join('')}</div></div>` : ''}
+      ${older.length ? `<div class="group-body"><div class="group-body-inner">${older.map(m=>`<div class="msg-older"><span class="msg-line">${messageChipHtml(m)}${messageDetailHtml(m)}${m.sessionId !== newest.sessionId ? viewSessionBtnHtml(m) : ''}</span>${dismissBtnHtml([m.id], 'Dismiss this message')}</div>`).join('')}</div></div>` : ''}
     </div>`;
   }).join('');
 }
