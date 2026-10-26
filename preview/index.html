@@ -203,6 +203,8 @@
   .notif-filter button.on{background:var(--navy);border-color:var(--navy);color:#fff;}
   .notif-devs{padding:12px 4px;display:flex;flex-direction:column;gap:4px;font-size:var(--fs-sm);border-bottom:1px solid #f1ede4;}
   .notif-devs-title{font-weight:700;color:var(--navy);}
+  .notif-dev{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;}
+  .notif-dev .link-btn{min-height:auto;padding:4px 8px;font-size:var(--fs-sm);}
   .notif-dev.warn{color:#7a5200;}
   .tag.priority{background:var(--primary);color:var(--on-primary);}
   .tag.contacted{background:var(--ok-bg);color:var(--ok);}
@@ -1271,7 +1273,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-26.1";
+const APP_VERSION = "2026-10-26.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1962,7 +1964,7 @@ async function loadAll(){
   }
   pushDevices = null;
   if(listIds.pushSubs){
-    try{ pushDevices = parsePushDevices(await listItems('pushSubs')); }
+    try{ pushDevices = await removeOldPushDevices(parsePushDevices(await listItems('pushSubs'))); }
     catch(e){ console.warn('Could not load notification devices:', e.message); }
   }
   // ResponsesJSON is the whole answers object, keyed by question id from
@@ -4933,8 +4935,33 @@ function renderOverview(){
      On    = at least one device opened in the last 30 days, not blocked
      Check = has devices, but every one is blocked or not opened in 30 days
      Off   = no devices
+   A device not opened in NOTIF_REMOVE_DAYS is deleted automatically each
+   time the Scheduler loads (an old phone, at the user's request), and an
+   admin can remove one by hand. The Worker separately deletes any device
+   the push service reports as gone (404/410) when it sends to it.
 ========================================================================= */
 const NOTIF_STALE_DAYS = 30;
+const NOTIF_REMOVE_DAYS = 90;
+async function removeOldPushDevices(devices){
+  const cutoff = Date.now() - NOTIF_REMOVE_DAYS*86400000;
+  const old = devices.filter(d=>{ const t = d.lastSeen ? Date.parse(d.lastSeen) : NaN; return !isNaN(t) && t < cutoff; });
+  if(!old.length) return devices;
+  const gone = new Set();
+  await Promise.all(old.map(d=>deleteItem('pushSubs', d.id).then(()=>gone.add(d.id)).catch(e=>console.warn('Could not remove old device:', e.message))));
+  return devices.filter(d=>!gone.has(d.id));
+}
+window.removePushDevice = async function(id){
+  const d = (pushDevices||[]).find(x=>x.id===id);
+  if(!d) return;
+  const m = ministers.find(x=>x.id===d.ministerId);
+  const ok = await askConfirm(`Remove ${d.label} from ${m ? m.name : 'this minister'}'s notification devices? That device stops getting phone notifications until they turn notifications on again in My FPHM.`, { confirmLabel: 'Remove', danger: true });
+  if(!ok) return;
+  try{
+    await deleteItem('pushSubs', id);
+    pushDevices = pushDevices.filter(x=>x.id!==id);
+    renderOverview();
+  }catch(e){ alert('Could not remove the device: ' + e.message); }
+};
 function parsePushDevices(items){
   return items.map(i=>{
     let sub = null;
@@ -4983,7 +5010,7 @@ function notifChipHtml(ministerId){
 function notifDevicesHtml(ministerId){
   const { devices } = notifStatusFor(ministerId);
   const lines = devices.length
-    ? devices.map(d=>`<div class="notif-dev${d.blocked||d.stale?' warn':''}">${escapeHtml(d.label)} · ${d.blocked ? 'notifications turned off on this device' : notifWhen(d.lastSeen)}${!d.blocked && d.stale ? ' (maybe an old device)' : ''}</div>`).join('')
+    ? devices.map(d=>`<div class="notif-dev${d.blocked||d.stale?' warn':''}"><span>${escapeHtml(d.label)} · ${d.blocked ? 'notifications turned off on this device' : notifWhen(d.lastSeen)}${!d.blocked && d.stale ? ' (maybe an old device)' : ''}</span><button type="button" class="link-btn" onclick="removePushDevice(${d.id})" aria-label="Remove ${escapeHtml(d.label)}">Remove</button></div>`).join('')
     : `<div class="notif-dev">No devices. They haven't turned notifications on in My FPHM. They still see messages in My FPHM's Messages tab.</div>`;
   return `<div class="notif-devs"><div class="notif-devs-title">Phone notifications</div>${lines}</div>`;
 }
@@ -5001,7 +5028,7 @@ function renderNotifSummary(show){
       ${counts.check ? `<span class="tag notif-check">${counts.check} to check</span>` : ''}
       ${counts.off ? `<span class="tag notif-off">${counts.off} off</span>` : ''}</div>
     <div class="notif-filter" role="group" aria-label="Filter by phone notifications">${btn('all','All')}${btn('help',`Needs help (${help})`)}${btn('on',`On (${counts.on})`)}</div>
-    <p class="helptext" style="margin:0;">"Check" means every device has notifications turned off or hasn't opened My FPHM in ${NOTIF_STALE_DAYS} days, often an old phone.</p>
+    <p class="helptext" style="margin:0;">"Check" means every device has notifications turned off or hasn't opened My FPHM in ${NOTIF_STALE_DAYS} days, often an old phone. A device not opened in ${NOTIF_REMOVE_DAYS} days is removed automatically.</p>
   </div>`;
 }
 window.setNotifFilter = function(f){ overviewNotifFilter = f; renderOverview(); };
@@ -7895,6 +7922,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 26, 2026', version: '2026-10-26.2', items: [
+    'New: old phones and tablets clear themselves out of the notification list. On the Prayer Ministers tab, a device that hasn\'t opened My FPHM in 90 days is removed automatically. Each device in a minister\'s "Phone notifications" list also has a Remove link so you can clear one yourself, for example right after someone gets a new phone. A removed device stops getting phone notifications until they turn them on again in My FPHM. Devices the phone company reports as no longer existing were already removed automatically.'
+  ]},
   { date: 'Oct 26, 2026', version: '2026-10-26.1', items: [
     'New: the Prayer Ministers tab now shows who has phone notifications working. A box under Active / Inactive says how many active ministers have them on, with All, Needs help and On filters. Each minister gets a chip: On, Check (every device has notifications turned off, or hasn\'t opened My FPHM in 30 days, often an old phone) or Off (never turned on). Open a minister to see each device, like "iPhone · today". Device names and dates fill in as each minister next opens My FPHM; until then older devices show as "Apple device" or "Android or Chrome device". Choose Needs help to see who to follow up with.'
   ]},
@@ -7907,15 +7937,15 @@ const CHANGE_LOG = [
   { date: 'Oct 23, 2026', version: '2026-10-23.2', items: [
     'Changed: when picking a team, prayer ministers who are already booked at that time are now hidden instead of shown with a warning. This applies to the New Session form (once the date, start and end time are filled in) and to "Choose the team" when you claim a slot. Someone you had already selected stays in the list so you can take them off. The line under "Choose the team" no longer explains who is hidden.'
   ]},
-  { date: 'Oct 23, 2026', version: '2026-10-23.1', items: [
-    'New: when picking a team, each prayer minister now shows how many sessions they have in the next 4 weeks and the date of their next one, for example "3 upcoming · next Oct 28". It counts booked sessions and Tentative slots, but not Drop-in or Training. The chip is green when they are below the team average and amber when they are well above it. A sort button above the list cycles between A–Z, Fewest first and Most first; tap it again to get back to A–Z. Check it in two places: the New Session form, and the "Choose the team" list when you claim a slot on Schedule & Planning. The count now stays visible after you select someone.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 23, 2026', version: '2026-10-23.1', items: [
+    'New: when picking a team, each prayer minister now shows how many sessions they have in the next 4 weeks and the date of their next one, for example "3 upcoming · next Oct 28". It counts booked sessions and Tentative slots, but not Drop-in or Training. The chip is green when they are below the team average and amber when they are well above it. A sort button above the list cycles between A–Z, Fewest first and Most first; tap it again to get back to A–Z. Check it in two places: the New Session form, and the "Choose the team" list when you claim a slot on Schedule & Planning. The count now stays visible after you select someone.'
+  ]},
   { date: 'Oct 22, 2026', version: '2026-10-22.3', items: [
     'New: a Messages tab for admins, next to Settings. Each new intake form that is submitted adds a message with the person\'s name and when it arrived, even if phone notifications are off. Open form shows the intake form and marks the message read. There are Unread and Read tabs, Mark as read / Mark as unread, Delete on each message, and Delete all on the Read tab. Deleting a message never deletes the intake form. The tab shows a count of unread messages. Messages are shared by all admins, so marking one read marks it read for everyone. Only forms submitted from now on appear. The tab shows up once the notification service has been updated.'
   ]},
