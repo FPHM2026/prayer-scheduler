@@ -245,9 +245,17 @@ footer{grid-column:1 / -1; margin-top:8px; color:var(--muted); font-size:.875rem
 
 <script>
 // Opened from an installed app (FPHM Admin or My FPHM), this page shows inside
-// the app with no browser back button, so offer our own whenever there is
-// somewhere to go back to.
-if (history.length > 1) document.getElementById('backBtn').hidden = false;
+// the app with no browser back button, so offer our own. Only when we came
+// from one of our own pages: a link opened from a text or email has no
+// referrer, so the button stays hidden there.
+(function(){
+  var ref = '';
+  try { ref = document.referrer ? new URL(document.referrer) : ''; } catch (e) {}
+  var fromOurSite = ref && ref.origin === location.origin &&
+    ref.pathname.indexOf('/prayer-scheduler/') === 0 &&
+    ref.pathname.indexOf('/portal/install/') === -1;
+  if (fromOurSite && history.length > 1) document.getElementById('backBtn').hidden = false;
+})();
 </script>
 </body>
 </html>
