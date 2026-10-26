@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en-US">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Install My FPHM</title>
+<link rel="icon" href="../icons/icon-192.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Jost:wght@400;500;700&display=swap">
+<style>
+/* Layout: one narrow phone-width column; a cream band opens the page, then
+   platform sections as numbered step lists. Light-only, matching the app. */
+:root{
+  --bg:#faf8f4; --card:#ffffff; --cream:#e7e2cf; --border:#9d8b67;
+  --text:#565656; --muted:#636363; --charcoal:#474747;
+  --gold:#aa5a3c; --gold-dark:#8a4a30;
+  --primary:#f28a00; --on-primary:#1a1a1a;
+  --ok:#2e7d32; --ok-bg:#e9f7ec;
+  --display:'Playfair Display',Georgia,serif;
+  --sans:'Jost','Segoe UI',Arial,sans-serif;
+  --radius:10px;
+  --shadow-sm:0 1px 2px rgba(35,28,20,.07), 0 1px 1px rgba(35,28,20,.05);
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:var(--sans); font-size:16px; line-height:1.55;
+  margin:0;
+}
+.band{background:var(--cream); border-bottom:1px solid var(--border)}
+.wrap{
+  max-width:34rem; margin:0 auto;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+}
+.band .wrap{padding-block:32px}
+main.wrap{padding-block:8px 40px}
+h1{
+  font-family:var(--display); font-weight:700;
+  font-size:1.75rem; line-height:1.2; letter-spacing:.01em;
+  color:var(--gold-dark); margin:0 0 8px; text-wrap:balance;
+}
+.lede{margin:0; color:var(--charcoal); font-size:1.0625rem; line-height:1.45}
+.band .url{
+  margin:16px 0 0; padding:10px 12px; background:var(--card);
+  border:1px solid var(--border); border-radius:6px;
+  font-size:.9375rem; word-break:break-all; color:var(--gold-dark);
+}
+.band .url a{color:inherit; text-decoration:underline; text-underline-offset:2px}
+.band .url span{display:block; font-size:.75rem; font-weight:700; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--muted); margin-bottom:2px}
+section{
+  background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+  box-shadow:var(--shadow-sm); padding:16px; margin-top:24px;
+}
+h2{
+  font-family:var(--display); font-weight:700; font-size:1.25rem; line-height:1.25;
+  color:var(--gold-dark); margin:0 0 4px; text-wrap:balance;
+}
+h2 + .sub{margin:0 0 16px; color:var(--muted); font-size:.875rem}
+ol{list-style:none; counter-reset:step; margin:0; padding:0; display:flex;
+  flex-direction:column; gap:16px}
+ol li{counter-increment:step; display:grid; grid-template-columns:28px 1fr;
+  gap:2px 12px; align-items:start; min-width:0}
+ol li::before{
+  content:counter(step); display:flex; align-items:center; justify-content:center;
+  width:28px; height:28px; border-radius:50%;
+  background:var(--charcoal); color:#fff;
+  font-size:.875rem; font-weight:700; line-height:1;
+}
+li p{margin:0; grid-column:2; min-width:0}
+ol li::before{grid-row:1 / span 2}
+li p + p{color:var(--muted); font-size:.9375rem}
+b{color:var(--charcoal); font-weight:700}
+.note{
+  margin-top:16px; padding:12px; border-radius:8px;
+  background:var(--bg); border:1px solid var(--border);
+  font-size:.9375rem;
+}
+.note.good{background:var(--ok-bg); border-color:var(--ok); color:#1f5d23}
+.note b{color:inherit}
+.why{margin:16px 0 0; font-size:.9375rem; color:var(--muted)}
+dl{margin:0; display:flex; flex-direction:column; gap:16px}
+dt{font-weight:700; color:var(--charcoal)}
+dd{margin:4px 0 0}
+footer{margin-top:32px; color:var(--muted); font-size:.875rem; text-align:center}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="band">
+  <div class="wrap">
+    <h1>Install My FPHM</h1>
+    <p class="lede">My FPHM is the prayer minister app — your sessions, your time off, and your messages. Adding it to your home screen makes it open like a normal app, and it's what lets your phone send you notifications.</p>
+    <p class="url"><span>The address</span><a href="../">FPHM2026.github.io/prayer-scheduler/portal/</a></p>
+  </div>
+</div>
+
+<main class="wrap">
+
+  <section>
+    <h2>iPhone and iPad</h2>
+    <p class="sub">You must use Safari. Chrome and other browsers on iPhone can't add it.</p>
+    <ol>
+      <li>
+        <p>Open <b>Safari</b> and go to the address above.</p>
+        <p>Tapping a link to My FPHM in an email or text usually opens Safari for you.</p>
+      </li>
+      <li>
+        <p>Tap the <b>Share</b> button — the square with an arrow pointing up.</p>
+        <p>It's at the bottom of the screen on an iPhone, at the top on an iPad.</p>
+      </li>
+      <li>
+        <p>Scroll down the list and tap <b>Add to Home Screen</b>.</p>
+      </li>
+      <li>
+        <p>Tap <b>Add</b> in the top right.</p>
+        <p>The My FPHM icon is now on your home screen.</p>
+      </li>
+      <li>
+        <p>Open My FPHM <b>from that new icon</b> and sign in.</p>
+        <p>Use the email and password you were given for the ministry. The first time, you'll be asked to choose your own password.</p>
+      </li>
+    </ol>
+    <div class="note">
+      <b>Notifications only work from the home screen icon.</b> Apple doesn't allow a website in Safari to send notifications, so if you skip this step you'll never see an alert. Once it's installed, use the icon from then on, not Safari.
+    </div>
+  </section>
+
+  <section>
+    <h2>Android</h2>
+    <p class="sub">These steps are for Chrome, which most Android phones use.</p>
+    <ol>
+      <li>
+        <p>Open <b>Chrome</b> and go to the address above.</p>
+      </li>
+      <li>
+        <p>Tap the <b>⋮</b> menu in the top right.</p>
+        <p>Some phones show a small "Install app" bar at the bottom instead — tapping that does the same thing.</p>
+      </li>
+      <li>
+        <p>Tap <b>Install app</b>, or <b>Add to Home screen</b> if that's what your phone says.</p>
+      </li>
+      <li>
+        <p>Tap <b>Install</b> to confirm.</p>
+      </li>
+      <li>
+        <p>Open My FPHM from the new icon and sign in.</p>
+        <p>Use the email and password you were given for the ministry. The first time, you'll be asked to choose your own password.</p>
+      </li>
+    </ol>
+    <p class="why">Notifications do work in Chrome on Android without installing, but installing keeps you signed in and puts My FPHM alongside your other apps.</p>
+  </section>
+
+  <section>
+    <h2>Turn on notifications</h2>
+    <p class="sub">Do this once on each phone or tablet you want alerts on.</p>
+    <ol>
+      <li>
+        <p>Open My FPHM from its home screen icon and sign in.</p>
+      </li>
+      <li>
+        <p>Tap <b>Settings</b> in the row of tabs along the top.</p>
+      </li>
+      <li>
+        <p>Under <b>Phone notifications</b>, tap the switch to turn it on.</p>
+      </li>
+      <li>
+        <p>When your phone asks whether to allow notifications, tap <b>Allow</b>.</p>
+        <p>If you tap Don't Allow, the switch won't stay on, and your phone won't ask again — see below.</p>
+      </li>
+      <li>
+        <p>Tap <b>Send a test</b>.</p>
+        <p>A notification should arrive within a few seconds. If it does, you're done.</p>
+      </li>
+    </ol>
+    <div class="note good">
+      <b>What you'll be told about.</b> A new session booked with you, a change to the date or time, and a session you've been taken off. Every one of those also waits for you in the <b>Messages</b> tab, so nothing is lost if you miss the alert on your phone.
+    </div>
+  </section>
+
+  <section>
+    <h2>If something isn't working</h2>
+    <dl>
+      <dt>There's no Settings tab</dt>
+      <dd>Pull down to refresh, or close My FPHM and open it again. If it still isn't there, tell the office.</dd>
+
+      <dt>The switch won't stay on</dt>
+      <dd>Your phone is blocking notifications for My FPHM. On an iPhone, open <b>Settings → Notifications → My FPHM</b> and allow them. On Android, press and hold the My FPHM icon, tap the <b>i</b> or App info, then <b>Notifications</b>.</dd>
+
+      <dt>The test notification never arrives</dt>
+      <dd>Check that your phone isn't in Do Not Disturb or a Focus mode, then try the test again.</dd>
+
+      <dt>I got a new phone</dt>
+      <dd>Install My FPHM on the new phone and turn notifications on there too. Each device is separate. Your old phone stops getting alerts once it's gone.</dd>
+
+      <dt>I can't sign in</dt>
+      <dd>Your sign-in is the ministry email address you were given, which is not your personal email. Ask the office to reset your password.</dd>
+    </dl>
+  </section>
+
+  <footer>Freedom Prayer Healing Ministry</footer>
+
+</main>
+
+</body>
+</html>

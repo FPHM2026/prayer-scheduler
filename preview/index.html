@@ -882,7 +882,7 @@
       <button class="btn secondary" id="rosterSortBtn" onclick="toggleRosterSort()" style="display:inline-flex;align-items:center;gap:4px;" aria-label="Toggle sort order, currently by next appointment"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h11M3 12h7M3 17h4"/><path d="M17 5v14M17 5l-4 4M17 5l4 4"/></svg> Next Appointment</button>
     </div>
     <div class="intake-linkrow no-print">
-      <a href="https://claude.ai/artifact/KawDfyLbd1r1xCfjQ4XfKe" target="_blank" rel="noopener">Install guide for ministers</a>
+      <a href="https://fphm2026.github.io/prayer-scheduler/portal/install/" target="_blank" rel="noopener">Install guide for ministers</a>
       <button class="link-btn" type="button" id="btnCopyInstallGuide">Copy Link to Install Guide</button>
       <span class="helptext" id="installGuideCopiedMsg" style="display:none;">Link copied!</span>
     </div>
@@ -1278,7 +1278,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-26.3";
+const APP_VERSION = "2026-10-26.4";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -5443,7 +5443,7 @@ function renderBlackouts(){
 function absoluteIntakeUrl(){
   return new URL(INTAKE_URL, window.location.href).href;
 }
-const INSTALL_GUIDE_URL = 'https://claude.ai/artifact/KawDfyLbd1r1xCfjQ4XfKe';
+const INSTALL_GUIDE_URL = 'https://fphm2026.github.io/prayer-scheduler/portal/install/';
 async function copyInstallGuideLink(){
   const msg = $('#installGuideCopiedMsg');
   try {
@@ -7942,6 +7942,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 26, 2026', version: '2026-10-26.4', items: [
+    'Changed: the "Install guide for ministers" link on the Prayer Ministers tab now opens a page on our own site (the My FPHM address followed by install/), so ministers can open it without any sign-in. Copy Link to Install Guide copies that address.'
+  ]},
   { date: 'Oct 26, 2026', version: '2026-10-26.3', items: [
     'New: an install guide you can send to prayer ministers. The Prayer Ministers tab has an "Install guide for ministers" link at the top, plus "Copy Link to Install Guide" so you can paste it into an email or text. The guide walks them through adding My FPHM to the home screen on iPhone/iPad (Safari) and Android (Chrome), turning notifications on in My FPHM Settings and sending themselves a test, and what to do when it does not work. It explains that on an iPhone notifications only work once My FPHM is on the home screen.'
   ]},
@@ -7954,15 +7957,15 @@ const CHANGE_LOG = [
   { date: 'Oct 23, 2026', version: '2026-10-23.4', items: [
     'Fixed: on a phone, the "+ Quick Add Slots" button on Schedule & Planning now fills the full width of the screen, like the buttons below it. The (i) on its right still explains what it does.'
   ]},
-  { date: 'Oct 23, 2026', version: '2026-10-23.3', items: [
-    'Fixed: on a phone, the "Completed sessions by month" chart on the Completed Sessions tab cut off the later months. The bars keep their size and you can now swipe the chart left and right to see every month.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 23, 2026', version: '2026-10-23.3', items: [
+    'Fixed: on a phone, the "Completed sessions by month" chart on the Completed Sessions tab cut off the later months. The bars keep their size and you can now swipe the chart left and right to see every month.'
+  ]},
   { date: 'Oct 23, 2026', version: '2026-10-23.2', items: [
     'Changed: when picking a team, prayer ministers who are already booked at that time are now hidden instead of shown with a warning. This applies to the New Session form (once the date, start and end time are filled in) and to "Choose the team" when you claim a slot. Someone you had already selected stays in the list so you can take them off. The line under "Choose the team" no longer explains who is hidden.'
   ]},
