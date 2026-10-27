@@ -107,9 +107,14 @@ const FPHM = (function () {
   // block; 'mark' (staff view) highlights it instead; omitted = plain text.
   // Each .ans-row carries data-qid so the staff view can tell which answer
   // a text selection came from.
+  //
+  // opts.autoNames (added 2026-10-27): with a redact mode, also hide the
+  // recipient's own name and the names typed into the spouse/partner
+  // questions, everywhere they appear, without staff having to pick them.
   function renderResponsesHtml(responses, opts) {
     const mode = (opts && opts.redact) || "";
     const redactions = (responses && responses._redactions) || {};
+    const autoRe = mode && opts.autoNames ? autoNameRegex(responses) : null;
     let html = "";
     for (const section of currentSections()) {
       const rows = section.questions
@@ -118,7 +123,7 @@ const FPHM = (function () {
         .map(
           (q) =>
             `<div class="ans-row" data-qid="${escapeHtml(q.id)}"><div class="ans-q">${escapeHtml(q.label)}</div><div class="ans-a">${answerTextHtml(
-              formatAnswer(q, responses[q.id]), mode ? redactions[q.id] : null, mode
+              formatAnswer(q, responses[q.id]), mode ? redactions[q.id] : null, mode, autoRe
             )}</div></div>`
         )
         .join("");
@@ -141,40 +146,100 @@ const FPHM = (function () {
     return parts.length ? new RegExp(parts.join("|"), "gi") : null;
   }
   const REDACTED_BLOCK = "\u2588\u2588\u2588\u2588\u2588\u2588";
-  function answerTextHtml(text, phrases, mode) {
+  function answerTextHtml(text, phrases, mode, autoRe) {
     const re = mode ? redactionRegex(phrases) : null;
     const plain = (t) => escapeHtml(t).replace(/\n/g, "<br>");
-    if (!re) return plain(text);
-    let out = "", last = 0, m;
-    while ((m = re.exec(text))) {
-      out += plain(text.slice(last, m.index));
+    if (!re && !autoRe) return plain(text);
+    // Collect the staff-picked and automatic matches, then merge overlaps.
+    const ranges = [];
+    [re, autoRe].forEach((r) => {
+      if (!r) return;
+      r.lastIndex = 0;
+      let m;
+      while ((m = r.exec(text))) {
+        if (!m[0]) { r.lastIndex++; continue; }
+        ranges.push([m.index, m.index + m[0].length]);
+      }
+    });
+    ranges.sort((a, b) => a[0] - b[0]);
+    const merged = [];
+    ranges.forEach((r) => {
+      const prev = merged[merged.length - 1];
+      if (prev && r[0] <= prev[1]) prev[1] = Math.max(prev[1], r[1]);
+      else merged.push(r.slice());
+    });
+    let out = "", last = 0;
+    merged.forEach(([a, b]) => {
+      out += plain(text.slice(last, a));
       out += mode === "hide"
         ? `<span class="ans-redacted" aria-label="Redacted">${REDACTED_BLOCK}</span>`
-        : `<mark class="ans-redacted-mark" title="Hidden from prayer ministers">${plain(m[0])}</mark>`;
-      last = m.index + m[0].length;
-    }
+        : `<mark class="ans-redacted-mark" title="Hidden from prayer ministers">${plain(text.slice(a, b))}</mark>`;
+      last = b;
+    });
     return out + plain(text.slice(last));
   }
+  // Names hidden automatically: the recipient's own name and the spouse/
+  // partner names, as a whole and word by word (so "Gary" alone is hidden
+  // too). The full name matches in any case; a single word only when it
+  // starts with a capital, so a name like "Grace" or "Hope" doesn't hide
+  // the ordinary word in a sentence.
+  function autoNameList(responses) {
+    const names = [];
+    ["name"].concat(NAME_FIELDS).forEach((id) => {
+      const v = responses && responses[id];
+      if (typeof v === "string" && v.trim()) names.push(v.trim());
+    });
+    return names;
+  }
+  function autoNameRegex(responses) {
+    // Escape regex syntax, and let each letter match either case.
+    const anyCase = (t) => Array.from(t).map((c) =>
+      c.toLowerCase() !== c.toUpperCase() ? `[${c.toLowerCase()}${c.toUpperCase()}]`
+        : /\s/.test(c) ? "\\s+"
+        : c.replace(/[.*+?^${}()|[\]\\\/]/g, "\\$&")).join("").replace(/(?:\\s\+)+/g, "\\s+");
+    const parts = [];
+    autoNameList(responses).forEach((n) => {
+      parts.push(anyCase(n));
+      n.split(/[\s,\-\/&]+/).forEach((w) => {
+        w = w.replace(/^[^\p{L}]+|[^\p{L}]+$/gu, "");
+        if (Array.from(w).length < 2) return;
+        const first = Array.from(w)[0];
+        parts.push(first.toUpperCase().replace(/[.*+?^${}()|[\]\\\/]/g, "\\$&") + anyCase(w.slice(first.length)));
+      });
+    });
+    if (!parts.length) return null;
+    parts.sort((a, b) => b.length - a.length);
+    return new RegExp(`(?<![\\p{L}\\p{N}])(?:${parts.join("|")})(?![\\p{L}\\p{N}])`, "gu");
+  }
+
   function isRedacted(text, phrases) {
     const re = redactionRegex(phrases);
     return !!re && re.test(text);
   }
 
   // Likely personal info, offered to staff for review - never applied
-  // automatically. Deliberately skips the Name and Email answers (ministers
-  // need the name; the portal already hides the email).
+  // automatically. Skips the Name and Email answers (the portal hides the
+  // email, and with opts.autoNames the names are hidden automatically - so
+  // anything autoNameRegex already covers isn't suggested either).
   const NAME_FIELDS = ["m_spouseName", "cl_partnerName", "d_spouseName"];
   const RELATION_WORDS = "husband|wife|son|daughter|brother|sister|mother|mom|mum|father|dad|uncle|aunt|auntie|cousin|nephew|niece|friend|boyfriend|girlfriend|fianc[eé]e?|partner|ex|ex-husband|ex-wife|grandmother|grandfather|grandma|grandpa|stepdad|stepmom|stepfather|stepmother|pastor|boss|teacher|coach|named|called";
   const CHILD_STOPWORDS = new Set(("I My Male Female Boy Girl Son Daughter Sons Daughters Living Deceased Alive Passed Died Yes No Age Aged Years Year Months Month Old " +
     "The And Both All One Two Three Four Five She He They Her His Their We Our Is Are Was Were Not Still Has Have Had Married Single Twins Stillborn Miscarriage " +
     "January February March April May June July August September October November December").split(" "));
-  function suggestRedactions(responses) {
+  function suggestRedactions(responses, opts) {
     const out = [];
+    const autoRe = opts && opts.autoNames ? autoNameRegex(responses) : null;
+    const autoCovers = (phrase) => {
+      if (!autoRe) return false;
+      autoRe.lastIndex = 0;
+      const m = autoRe.exec(phrase);
+      return !!m && m.index === 0 && m[0].length === phrase.length;
+    };
     const redactions = responses._redactions || {};
     const seen = new Set();
     const add = (qid, phrase, reason) => {
       phrase = String(phrase).trim().replace(/[.,;:]+$/, "");
-      if (phrase.length < 2) return;
+      if (phrase.length < 2 || autoCovers(phrase)) return;
       const key = qid + "\u0000" + phrase.toLowerCase();
       if (seen.has(key)) return;
       seen.add(key);

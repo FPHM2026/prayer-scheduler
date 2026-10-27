@@ -887,6 +887,8 @@ function findMyIntakeForRecipient(name){
 // Ministers only ever reach this for a Submitted form (see
 // findMyIntakeForRecipient() above) - no in-progress branch needed here.
 let intakeViewingId = null;
+// The recipient's name and the spouse/partner names are hidden in the
+// answers ({autoNames:true}) and left off the printout (2026-10-27).
 // Ministers don't see the recipient's email address (header or the Email
 // answer in Personal Information) - display-only, the stored data is untouched.
 function responsesWithoutEmail(r){ const c = Object.assign({}, r||{}); delete c.email; return c; }
@@ -896,7 +898,7 @@ window.openIntakeView = function(id){
   intakeViewingId = id;
   $('#intakeViewTitle').textContent = i.recipName || '(name not yet entered)';
   $('#intakeViewMeta').textContent = `Submitted ${fmtShort((i.submittedAt||'').split('T')[0])}`;
-  $('#intakeViewBody').innerHTML = FPHM.renderResponsesHtml(responsesWithoutEmail(i.responses), { redact: 'hide' }) +
+  $('#intakeViewBody').innerHTML = FPHM.renderResponsesHtml(responsesWithoutEmail(i.responses), { redact: 'hide', autoNames: true }) +
     (i.signatureDataUrl ? `<h3>Signature</h3><img src="${i.signatureDataUrl}" alt="Signature" style="max-width:280px;border:1px solid var(--border);border-radius:8px;background:#fff;">` : '');
   applyIntakeTextSize();
   $('#intakeViewModal').classList.add('open');
@@ -929,9 +931,9 @@ window.printIntakeView = function(){
   if(!i) return;
   const liability = window.FPHM_INTAKE_CONFIG.LIABILITY_TEXT || { title:'', body:'' };
   $('#intakePrintArea').innerHTML = `
-    <h1>${escapeHtml(i.recipName || '(name not yet entered)')}</h1>
+    <h1>Intake form</h1>
     <p>Submitted ${escapeHtml(fmtShort((i.submittedAt||'').split('T')[0]))}</p>
-    ${FPHM.renderResponsesHtml(responsesWithoutEmail(i.responses), { redact: 'hide' })}
+    ${FPHM.renderResponsesHtml(responsesWithoutEmail(i.responses), { redact: 'hide', autoNames: true })}
     <section class="ans-section">
       <h2>${escapeHtml(liability.title)}</h2>
       <div class="legal-text rich-text">${FPHM.liabilityBodyHtml(liability.body)}</div>
