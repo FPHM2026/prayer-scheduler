@@ -1291,7 +1291,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-26.5";
+const APP_VERSION = "2026-10-27.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -5873,7 +5873,7 @@ window.openIntakeDetail = function(id){
         <button type="button" class="btn" id="btnRedactPicked" onclick="redactPickedWords(${i.id})">Redact chosen words</button>
         <button type="button" class="btn secondary" onclick="clearRedactPicks()">Clear</button>
       </div>` : ''}
-    ${FPHM.renderResponsesHtml(i.responses, { redact: 'mark' })}
+    ${FPHM.renderResponsesHtml(i.responses, { redact: 'mark', autoNames: true })}
     ${i.signatureDataUrl ? `<h3>Signature</h3><img src="${i.signatureDataUrl}" alt="Signature" style="max-width:300px;border:1px solid var(--border);border-radius:8px;background:#fff;">` : ''}
   `;
   applyIntakeTextSize();
@@ -5901,7 +5901,7 @@ function currentRedactions(i){
 }
 function redactPanelHtml(i){
   const red = currentRedactions(i);
-  const sugg = FPHM.suggestRedactions(i.responses);
+  const sugg = FPHM.suggestRedactions(i.responses, { autoNames: true });
   const redCount = Object.values(red).reduce((n, a) => n + a.length, 0);
   const suggHtml = sugg.length
     ? `<div class="redact-list">${sugg.map((x, k) => `
@@ -5919,6 +5919,7 @@ function redactPanelHtml(i){
   return `
     <h3>Redact personal info</h3>
     <p class="helptext">Prayer ministers will see &#9608;&#9608;&#9608;&#9608;&#9608;&#9608; in place of redacted words. You still see them here, highlighted. </p>
+    <p class="helptext">The recipient's name and the spouse or partner names are always hidden, wherever they appear. Other names need picking below.</p>
     <p class="redact-howto"><strong>To hide other words:</strong> tap them in the answers below - each one you tap turns red. Tap again to un-choose. Then press the <strong>Redact chosen words</strong> bar at the bottom of the screen.</p>
     <p class="errbox" role="alert" id="redactMsg" hidden></p>
     <h4>Suggested (${sugg.length})</h4>
@@ -6031,7 +6032,7 @@ window.redactPickedWords = async function(id){
 window.redactCheckedSuggestions = async function(id){
   const i = intakeResponses.find(x => x.id === id);
   if(!i) return;
-  const sugg = FPHM.suggestRedactions(i.responses);
+  const sugg = FPHM.suggestRedactions(i.responses, { autoNames: true });
   const picked = [...document.querySelectorAll('#redactPanel .redact-sugg:checked')].map(c => sugg[+c.dataset.k]).filter(Boolean);
   if(!picked.length) return redactMsg('Tick at least one suggestion first.');
   const red = currentRedactions(i);
@@ -7973,6 +7974,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 27, 2026', version: '2026-10-27.1', items: [
+    'Changed: names are now hidden on intake forms automatically. In My FPHM, prayer ministers see \u2588\u2588\u2588\u2588\u2588\u2588 in place of the recipient\'s name and the spouse or partner name, everywhere they appear in the answers (full name, first name or last name), and a printed form is headed "Intake form" instead of the recipient\'s name. You don\'t have to pick these any more. Other names (children, friends, family named in answers) still need picking with Redact personal info. To check: open a submitted form in Intake Forms, tap Redact personal info, and see the recipient\'s and spouse\'s names highlighted; then open the same form from a minister\'s card in My FPHM.'
+  ]},
   { date: 'Oct 26, 2026', version: '2026-10-26.5', items: [
     'Changed: "Install guide for ministers" on the Prayer Ministers tab now opens the guide full screen inside the Scheduler instead of leaving it. Close takes you straight back to the Prayer Ministers tab, still signed in. Copy Link at the top copies the guide\'s address to send to a minister. In the installed app, check that the guide opens and Close returns you to where you were.'
   ]},
@@ -7985,15 +7989,15 @@ const CHANGE_LOG = [
   { date: 'Oct 26, 2026', version: '2026-10-26.2', items: [
     'New: old phones and tablets clear themselves out of the notification list. On the Prayer Ministers tab, a device that hasn\'t opened My FPHM in 90 days is removed automatically. Each device in a minister\'s "Phone notifications" list also has a Remove link so you can clear one yourself, for example right after someone gets a new phone. A removed device stops getting phone notifications until they turn them on again in My FPHM. Devices the phone company reports as no longer existing were already removed automatically.'
   ]},
-  { date: 'Oct 26, 2026', version: '2026-10-26.1', items: [
-    'New: the Prayer Ministers tab now shows who has phone notifications working. A box under Active / Inactive says how many active ministers have them on, with All, Needs help and On filters. Each minister gets a chip: On, Check (every device has notifications turned off, or hasn\'t opened My FPHM in 30 days, often an old phone) or Off (never turned on). Open a minister to see each device, like "iPhone · today". Device names and dates fill in as each minister next opens My FPHM; until then older devices show as "Apple device" or "Android or Chrome device". Choose Needs help to see who to follow up with.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 26, 2026', version: '2026-10-26.1', items: [
+    'New: the Prayer Ministers tab now shows who has phone notifications working. A box under Active / Inactive says how many active ministers have them on, with All, Needs help and On filters. Each minister gets a chip: On, Check (every device has notifications turned off, or hasn\'t opened My FPHM in 30 days, often an old phone) or Off (never turned on). Open a minister to see each device, like "iPhone · today". Device names and dates fill in as each minister next opens My FPHM; until then older devices show as "Apple device" or "Android or Chrome device". Choose Needs help to see who to follow up with.'
+  ]},
   { date: 'Oct 23, 2026', version: '2026-10-23.4', items: [
     'Fixed: on a phone, the "+ Quick Add Slots" button on Schedule & Planning now fills the full width of the screen, like the buttons below it. The (i) on its right still explains what it does.'
   ]},
