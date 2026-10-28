@@ -204,15 +204,21 @@
   .ans-redacted{display:inline-block;background:var(--text);color:var(--text);border-radius:2px;letter-spacing:-1px;user-select:none;}
   /* Intake view: fills the whole viewport, header (name, text-size and Close
      buttons) stays pinned while the answers scroll underneath. */
-  #intakeViewModal{padding:0;align-items:stretch;}
-  #intakeViewModal .modal{max-width:none;width:100%;height:100%;max-height:none;border-radius:0;padding:0;display:flex;flex-direction:column;overflow:hidden;}
+  #intakeViewModal,#notesViewModal{padding:0;align-items:stretch;}
+  #intakeViewModal .modal,#notesViewModal .modal{max-width:none;width:100%;height:100%;max-height:none;border-radius:0;padding:0;display:flex;flex-direction:column;overflow:hidden;}
   .intake-view-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--border);background:#fff;}
   .intake-view-head h2{margin:0;font-size:var(--fs-lg);}
   .intake-view-head .head-btns{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
   .intake-view-head button.icon-btn{font-family:inherit;font-weight:700;line-height:1;color:var(--navy);}
   .intake-view-head .a-sm{font-size:15px;} .intake-view-head .a-lg{font-size:24px;}
   .intake-view-scroll{flex:1;overflow-y:auto;padding:12px 16px 24px;}
-  .intake-link-row{margin-top:8px;}
+  .intake-link-row{margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;}
+  .note-view{border:1px solid var(--border);border-radius:8px;background:#fff;padding:16px;margin-bottom:16px;}
+  .note-view-date{font-family:'Playfair Display',Georgia,serif;margin:0 0 4px;font-size:var(--fs-md);}
+  .note-view-meta{margin:0 0 16px;}
+  .ans-subrow{padding:8px 0;border-bottom:1px dashed var(--border);}
+  .ans-subrow:last-child{border-bottom:0;}
+  .ans-empty{color:var(--muted);margin:0;}
   .legal-text{font-size:var(--fs-sm);color:var(--muted);background:var(--cream);padding:14px;border-radius:8px;}
   .rich-text p{margin:0 0 1em;} .rich-text p:last-child{margin-bottom:0;}
   .rich-text ul,.rich-text ol{margin:0 0 1em;padding-left:1.4em;}
@@ -495,6 +501,23 @@
 </div>
 <div id="intakePrintArea"></div>
 
+<div class="modal-bg" id="notesViewModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="notesViewTitle">
+    <div class="intake-view-head">
+      <h2 id="notesViewTitle">Session notes</h2>
+      <div class="head-btns">
+        <button type="button" class="icon-btn" onclick="changeIntakeTextSize(-1)" title="Smaller text" aria-label="Make text smaller"><span class="a-sm" aria-hidden="true">A</span><span aria-hidden="true">&minus;</span></button>
+        <button type="button" class="icon-btn" onclick="changeIntakeTextSize(1)" title="Larger text" aria-label="Make text larger"><span class="a-lg" aria-hidden="true">A</span><span aria-hidden="true">+</span></button>
+        <button class="btn" id="btnNotesViewClose">Close</button>
+      </div>
+    </div>
+    <div class="intake-view-scroll">
+      <p class="helptext" style="margin-top:0;">Notes from this person's sessions, newest first.</p>
+      <div id="notesViewBody"></div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="confirmModal">
   <div class="modal small" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
     <h2 id="confirmTitle">Please confirm</h2>
@@ -522,7 +545,9 @@ const MSAL_CONFIG = {
 };
 const GRAPH_SCOPES = ["Sites.ReadWrite.All", "User.Read"];
 const SITE_URL = "https://creeksidechurch.sharepoint.com/sites/FreedomPrayer";
-const LIST_NAMES = { ministers: "PrayerMinisters", sessions: "PrayerSessions", blackouts: "BlackoutDates", intake: "IntakeResponses", formSchema: "IntakeFormSchema" };
+const LIST_NAMES = { ministers: "PrayerMinisters", sessions: "PrayerSessions", blackouts: "BlackoutDates", intake: "IntakeResponses", formSchema: "IntakeFormSchema", notes: "SessionNotes" };
+// Lists the portal can do without: missing or unreadable just hides the feature.
+const OPTIONAL_LISTS = new Set(["notes"]);
 
 const msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
 const msalReady = msalInstance.initialize();
@@ -681,7 +706,10 @@ async function resolveSiteAndLists(){
   const listsResp = await graphFetch(`/sites/${siteId}/lists?$select=id,displayName`);
   for(const key of Object.keys(LIST_NAMES)){
     const match = listsResp.value.find(l => l.displayName === LIST_NAMES[key]);
-    if(!match) throw new Error(`List "${LIST_NAMES[key]}" not found or not accessible.`);
+    if(!match){
+      if(OPTIONAL_LISTS.has(key)){ delete listIds[key]; continue; }
+      throw new Error(`List "${LIST_NAMES[key]}" not found or not accessible.`);
+    }
     listIds[key] = match.id;
   }
 }
@@ -703,7 +731,7 @@ async function deleteItem(key, itemId){
 /* =========================================================================
    DATA
 ========================================================================= */
-let ministers=[], sessions=[], blackouts=[], intakeResponses=[], me=null;
+let ministers=[], sessions=[], blackouts=[], intakeResponses=[], sessionNotes=[], me=null;
 let sessionNumberMap = new Map();
 
 async function loadAll(){
@@ -752,6 +780,7 @@ async function loadAll(){
       intakeResponseId: (s.IntakeResponseId!=null && s.IntakeResponseId!=='') ? parseInt(s.IntakeResponseId,10) : null
     };
   });
+  sessionNotes = await loadSessionNotes();
   blackouts = rawBlack.map(b => ({ id: b.id, ministerName: b.Title, date: (b.BlackoutDate||'').split('T')[0], endDate: b.EndDate ? b.EndDate.split('T')[0] : null, notes: b.Notes||'', createdByEmail: b._createdByEmail||'' }));
 
   const myEmail = (account.username||'').trim().toLowerCase();
@@ -767,6 +796,25 @@ async function loadAll(){
     if(messagesReady) renderMessages();
   }
   $('#lastRefreshed').textContent = 'Data as of ' + fmtTime(new Date());
+}
+// Session Notes (written in the admin Scheduler, one self-contained JSON
+// record per session - see preview/index.html's SESSION NOTES section).
+// Optional: if the SessionNotes list is missing or this minister can't read
+// it, the portal just shows no notes.
+async function loadSessionNotes(){
+  if(!listIds.notes) return [];
+  try{
+    const raw = await listItems('notes');
+    return raw.map(n=>{
+      let rec = null;
+      try{ rec = JSON.parse(n.NotesJSON||''); }catch(e){}
+      const sid = rec && rec.session && rec.session.id!=null ? parseInt(rec.session.id,10) : parseInt(n.SessionId,10);
+      return rec && !isNaN(sid) ? { id: n.id, sessionId: sid, record: rec } : null;
+    }).filter(Boolean);
+  }catch(e){
+    console.warn('Could not load session notes:', e.message);
+    return [];
+  }
 }
 function toHM(iso){
   if(!iso) return '';
@@ -851,13 +899,59 @@ window.toggleStatsCollapse = function(btn){
 /* Only sessions where I'm one of the assigned ministers */
 function mySessions(){ return sessions.filter(s=> s.ministers.some(m=>m.id===me.id)); }
 
-// A small "View intake form" row, or '' if there's no match - prepended
-// to a recipient group's body in Schedule/Completed Sessions.
-function intakeLinkRowFor(name){
+// A small row of "View intake form" / "Session notes (N)" buttons, or ''
+// if there's neither - prepended to a recipient group's body in
+// Schedule/Completed Sessions.
+function recipientLinksRowFor(name){
   const match = findMyIntakeForRecipient(name);
-  if(!match) return '';
-  return `<div class="intake-link-row"><button type="button" class="btn secondary" onclick="openIntakeView(${match.id})">View intake form</button></div>`;
+  const notes = notesForRecipient(name);
+  if(!match && !notes.length) return '';
+  return `<div class="intake-link-row">`
+    + (match ? `<button type="button" class="btn secondary" onclick="openIntakeView(${match.id})">View intake form</button>` : '')
+    + (notes.length ? `<button type="button" class="btn secondary" onclick="openRecipientNotes(${escapeHtml(JSON.stringify(name))})">Session notes (${notes.length})</button>` : '')
+    + `</div>`;
 }
+
+// Session notes from EVERY session this recipient has had (whoever was on
+// the team), so a follow-up team can read what happened before - added
+// 2026-10-28 at the user's request. Only for a recipient the signed-in
+// minister has (or had) a session with; like the intake forms, that's a
+// client-side filter, not a SharePoint-enforced boundary (gotcha #11).
+// Matched by recipient name, same convention as everywhere else. Newest first.
+function notesForRecipient(name){
+  if(!name || !sessionNotes.length) return [];
+  const key = name.trim().toLowerCase();
+  if(!mySessions().some(s=>s.recipName.trim().toLowerCase()===key)) return [];
+  return sessionNotes.map(n=>{
+    const s = sessions.find(x=>x.id===n.sessionId) || null;
+    const recip = s ? s.recipName : ((n.record.session||{}).recipName||'');
+    return { note: n, session: s, recip };
+  }).filter(x=>x.recip.trim().toLowerCase()===key)
+    .sort((a,b)=> noteSortKey(b).localeCompare(noteSortKey(a)));
+}
+function noteSortKey(x){
+  const rs = x.note.record.session||{};
+  return x.session ? sessionSortKey(x.session) : (rs.date||'')+' '+(rs.time||'');
+}
+window.openRecipientNotes = function(name){
+  const list = notesForRecipient(name);
+  if(!list.length) return;
+  $('#notesViewTitle').textContent = `Session notes: ${name}`;
+  $('#notesViewBody').innerHTML = list.map(({note, session})=>{
+    const rs = note.record.session||{};
+    const date = session ? session.date : (rs.date||'');
+    const team = session ? ministerNamesOf(session)
+      : (rs.ministers||[]).map(m=>m.name + (m.role==='Lead'?' (Lead)':'')).join(', ');
+    const meta = [session ? `Session #${sessionNumberOf(session)}` : '', session && session.apptType ? session.apptType : '', team ? 'Team: '+team : ''].filter(Boolean).join(' · ');
+    return `<article class="note-view">
+      <h3 class="note-view-date">${escapeHtml(date ? fmtDate(new Date(date+'T00:00')) : 'Date unknown')}</h3>
+      ${meta ? `<p class="helptext note-view-meta">${escapeHtml(meta)}</p>` : ''}
+      ${FPHM.renderNotesHtml(note.record)}
+    </article>`;
+  }).join('');
+  applyIntakeTextSize();
+  $('#notesViewModal').classList.add('open');
+};
 
 // A minister can only see an intake form for a recipient they actually
 // have (or had) a session with, AND only once staff has explicitly
@@ -910,6 +1004,7 @@ function applyIntakeTextSize(){
   let n = 1;
   try{ n = parseFloat(localStorage.getItem('fphmIntakeTextScale')) || 1; }catch(e){}
   $('#intakeViewModal').style.setProperty('--ans-scale', n);
+  $('#notesViewModal').style.setProperty('--ans-scale', n);
 }
 window.changeIntakeTextSize = function(dir){
   let n = 1;
@@ -1092,7 +1187,7 @@ function renderSchedule(){
       : `Last: ${fmtShort(g.mostRecent.date)} · ${g.mostRecent.status}`;
     const wasOpen = opened.has(g.key) ? opened.get(g.key) : false;
     return groupRow(g.key, initials(g.name), g.name, `${g.vis.length} session${g.vis.length===1?'':'s'}`, summary,
-      intakeLinkRowFor(g.name) + g.vis.map(s=>scheduleSessionRow(s)).join(''), wasOpen);
+      recipientLinksRowFor(g.name) + g.vis.map(s=>scheduleSessionRow(s)).join(''), wasOpen);
   }).join('');
 }
 
@@ -1173,7 +1268,7 @@ function renderCompleted(){
   box.innerHTML = groups.map(g=>{
     const wasOpen = opened.has(g.key) ? opened.get(g.key) : false;
     return groupRow(g.key, initials(g.name), g.name, `${g.done.length} completed`, `Last: ${fmtShort(g.done[0].date)}`,
-      intakeLinkRowFor(g.name) + g.done.map(s=>completedSessionRow(s)).join(''), wasOpen);
+      recipientLinksRowFor(g.name) + g.done.map(s=>completedSessionRow(s)).join(''), wasOpen);
   }).join('');
 
   renderCompletedStats();
@@ -1871,6 +1966,7 @@ function wireApp(){
   $('#btnConfirmOk').addEventListener('click', ()=>closeConfirm(true));
   $('#btnIntakeViewClose').addEventListener('click', ()=>$('#intakeViewModal').classList.remove('open'));
   $('#btnIntakeViewPrint').addEventListener('click', printIntakeView);
+  $('#btnNotesViewClose').addEventListener('click', ()=>$('#notesViewModal').classList.remove('open'));
   document.querySelectorAll('.modal-bg').forEach(bg=>{
     bg.addEventListener('click', (e)=>{
       if(e.target!==bg) return;

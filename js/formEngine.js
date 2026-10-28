@@ -133,6 +133,53 @@ const FPHM = (function () {
     return html;
   }
 
+  // Read-only view of a saved Session Notes record (added 2026-10-28):
+  // { schema:{SECTIONS}, answers } - the note carries the exact form it was
+  // written with, so it's rendered from that, never the current form. Uses
+  // the same .ans-* classes as renderResponsesHtml(). Handles every notes
+  // question type: text/number/textarea/select, radio (+ its "__text" box),
+  // checkboxes (+ "Other"), add-rows tables and choice/checkbox grids (+ the
+  // grid's "__notes" box).
+  function renderNotesHtml(record) {
+    const sections = (record && record.schema && record.schema.SECTIONS) || [];
+    const a = (record && record.answers) || {};
+    const has = (v) => v !== undefined && v !== null && String(v).trim() !== "";
+    const line = (label, val) => `<div>${label ? `<strong>${escapeHtml(label)}:</strong> ` : ""}${escapeHtml(val)}</div>`;
+    let html = "";
+    for (const section of sections) {
+      const rows = (section.questions || []).map((q) => {
+        const v = a[q.id];
+        let body = "";
+        if (q.type === "rowtable") {
+          const cols = q.tableColumns || [];
+          body = (Array.isArray(v) ? v : []).map((row, ri) => {
+            const parts = cols.filter((c) => has(row[c.id]) || has(row[c.id + "__text"])).map((c) => {
+              let val = has(row[c.id]) ? String(row[c.id]) : "";
+              if (has(row[c.id + "__text"])) val += (val ? " - " : "") + row[c.id + "__text"];
+              return line(c.label, val);
+            }).join("");
+            return parts ? `<div class="ans-subrow">${parts}</div>` : "";
+          }).join("");
+        } else if (q.type === "choicegrid" || q.type === "checkboxgrid") {
+          if (v && typeof v === "object" && !Array.isArray(v)) {
+            body = Object.keys(v).filter((r) => (Array.isArray(v[r]) ? v[r].length : has(v[r])))
+              .map((r) => line(r, Array.isArray(v[r]) ? v[r].join(", ") : v[r])).join("");
+          }
+          if (has(a[q.id + "__notes"])) body += line(q.notesLabel || "Notes", a[q.id + "__notes"]);
+        } else {
+          const txt = Array.isArray(v) ? formatAnswer(q, v) : has(v) ? String(v) : "";
+          if (txt) body = escapeHtml(txt);
+          if (has(a[q.id + "__text"])) body += (body ? "\n" : "") + escapeHtml(a[q.id + "__text"]);
+        }
+        if (!body) return "";
+        return `<div class="ans-row"><div class="ans-q">${escapeHtml(q.label || "")}</div><div class="ans-a">${body}</div></div>`;
+      }).join("");
+      if (!rows) continue;
+      html += `<section class="ans-section"><h3>${escapeHtml(section.title || "")}</h3>${rows}</section>`;
+    }
+    return html || `<p class="ans-empty">No answers were filled in.</p>`;
+  }
+
   // ---- redaction ----------------------------------------------------
   // A phrase matches case-insensitively and with any run of whitespace
   // standing in for a space, so a phrase picked from the rendered page
@@ -471,6 +518,7 @@ const FPHM = (function () {
     validateAll,
     formatAnswer,
     renderResponsesHtml,
+    renderNotesHtml,
     suggestRedactions,
     isRedacted,
     escapeHtml,
