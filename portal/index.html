@@ -213,8 +213,12 @@
   .intake-view-head .a-sm{font-size:15px;} .intake-view-head .a-lg{font-size:24px;}
   .intake-view-scroll{flex:1;overflow-y:auto;padding:12px 16px 24px;}
   .intake-link-row{margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;}
-  /* Intake form + Session notes share one row at equal width (2026-10-29). */
-  .intake-link-row .btn{flex:1 1 0;min-width:0;padding:12px 8px;}
+  /* Recipient card buttons (2026-10-29, at the user's request): full width
+     and stacked on phones, as wide as their label from 640px up. */
+  .intake-link-row .btn,.notes-btn{width:100%;}
+  @media (min-width:640px){
+    .intake-link-row .btn,.notes-btn{width:auto;}
+  }
   .note-view{border:1px solid var(--border);border-radius:8px;background:#fff;padding:16px;margin-bottom:16px;}
   .note-view-date{font-family:'Playfair Display',Georgia,serif;margin:0 0 4px;font-size:var(--fs-md);}
   .note-view-meta{margin:0 0 16px;}
@@ -918,7 +922,7 @@ function recipientLinksRowFor(name){
   if(!match && !notes.length) return '';
   return `<div class="intake-link-row">`
     + (match ? `<button type="button" class="btn secondary" onclick="openIntakeView(${match.id})">View intake form</button>` : '')
-    + (notes.length ? `<button type="button" class="btn secondary" onclick="openRecipientNotes(${escapeHtml(JSON.stringify(name))})">Session notes (${notes.length})</button>` : '')
+    + (notes.length ? `<button type="button" class="btn secondary" onclick="openRecipientNotes(${escapeHtml(JSON.stringify(name))})">View combined session notes</button>` : '')
     + `</div>`;
 }
 
@@ -952,7 +956,7 @@ window.openRecipientNotes = function(name){
 // session's own row (2026-10-29, at the user's request).
 function sessionNoteFor(id){ return sessionNotes.find(n=>n.sessionId===id) || null; }
 function sessionNotesBtnHtml(s){
-  return sessionNoteFor(s.id) ? `<button class="btn secondary" style="width:100%;" onclick="openSessionNote(${s.id})">View session notes</button>` : '';
+  return sessionNoteFor(s.id) ? `<button class="btn secondary notes-btn" onclick="openSessionNote(${s.id})">View session notes</button>` : '';
 }
 window.openSessionNote = function(id){
   const note = sessionNoteFor(id), s = sessions.find(x=>x.id===id);
