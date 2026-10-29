@@ -1309,7 +1309,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-28.1";
+const APP_VERSION = "2026-10-28.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -4983,7 +4983,9 @@ function renderOverview(){
      Check = has devices, but every one is blocked or not opened in 30 days
      Off   = no devices
    A device not opened in NOTIF_REMOVE_DAYS is deleted automatically each
-   time the Scheduler loads (an old phone, at the user's request), and an
+   time the Scheduler loads (an old phone, at the user's request), except a
+   minister's most recently opened device, which is always kept so someone
+   with one device (or only old ones) never drops off the list; an
    admin can remove one by hand. The Worker separately deletes any device
    the push service reports as gone (404/410) when it sends to it.
 ========================================================================= */
@@ -4991,7 +4993,10 @@ const NOTIF_STALE_DAYS = 30;
 const NOTIF_REMOVE_DAYS = 90;
 async function removeOldPushDevices(devices){
   const cutoff = Date.now() - NOTIF_REMOVE_DAYS*86400000;
-  const old = devices.filter(d=>{ const t = d.lastSeen ? Date.parse(d.lastSeen) : NaN; return !isNaN(t) && t < cutoff; });
+  const seen = d=>{ const t = d.lastSeen ? Date.parse(d.lastSeen) : NaN; return isNaN(t) ? 0 : t; };
+  const newest = new Map();
+  devices.forEach(d=>{ const k = newest.get(d.ministerId); if(!k || seen(d) > seen(k)) newest.set(d.ministerId, d); });
+  const old = devices.filter(d=>{ const t = seen(d); return t && t < cutoff && newest.get(d.ministerId) !== d; });
   if(!old.length) return devices;
   const gone = new Set();
   await Promise.all(old.map(d=>deleteItem('pushSubs', d.id).then(()=>gone.add(d.id)).catch(e=>console.warn('Could not remove old device:', e.message))));
@@ -5075,7 +5080,7 @@ function renderNotifSummary(show){
       ${counts.check ? `<span class="tag notif-check">${counts.check} to check</span>` : ''}
       ${counts.off ? `<span class="tag notif-off">${counts.off} off</span>` : ''}</div>
     <div class="notif-filter" role="group" aria-label="Filter by phone notifications">${btn('all','All')}${btn('help',`Needs help (${help})`)}${btn('on',`On (${counts.on})`)}</div>
-    <p class="helptext" style="margin:0;">"Check" means every device has notifications turned off or hasn't opened My FPHM in ${NOTIF_STALE_DAYS} days, often an old phone. A device not opened in ${NOTIF_REMOVE_DAYS} days is removed automatically.</p>
+    <p class="helptext" style="margin:0;">"Check" means every device has notifications turned off or hasn't opened My FPHM in ${NOTIF_STALE_DAYS} days, often an old phone. A device not opened in ${NOTIF_REMOVE_DAYS} days is removed automatically, unless it's the minister's only one.</p>
   </div>`;
 }
 window.setNotifFilter = function(f){ overviewNotifFilter = f; renderOverview(); };
@@ -8018,6 +8023,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 29, 2026', version: '2026-10-28.2', items: [
+    'Changed: the 90-day clean-up on the Prayer Ministers tab never removes a minister\'s only device. If someone has just one phone or tablet, it stays on their "Phone notifications" list (showing Check) however long it has been, so you can still see it and follow up. When someone has more than one device, the old ones are still removed after 90 days, but their most recently opened device is always kept. The Remove link still works on any device.'
+  ]},
   { date: 'Oct 28, 2026', version: '2026-10-28.1', items: [
     'New: earlier session notes for follow-up sessions. In My FPHM (live now), a prayer recipient\'s card on Schedule and Completed Sessions has a "Session notes (N)" button whenever notes were written for any of that person\'s sessions, including ones with a different team. It opens the notes full screen, newest first, each with its date, session number and team. Here in the Scheduler, the Session Notes form for a follow-up shows "Notes from earlier sessions" above the questions (tap to open). To check: write notes on a past session, then open a later session for the same person in both places. Ministers need permission to read the SessionNotes list in SharePoint; if they don\'t have it, the button just doesn\'t appear.'
   ]},
@@ -8030,15 +8038,15 @@ const CHANGE_LOG = [
   { date: 'Oct 26, 2026', version: '2026-10-26.4', items: [
     'Changed: the "Install guide for ministers" link on the Prayer Ministers tab now opens a page on our own site (the My FPHM address followed by install/), so ministers can open it without any sign-in. Copy Link to Install Guide copies that address.'
   ]},
-  { date: 'Oct 26, 2026', version: '2026-10-26.3', items: [
-    'New: an install guide you can send to prayer ministers. The Prayer Ministers tab has an "Install guide for ministers" link at the top, plus "Copy Link to Install Guide" so you can paste it into an email or text. The guide walks them through adding My FPHM to the home screen on iPhone/iPad (Safari) and Android (Chrome), turning notifications on in My FPHM Settings and sending themselves a test, and what to do when it does not work. It explains that on an iPhone notifications only work once My FPHM is on the home screen.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 26, 2026', version: '2026-10-26.3', items: [
+    'New: an install guide you can send to prayer ministers. The Prayer Ministers tab has an "Install guide for ministers" link at the top, plus "Copy Link to Install Guide" so you can paste it into an email or text. The guide walks them through adding My FPHM to the home screen on iPhone/iPad (Safari) and Android (Chrome), turning notifications on in My FPHM Settings and sending themselves a test, and what to do when it does not work. It explains that on an iPhone notifications only work once My FPHM is on the home screen.'
+  ]},
   { date: 'Oct 26, 2026', version: '2026-10-26.2', items: [
     'New: old phones and tablets clear themselves out of the notification list. On the Prayer Ministers tab, a device that hasn\'t opened My FPHM in 90 days is removed automatically. Each device in a minister\'s "Phone notifications" list also has a Remove link so you can clear one yourself, for example right after someone gets a new phone. A removed device stops getting phone notifications until they turn them on again in My FPHM. Devices the phone company reports as no longer existing were already removed automatically.'
   ]},
