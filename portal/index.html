@@ -514,7 +514,7 @@
       </div>
     </div>
     <div class="intake-view-scroll">
-      <p class="helptext" style="margin-top:0;">Notes from this person's sessions, newest first.</p>
+      <p class="helptext" id="notesViewHelp" style="margin-top:0;"></p>
       <div id="notesViewBody"></div>
     </div>
   </div>
@@ -938,7 +938,23 @@ function noteSortKey(x){
 window.openRecipientNotes = function(name){
   const list = notesForRecipient(name);
   if(!list.length) return;
-  $('#notesViewTitle').textContent = `Session notes: ${name}`;
+  showNotesView(`Session notes: ${name}`, "Notes from this person's sessions, newest first.", list);
+};
+// One session's notes, from the "View session notes" button on that
+// session's own row (2026-10-29, at the user's request).
+function sessionNoteFor(id){ return sessionNotes.find(n=>n.sessionId===id) || null; }
+function sessionNotesBtnHtml(s){
+  return sessionNoteFor(s.id) ? `<button class="btn secondary" style="width:100%;" onclick="openSessionNote(${s.id})">View session notes</button>` : '';
+}
+window.openSessionNote = function(id){
+  const note = sessionNoteFor(id), s = sessions.find(x=>x.id===id);
+  if(!note || !s) return;
+  showNotesView(`Session #${sessionNumberOf(s)} notes: ${s.recipName}`, '', [{ note, session: s }]);
+};
+function showNotesView(title, help, list){
+  $('#notesViewTitle').textContent = title;
+  $('#notesViewHelp').textContent = help;
+  $('#notesViewHelp').hidden = !help;
   $('#notesViewBody').innerHTML = list.map(({note, session})=>{
     const rs = note.record.session||{};
     const date = session ? session.date : (rs.date||'');
@@ -953,7 +969,7 @@ window.openRecipientNotes = function(name){
   }).join('');
   applyIntakeTextSize();
   $('#notesViewModal').classList.add('open');
-};
+}
 
 // A minister can only see an intake form for a recipient they actually
 // have (or had) a session with, AND only once staff has explicitly
@@ -1118,6 +1134,7 @@ function scheduleSessionRow(s){
       <div class="wa-note ${s.waCreated?'on':''}">${ICONS.chat} ${s.waCreated?'WhatsApp group created':'No WhatsApp group yet'}</div>
       ${s.waCreated && s.waLink ? ` · <a href="${escapeHtml(s.waLink)}" target="_blank" rel="noopener">open chat</a>` : ''}
       <div style="margin-top:8px;display:flex;flex-direction:column;gap:8px;">
+        ${sessionNotesBtnHtml(s)}
         ${s.status==='Scheduled' ? `<button class="btn secondary" style="display:inline-flex;align-items:center;justify-content:center;gap:4px;width:100%;" onclick="addToCalendar(${s.id})">${ICONS.calendarPlus} Add to Calendar</button>` : ''}
         ${confirmBtn}
         ${declineBtn}
@@ -1207,6 +1224,7 @@ function completedSessionRow(s, withName){
       <div class="sess-meta">${fmtDate(new Date(s.date+'T'+s.time))} · ${fmt12(s.time)}–${fmt12(s.endTime)} · ${escapeHtml(s.location)}</div>
       <div class="sess-meta">${escapeHtml(ministerNamesOf(s))}</div>
       ${s.notes ? `<div class="sess-meta">${escapeHtml(s.notes)}</div>` : ''}
+      ${sessionNoteFor(s.id) ? `<div style="margin-top:8px;">${sessionNotesBtnHtml(s)}</div>` : ''}
     </div>
   </div>`;
 }
