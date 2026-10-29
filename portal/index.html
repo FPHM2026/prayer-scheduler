@@ -215,9 +215,9 @@
   .intake-link-row{margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;}
   /* Recipient card buttons (2026-10-29, at the user's request): full width
      and stacked on phones, as wide as their label from 640px up. */
-  .intake-link-row .btn,.notes-btn{width:100%;}
+  .intake-link-row .btn{width:100%;}
   @media (min-width:640px){
-    .intake-link-row .btn,.notes-btn{width:auto;}
+    .intake-link-row .btn{width:auto;}
   }
   .note-view{border:1px solid var(--border);border-radius:8px;background:#fff;padding:16px;margin-bottom:16px;}
   .note-view-date{font-family:'Playfair Display',Georgia,serif;margin:0 0 4px;font-size:var(--fs-md);}
@@ -922,7 +922,7 @@ function recipientLinksRowFor(name){
   if(!match && !notes.length) return '';
   return `<div class="intake-link-row">`
     + (match ? `<button type="button" class="btn secondary" onclick="openIntakeView(${match.id})">View intake form</button>` : '')
-    + (notes.length ? `<button type="button" class="btn secondary" onclick="openRecipientNotes(${escapeHtml(JSON.stringify(name))})">View combined session notes</button>` : '')
+    + (notes.length ? `<button type="button" class="btn secondary" onclick="openRecipientNotes(${escapeHtml(JSON.stringify(name))})">View session notes</button>` : '')
     + `</div>`;
 }
 
@@ -951,17 +951,6 @@ window.openRecipientNotes = function(name){
   const list = notesForRecipient(name);
   if(!list.length) return;
   showNotesView(`Session notes: ${name}`, "Notes from this person's sessions, newest first.", list);
-};
-// One session's notes, from the "View session notes" button on that
-// session's own row (2026-10-29, at the user's request).
-function sessionNoteFor(id){ return sessionNotes.find(n=>n.sessionId===id) || null; }
-function sessionNotesBtnHtml(s){
-  return sessionNoteFor(s.id) ? `<button class="btn secondary notes-btn" onclick="openSessionNote(${s.id})">View session notes</button>` : '';
-}
-window.openSessionNote = function(id){
-  const note = sessionNoteFor(id), s = sessions.find(x=>x.id===id);
-  if(!note || !s) return;
-  showNotesView(`Session #${sessionNumberOf(s)} notes: ${s.recipName}`, '', [{ note, session: s }]);
 };
 function showNotesView(title, help, list){
   $('#notesViewTitle').textContent = title;
@@ -1151,7 +1140,6 @@ function scheduleSessionRow(s){
       <div class="wa-note ${s.waCreated?'on':''}">${ICONS.chat} ${s.waCreated?'WhatsApp group created':'No WhatsApp group yet'}</div>
       ${s.waCreated && s.waLink ? ` · <a href="${escapeHtml(s.waLink)}" target="_blank" rel="noopener">open chat</a>` : ''}
       <div style="margin-top:8px;display:flex;flex-direction:column;gap:8px;">
-        ${sessionNotesBtnHtml(s)}
         ${s.status==='Scheduled' ? `<button class="btn secondary" style="display:inline-flex;align-items:center;justify-content:center;gap:4px;width:100%;" onclick="addToCalendar(${s.id})">${ICONS.calendarPlus} Add to Calendar</button>` : ''}
         ${confirmBtn}
         ${declineBtn}
@@ -1241,7 +1229,6 @@ function completedSessionRow(s, withName){
       <div class="sess-meta">${fmtDate(new Date(s.date+'T'+s.time))} · ${fmt12(s.time)}–${fmt12(s.endTime)} · ${escapeHtml(s.location)}</div>
       <div class="sess-meta">${escapeHtml(ministerNamesOf(s))}</div>
       ${s.notes ? `<div class="sess-meta">${escapeHtml(s.notes)}</div>` : ''}
-      ${sessionNoteFor(s.id) ? `<div style="margin-top:8px;">${sessionNotesBtnHtml(s)}</div>` : ''}
     </div>
   </div>`;
 }
