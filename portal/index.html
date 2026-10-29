@@ -284,6 +284,9 @@
   .sess-row:last-child{border-bottom:none;}
   .sess-row>*:first-child{min-width:0;}
   .sess-meta{color:var(--muted);font-size:var(--fs-sm);margin-top:3px;}
+  /* A session's Notes, set apart from the date/team lines (2026-10-29). */
+  .sess-notes{margin-top:8px;padding:8px 16px;background:#f3e7e0;border-left:4px solid var(--gold);border-radius:4px;font-size:var(--fs-sm);color:var(--text);white-space:pre-wrap;overflow-wrap:anywhere;}
+  .sess-notes-label{display:block;font-family:'Playfair Display',Georgia,serif;font-weight:700;font-size:var(--fs-xs);color:var(--gold-dark);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;white-space:normal;}
   .sess-actions{display:flex;gap:2px;flex-shrink:0;}
   .wa-note{display:inline-flex;align-items:center;gap:4px;color:var(--muted);font-size:var(--fs-sm);margin-top:4px;}
   .wa-note.on{color:var(--ok);font-weight:600;}
@@ -1136,7 +1139,7 @@ function scheduleSessionRow(s){
       </div>
       <div class="sess-meta">${fmtDate(new Date(s.date+'T'+s.time))} · ${fmt12(s.time)}–${fmt12(s.endTime)} · ${escapeHtml(s.location)}</div>
       <div class="sess-meta">${escapeHtml(ministerNamesOf(s))}</div>
-      ${s.notes ? `<div class="sess-meta">${escapeHtml(s.notes)}</div>` : ''}
+      ${s.notes ? `<div class="sess-notes"><span class="sess-notes-label">Notes</span>${escapeHtml(s.notes)}</div>` : ''}
       <div class="wa-note ${s.waCreated?'on':''}">${ICONS.chat} ${s.waCreated?'WhatsApp group created':'No WhatsApp group yet'}</div>
       ${s.waCreated && s.waLink ? ` · <a href="${escapeHtml(s.waLink)}" target="_blank" rel="noopener">open chat</a>` : ''}
       <div style="margin-top:8px;display:flex;flex-direction:column;gap:8px;">
@@ -1228,7 +1231,7 @@ function completedSessionRow(s, withName){
       </div>
       <div class="sess-meta">${fmtDate(new Date(s.date+'T'+s.time))} · ${fmt12(s.time)}–${fmt12(s.endTime)} · ${escapeHtml(s.location)}</div>
       <div class="sess-meta">${escapeHtml(ministerNamesOf(s))}</div>
-      ${s.notes ? `<div class="sess-meta">${escapeHtml(s.notes)}</div>` : ''}
+      ${s.notes ? `<div class="sess-notes"><span class="sess-notes-label">Notes</span>${escapeHtml(s.notes)}</div>` : ''}
     </div>
   </div>`;
 }
