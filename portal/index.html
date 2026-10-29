@@ -220,8 +220,8 @@
     .intake-link-row .btn{width:auto;}
   }
   /* Combined session notes: each session is its own clearly separated card
-     with a bold date header; the open one gets a solid terracotta header
-     (2026-10-29, at the user's request). */
+     with a bold date header on a light terracotta band; the open one gets a
+     terracotta rule under it (2026-10-29, at the user's request). */
   .note-view{border:1px solid var(--border);border-left:4px solid var(--gold);border-radius:8px;background:#fff;padding:16px;margin-bottom:24px;box-shadow:0 1px 4px rgba(0,0,0,.06);overflow:hidden;}
   .note-view-chip{display:inline-block;font-size:var(--fs-xs);font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--gold-dark);margin-bottom:4px;}
   .note-view-date{font-family:'Playfair Display',Georgia,serif;margin:0 0 4px;font-size:var(--fs-lg);color:var(--navy);line-height:1.25;}
@@ -232,8 +232,7 @@
   .note-fold-text{flex:1;min-width:0;}
   .note-fold .note-view-meta{margin:0;}
   .note-fold-chev{display:inline-flex;color:var(--gold-dark);transition:transform .2s;}
-  .note-fold[open] > summary{background:var(--gold);}
-  .note-fold[open] > summary .note-view-chip,.note-fold[open] > summary .note-view-date,.note-fold[open] > summary .note-view-meta,.note-fold[open] .note-fold-chev{color:#fff;}
+  .note-fold[open] > summary{border-bottom:2px solid var(--gold);}
   .note-fold[open] .note-fold-chev{transform:rotate(180deg);}
   .note-fold-body{padding:16px;}
   .ans-subrow{padding:8px 0;border-bottom:1px dashed var(--border);}
