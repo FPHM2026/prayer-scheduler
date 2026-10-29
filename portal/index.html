@@ -219,17 +219,23 @@
   @media (min-width:640px){
     .intake-link-row .btn{width:auto;}
   }
-  .note-view{border:1px solid var(--border);border-radius:8px;background:#fff;padding:16px;margin-bottom:16px;}
-  .note-view-date{font-family:'Playfair Display',Georgia,serif;margin:0 0 4px;font-size:var(--fs-md);}
-  .note-view-meta{margin:0 0 16px;}
+  /* Combined session notes: each session is its own clearly separated card
+     with a bold date header; the open one gets a solid terracotta header
+     (2026-10-29, at the user's request). */
+  .note-view{border:1px solid var(--border);border-left:4px solid var(--gold);border-radius:8px;background:#fff;padding:16px;margin-bottom:24px;box-shadow:0 1px 4px rgba(0,0,0,.06);overflow:hidden;}
+  .note-view-chip{display:inline-block;font-size:var(--fs-xs);font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--gold-dark);margin-bottom:4px;}
+  .note-view-date{font-family:'Playfair Display',Georgia,serif;margin:0 0 4px;font-size:var(--fs-lg);color:var(--navy);line-height:1.25;}
+  .note-view-meta{margin:0 0 16px;font-size:var(--fs-sm);color:var(--muted);}
   .note-fold{padding:0;}
-  .note-fold > summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:16px;min-height:44px;}
+  .note-fold > summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:16px;min-height:44px;background:#f3e7e0;}
   .note-fold > summary::-webkit-details-marker{display:none;}
   .note-fold-text{flex:1;min-width:0;}
   .note-fold .note-view-meta{margin:0;}
   .note-fold-chev{display:inline-flex;color:var(--gold-dark);transition:transform .2s;}
+  .note-fold[open] > summary{background:var(--gold);}
+  .note-fold[open] > summary .note-view-chip,.note-fold[open] > summary .note-view-date,.note-fold[open] > summary .note-view-meta,.note-fold[open] .note-fold-chev{color:#fff;}
   .note-fold[open] .note-fold-chev{transform:rotate(180deg);}
-  .note-fold-body{padding:0 16px 16px;border-top:1px solid var(--border);padding-top:16px;}
+  .note-fold-body{padding:16px;}
   .ans-subrow{padding:8px 0;border-bottom:1px dashed var(--border);}
   .ans-subrow:last-child{border-bottom:0;}
   .ans-empty{color:var(--muted);margin:0;}
@@ -964,9 +970,10 @@ function showNotesView(title, help, list){
     const date = session ? session.date : (rs.date||'');
     const team = session ? ministerNamesOf(session)
       : (rs.ministers||[]).map(m=>m.name + (m.role==='Lead'?' (Lead)':'')).join(', ');
-    const meta = [session ? `Session #${sessionNumberOf(session)}` : '', session && session.apptType ? session.apptType : '', team ? 'Team: '+team : ''].filter(Boolean).join(' · ');
-    const head = `<h3 class="note-view-date">${escapeHtml(date ? fmtDate(new Date(date+'T00:00')) : 'Date unknown')}</h3>
-      ${meta ? `<p class="helptext note-view-meta">${escapeHtml(meta)}</p>` : ''}`;
+    const meta = [session && session.apptType ? session.apptType : '', team ? 'Team: '+team : ''].filter(Boolean).join(' · ');
+    const chip = session ? `<span class="note-view-chip">Session #${sessionNumberOf(session)}</span>` : '';
+    const head = `${chip}<h3 class="note-view-date">${escapeHtml(date ? fmtDate(new Date(date+'T00:00')) : 'Date unknown')}</h3>
+      ${meta ? `<p class="note-view-meta">${escapeHtml(meta)}</p>` : ''}`;
     if(!many) return `<article class="note-view">${head}${FPHM.renderNotesHtml(note.record)}</article>`;
     return `<details class="note-view note-fold"${i===0?' open':''}>
       <summary><span class="note-fold-text">${head}</span><span class="note-fold-chev" aria-hidden="true">${ICONS.chevron}</span></summary>
