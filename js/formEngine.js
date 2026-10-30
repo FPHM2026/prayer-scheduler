@@ -139,7 +139,7 @@ const FPHM = (function () {
   // the same .ans-* classes as renderResponsesHtml(). Handles every notes
   // question type: text/number/textarea/select, radio (+ its "__text" box),
   // checkboxes (+ "Other"), add-rows tables and choice/checkbox grids (+ the
-  // grid's "__notes" box).
+  // grid's "__notes" box and per-row "__rownotes").
   function renderNotesHtml(record) {
     const sections = (record && record.schema && record.schema.SECTIONS) || [];
     const a = (record && record.answers) || {};
@@ -161,10 +161,16 @@ const FPHM = (function () {
             return parts ? `<div class="ans-subrow">${parts}</div>` : "";
           }).join("");
         } else if (q.type === "choicegrid" || q.type === "checkboxgrid") {
-          if (v && typeof v === "object" && !Array.isArray(v)) {
-            body = Object.keys(v).filter((r) => (Array.isArray(v[r]) ? v[r].length : has(v[r])))
-              .map((r) => line(r, Array.isArray(v[r]) ? v[r].join(", ") : v[r])).join("");
-          }
+          // Per-row notes ("__rownotes", { row: text }) sit right under their row.
+          const rn = a[q.id + "__rownotes"] || {};
+          const g = (v && typeof v === "object" && !Array.isArray(v)) ? v : {};
+          const rowNames = Object.keys(g).filter((r) => (Array.isArray(g[r]) ? g[r].length : has(g[r])));
+          Object.keys(rn).forEach((r) => { if (has(rn[r]) && !rowNames.includes(r)) rowNames.push(r); });
+          body = rowNames.map((r) => {
+            const val = Array.isArray(g[r]) ? g[r].join(", ") : (has(g[r]) ? String(g[r]) : "");
+            const note = has(rn[r]) ? `<div class="ans-rownote">${escapeHtml(rn[r])}</div>` : "";
+            return (note ? `<div class="ans-subrow">` : "") + (val ? line(r, val) : `<div><strong>${escapeHtml(r)}</strong></div>`) + note + (note ? `</div>` : "");
+          }).join("");
           if (has(a[q.id + "__notes"])) body += line(q.notesLabel || "Notes", a[q.id + "__notes"]);
         } else {
           const txt = Array.isArray(v) ? formatAnswer(q, v) : has(v) ? String(v) : "";

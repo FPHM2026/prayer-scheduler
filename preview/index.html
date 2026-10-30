@@ -377,6 +377,7 @@
   #notesViewBody .ans-a{font-size:calc(var(--fs-sm) * var(--ans-scale,1));}
   .ans-subrow{padding:8px 0;border-bottom:1px dashed var(--border);}
   .ans-subrow:last-child{border-bottom:0;}
+  .ans-rownote{margin-top:4px;white-space:pre-wrap;}
   .ans-empty{color:var(--muted);margin:0;}
   /* Earlier sessions' notes, shown above the form in the notes modal. */
   .notes-earlier{border:1px solid var(--border);border-radius:8px;background:#fff;margin:0 0 16px;}
@@ -627,6 +628,10 @@
   #notesBody .nt-grid tbody th{text-align:left;font-weight:600;min-width:120px;}
   #notesBody .nt-grid tbody tr:last-child th,#notesBody .nt-grid tbody tr:last-child td{border-bottom:none;}
   #notesBody .nt-grid input{width:20px;height:20px;cursor:pointer;}
+  #notesBody .nt-grid tr.has-rownote th,#notesBody .nt-grid tr.has-rownote td{border-bottom:none;padding-bottom:4px;}
+  #notesBody .nt-grid td.nt-rownote{padding:0 12px 16px;text-align:left;}
+  #notesBody .nt-grid td.nt-rownote textarea{width:100%;min-height:64px;}
+  #notesBody .nt-grid tbody tr:last-child td.nt-rownote{padding-bottom:12px;}
   #notesBody input[type=text],#notesBody input[type=email],#notesBody input[type=number],#notesBody textarea,#notesBody select{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:8px;font-size:1rem;font-family:inherit;background:#fff;box-sizing:border-box;}
   #notesBody textarea{min-height:90px;resize:vertical;}
   #notesBody .choice-option .other-text{flex:1 1 100%;width:auto;}
@@ -1354,7 +1359,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-29.1";
+const APP_VERSION = "2026-10-30.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -6838,6 +6843,9 @@ function gridEditorHtml(q, sIdx, qIdx){
       <input type="checkbox" ${q.limitPerColumn?'checked':''} onchange="updateQuestionField(${sIdx},${qIdx},'limitPerColumn',this.checked)"> Limit to one response per column
     </label></div>
     <div class="field"><label style="display:flex;align-items:center;gap:6px;font-weight:400;">
+      <input type="checkbox" ${q.rowNotes?'checked':''} onchange="updateQuestionField(${sIdx},${qIdx},'rowNotes',this.checked)"> Add a notes box under each row
+    </label></div>
+    <div class="field"><label style="display:flex;align-items:center;gap:6px;font-weight:400;">
       <input type="checkbox" ${q.withNotes?'checked':''} onchange="updateQuestionFieldAndRerender(${sIdx},${qIdx},'withNotes',this.checked)"> Add a text box below the grid
     </label></div>
     ${q.withNotes ? `<div class="field"><label>Text box label</label>
@@ -6939,7 +6947,7 @@ window.onQuestionTypeChange = function(sIdx, qIdx, newType){
   if(GRID_TYPES.includes(newType)){
     if(!Array.isArray(q.rows)) q.rows = ['Row 1','Row 2'];
     if(!Array.isArray(q.columns)) q.columns = ['Column 1','Column 2','Column 3'];
-  } else { delete q.rows; delete q.columns; delete q.limitPerColumn; delete q.rowsFrom; delete q.withNotes; delete q.notesLabel; }
+  } else { delete q.rows; delete q.columns; delete q.limitPerColumn; delete q.rowsFrom; delete q.rowNotes; delete q.withNotes; delete q.notesLabel; }
   if(!TYPES_WITH_OPTIONS.includes(newType)){ delete q.options; delete q.otherOption; }
   if(newType!=='checkboxes') delete q.otherOption;
   if(newType!=='number'){ delete q.min; delete q.max; }
@@ -7415,10 +7423,13 @@ function notesQuestionHtml(q, si, qi){
     const rows = notesRowsOf(q), cols = q.columns||[];
     const ans = (v && typeof v==='object' && !Array.isArray(v)) ? v : {};
     const isRadio = q.type==='choicegrid';
-    input = `<div class="grid-wrap"><table class="nt-grid"><thead><tr><th></th>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((r,ri)=>`<tr><th scope="row">${escapeHtml(r)}</th>${cols.map((c,ci)=>{
+    // "A notes box under each row" (added 2026-10-30): its own text per row,
+    // saved as answers[id+'__rownotes'] = { rowLabel: text }.
+    const rn = notesCtx.answers[q.id+'__rownotes'] || {};
+    input = `<div class="grid-wrap"><table class="nt-grid"><thead><tr><th></th>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((r,ri)=>`<tr${q.rowNotes?' class="has-rownote"':''}><th scope="row">${escapeHtml(r)}</th>${cols.map((c,ci)=>{
       const on = isRadio ? ans[r]===c : (Array.isArray(ans[r]) && ans[r].includes(c));
       return `<td><input type="${isRadio?'radio':'checkbox'}" name="${id}_${ri}" ${on?'checked':''} aria-label="${escapeHtml(r)}: ${escapeHtml(c)}" onchange="notesGridSet(${si},${qi},${ri},${ci},this.checked)"></td>`;
-    }).join('')}</tr>`).join('')}</tbody></table></div>`
+    }).join('')}</tr>${q.rowNotes ? `<tr><td class="nt-rownote" colspan="${cols.length+1}"><textarea rows="2" placeholder="Notes on ${escapeHtml(r)}" aria-label="Notes on ${escapeHtml(r)}" oninput="notesSetRowNote(${si},${qi},${ri},this.value)">${escapeHtml(rn[r]||'')}</textarea></td></tr>` : ''}`).join('')}</tbody></table></div>`
       + (q.withNotes ? `<label class="qlabel" style="margin-top:14px;">${escapeHtml(q.notesLabel||'Notes')}</label><textarea rows="3" oninput="notesSetGridNotes(${si},${qi},this.value)">${escapeHtml(notesCtx.answers[q.id+'__notes']||'')}</textarea>` : '');
   } else {
     const type = q.type==='email' ? 'email' : q.type==='number' ? 'number' : 'text';
@@ -7475,6 +7486,13 @@ window.notesGridSet = function(si, qi, ri, ci, checked){
     }
   }));
   notesApplyVisibility();
+};
+window.notesSetRowNote = function(si, qi, ri, text){
+  const q = notesQ(si,qi), row = notesRowsOf(q)[ri];
+  const cur = notesCtx.answers[q.id+'__rownotes'];
+  const m = (cur && typeof cur==='object') ? cur : {};
+  m[row] = text;
+  notesCtx.answers[q.id+'__rownotes'] = m;
 };
 window.notesSetGridNotes = function(si, qi, text){
   notesCtx.answers[notesQ(si,qi).id + '__notes'] = text;
@@ -7570,6 +7588,12 @@ function notesVisibleAnswers(){
         if(Object.keys(clean).length) out[q.id] = clean;
         const gn = a[q.id + '__notes'];
         if(q.withNotes && gn && String(gn).trim()) out[q.id + '__notes'] = String(gn);
+        const rn = a[q.id + '__rownotes'];
+        if(q.rowNotes && rn && typeof rn==='object'){
+          const keep = {};
+          rows.forEach(r=>{ if(rn[r] && String(rn[r]).trim()) keep[r] = String(rn[r]); });
+          if(Object.keys(keep).length) out[q.id + '__rownotes'] = keep;
+        }
         return;
       }
       const blank = v===undefined || v===null || v==='' || (Array.isArray(v) && v.length===0);
@@ -8130,6 +8154,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 30, 2026', version: '2026-10-30.1', items: [
+    'New: a notes box for each sequence. In Settings > Session Notes, open a grid question (for example "Was there an effect?") and tick "Add a notes box under each row". The session notes form then shows a notes box right under each row, so Forgiveness, Listening prayer and so on each get their own notes. Because "Was there an effect?" only lists the sequences marked Yes above it, only the sequences used get a box. The single text box below the grid is a separate option, so you can keep it as General notes or turn it off. Saved notes, and earlier notes in My FPHM, show each sequence\'s notes under its own name. Notes already saved stay exactly as they were written.'
+  ]},
   { date: 'Oct 29, 2026', version: '2026-10-29.1', items: [
     'New: "View intake form" and "View session notes" buttons at the top of each recipient\'s card on the Completed Sessions tab (By recipient), the same as prayer ministers have in My FPHM. View intake form opens the form that\'s linked to that person, and Back returns you to Completed Sessions. View session notes opens all of that person\'s notes full screen: one card per session, newest open, with the session number, a large date and the team on a light terracotta header. On phones the buttons are full width; on larger screens they\'re as wide as their labels. To check: open a recipient on Completed Sessions who has notes and a linked intake form.'
   ]},
@@ -8142,15 +8169,15 @@ const CHANGE_LOG = [
   { date: 'Oct 27, 2026', version: '2026-10-27.1', items: [
     'Changed: names are now hidden on intake forms automatically. In My FPHM, prayer ministers see \u2588\u2588\u2588\u2588\u2588\u2588 in place of the recipient\'s name and the spouse or partner name, everywhere they appear in the answers (full name, first name or last name), and a printed form is headed "Intake form" instead of the recipient\'s name. You don\'t have to pick these any more. Other names (children, friends, family named in answers) still need picking with Redact personal info. To check: open a submitted form in Intake Forms, tap Redact personal info, and see the recipient\'s and spouse\'s names highlighted; then open the same form from a minister\'s card in My FPHM.'
   ]},
-  { date: 'Oct 26, 2026', version: '2026-10-26.5', items: [
-    'Changed: "Install guide for ministers" on the Prayer Ministers tab now opens the guide full screen inside the Scheduler instead of leaving it. Close takes you straight back to the Prayer Ministers tab, still signed in. Copy Link at the top copies the guide\'s address to send to a minister. In the installed app, check that the guide opens and Close returns you to where you were.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 26, 2026', version: '2026-10-26.5', items: [
+    'Changed: "Install guide for ministers" on the Prayer Ministers tab now opens the guide full screen inside the Scheduler instead of leaving it. Close takes you straight back to the Prayer Ministers tab, still signed in. Copy Link at the top copies the guide\'s address to send to a minister. In the installed app, check that the guide opens and Close returns you to where you were.'
+  ]},
   { date: 'Oct 26, 2026', version: '2026-10-26.4', items: [
     'Changed: the "Install guide for ministers" link on the Prayer Ministers tab now opens a page on our own site (the My FPHM address followed by install/), so ministers can open it without any sign-in. Copy Link to Install Guide copies that address.'
   ]},
