@@ -1359,7 +1359,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-30.1";
+const APP_VERSION = "2026-10-30.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -6807,6 +6807,10 @@ window.sortQuestionList = function(sIdx, qIdx, field, dir){
   edSetDirty(true);
   renderFormEditor();
 };
+// Per-row notes boxes: on by default for a grid that pulls its rows from an
+// earlier grid (e.g. "Was there an effect?" listing the sequences used),
+// unless the editor's checkbox was unticked (rowNotes:false).
+function gridRowNotesOn(q){ return q.rowNotes===undefined ? !!q.rowsFrom : !!q.rowNotes; }
 function gridEditorHtml(q, sIdx, qIdx){
   const sources = questionsBefore(sIdx, qIdx).filter(x=>GRID_TYPES.includes(x.type));
   const fromMode = !!q.rowsFrom;
@@ -6843,7 +6847,7 @@ function gridEditorHtml(q, sIdx, qIdx){
       <input type="checkbox" ${q.limitPerColumn?'checked':''} onchange="updateQuestionField(${sIdx},${qIdx},'limitPerColumn',this.checked)"> Limit to one response per column
     </label></div>
     <div class="field"><label style="display:flex;align-items:center;gap:6px;font-weight:400;">
-      <input type="checkbox" ${q.rowNotes?'checked':''} onchange="updateQuestionField(${sIdx},${qIdx},'rowNotes',this.checked)"> Add a notes box under each row
+      <input type="checkbox" ${gridRowNotesOn(q)?'checked':''} onchange="updateQuestionField(${sIdx},${qIdx},'rowNotes',this.checked)"> Add a notes box under each row
     </label></div>
     <div class="field"><label style="display:flex;align-items:center;gap:6px;font-weight:400;">
       <input type="checkbox" ${q.withNotes?'checked':''} onchange="updateQuestionFieldAndRerender(${sIdx},${qIdx},'withNotes',this.checked)"> Add a text box below the grid
@@ -7426,10 +7430,10 @@ function notesQuestionHtml(q, si, qi){
     // "A notes box under each row" (added 2026-10-30): its own text per row,
     // saved as answers[id+'__rownotes'] = { rowLabel: text }.
     const rn = notesCtx.answers[q.id+'__rownotes'] || {};
-    input = `<div class="grid-wrap"><table class="nt-grid"><thead><tr><th></th>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((r,ri)=>`<tr${q.rowNotes?' class="has-rownote"':''}><th scope="row">${escapeHtml(r)}</th>${cols.map((c,ci)=>{
+    input = `<div class="grid-wrap"><table class="nt-grid"><thead><tr><th></th>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((r,ri)=>`<tr${gridRowNotesOn(q)?' class="has-rownote"':''}><th scope="row">${escapeHtml(r)}</th>${cols.map((c,ci)=>{
       const on = isRadio ? ans[r]===c : (Array.isArray(ans[r]) && ans[r].includes(c));
       return `<td><input type="${isRadio?'radio':'checkbox'}" name="${id}_${ri}" ${on?'checked':''} aria-label="${escapeHtml(r)}: ${escapeHtml(c)}" onchange="notesGridSet(${si},${qi},${ri},${ci},this.checked)"></td>`;
-    }).join('')}</tr>${q.rowNotes ? `<tr><td class="nt-rownote" colspan="${cols.length+1}"><textarea rows="2" placeholder="Notes on ${escapeHtml(r)}" aria-label="Notes on ${escapeHtml(r)}" oninput="notesSetRowNote(${si},${qi},${ri},this.value)">${escapeHtml(rn[r]||'')}</textarea></td></tr>` : ''}`).join('')}</tbody></table></div>`
+    }).join('')}</tr>${gridRowNotesOn(q) ? `<tr><td class="nt-rownote" colspan="${cols.length+1}"><textarea rows="2" placeholder="Notes on ${escapeHtml(r)}" aria-label="Notes on ${escapeHtml(r)}" oninput="notesSetRowNote(${si},${qi},${ri},this.value)">${escapeHtml(rn[r]||'')}</textarea></td></tr>` : ''}`).join('')}</tbody></table></div>`
       + (q.withNotes ? `<label class="qlabel" style="margin-top:14px;">${escapeHtml(q.notesLabel||'Notes')}</label><textarea rows="3" oninput="notesSetGridNotes(${si},${qi},this.value)">${escapeHtml(notesCtx.answers[q.id+'__notes']||'')}</textarea>` : '');
   } else {
     const type = q.type==='email' ? 'email' : q.type==='number' ? 'number' : 'text';
@@ -7589,7 +7593,7 @@ function notesVisibleAnswers(){
         const gn = a[q.id + '__notes'];
         if(q.withNotes && gn && String(gn).trim()) out[q.id + '__notes'] = String(gn);
         const rn = a[q.id + '__rownotes'];
-        if(q.rowNotes && rn && typeof rn==='object'){
+        if(gridRowNotesOn(q) && rn && typeof rn==='object'){
           const keep = {};
           rows.forEach(r=>{ if(rn[r] && String(rn[r]).trim()) keep[r] = String(rn[r]); });
           if(Object.keys(keep).length) out[q.id + '__rownotes'] = keep;
@@ -8154,6 +8158,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Oct 30, 2026', version: '2026-10-30.2', items: [
+    'Changed: the per-sequence notes boxes are now on automatically. On the session notes form, "Was there an effect?" shows a notes box under each sequence listed, with no setting to change, including notes you reopen. To turn them off, untick "Add a notes box under each row" on that question in Settings > Session Notes.'
+  ]},
   { date: 'Oct 30, 2026', version: '2026-10-30.1', items: [
     'New: a notes box for each sequence. In Settings > Session Notes, open a grid question (for example "Was there an effect?") and tick "Add a notes box under each row". The session notes form then shows a notes box right under each row, so Forgiveness, Listening prayer and so on each get their own notes. Because "Was there an effect?" only lists the sequences marked Yes above it, only the sequences used get a box. The single text box below the grid is a separate option, so you can keep it as General notes or turn it off. Saved notes, and earlier notes in My FPHM, show each sequence\'s notes under its own name. Notes already saved stay exactly as they were written.'
   ]},
@@ -8166,15 +8173,15 @@ const CHANGE_LOG = [
   { date: 'Oct 28, 2026', version: '2026-10-28.1', items: [
     'New: earlier session notes for follow-up sessions. In My FPHM (live now), a prayer recipient\'s card on Schedule and Completed Sessions has a "Session notes (N)" button whenever notes were written for any of that person\'s sessions, including ones with a different team. It opens the notes full screen, newest first, each with its date, session number and team. Here in the Scheduler, the Session Notes form for a follow-up shows "Notes from earlier sessions" above the questions (tap to open). To check: write notes on a past session, then open a later session for the same person in both places. Ministers need permission to read the SessionNotes list in SharePoint; if they don\'t have it, the button just doesn\'t appear.'
   ]},
-  { date: 'Oct 27, 2026', version: '2026-10-27.1', items: [
-    'Changed: names are now hidden on intake forms automatically. In My FPHM, prayer ministers see \u2588\u2588\u2588\u2588\u2588\u2588 in place of the recipient\'s name and the spouse or partner name, everywhere they appear in the answers (full name, first name or last name), and a printed form is headed "Intake form" instead of the recipient\'s name. You don\'t have to pick these any more. Other names (children, friends, family named in answers) still need picking with Redact personal info. To check: open a submitted form in Intake Forms, tap Redact personal info, and see the recipient\'s and spouse\'s names highlighted; then open the same form from a minister\'s card in My FPHM.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 27, 2026', version: '2026-10-27.1', items: [
+    'Changed: names are now hidden on intake forms automatically. In My FPHM, prayer ministers see \u2588\u2588\u2588\u2588\u2588\u2588 in place of the recipient\'s name and the spouse or partner name, everywhere they appear in the answers (full name, first name or last name), and a printed form is headed "Intake form" instead of the recipient\'s name. You don\'t have to pick these any more. Other names (children, friends, family named in answers) still need picking with Redact personal info. To check: open a submitted form in Intake Forms, tap Redact personal info, and see the recipient\'s and spouse\'s names highlighted; then open the same form from a minister\'s card in My FPHM.'
+  ]},
   { date: 'Oct 26, 2026', version: '2026-10-26.5', items: [
     'Changed: "Install guide for ministers" on the Prayer Ministers tab now opens the guide full screen inside the Scheduler instead of leaving it. Close takes you straight back to the Prayer Ministers tab, still signed in. Copy Link at the top copies the guide\'s address to send to a minister. In the installed app, check that the guide opens and Close returns you to where you were.'
   ]},
