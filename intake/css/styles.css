@@ -215,6 +215,19 @@ button {
   margin-bottom: 8px;
 }
 .top-actions .text-size { margin-right: auto; }
+.top-links { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.top-links .btn-link, .text-size { white-space: nowrap; }
+/* Narrow phones: text size on its own row, Reset / Save on the row below,
+   spread across the full width, so nothing gets squeezed into two lines. */
+@media (max-width: 480px) {
+  .top-actions { flex-direction: column; align-items: stretch; gap: 8px; }
+  .top-actions .text-size { margin-right: 0; }
+  .top-links { justify-content: space-between; }
+}
+@media (max-width: 360px) {
+  .top-links { gap: 4px 8px; }
+  .top-links .btn-link { font-size: min(1rem, 17px); }
+}
 
 /* A- / A+ text size control (2026-10-31). Shown at the top of every
    screen; in the sticky bar while filling out the form, so it is always
@@ -223,7 +236,7 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 .text-size-label { font-size: .9em; font-weight: 600; color: var(--ink-soft); }
 .text-size button {

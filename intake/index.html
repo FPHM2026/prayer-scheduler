@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Freedom Prayer Healing Ministry — Intake Questionnaire</title>
-<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/styles.css?v=2026-10-31.2">
 <script>
   // Apply the saved text size before the page draws, so it never flashes
   // at the normal size first. See TEXT_SCALES further down.
@@ -484,8 +484,10 @@ function renderTopBar(sectionsCount, currentIdx, title) {
     <div class="top-bar-sticky">
       <div class="top-actions no-print">
         ${textSizeHtml()}
-        <button class="btn-link" id="btnDeleteForm">Reset Form</button>
-        <button class="btn-link" id="btnSaveExit">Save &amp; continue later</button>
+        <div class="top-links">
+          <button class="btn-link" id="btnDeleteForm">Reset Form</button>
+          <button class="btn-link" id="btnSaveExit">Save &amp; continue later</button>
+        </div>
       </div>
       <div class="progress-outer"><div class="progress-inner" style="width:${pct}%"></div></div>
       <div class="progress-label">Section ${currentIdx + 1} of ${sectionsCount + 1}${title ? " — " + FPHM.escapeHtml(title) : ""}</div>
