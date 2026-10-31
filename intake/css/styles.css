@@ -18,7 +18,10 @@
   --error: #c0392b;
   --radius: 12px;
   --maxw: 720px;
-  font-size: 17px;
+  /* --text-scale is set by the A- / A+ text size buttons (2026-10-31, for
+     visually impaired visitors). Everything sized in rem/em grows with it. */
+  --text-scale: 1;
+  font-size: calc(17px * var(--text-scale));
 }
 
 * { box-sizing: border-box; }
@@ -29,6 +32,7 @@ body {
   color: var(--ink);
   font-family: 'Jost', -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   line-height: 1.55;
+  overflow-wrap: break-word;
 }
 
 .wrap {
@@ -107,7 +111,8 @@ input[type=text], input[type=email], input[type=number], textarea, select {
   padding: 11px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  font-size: 1rem;
+  /* never under 16px, or iPhone zooms the page when the box is tapped */
+  font-size: max(16px, 1rem);
   font-family: inherit;
   background: #fff;
   color: var(--ink);
@@ -134,7 +139,7 @@ input:focus, textarea:focus, select:focus {
   border-color: var(--accent);
   background: #f3e7e0;
 }
-.choice-option input { width: 18px; height: 18px; flex-shrink: 0; }
+.choice-option input { font-size: inherit; width: 1.1em; height: 1.1em; flex-shrink: 0; margin: 0; }
 .choice-option .other-text {
   /* flex-basis:100% forces this onto its own line below the checkbox and
      label instead of squeezing onto the same row - without flex-wrap on
@@ -203,10 +208,52 @@ button {
 
 .top-actions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 8px 16px;
+  margin-bottom: 8px;
 }
+.top-actions .text-size { margin-right: auto; }
+
+/* A- / A+ text size control (2026-10-31). Shown at the top of every
+   screen; in the sticky bar while filling out the form, so it is always
+   in reach. Its own size grows with the text like everything else. */
+.text-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.text-size-label { font-size: .9em; font-weight: 600; color: var(--ink-soft); }
+.text-size button {
+  min-width: 2.75em;
+  min-height: 2.75em;
+  padding: 4px 8px;
+  font-weight: 700;
+  line-height: 1;
+  background: #fff;
+  color: var(--accent-dark);
+  border: 2px solid var(--accent);
+}
+.text-size button:hover:not(:disabled) { background: #f3e7e0; }
+.text-size button:focus-visible { outline: 3px solid var(--accent-dark); outline-offset: 2px; }
+.text-size button:disabled { opacity: .4; cursor: not-allowed; }
+.text-size .ts-small { font-size: .9em; }
+.text-size .ts-big { font-size: 1.2em; }
+.text-size-bar { display: flex; justify-content: flex-end; margin-bottom: 16px; }
+
+/* At large text sizes the pinned bars would otherwise cover most of a
+   phone screen, so their text grows with the setting only up to a cap.
+   The questions and answers themselves are never capped. */
+.top-bar-sticky { font-size: min(1rem, 24px); }
+.top-bar-sticky .btn-link { font-size: 1em; padding: 4px 0; }
+.top-bar-sticky .progress-label { font-size: .85em; }
+@media (max-width: 640px) {
+  .top-bar-sticky { font-size: min(1rem, 20px); }
+  .nav-row-sticky button { font-size: min(1rem, 24px); }
+}
+@media print { .text-size, .text-size-bar { display: none !important; } }
 
 /* Started smaller than the intro screen's own h1 (1.6rem), since this one
    stays pinned on screen the whole time you're filling out the form - but
@@ -214,7 +261,7 @@ button {
    full h1 size. Added 2026-09-29 at the user's request, so the ministry
    name is visible on every section, not just the intro screen; sized up
    the same day per follow-up feedback. */
-.intake-top-title { font-size: 1.75rem; margin: 0 0 10px; }
+.intake-top-title { font-size: min(1.75rem, 9vw); margin: 0 0 10px; }
 
 /* padding-bottom (not the label's margin-bottom) is what actually creates
    the gap under "Section X of Y": a margin on the last child collapses
@@ -329,6 +376,8 @@ button {
 
 @media print {
   @page { size: letter; margin: 0.5in; }
+  /* The printout always uses the normal size, whatever the screen size is. */
+  :root { font-size: 17px !important; }
   body { background: #fff; }
   .no-print { display: none !important; }
   .card { border: none; padding: 0; }
@@ -352,6 +401,6 @@ button {
 }
 
 @media (max-width: 480px) {
-  :root { font-size: 16px; }
+  :root { font-size: calc(16px * var(--text-scale)); }
   .card { padding: 16px 14px; }
 }
