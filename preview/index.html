@@ -486,6 +486,26 @@
   .push-toggle input:checked + .track::after{left:18px;}
   .push-toggle input:focus-visible + .track{outline:2px solid var(--navy);outline-offset:2px;}
   .settings-card .helptext{margin-bottom:14px;}
+  /* ---- Prayer List tab + its Settings card ---- */
+  .pl-list{background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-sm);overflow:hidden;}
+  .pl-row{display:flex;gap:16px;align-items:flex-start;padding:16px;border-top:1px solid #f1ede4;}
+  .pl-row:first-child{border-top:none;}
+  .pl-num{flex:0 0 32px;height:32px;border-radius:50%;background:#f3e7e0;color:var(--gold-dark);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:var(--fs-sm);}
+  .pl-main{flex:1 1 auto;min-width:0;}
+  .pl-name{font-family:'Playfair Display',Georgia,serif;font-size:var(--fs-lg);font-weight:700;color:var(--navy);overflow-wrap:anywhere;margin-right:8px;}
+  .pl-meta{font-size:var(--fs-sm);color:var(--muted);margin-top:4px;overflow-wrap:anywhere;}
+  .pl-meta strong{color:var(--text);font-weight:600;}
+  .pl-overdue{color:#9a5b00;}
+  .pl-access-tools{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:8px;font-size:var(--fs-sm);}
+  .pl-access-count{color:var(--muted);margin-left:auto;}
+  .pl-access-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0 16px;}
+  .pl-access-item{display:flex;align-items:center;gap:8px;min-height:44px;font-size:var(--fs-sm);cursor:pointer;border-bottom:1px solid #f1ede4;}
+  .pl-access-item input{width:20px;height:20px;flex:0 0 auto;accent-color:var(--gold-dark);}
+  @media (max-width:640px){
+    .pl-row{gap:8px;padding:16px 8px 16px 16px;}
+    .pl-num{flex-basis:28px;height:28px;}
+    .pl-access-count{margin-left:0;width:100%;}
+  }
   .settings-card:last-child{margin-bottom:0;}
 
   /* ---- Completed Sessions: combo card (YTD / Last Year / Lifetime) ---- */
@@ -804,6 +824,7 @@
        the "no duplicated functionality" decision. Re-add these two buttons
        plus data-tab="schedule"/"planning" here to fall back if needed. -->
   <button data-tab="schedplan" class="active" aria-current="page">Schedule &amp; Planning</button>
+  <button data-tab="prayerlist">Prayer List</button>
   <button data-tab="completed">Completed Sessions</button>
   <button data-tab="overview">Prayer Ministers</button>
   <button data-tab="blackouts">Blackout Dates</button>
@@ -905,6 +926,15 @@
     </div>
     <div id="planningList"></div>
     <div class="no-results" id="planningNoResults" hidden>No one on the waiting list matches your search.</div>
+  </section>
+
+  <section class="panel" id="panel-prayerlist">
+    <p class="helptext" id="prayerListHelp">Everyone with a booked session that hasn't been marked Completed yet, soonest session first. A person drops off once all of their sessions are Completed.</p>
+    <div class="search-row">
+      <div class="search-wrap"><input id="prayerListSearch" placeholder="Search by recipient or minister..." aria-label="Search the prayer list by recipient or minister"><button type="button" class="search-clear" aria-label="Clear search" hidden>&times;</button></div>
+    </div>
+    <div id="prayerListBox"></div>
+    <div class="no-results" id="prayerListEmpty" hidden></div>
   </section>
 
   <section class="panel" id="panel-completed">
@@ -1056,6 +1086,7 @@
       <button data-settingsview="locations">Locations</button>
       <button data-settingsview="defaultlocation">Sessions</button>
       <button data-settingsview="notes">Session Notes</button>
+      <button data-settingsview="prayerlist">Prayer List</button>
       <button data-settingsview="notifications" id="settingsNotificationsTab" hidden>Notifications</button>
     </nav>
 
@@ -1097,6 +1128,26 @@
     <div class="settings-subview" id="settingsNotesView">
       <div class="errbox" id="notesSetupMsg" hidden style="margin:16px 0;"></div>
       <div id="notesQuestionsHost" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="settings-subview" id="settingsPrayerListView">
+      <div class="settings-card" style="margin-top:16px;">
+        <h2>Who can see the Prayer List</h2>
+        <p class="helptext">Tick the prayer ministers who may see the Prayer List. My FPHM doesn't show the list yet; this choice is saved now so it's ready when it does. Admins always see it here.</p>
+        <div class="errbox" id="prayerListSetupMsg" hidden></div>
+        <div id="prayerListAccessBody">
+          <div class="pl-access-tools">
+            <button type="button" class="link-btn" id="btnPlSelectAll">Select all</button>
+            <button type="button" class="link-btn" id="btnPlSelectNone">Clear all</button>
+            <span class="pl-access-count" id="prayerListAccessCount" role="status"></span>
+          </div>
+          <div class="pl-access-list" id="prayerListAccessList"></div>
+          <div class="toolbar" style="margin-top:16px;">
+            <button class="btn" id="btnSavePrayerListAccess">Save</button>
+          </div>
+          <p class="helptext" id="prayerListAccessMsg" role="status" style="margin:8px 0 0;"></p>
+        </div>
+      </div>
     </div>
 
     <div class="settings-subview" id="settingsNotificationsView">
@@ -1359,7 +1410,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-30.2";
+const APP_VERSION = "2026-11-07.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1942,6 +1993,14 @@ async function resolveSiteAndLists(){
     if(match) listIds[key] = match.id;
   }
   notesAvailable = !!(listIds.notesSchema && listIds.notes);
+  // Prayer List visibility is a Yes/No column on PrayerMinisters that has
+  // to be added by hand in SharePoint. Check it exists so Settings can show
+  // setup steps instead of failing on Save. Never blocks sign-in.
+  prayerListColumnReady = false;
+  try{
+    const cols = await graphFetch(`/sites/${siteId}/lists/${listIds.ministers}/columns?$select=name`);
+    prayerListColumnReady = !!(cols && Array.isArray(cols.value) && cols.value.some(c=>c.name===PRAYER_LIST_COLUMN));
+  }catch(e){ console.warn('Could not check PrayerMinisters columns:', e.message); }
 }
 
 async function listItems(key){
@@ -2004,6 +2063,11 @@ let overviewNotifFilter='all'; // 'all' | 'help' | 'on' - Prayer Ministers notif
 // status UI stays hidden. See MINISTER NOTIFICATION STATUS below.
 let pushDevices = null;
 let sessionNumberMap = new Map(); // session id -> chronological "Session #N" for that recipient
+// Prayer List: which ministers may see it (PrayerMinisters.PrayerListAccess,
+// Yes/No). Admin-only for now; stored so My FPHM can use it later.
+const PRAYER_LIST_COLUMN = 'PrayerListAccess';
+let prayerListColumnReady = false;
+let prayerListDraft = null; // Set of minister ids ticked in Settings, null = not edited
 
 async function loadAll(){
   const [rawMin, rawSess, rawBlack, rawLoc, rawSlots, rawTW, rawIntake, rawSchema] = await Promise.all([
@@ -2066,7 +2130,7 @@ async function loadAll(){
       signatureDataUrl: i.SignatureDataUrl||'', responses
     };
   });
-  ministers = rawMin.map(m => ({ id: m.id, name: m.Title, email: m.Email||'', phone: m.Phone||'', signInEmail: m.SignInEmail||'', status: m.Status||'Active', gender: m.Gender||'' }));
+  ministers = rawMin.map(m => ({ id: m.id, name: m.Title, email: m.Email||'', phone: m.Phone||'', signInEmail: m.SignInEmail||'', status: m.Status||'Active', gender: m.Gender||'', prayerListAccess: m[PRAYER_LIST_COLUMN]===true }));
   locations = rawLoc.map(l => ({ id: l.id, name: l.Title }));
   timeWindows = rawTW.map(t => ({
     id: t.id, title: t.Title||'', kind: t.Kind||'',
@@ -2297,7 +2361,7 @@ function groupRow(key, avatarText, name, countLabel, summaryHtml, bodyHtml, wasO
   </div>`;
 }
 
-function renderAll(){ renderSchedule(); renderPlanning(); renderCompleted(); renderOverview(); renderBlackouts(); renderSchedPlan(); renderTimeWindowsSettings(); renderLocationsSettings(); renderIntake(); renderFormEditor(); }
+function renderAll(){ renderSchedule(); renderPlanning(); renderCompleted(); renderOverview(); renderBlackouts(); renderSchedPlan(); renderTimeWindowsSettings(); renderLocationsSettings(); renderIntake(); renderFormEditor(); renderPrayerList(); renderPrayerListSettings(); }
 
 async function withLoading(btn, loadingText, fn){
   if(!btn) return fn();
@@ -2450,6 +2514,11 @@ function wireApp(){
   wireSearchClear('planningSearch');
   $('#prospectSort').addEventListener('change', renderPlanning);
   $('#completedSearch').addEventListener('input', renderCompleted);
+  $('#prayerListSearch').addEventListener('input', renderPrayerList);
+  wireSearchClear('prayerListSearch');
+  $('#btnPlSelectAll').addEventListener('click', ()=>setPrayerListAccessAll(true));
+  $('#btnPlSelectNone').addEventListener('click', ()=>setPrayerListAccessAll(false));
+  $('#btnSavePrayerListAccess').addEventListener('click', ()=>withLoading($('#btnSavePrayerListAccess'), 'Saving…', savePrayerListAccess));
   $('#schedFilterTabs').querySelectorAll('button[data-schedfilter]').forEach(b=>b.addEventListener('click', ()=>{ schedFilter = b.dataset.schedfilter; renderSchedPlan(); }));
   $('#completedSubtabs').querySelectorAll('button[data-completedview]').forEach(b=>b.addEventListener('click', ()=>{
     completedView = b.dataset.completedview;
@@ -2497,6 +2566,122 @@ function switchTab(tab){
   });
   document.querySelectorAll('main .panel').forEach(p=>p.classList.toggle('active', p.id==='panel-'+tab));
   if(tab === 'messages'){ adminMessageTab = 'unread'; renderAdminMessages(); }
+}
+
+/* ---- PRAYER LIST ----
+   One row per prayer recipient who has at least one Scheduled (booked)
+   session. Waiting entries and Tentative slots don't count - nothing is
+   booked yet. Drop-in/Training are group events, not a person, so they're
+   left out. A Scheduled session whose date has passed still counts until
+   it's marked Completed (that's what takes someone off the list). Name
+   match per recipient, same as every other grouping in this app. */
+function prayerListEntries(){
+  const active = sessions.filter(s=>s.status==='Scheduled' && s.apptType!=='Drop-in' && s.apptType!=='Training' && s.recipName.trim());
+  const today = todayISO();
+  return groupByRecipient(active).map(g=>{
+    const sorted = g.sessions.slice().sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
+    // Next = soonest session today or later; if every one is in the past
+    // (not marked Completed yet) show the latest of those instead.
+    const upcoming = sorted.filter(s=>(s.date||'')>=today);
+    const next = upcoming[0] || sorted[sorted.length-1];
+    return { key: g.key, name: g.name, sessions: sorted, next, overdue: !upcoming.length, upcomingCount: upcoming.length };
+  }).sort((a,b)=>{
+    // Upcoming first (soonest first), then the overdue ones (oldest first).
+    if(a.overdue!==b.overdue) return a.overdue ? 1 : -1;
+    return ((a.next.date||'')+(a.next.time||'')).localeCompare((b.next.date||'')+(b.next.time||''));
+  });
+}
+function todayISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function renderPrayerList(){
+  const box = $('#prayerListBox'), empty = $('#prayerListEmpty');
+  if(!box) return;
+  const q = $('#prayerListSearch').value.trim().toLowerCase();
+  const all = prayerListEntries();
+  const list = !q ? all : all.filter(e=> e.name.toLowerCase().includes(q) || e.sessions.some(s=>ministerNamesOf(s).toLowerCase().includes(q)));
+  $('#prayerListHelp').textContent = `${all.length} ${all.length===1?'person':'people'} with a booked session that hasn't been marked Completed yet, soonest session first. A person drops off once all of their sessions are Completed.`;
+  if(!list.length){
+    box.innerHTML = '';
+    empty.hidden = false;
+    empty.textContent = q ? 'No one on the prayer list matches your search.' : 'No one has a booked session right now.';
+    return;
+  }
+  empty.hidden = true;
+  box.innerHTML = `<div class="pl-list" role="list">${list.map((e,i)=>{
+    const s = e.next;
+    const when = s.date ? `${fmtShortDay(s.date)}${s.time?' · '+fmt12(s.time):''}` : 'Date not set';
+    const more = e.upcomingCount>1 ? ` · ${e.upcomingCount} sessions booked` : '';
+    return `<div class="pl-row" role="listitem">
+      <span class="pl-num" aria-hidden="true">${i+1}</span>
+      <div class="pl-main">
+        <div><span class="pl-name">${escapeHtml(e.name)}</span><span class="tag ${sessionNumberOf(s)===1?'first':''}">Session #${sessionNumberOf(s)}</span></div>
+        <div class="pl-meta">${e.overdue ? `<span class="pl-overdue">Last session ${escapeHtml(when)} · not marked Completed yet</span>` : `Next session <strong>${escapeHtml(when)}</strong>${more}`}</div>
+        ${s.ministers.length ? `<div class="pl-meta">${escapeHtml(ministerNamesOf(s))}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+function fmtShortDay(iso){ return new Date(iso+'T00:00').toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric'}); }
+
+// Settings > Prayer List: tick which ministers may see the list. Active
+// ministers only are shown; an inactive minister keeps whatever was saved.
+function prayerListTicked(){ return prayerListDraft || new Set(ministers.filter(m=>m.prayerListAccess).map(m=>m.id)); }
+function renderPrayerListSettings(){
+  const list = $('#prayerListAccessList');
+  if(!list) return;
+  const setup = $('#prayerListSetupMsg'), body = $('#prayerListAccessBody');
+  if(!prayerListColumnReady){
+    setup.hidden = false;
+    setup.innerHTML = `<strong>This needs one new SharePoint column before it can be saved.</strong><br>
+      1. Open the <strong>PrayerMinisters</strong> list on the FreedomPrayer site.<br>
+      2. Add a column → <strong>Yes/No</strong>, named exactly <strong>${PRAYER_LIST_COLUMN}</strong> (no spaces), default value <strong>No</strong>.<br>
+      3. Reload this page.`;
+    body.hidden = true;
+    return;
+  }
+  setup.hidden = true; body.hidden = false;
+  const ticked = prayerListTicked();
+  const active = ministers.filter(m=>m.status==='Active').sort((a,b)=>a.name.localeCompare(b.name));
+  list.innerHTML = active.length ? active.map(m=>`<label class="pl-access-item"><input type="checkbox" data-mid="${m.id}" ${ticked.has(m.id)?'checked':''}><span>${escapeHtml(m.name)}</span></label>`).join('')
+    : '<p class="helptext">No active prayer ministers.</p>';
+  list.querySelectorAll('input[data-mid]').forEach(cb=>cb.addEventListener('change', ()=>{
+    const set = new Set(prayerListTicked());
+    const id = parseInt(cb.dataset.mid,10);
+    if(cb.checked) set.add(id); else set.delete(id);
+    prayerListDraft = set;
+    $('#prayerListAccessMsg').textContent = '';
+    updatePrayerListCount();
+  }));
+  updatePrayerListCount();
+}
+function updatePrayerListCount(){
+  const ticked = prayerListTicked();
+  const active = ministers.filter(m=>m.status==='Active');
+  const n = active.filter(m=>ticked.has(m.id)).length;
+  const unsaved = prayerListDraft && ministers.some(m=>m.prayerListAccess!==prayerListDraft.has(m.id));
+  $('#prayerListAccessCount').textContent = `${n} of ${active.length} active ministers${unsaved?' · not saved yet':''}`;
+}
+function setPrayerListAccessAll(on){
+  const set = new Set(prayerListTicked());
+  ministers.filter(m=>m.status==='Active').forEach(m=>{ if(on) set.add(m.id); else set.delete(m.id); });
+  prayerListDraft = set;
+  $('#prayerListAccessMsg').textContent = '';
+  renderPrayerListSettings();
+}
+async function savePrayerListAccess(){
+  const msg = $('#prayerListAccessMsg');
+  const ticked = prayerListTicked();
+  const changed = ministers.filter(m=>m.prayerListAccess!==ticked.has(m.id));
+  if(!changed.length){ msg.textContent = 'Nothing to save.'; return; }
+  try{
+    for(const m of changed) await updateItem('ministers', m.id, { [PRAYER_LIST_COLUMN]: ticked.has(m.id) });
+  }catch(e){
+    msg.textContent = 'Could not save: ' + e.message;
+    await loadAll();
+    return;
+  }
+  prayerListDraft = null;
+  await loadAll();
+  msg.textContent = `Saved. ${ministers.filter(m=>m.status==='Active' && m.prayerListAccess).length} active ministers can see the Prayer List.`;
 }
 
 /* ---- SCHEDULE ---- */
@@ -4521,6 +4706,8 @@ function switchSettingsSub(view){
   $('#settingsDefaultLocationView').classList.toggle('active', view==='defaultlocation');
   $('#settingsNotesView').classList.toggle('active', view==='notes');
   $('#settingsNotificationsView').classList.toggle('active', view==='notifications');
+  $('#settingsPrayerListView').classList.toggle('active', view==='prayerlist');
+  if(view==='prayerlist') renderPrayerListSettings();
   if(view==='notes') showNotesEditor();
   if(view==='notifications') renderAdminPush();
 }
@@ -8158,6 +8345,10 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Nov 7, 2026', version: '2026-11-07.1', items: [
+    'New: a Prayer List tab, next to Schedule & Planning. It lists every prayer recipient who has a booked session that hasn\'t been marked Completed yet, with their next session\'s date and time, session number and team, soonest first. When all of a person\'s sessions are marked Completed, they drop off the list. Waiting-list entries and Tentative slots aren\'t on it (nothing is booked yet), and neither are Drop-in or Training. Someone whose session date has passed but wasn\'t marked Completed stays at the bottom with a note, so you can spot it. There\'s a search box for recipient or minister names.',
+    'New: Settings > Prayer List, where you tick which prayer ministers may see the list, then Save. My FPHM doesn\'t show the list yet; the choice is stored so it\'s ready later. It needs one new Yes/No column, PrayerListAccess, on the PrayerMinisters list in SharePoint; until it exists, the card shows the steps to add it.'
+  ]},
   { date: 'Oct 30, 2026', version: '2026-10-30.2', items: [
     'Changed: the per-sequence notes boxes are now on automatically. On the session notes form, "Was there an effect?" shows a notes box under each sequence listed, with no setting to change, including notes you reopen. To turn them off, untick "Add a notes box under each row" on that question in Settings > Session Notes.'
   ]},
@@ -8170,15 +8361,15 @@ const CHANGE_LOG = [
   { date: 'Oct 29, 2026', version: '2026-10-28.2', items: [
     'Changed: the 90-day clean-up on the Prayer Ministers tab never removes a minister\'s only device. If someone has just one phone or tablet, it stays on their "Phone notifications" list (showing Check) however long it has been, so you can still see it and follow up. When someone has more than one device, the old ones are still removed after 90 days, but their most recently opened device is always kept. The Remove link still works on any device.'
   ]},
-  { date: 'Oct 28, 2026', version: '2026-10-28.1', items: [
-    'New: earlier session notes for follow-up sessions. In My FPHM (live now), a prayer recipient\'s card on Schedule and Completed Sessions has a "Session notes (N)" button whenever notes were written for any of that person\'s sessions, including ones with a different team. It opens the notes full screen, newest first, each with its date, session number and team. Here in the Scheduler, the Session Notes form for a follow-up shows "Notes from earlier sessions" above the questions (tap to open). To check: write notes on a past session, then open a later session for the same person in both places. Ministers need permission to read the SessionNotes list in SharePoint; if they don\'t have it, the button just doesn\'t appear.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 28, 2026', version: '2026-10-28.1', items: [
+    'New: earlier session notes for follow-up sessions. In My FPHM (live now), a prayer recipient\'s card on Schedule and Completed Sessions has a "Session notes (N)" button whenever notes were written for any of that person\'s sessions, including ones with a different team. It opens the notes full screen, newest first, each with its date, session number and team. Here in the Scheduler, the Session Notes form for a follow-up shows "Notes from earlier sessions" above the questions (tap to open). To check: write notes on a past session, then open a later session for the same person in both places. Ministers need permission to read the SessionNotes list in SharePoint; if they don\'t have it, the button just doesn\'t appear.'
+  ]},
   { date: 'Oct 27, 2026', version: '2026-10-27.1', items: [
     'Changed: names are now hidden on intake forms automatically. In My FPHM, prayer ministers see \u2588\u2588\u2588\u2588\u2588\u2588 in place of the recipient\'s name and the spouse or partner name, everywhere they appear in the answers (full name, first name or last name), and a printed form is headed "Intake form" instead of the recipient\'s name. You don\'t have to pick these any more. Other names (children, friends, family named in answers) still need picking with Redact personal info. To check: open a submitted form in Intake Forms, tap Redact personal info, and see the recipient\'s and spouse\'s names highlighted; then open the same form from a minister\'s card in My FPHM.'
   ]},
