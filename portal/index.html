@@ -891,7 +891,7 @@ function renderPrayerList(){
   const all = [...groups.values()].map(g=>{
     const sorted = g.sessions.sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
     const upcoming = sorted.filter(s=>(s.date||'')>=today);
-    return { name: prayerListName(g.name), next: upcoming[0] || sorted[sorted.length-1], past: !upcoming.length };
+    return { name: prayerListName(g.name), next: upcoming[0] || sorted[sorted.length-1], past: !upcoming.length, upcomingCount: upcoming.length };
   }).sort((a,b)=>{
     if(a.past!==b.past) return a.past ? 1 : -1;
     return ((a.next.date||'')+(a.next.time||'')).localeCompare((b.next.date||'')+(b.next.time||''));
@@ -909,12 +909,14 @@ function renderPrayerList(){
   empty.hidden = true;
   $('#prayerListBox').innerHTML = `<div class="pl-list" role="list">${list.map((e,i)=>{
     const s = e.next;
-    const when = s.date ? new Date(s.date+'T00:00').toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric'}) : '';
+    const when = s.date ? new Date(s.date+'T00:00').toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric'}) + (s.time ? ' · '+fmt12(s.time) : '') : '';
+    const more = !e.past && e.upcomingCount>1 ? ` · ${e.upcomingCount} sessions booked` : '';
     return `<div class="pl-row" role="listitem">
       <span class="pl-num" aria-hidden="true">${i+1}</span>
       <div class="pl-main">
         <div><span class="pl-name">${escapeHtml(e.name)}</span><span class="tag ${sessionNumberOf(s)===1?'first':''}">Session #${sessionNumberOf(s)}</span></div>
-        ${when ? `<div class="pl-meta">${e.past ? 'Session' : 'Next session'} <strong>${escapeHtml(when)}</strong></div>` : ''}
+        ${when ? `<div class="pl-meta">${e.past ? 'Last session' : 'Next session'} <strong>${escapeHtml(when)}</strong>${more}</div>` : ''}
+        ${s.ministers.length ? `<div class="pl-meta">${escapeHtml(ministerNamesOf(s))}</div>` : ''}
       </div>
     </div>`;
   }).join('')}</div>`;
