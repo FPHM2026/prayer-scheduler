@@ -363,6 +363,16 @@
     .stats-collapse.toggled .stats-body{max-height:2000px;}
   }
 
+  /* ---- Prayer List (same look as the admin Scheduler's) ---- */
+  .pl-list{background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-sm);overflow:hidden;}
+  .pl-row{display:flex;gap:16px;align-items:flex-start;padding:16px;border-top:1px solid #f1ede4;}
+  .pl-row:first-child{border-top:none;}
+  .pl-num{flex:0 0 32px;height:32px;border-radius:50%;background:#f3e7e0;color:var(--gold-dark);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:var(--fs-sm);}
+  .pl-main{flex:1 1 auto;min-width:0;}
+  .pl-name{font-family:'Playfair Display',Georgia,serif;font-size:var(--fs-lg);font-weight:700;color:var(--navy);overflow-wrap:anywhere;margin-right:8px;}
+  .pl-meta{font-size:var(--fs-sm);color:var(--muted);margin-top:4px;overflow-wrap:anywhere;}
+  .pl-meta strong{color:var(--text);font-weight:600;}
+  @media (max-width:640px){ .pl-row{gap:8px;padding:16px 8px 16px 16px;} .pl-num{flex-basis:28px;height:28px;} }
   .no-results{padding:32px 16px;text-align:center;color:var(--muted);font-size:var(--fs-sm);}
 
   @media (min-width:640px){
@@ -396,6 +406,7 @@
 </header>
 <nav aria-label="Primary">
   <button data-tab="schedule" class="active" aria-current="page">Schedule</button>
+  <button data-tab="prayerlist" id="navPrayerList" hidden>Prayer List</button>
   <button data-tab="completed">Completed Sessions</button>
   <button data-tab="blackouts">Blackout Dates</button>
   <button data-tab="messages" id="navMessages" hidden>Messages<span class="nav-badge" id="msgBadge" hidden></span></button>
@@ -416,6 +427,13 @@
       <p class="helptext">Grouped by recipient — soonest first.</p>
       <div id="scheduleGroups"></div>
       <div class="no-results" id="scheduleNoResults" hidden>No sessions match your search.</div>
+    </section>
+
+    <section class="panel" id="panel-prayerlist">
+      <p class="helptext" id="prayerListHelp" style="margin:0 0 8px;"></p>
+      <div class="search-row"><div class="search-wrap"><input id="prayerListSearch" placeholder="Search by name..." aria-label="Search the prayer list by name"><button type="button" class="search-clear" aria-label="Clear search" hidden>&times;</button></div></div>
+      <div id="prayerListBox" style="margin-top:8px;"></div>
+      <div class="no-results" id="prayerListEmpty" hidden></div>
     </section>
 
     <section class="panel" id="panel-completed">
@@ -756,7 +774,7 @@ let sessionNumberMap = new Map();
 
 async function loadAll(){
   const [rawMin, rawSess, rawBlack, rawIntake, rawSchema] = await Promise.all([listItems('ministers'), listItems('sessions'), listItems('blackouts'), listItems('intake'), listItems('formSchema')]);
-  ministers = rawMin.map(m => ({ id: m.id, name: m.Title, signInEmail: m.SignInEmail||'', status: m.Status||'Active' }));
+  ministers = rawMin.map(m => ({ id: m.id, name: m.Title, signInEmail: m.SignInEmail||'', status: m.Status||'Active', prayerListAccess: m.PrayerListAccess===true }));
   // Live-editable question schema (see the "Edit Intake Questions" tab in
   // the main app's CLAUDE.md "Intake Forms" section) - overrides the
   // hardcoded default from js/formConfig.js so a minister viewing an
@@ -813,6 +831,7 @@ async function loadAll(){
     renderSchedule();
     renderCompleted();
     renderBlackouts();
+    renderPrayerList();
     if(messagesReady) renderMessages();
   }
   $('#lastRefreshed').textContent = 'Data as of ' + fmtTime(new Date());
@@ -836,6 +855,71 @@ async function loadSessionNotes(){
     return [];
   }
 }
+/* =========================================================================
+   PRAYER LIST - only for ministers an admin ticked in the Scheduler's
+   Settings > Prayer List (PrayerMinisters.PrayerListAccess = Yes; blank or
+   No = hidden). Same rule as the admin tab: everyone with a Scheduled
+   session not yet marked Completed, Drop-in/Training left out. This is a
+   client-side gate only: ministers already have Read on PrayerSessions
+   (see CLAUDE.md "Minister portal"), so it shows nothing they couldn't
+   already fetch; it just doesn't offer the list to anyone without access.
+========================================================================= */
+// 'full' | 'initial' (first name + last initial) | 'first'
+const PRAYER_LIST_NAMES = 'initial';
+function prayerListName(full){
+  const parts = String(full||'').trim().split(/\s+/).filter(Boolean);
+  if(PRAYER_LIST_NAMES==='full' || parts.length<2) return parts.join(' ');
+  if(PRAYER_LIST_NAMES==='first') return parts[0];
+  return parts[0] + ' ' + parts[parts.length-1].charAt(0).toUpperCase() + '.';
+}
+function plTodayISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function renderPrayerList(){
+  const allowed = !!(me && me.prayerListAccess);
+  $('#navPrayerList').hidden = !allowed;
+  if(!allowed){
+    if($('#panel-prayerlist').classList.contains('active')) switchTab('schedule');
+    $('#prayerListBox').innerHTML = '';
+    return;
+  }
+  const today = plTodayISO();
+  const groups = new Map();
+  sessions.filter(s=>s.status==='Scheduled' && s.apptType!=='Drop-in' && s.apptType!=='Training' && s.recipName.trim()).forEach(s=>{
+    const key = s.recipName.trim().toLowerCase();
+    if(!groups.has(key)) groups.set(key, { name: s.recipName.trim(), sessions: [] });
+    groups.get(key).sessions.push(s);
+  });
+  const all = [...groups.values()].map(g=>{
+    const sorted = g.sessions.sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
+    const upcoming = sorted.filter(s=>(s.date||'')>=today);
+    return { name: prayerListName(g.name), next: upcoming[0] || sorted[sorted.length-1], past: !upcoming.length };
+  }).sort((a,b)=>{
+    if(a.past!==b.past) return a.past ? 1 : -1;
+    return ((a.next.date||'')+(a.next.time||'')).localeCompare((b.next.date||'')+(b.next.time||''));
+  });
+  const q = $('#prayerListSearch').value.trim().toLowerCase();
+  const list = q ? all.filter(e=>e.name.toLowerCase().includes(q)) : all;
+  $('#prayerListHelp').textContent = `${all.length} ${all.length===1?'person':'people'} with a session coming up. Please keep them in prayer.`;
+  const empty = $('#prayerListEmpty');
+  if(!list.length){
+    $('#prayerListBox').innerHTML = '';
+    empty.hidden = false;
+    empty.textContent = q ? 'No one on the prayer list matches your search.' : 'No one has a session booked right now.';
+    return;
+  }
+  empty.hidden = true;
+  $('#prayerListBox').innerHTML = `<div class="pl-list" role="list">${list.map((e,i)=>{
+    const s = e.next;
+    const when = s.date ? new Date(s.date+'T00:00').toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric'}) : '';
+    return `<div class="pl-row" role="listitem">
+      <span class="pl-num" aria-hidden="true">${i+1}</span>
+      <div class="pl-main">
+        <div><span class="pl-name">${escapeHtml(e.name)}</span><span class="tag ${sessionNumberOf(s)===1?'first':''}">Session #${sessionNumberOf(s)}</span></div>
+        ${when ? `<div class="pl-meta">${e.past ? 'Session' : 'Next session'} <strong>${escapeHtml(when)}</strong></div>` : ''}
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
 function toHM(iso){
   if(!iso) return '';
   const d = new Date(iso);
@@ -1989,6 +2073,8 @@ function wireApp(){
   $('#completedSearch').addEventListener('input', renderCompleted);
   document.querySelectorAll('[data-completedby]').forEach(b=>b.addEventListener('click', ()=>{ completedBy = b.dataset.completedby; renderCompleted(); }));
   wireSearchClear('completedSearch');
+  $('#prayerListSearch').addEventListener('input', renderPrayerList);
+  wireSearchClear('prayerListSearch');
   $('#btnAddBlackout').addEventListener('click', ()=>openBlackoutModal());
   $('#blackoutRange').addEventListener('change', renderBlackouts);
   $('#btnBlackoutCancel').addEventListener('click', ()=>$('#blackoutModal').classList.remove('open'));
