@@ -865,7 +865,7 @@ async function loadSessionNotes(){
    already fetch; it just doesn't offer the list to anyone without access.
 ========================================================================= */
 // 'full' | 'initial' (first name + last initial) | 'first'
-const PRAYER_LIST_NAMES = 'initial';
+const PRAYER_LIST_NAMES = 'full';
 function prayerListName(full){
   const parts = String(full||'').trim().split(/\s+/).filter(Boolean);
   if(PRAYER_LIST_NAMES==='full' || parts.length<2) return parts.join(' ');
