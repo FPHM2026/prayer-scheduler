@@ -242,6 +242,14 @@
   .legal-text{font-size:var(--fs-sm);color:var(--muted);background:var(--cream);padding:14px;border-radius:8px;}
   .rich-text p{margin:0 0 1em;} .rich-text p:last-child{margin-bottom:0;}
   .rich-text ul,.rich-text ol{margin:0 0 1em;padding-left:1.4em;}
+  /* PDF made for the iPhone/iPad Home Screen app share sheet
+     (printViaShareSheet()): same two-column layout as the print view. */
+  .pdf-render{padding:0;font-size:16px;}
+  .pdf-render .ans-section{margin-bottom:14px;}
+  .pdf-render .ans-section h3{font-size:1rem;margin:0 0 6px;padding-bottom:4px;}
+  .pdf-render .ans-row{flex-direction:row;align-items:baseline;gap:8px;margin-bottom:4px;}
+  .pdf-render .ans-q{flex:0 0 30%;max-width:30%;font-size:.78rem;}
+  .pdf-render .ans-a{flex:1 1 auto;font-size:.85rem;}
   #intakePrintArea{display:none;}
   @media print{
     .no-print{display:none!important;}
@@ -1130,6 +1138,119 @@ window.changeIntakeTextSize = function(dir){
   try{ localStorage.setItem('fphmIntakeTextScale', n); }catch(e){}
   applyIntakeTextSize();
 };
+// ---- Print from an iPhone/iPad Home Screen app (added 2026-11-08) --------
+// iOS Home Screen apps silently ignore window.print(), in the page and in
+// iframes alike (Andrew hit it on iOS 27.2; others report the same since
+// late Oct 2026). There, Print draws the printable content into a PDF
+// (html2canvas + jsPDF from cdnjs, loaded only when needed) and opens the
+// share sheet, whose Print action works. Safari tabs and computers keep
+// using window.print(). Duplicated in preview/index.html and
+// portal/index.html, same as other shared helpers.
+const PRINT_VIA_SHARE = window.navigator.standalone === true;
+function loadPrintLib(src, ready){
+  if(ready()) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('Could not load the PDF maker. Check your internet connection and try again.'));
+    document.head.appendChild(s);
+  });
+}
+function printShareDialog(){
+  let bg = document.getElementById('printShareModal');
+  if(!bg){
+    bg = document.createElement('div');
+    bg.className = 'modal-bg';
+    bg.id = 'printShareModal';
+    bg.style.zIndex = '200';
+    bg.innerHTML = `<div class="modal small" role="dialog" aria-modal="true" aria-labelledby="printShareTitle">
+      <h2 id="printShareTitle">Print</h2>
+      <p id="printShareMsg" style="margin:0 0 16px;"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn secondary" id="btnPrintShareClose">Close</button>
+        <button type="button" class="btn" id="btnPrintShareGo" hidden>Print or share PDF</button>
+      </div>
+    </div>`;
+    document.body.appendChild(bg);
+    bg.querySelector('#btnPrintShareClose').addEventListener('click', () => bg.classList.remove('open'));
+  }
+  return bg;
+}
+// el: a detached element holding what should print. title: shown in the
+// share sheet; also the file name.
+async function printViaShareSheet(el, title){
+  const bg = printShareDialog();
+  const msg = bg.querySelector('#printShareMsg');
+  const go = bg.querySelector('#btnPrintShareGo');
+  go.hidden = true;
+  msg.textContent = 'Preparing a PDF to print…';
+  bg.classList.add('open');
+  const W = 720, PAGE_H = 960; // 7.5in x 10in printable area at 96px/in
+  const host = document.createElement('div');
+  host.className = 'pdf-render';
+  host.style.cssText = 'position:absolute;left:0;top:0;width:'+W+'px;background:#fff;color:#222;z-index:-1;pointer-events:none;--ans-scale:1;';
+  host.appendChild(el);
+  document.body.appendChild(host);
+  let file;
+  try{
+    await loadPrintLib('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', () => !!window.html2canvas);
+    await loadPrintLib('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', () => !!(window.jspdf && window.jspdf.jsPDF));
+    await Promise.all([...host.querySelectorAll('img')].map(img => img.complete ? null : new Promise(r => { img.onload = img.onerror = r; })));
+    if(document.fonts && document.fonts.ready) await document.fonts.ready;
+    const r = host.getBoundingClientRect();
+    const top = r.top + window.scrollY, left = r.left + window.scrollX;
+    const total = Math.ceil(host.scrollHeight);
+    // Break pages only between rows/paragraphs, never through a line.
+    const cuts = [...host.querySelectorAll('.ans-row,.ans-subrow,.ans-section h3,h1,h2,h3,p,li,img,.legal-text')]
+      .map(n => Math.round(n.getBoundingClientRect().bottom - r.top)).filter(y => y > 0).sort((a,b) => a-b);
+    const pages = [];
+    for(let start = 0; start < total; ){
+      let end = start + PAGE_H;
+      if(end >= total) end = total;
+      else {
+        const fit = cuts.filter(y => y > start + PAGE_H/2 && y <= start + PAGE_H);
+        if(fit.length) end = fit[fit.length-1];
+      }
+      pages.push([start, end]);
+      start = end;
+    }
+    const pdf = new window.jspdf.jsPDF({ unit:'in', format:'letter' });
+    for(let k = 0; k < pages.length; k++){
+      msg.textContent = `Preparing a PDF to print… page ${k+1} of ${pages.length}`;
+      const [a, b] = pages[k];
+      const canvas = await window.html2canvas(host, { scale:2, backgroundColor:'#fff', useCORS:true, logging:false,
+        x:left, y:top + a, width:W, height:b - a, windowWidth:Math.max(W, document.documentElement.clientWidth) });
+      if(k) pdf.addPage();
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0.5, 0.5, 7.5, 7.5 * (b - a) / W);
+    }
+    const name = (title || 'Intake form').replace(/[^\w\- ]+/g, '').trim() || 'Intake form';
+    file = new File([pdf.output('blob')], name + '.pdf', { type:'application/pdf' });
+  }catch(err){
+    console.error(err);
+    msg.textContent = 'Sorry, the PDF could not be made. ' + (err && err.message ? err.message : '');
+    return;
+  }finally{
+    host.remove();
+  }
+  const share = async () => {
+    if(navigator.canShare && navigator.canShare({ files:[file] })){
+      await navigator.share({ files:[file], title: file.name });
+    } else {
+      // No file sharing: open the PDF itself; its own share button prints.
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(file); a.target = '_blank'; a.download = file.name;
+      document.body.appendChild(a); a.click(); a.remove();
+    }
+    bg.classList.remove('open');
+  };
+  msg.textContent = 'Your PDF is ready. Tap the button, then choose Print from the menu.';
+  go.hidden = false;
+  go.onclick = () => share().catch(err => { if(err && err.name !== 'AbortError') msg.textContent = 'Could not open the share menu. ' + (err.message || ''); });
+  // Opening the share menu needs a fresh tap; try now, and fall back to
+  // the button above if iOS says the tap is too old.
+  try{ await share(); }catch(err){ /* AbortError = cancelled; NotAllowedError = tap expired; the button stays */ }
+}
 // Print/PDF for a minister's read-only view - same document shape as the
 // recipient's own printout (intake/index.html's #printArea): answers
 // first, then the Liability Release wording and signature together at
@@ -1152,6 +1273,12 @@ window.printIntakeView = function(){
       ${i.signatureDataUrl ? `<div class="ans-row" style="flex-direction:column;"><div class="ans-q">Signature</div><img src="${i.signatureDataUrl}" alt="Signature" style="max-width:280px;border:1px solid var(--border);border-radius:8px;background:#fff;margin-top:6px;"></div>` : ''}
     </section>
   `;
+  if(PRINT_VIA_SHARE){
+    const copy = document.createElement('div');
+    copy.innerHTML = $('#intakePrintArea').innerHTML;
+    printViaShareSheet(copy, 'Intake form');
+    return;
+  }
   document.body.classList.add('printing-intake');
   window.print();
 };
