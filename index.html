@@ -413,6 +413,14 @@
   button.link-btn{background:none;border:none;padding:8px 0;min-height:44px;color:var(--gold);text-decoration:underline;cursor:pointer;font-family:inherit;}
   button.link-btn:hover{color:var(--navy);}
   /* Intake detail header: name left, text-size icon buttons right. */
+  /* PDF made for the iPhone/iPad Home Screen app share sheet
+     (printViaShareSheet()): same two-column layout as the print view. */
+  .pdf-render{padding:0;font-size:16px;}
+  .pdf-render .ans-section{margin-bottom:14px;}
+  .pdf-render .ans-section h3{font-size:1rem;margin:0 0 6px;padding-bottom:4px;}
+  .pdf-render .ans-row{flex-direction:row;align-items:baseline;gap:8px;margin-bottom:4px;}
+  .pdf-render .ans-q{flex:0 0 30%;max-width:30%;font-size:.78rem;}
+  .pdf-render .ans-a{flex:1 1 auto;font-size:.85rem;}
   .intake-namerow{display:flex;justify-content:space-between;align-items:center;gap:12px;}
   .intake-namerow h2{margin:0;}
   .intake-namerow .size-btns{display:flex;gap:6px;flex:0 0 auto;}
@@ -1403,7 +1411,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-11-07.2";
+const APP_VERSION = "2026-11-08.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -6100,6 +6108,130 @@ window.deleteIntakeForm = async function(id){
   await deleteItem('intake', id);
   await loadAll();
 };
+// ---- Print from an iPhone/iPad Home Screen app (added 2026-11-08) --------
+// iOS Home Screen apps silently ignore window.print(), in the page and in
+// iframes alike (Andrew hit it on iOS 27.2; others report the same since
+// late Oct 2026). There, Print draws the printable content into a PDF
+// (html2canvas + jsPDF from cdnjs, loaded only when needed) and opens the
+// share sheet, whose Print action works. Safari tabs and computers keep
+// using window.print(). Duplicated in preview/index.html and
+// portal/index.html, same as other shared helpers.
+const PRINT_VIA_SHARE = window.navigator.standalone === true;
+function loadPrintLib(src, ready){
+  if(ready()) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('Could not load the PDF maker. Check your internet connection and try again.'));
+    document.head.appendChild(s);
+  });
+}
+function printShareDialog(){
+  let bg = document.getElementById('printShareModal');
+  if(!bg){
+    bg = document.createElement('div');
+    bg.className = 'modal-bg';
+    bg.id = 'printShareModal';
+    bg.style.zIndex = '200';
+    bg.innerHTML = `<div class="modal small" role="dialog" aria-modal="true" aria-labelledby="printShareTitle">
+      <h2 id="printShareTitle">Print</h2>
+      <p id="printShareMsg" style="margin:0 0 16px;"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn secondary" id="btnPrintShareClose">Close</button>
+        <button type="button" class="btn" id="btnPrintShareGo" hidden>Print or share PDF</button>
+      </div>
+    </div>`;
+    document.body.appendChild(bg);
+    bg.querySelector('#btnPrintShareClose').addEventListener('click', () => bg.classList.remove('open'));
+  }
+  return bg;
+}
+// el: a detached element holding what should print. title: shown in the
+// share sheet; also the file name.
+async function printViaShareSheet(el, title){
+  const bg = printShareDialog();
+  const msg = bg.querySelector('#printShareMsg');
+  const go = bg.querySelector('#btnPrintShareGo');
+  go.hidden = true;
+  msg.textContent = 'Preparing a PDF to print…';
+  bg.classList.add('open');
+  const W = 720, PAGE_H = 960; // 7.5in x 10in printable area at 96px/in
+  const host = document.createElement('div');
+  host.className = 'pdf-render';
+  host.style.cssText = 'position:absolute;left:0;top:0;width:'+W+'px;background:#fff;color:#222;z-index:-1;pointer-events:none;--ans-scale:1;';
+  host.appendChild(el);
+  document.body.appendChild(host);
+  let file;
+  try{
+    await loadPrintLib('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', () => !!window.html2canvas);
+    await loadPrintLib('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', () => !!(window.jspdf && window.jspdf.jsPDF));
+    await Promise.all([...host.querySelectorAll('img')].map(img => img.complete ? null : new Promise(r => { img.onload = img.onerror = r; })));
+    if(document.fonts && document.fonts.ready) await document.fonts.ready;
+    const r = host.getBoundingClientRect();
+    const top = r.top + window.scrollY, left = r.left + window.scrollX;
+    const total = Math.ceil(host.scrollHeight);
+    // Break pages only between rows/paragraphs, never through a line.
+    const cuts = [...host.querySelectorAll('.ans-row,.ans-subrow,.ans-section h3,h1,h2,h3,p,li,img,.legal-text')]
+      .map(n => Math.round(n.getBoundingClientRect().bottom - r.top)).filter(y => y > 0).sort((a,b) => a-b);
+    const pages = [];
+    for(let start = 0; start < total; ){
+      let end = start + PAGE_H;
+      if(end >= total) end = total;
+      else {
+        const fit = cuts.filter(y => y > start + PAGE_H/2 && y <= start + PAGE_H);
+        if(fit.length) end = fit[fit.length-1];
+      }
+      pages.push([start, end]);
+      start = end;
+    }
+    const pdf = new window.jspdf.jsPDF({ unit:'in', format:'letter' });
+    for(let k = 0; k < pages.length; k++){
+      msg.textContent = `Preparing a PDF to print… page ${k+1} of ${pages.length}`;
+      const [a, b] = pages[k];
+      const canvas = await window.html2canvas(host, { scale:2, backgroundColor:'#fff', useCORS:true, logging:false,
+        x:left, y:top + a, width:W, height:b - a, windowWidth:Math.max(W, document.documentElement.clientWidth) });
+      if(k) pdf.addPage();
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0.5, 0.5, 7.5, 7.5 * (b - a) / W);
+    }
+    const name = (title || 'Intake form').replace(/[^\w\- ]+/g, '').trim() || 'Intake form';
+    file = new File([pdf.output('blob')], name + '.pdf', { type:'application/pdf' });
+  }catch(err){
+    console.error(err);
+    msg.textContent = 'Sorry, the PDF could not be made. ' + (err && err.message ? err.message : '');
+    return;
+  }finally{
+    host.remove();
+  }
+  const share = async () => {
+    if(navigator.canShare && navigator.canShare({ files:[file] })){
+      await navigator.share({ files:[file], title: file.name });
+    } else {
+      // No file sharing: open the PDF itself; its own share button prints.
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(file); a.target = '_blank'; a.download = file.name;
+      document.body.appendChild(a); a.click(); a.remove();
+    }
+    bg.classList.remove('open');
+  };
+  msg.textContent = 'Your PDF is ready. Tap the button, then choose Print from the menu.';
+  go.hidden = false;
+  go.onclick = () => share().catch(err => { if(err && err.name !== 'AbortError') msg.textContent = 'Could not open the share menu. ' + (err.message || ''); });
+  // Opening the share menu needs a fresh tap; try now, and fall back to
+  // the button above if iOS says the tap is too old.
+  try{ await share(); }catch(err){ /* AbortError = cancelled; NotAllowedError = tap expired; the button stays */ }
+}
+// Print button on the intake detail view. Home Screen app on iPhone/iPad:
+// PDF + share sheet (printViaShareSheet above); everywhere else the
+// normal print dialog with the @media print rules.
+window.printIntakeDetail = function(){
+  if(!PRINT_VIA_SHARE){ window.print(); return; }
+  const i = intakeResponses.find(x=>x.id===intakeDetailId);
+  const copy = $('#intakeDetail').cloneNode(true);
+  copy.removeAttribute('id');
+  copy.querySelectorAll('.no-print,#redactPanel,#redactPickBar').forEach(n => n.remove());
+  printViaShareSheet(copy, ((i && i.recipName) ? i.recipName + ' ' : '') + 'intake form');
+};
 window.openIntakeDetail = function(id){
   const i = intakeResponses.find(x=>x.id===id);
   if(!i) return;
@@ -6110,7 +6242,7 @@ window.openIntakeDetail = function(id){
   detail.innerHTML = `
     <div class="toolbar no-print">
       <button type="button" class="btn secondary" onclick="closeIntakeDetail()">&larr; ${intakeReturn ? 'Back to '+escapeHtml(intakeReturn.label) : 'Back to list'}</button>
-      <button type="button" class="btn" onclick="window.print()">Print / Save as PDF</button>
+      <button type="button" class="btn" onclick="printIntakeDetail()">Print / Save as PDF</button>
       ${i.status !== 'InProgress' ? `<button type="button" class="btn secondary" onclick="toggleRedactPanel(${i.id})">${redactPanelOpen ? 'Close redaction' : 'Redact personal info'}</button>` : ''}
     </div>
     <div class="intake-namerow">
@@ -8338,6 +8470,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Nov 8, 2026', version: '2026-11-08.1', items: [
+    'Fixed: printing an intake form from the installed app on an iPhone or iPad. Since recent iOS updates, the home-screen app ignores Print completely. Now, in the installed app, "Print / Save as PDF" makes a PDF of the form and opens the iPhone share menu; choose Print there (or Save to Files). If the menu doesn\'t open by itself, tap "Print or share PDF". In Safari and on a computer, Print works the same as before. My FPHM has the same fix (live now). To check: open a submitted form in Intake Forms in the installed FPHM Admin app and tap Print / Save as PDF.'
+  ]},
   { date: 'Nov 7, 2026', version: '2026-11-07.2', items: [
     'New: the Prayer List is in My FPHM (live now). Ministers ticked in Settings > Prayer List see a Prayer List tab with each person\'s full name, session number and next session date, soonest first. Everyone else doesn\'t see the tab. To check: tick a minister, Save, then sign in to My FPHM as them (or ask them to tap Refresh).'
   ]},
@@ -8351,15 +8486,15 @@ const CHANGE_LOG = [
   { date: 'Oct 30, 2026', version: '2026-10-30.1', items: [
     'New: a notes box for each sequence. In Settings > Session Notes, open a grid question (for example "Was there an effect?") and tick "Add a notes box under each row". The session notes form then shows a notes box right under each row, so Forgiveness, Listening prayer and so on each get their own notes. Because "Was there an effect?" only lists the sequences marked Yes above it, only the sequences used get a box. The single text box below the grid is a separate option, so you can keep it as General notes or turn it off. Saved notes, and earlier notes in My FPHM, show each sequence\'s notes under its own name. Notes already saved stay exactly as they were written.'
   ]},
-  { date: 'Oct 29, 2026', version: '2026-10-29.1', items: [
-    'New: "View intake form" and "View session notes" buttons at the top of each recipient\'s card on the Completed Sessions tab (By recipient), the same as prayer ministers have in My FPHM. View intake form opens the form that\'s linked to that person, and Back returns you to Completed Sessions. View session notes opens all of that person\'s notes full screen: one card per session, newest open, with the session number, a large date and the team on a light terracotta header. On phones the buttons are full width; on larger screens they\'re as wide as their labels. To check: open a recipient on Completed Sessions who has notes and a linked intake form.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 29, 2026', version: '2026-10-29.1', items: [
+    'New: "View intake form" and "View session notes" buttons at the top of each recipient\'s card on the Completed Sessions tab (By recipient), the same as prayer ministers have in My FPHM. View intake form opens the form that\'s linked to that person, and Back returns you to Completed Sessions. View session notes opens all of that person\'s notes full screen: one card per session, newest open, with the session number, a large date and the team on a light terracotta header. On phones the buttons are full width; on larger screens they\'re as wide as their labels. To check: open a recipient on Completed Sessions who has notes and a linked intake form.'
+  ]},
   { date: 'Oct 29, 2026', version: '2026-10-28.2', items: [
     'Changed: the 90-day clean-up on the Prayer Ministers tab never removes a minister\'s only device. If someone has just one phone or tablet, it stays on their "Phone notifications" list (showing Check) however long it has been, so you can still see it and follow up. When someone has more than one device, the old ones are still removed after 90 days, but their most recently opened device is always kept. The Remove link still works on any device.'
   ]},
