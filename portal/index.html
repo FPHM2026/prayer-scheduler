@@ -823,7 +823,9 @@ async function loadAll(){
       // Staff-confirmed intake form link (see preview/index.html's "Intake
       // form linking" section) - findMyIntakeForRecipient() below prefers
       // this over its own name match when it's set.
-      intakeResponseId: (s.IntakeResponseId!=null && s.IntakeResponseId!=='') ? parseInt(s.IntakeResponseId,10) : null
+      intakeResponseId: (s.IntakeResponseId!=null && s.IntakeResponseId!=='') ? parseInt(s.IntakeResponseId,10) : null,
+      // Admin marked this person Private: keep them off the Prayer List.
+      plPrivate: s.PrayerListPrivate===true
     };
   });
   sessionNotes = await loadSessionNotes();
@@ -896,7 +898,10 @@ function renderPrayerList(){
     if(!groups.has(key)) groups.set(key, { name: s.recipName.trim(), sessions: [] });
     groups.get(key).sessions.push(s);
   });
-  const all = [...groups.values()].map(g=>{
+  // A person is left off entirely if an admin marked any of their booked
+  // sessions Private (they don't want other ministers to know). Client-side
+  // only, same as the rest of this tab.
+  const all = [...groups.values()].filter(g=>!g.sessions.some(s=>s.plPrivate)).map(g=>{
     const sorted = g.sessions.sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
     const upcoming = sorted.filter(s=>(s.date||'')>=today);
     return { name: prayerListName(g.name), next: upcoming[0] || sorted[sorted.length-1], past: !upcoming.length, upcomingCount: upcoming.length };

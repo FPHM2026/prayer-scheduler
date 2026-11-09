@@ -169,6 +169,8 @@
       let m;
       if((m = path.match(/^\/sites\/[^/]+:\/.+$/))) return json({ id:'demo-site' });
       if(/^\/sites\/demo-site\/lists\?/.test(path)) return json({ value: Object.keys(lists).map(n=>({ id:listIdByName[n], displayName:n })) });
+      // Hand-made columns the app checks for before using them.
+      if(/^\/sites\/demo-site\/lists\/list-\w+\/columns/.test(path)) return json({ value: ['PrayerListAccess','PrayerListPrivate'].map(name=>({ name })) });
       if((m = path.match(/^\/sites\/demo-site\/lists\/list-(\w+)\/items\?/)) && method==='GET'){
         return json({ value: lists[m[1]].map(it=>({ id:String(it.id), createdDateTime: it.createdDateTime||'2026-01-02T09:00:00Z', createdBy: it.createdBy||{user:{email:'admin@demo.example'}}, fields: it.fields })) });
       }

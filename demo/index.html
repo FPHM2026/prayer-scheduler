@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FPHM Scheduler (Demo)</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#474747">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="FPHM Admin">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
@@ -158,7 +163,7 @@
      user asked for exactly this shape after an earlier labeled-button
      version ("What's this?" on its own line) didn't read as one button. */
   .split-btn{display:inline-flex;border-radius:6px;overflow:hidden;}
-  .split-btn .split-btn-main{border-radius:0;}
+  .split-btn .split-btn-main{border-radius:0;flex:1 1 auto;}
   .split-btn-info{background:var(--primary);color:var(--on-primary);border:none;border-left:1px solid rgba(0,0,0,.18);width:36px;min-width:36px;min-height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;}
   .split-btn-info:hover{background:var(--primary-dark);}
   .split-btn.secondary .split-btn-info,.split-btn-info.secondary{background:var(--card);color:var(--navy);border-left-color:var(--border);}
@@ -187,6 +192,20 @@
   .tag.scheduled{background:#eef4fb;color:#2c5f8a;}
   .tag.active{background:var(--ok-bg);color:var(--ok);}
   .tag.inactive{background:#f1ede4;color:var(--muted);}
+  .tag.notif-on,.tag.notif-check,.tag.notif-off{white-space:nowrap;margin-right:0;}
+  .tag.notif-on{background:var(--ok-bg);color:var(--ok);}
+  .tag.notif-check{background:#fbf0d4;color:#7a5200;}
+  .tag.notif-off{background:var(--danger-bg);color:var(--danger);}
+  .notif-summary{border:1px solid #e8e0d3;background:var(--card);border-radius:8px;padding:16px;margin:0 0 16px;display:flex;flex-direction:column;gap:8px;}
+  .notif-summary-line{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-weight:600;color:var(--navy);}
+  .notif-filter{display:flex;gap:8px;flex-wrap:wrap;}
+  .notif-filter button{font:inherit;font-size:var(--fs-xs);border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:999px;padding:4px 16px;cursor:pointer;}
+  .notif-filter button.on{background:var(--navy);border-color:var(--navy);color:#fff;}
+  .notif-devs{padding:12px 4px;display:flex;flex-direction:column;gap:4px;font-size:var(--fs-sm);border-bottom:1px solid #f1ede4;}
+  .notif-devs-title{font-weight:700;color:var(--navy);}
+  .notif-dev{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;}
+  .notif-dev .link-btn{min-height:auto;padding:4px 8px;font-size:var(--fs-sm);}
+  .notif-dev.warn{color:#7a5200;}
   .tag.priority{background:var(--primary);color:var(--on-primary);}
   .tag.contacted{background:var(--ok-bg);color:var(--ok);}
 
@@ -233,6 +252,14 @@
 
   /* ---- Form modals are bottom sheets: full width, slide up, capped at 90vh ---- */
   .modal-bg.sheet{align-items:flex-end;padding:0;}
+  /* Install guide: a full-screen in-app view, so the admin never leaves the Scheduler. */
+  .modal-bg.guide-full{padding:0;align-items:stretch;}
+  .modal-bg.guide-full .modal{max-width:none;width:100%;height:100%;max-height:none;border-radius:0;padding:0;display:flex;flex-direction:column;overflow:hidden;}
+  .guide-bar{display:flex;flex-wrap:nowrap;align-items:center;gap:8px 16px;padding:8px 16px;padding-top:calc(8px + env(safe-area-inset-top, 0px));padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));border-bottom:1px solid var(--border);background:var(--card);}
+  .guide-bar h2{flex:1 1 auto;min-width:0;margin:0;font-size:var(--fs-md);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .guide-bar-actions{display:flex;align-items:center;gap:8px 16px;flex:0 0 auto;}
+  .guide-bar-actions .helptext{margin:0;}
+  .guide-frame{flex:1 1 auto;width:100%;min-height:0;border:0;display:block;background:#faf8f4;}
   .modal-bg.sheet .modal{max-width:none;width:100%;max-height:90vh;border-radius:16px 16px 0 0;animation:sheetSlideUp .25s ease;}
   @keyframes sheetSlideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
 
@@ -240,6 +267,14 @@
   .followup-hit{padding:10px 4px;cursor:pointer;color:var(--gold);text-decoration:underline;font-size:var(--fs-sm);min-height:44px;}
   .sameday-box{background:#f5f0e6;border:1px solid #e6dcc7;border-radius:6px;padding:10px 12px;font-size:var(--fs-sm);margin:8px 0;}
   .sameday-box .title{font-weight:700;font-size:var(--fs-xs);color:var(--navy);margin-bottom:4px;}
+  .minister-row-right{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+  .minister-row-right .role-toggle,.minister-row-right .flag{margin-left:0;}
+  .load-chip{font-size:var(--fs-2xs);font-weight:600;border-radius:10px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums;background:#f1ede4;color:var(--muted);}
+  .load-chip.light{background:var(--ok-bg);color:var(--ok);}
+  .load-chip.heavy{background:#fdf1dc;color:#8a5a00;}
+  .load-chip small{font-weight:400;font-size:inherit;}
+  .load-sort-row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:0 0 8px;}
+  .load-sort-btn{font-family:inherit;font-size:var(--fs-xs);border:1px solid var(--border);background:#fff;color:var(--navy);border-radius:14px;padding:4px 12px;cursor:pointer;}
   .workload-badge{margin-left:auto;font-size:var(--fs-2xs);color:var(--muted);background:#f1ede4;border-radius:10px;padding:3px 9px;}
   #dayLabel{display:block;margin-top:4px;}
   .slot-btn{background:#fff;border:1px solid var(--navy);color:var(--navy);border-radius:16px;padding:6px 14px;font-size:var(--fs-xs);cursor:pointer;margin:6px 6px 0 0;min-height:36px;}
@@ -313,6 +348,44 @@
   .ans-section{margin-bottom:20px;}
   .ans-section h3{font-family:'Playfair Display',Georgia,serif;color:var(--gold-dark);border-bottom:1px solid var(--border);padding-bottom:6px;margin:0 0 10px;}
   .ans-row{display:flex;flex-direction:column;margin-bottom:10px;}
+  /* Recipient card buttons + combined session notes view - same look as
+     My FPHM (2026-10-29, at the user's request). */
+  .recip-links-row{margin:0 0 8px;display:flex;flex-wrap:wrap;gap:8px;}
+  .recip-links-row .btn{width:100%;}
+  @media (min-width:640px){ .recip-links-row .btn{width:auto;} }
+  #notesViewModal{padding:0;align-items:stretch;}
+  #notesViewModal .modal{max-width:none;width:100%;height:100%;max-height:none;border-radius:0;padding:0;display:flex;flex-direction:column;overflow:hidden;}
+  .notes-view-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--border);background:#fff;}
+  .notes-view-head h2{margin:0;font-size:var(--fs-lg);}
+  .notes-view-head .head-btns{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .notes-view-head .a-sm{font-size:15px;} .notes-view-head .a-lg{font-size:24px;}
+  .notes-view-scroll{flex:1;overflow-y:auto;padding:12px 16px 24px;}
+  .nv-card{border:1px solid var(--border);border-left:4px solid var(--gold);border-radius:8px;background:#fff;padding:16px;margin-bottom:24px;box-shadow:0 1px 4px rgba(0,0,0,.06);overflow:hidden;}
+  .nv-chip{display:inline-block;font-size:var(--fs-xs);font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--gold-dark);margin-bottom:4px;}
+  .nv-date{font-family:'Playfair Display',Georgia,serif;margin:0 0 4px;font-size:var(--fs-lg);color:var(--navy);line-height:1.25;}
+  .nv-meta{margin:0 0 16px;font-size:var(--fs-sm);color:var(--muted);}
+  .nv-fold{padding:0;}
+  .nv-fold > summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:16px;min-height:44px;background:#f3e7e0;}
+  .nv-fold > summary::-webkit-details-marker{display:none;}
+  .nv-fold-text{flex:1;min-width:0;}
+  .nv-fold .nv-meta{margin:0;}
+  .nv-fold-chev{display:inline-flex;color:var(--gold-dark);transition:transform .2s;}
+  .nv-fold[open] > summary{border-bottom:2px solid var(--gold);}
+  .nv-fold[open] .nv-fold-chev{transform:rotate(180deg);}
+  .nv-fold-body{padding:16px;}
+  #notesViewBody .ans-q{font-size:calc(var(--fs-xs) * var(--ans-scale,1));}
+  #notesViewBody .ans-a{font-size:calc(var(--fs-sm) * var(--ans-scale,1));}
+  .ans-subrow{padding:8px 0;border-bottom:1px dashed var(--border);}
+  .ans-subrow:last-child{border-bottom:0;}
+  .ans-rownote{margin-top:4px;white-space:pre-wrap;}
+  .ans-empty{color:var(--muted);margin:0;}
+  /* Earlier sessions' notes, shown above the form in the notes modal. */
+  .notes-earlier{border:1px solid var(--border);border-radius:8px;background:#fff;margin:0 0 16px;}
+  .notes-earlier > summary{cursor:pointer;padding:12px 16px;font-weight:700;min-height:44px;box-sizing:border-box;display:flex;align-items:center;}
+  .notes-earlier-body{padding:0 16px 8px;}
+  .note-view{border-top:1px solid var(--border);padding:16px 0 8px;}
+  .note-view h4{margin:0 0 4px;font-family:'Playfair Display',Georgia,serif;}
+  .note-view .helptext{margin:0 0 16px;}
   .ans-q{font-weight:700;font-size:calc(var(--fs-xs) * var(--ans-scale,1));color:var(--muted);}
   .ans-a{font-size:calc(var(--fs-sm) * var(--ans-scale,1));white-space:pre-wrap;}
   #intakeDetail{--ans-scale:1;}
@@ -344,6 +417,14 @@
   button.link-btn{background:none;border:none;padding:8px 0;min-height:44px;color:var(--gold);text-decoration:underline;cursor:pointer;font-family:inherit;}
   button.link-btn:hover{color:var(--navy);}
   /* Intake detail header: name left, text-size icon buttons right. */
+  /* PDF made for the iPhone/iPad Home Screen app share sheet
+     (printViaShareSheet()): same two-column layout as the print view. */
+  .pdf-render{padding:0;font-size:16px;}
+  .pdf-render .ans-section{margin-bottom:14px;}
+  .pdf-render .ans-section h3{font-size:1rem;margin:0 0 6px;padding-bottom:4px;}
+  .pdf-render .ans-row{flex-direction:row;align-items:baseline;gap:8px;margin-bottom:4px;}
+  .pdf-render .ans-q{flex:0 0 30%;max-width:30%;font-size:.78rem;}
+  .pdf-render .ans-a{flex:1 1 auto;font-size:.85rem;}
   .intake-namerow{display:flex;justify-content:space-between;align-items:center;gap:12px;}
   .intake-namerow h2{margin:0;}
   .intake-namerow .size-btns{display:flex;gap:6px;flex:0 0 auto;}
@@ -403,7 +484,40 @@
   /* ---- Settings: one card per distinct setting group ---- */
   .settings-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:16px;box-shadow:var(--shadow-sm);}
   .settings-card h2{font-size:var(--fs-lg);margin:0 0 4px;color:var(--navy);}
+  /* Admin push switch (Settings > Notifications), same look as the portal's. */
+  .push-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-size:var(--fs-sm);}
+  .push-toggle{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;min-height:44px;}
+  .push-toggle input{position:absolute;opacity:0;width:1px;height:1px;}
+  .push-toggle .track{position:relative;width:40px;height:24px;border-radius:12px;background:#c9c1b1;transition:background .15s;flex:0 0 auto;}
+  .push-toggle .track::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:10px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:left .15s;}
+  .push-toggle input:checked + .track{background:#4a7c59;}
+  .push-toggle input:checked + .track::after{left:18px;}
+  .push-toggle input:focus-visible + .track{outline:2px solid var(--navy);outline-offset:2px;}
   .settings-card .helptext{margin-bottom:14px;}
+  /* ---- Prayer List tab + its Settings card ---- */
+  .pl-list{background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-sm);overflow:hidden;}
+  .pl-row{display:flex;gap:16px;align-items:flex-start;padding:16px;border-top:1px solid #f1ede4;}
+  .pl-row:first-child{border-top:none;}
+  .pl-num{flex:0 0 32px;height:32px;border-radius:50%;background:#f3e7e0;color:var(--gold-dark);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:var(--fs-sm);}
+  .pl-main{flex:1 1 auto;min-width:0;}
+  .pl-name{font-family:'Playfair Display',Georgia,serif;font-size:var(--fs-lg);font-weight:700;color:var(--navy);overflow-wrap:anywhere;margin-right:8px;}
+  .pl-meta{font-size:var(--fs-sm);color:var(--muted);margin-top:4px;overflow-wrap:anywhere;}
+  .pl-meta strong{color:var(--text);font-weight:600;}
+  .pl-overdue{color:#9a5b00;}
+  .pl-private-btn{flex:0 0 auto;align-self:center;white-space:nowrap;}
+  .tag.pl-private-tag{background:#ece7f3;color:#4b3a6b;}
+  .pl-access-tools{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:8px;font-size:var(--fs-sm);}
+  .pl-access-count{color:var(--muted);margin-left:auto;}
+  .pl-access-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0 16px;}
+  .pl-access-item{display:flex;align-items:center;gap:8px;min-height:44px;font-size:var(--fs-sm);cursor:pointer;border-bottom:1px solid #f1ede4;}
+  .pl-access-item input{width:20px;height:20px;flex:0 0 auto;accent-color:var(--gold-dark);}
+  @media (max-width:640px){
+    .pl-row{gap:8px;padding:16px 8px 16px 16px;}
+    .pl-num{flex-basis:28px;height:28px;}
+    .pl-access-count{margin-left:0;width:100%;}
+    .pl-row{flex-wrap:wrap;}
+    .pl-private-btn{flex:1 1 100%;margin-left:36px;}
+  }
   .settings-card:last-child{margin-bottom:0;}
 
   /* ---- Completed Sessions: combo card (YTD / Last Year / Lifetime) ---- */
@@ -426,7 +540,9 @@
   .trend-legend .legend-dot{width:9px;height:9px;border-radius:2px;display:inline-block;}
   .trend-legend .legend-dot.this{background:var(--primary);}
   .trend-legend .legend-dot.last{background:var(--muted-bar);margin-left:10px;}
-  .trend-bars{display:flex;align-items:flex-end;gap:10px;height:104px;}
+  /* Scrolls sideways on narrow screens so all 12 months stay full size. */
+  .trend-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;}
+  .trend-bars{display:flex;align-items:flex-end;gap:10px;height:104px;min-width:max-content;}
   .trend-bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;}
   .trend-bar-pair{display:flex;align-items:flex-end;justify-content:center;gap:3px;width:100%;flex-shrink:0;}
   .trend-bar-current{display:flex;flex-direction:column;align-items:center;flex-shrink:0;}
@@ -544,17 +660,33 @@
   #notesBody .nt-grid tbody th{text-align:left;font-weight:600;min-width:120px;}
   #notesBody .nt-grid tbody tr:last-child th,#notesBody .nt-grid tbody tr:last-child td{border-bottom:none;}
   #notesBody .nt-grid input{width:20px;height:20px;cursor:pointer;}
+  #notesBody .nt-grid tr.has-rownote th,#notesBody .nt-grid tr.has-rownote td{border-bottom:none;padding-bottom:4px;}
+  #notesBody .nt-grid td.nt-rownote{padding:0 12px 16px;text-align:left;}
+  #notesBody .nt-grid td.nt-rownote textarea{width:100%;min-height:64px;}
+  #notesBody .nt-grid tbody tr:last-child td.nt-rownote{padding-bottom:12px;}
   #notesBody input[type=text],#notesBody input[type=email],#notesBody input[type=number],#notesBody textarea,#notesBody select{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:8px;font-size:1rem;font-family:inherit;background:#fff;box-sizing:border-box;}
   #notesBody textarea{min-height:90px;resize:vertical;}
   #notesBody .choice-option .other-text{flex:1 1 100%;width:auto;}
   .editor-sticky{position:sticky;top:var(--nav-h,0px);z-index:15;background:var(--bg);padding:8px 0 6px;margin-bottom:8px;border-bottom:1px solid var(--border);}
   .editor-sticky .toolbar{margin-bottom:4px;}
   .editor-sticky .errbox{margin:6px 0 0;}
-  .subtabs{display:flex;gap:20px;margin:4px 0 16px;border-bottom:1px solid var(--border);}
-  .subtabs button{background:none;border:none;border-bottom:3px solid transparent;padding:8px 2px;font-weight:700;font-size:var(--fs-sm);color:var(--muted);cursor:pointer;}
+  /* Scrolls sideways instead of widening the page when the tabs don't fit (2026-10-29). */
+  .subtabs{display:flex;gap:20px;margin:4px 0 16px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;}
+  .subtabs::-webkit-scrollbar{display:none;}
+  .subtabs button{flex-shrink:0;white-space:nowrap;background:none;border:none;border-bottom:3px solid transparent;padding:8px 2px;font-weight:700;font-size:var(--fs-sm);color:var(--muted);cursor:pointer;}
   .subtabs button:hover{color:var(--gold-dark);}
   .subtabs button.active{color:var(--navy);border-bottom-color:var(--primary);}
 
+  /* Admin Messages tab (added 2026-10-22) */
+  .nav-badge{display:inline-block;min-width:20px;height:20px;line-height:20px;padding:0 4px;margin-left:8px;border-radius:10px;background:var(--primary);color:var(--on-primary);font-size:12px;font-weight:800;text-align:center;vertical-align:middle;}
+  .nav-badge[hidden]{display:none;}
+  .admin-msg{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:8px;}
+  .admin-msg.unread{border-left:4px solid var(--primary);}
+  .admin-msg-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .admin-msg-name{font-weight:700;font-size:var(--fs-md);}
+  .admin-msg-chip{display:inline-block;border-radius:12px;padding:2px 10px;font-size:var(--fs-xs);font-weight:700;white-space:nowrap;background:#e3f1e6;color:#2f6b3f;}
+  .admin-msg-when{font-size:var(--fs-xs);color:var(--muted);margin-top:4px;}
+  .admin-msg-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:8px;}
   .no-results{padding:32px 16px;text-align:center;color:var(--muted);font-size:var(--fs-sm);}
 
   .prospect-card{background:var(--card);border:1px solid var(--border);border-left:4px solid transparent;border-radius:8px;padding:14px;margin-bottom:10px;box-shadow:var(--shadow-sm);}
@@ -704,11 +836,13 @@
        the "no duplicated functionality" decision. Re-add these two buttons
        plus data-tab="schedule"/"planning" here to fall back if needed. -->
   <button data-tab="schedplan" class="active" aria-current="page">Schedule &amp; Planning</button>
+  <button data-tab="prayerlist">Prayer List</button>
   <button data-tab="completed">Completed Sessions</button>
   <button data-tab="overview">Prayer Ministers</button>
   <button data-tab="blackouts">Blackout Dates</button>
   <button data-tab="intake">Intake Forms</button>
   <button data-tab="reports">Reports</button>
+  <button data-tab="messages" id="navMessages" hidden>Messages<span class="nav-badge" id="msgBadge" hidden></span></button>
   <button data-tab="settings">Settings</button>
   <!-- Moved to the end of the tab list 2026-09-27, at the user's request -
        previously kept first (and the default-active tab) specifically so
@@ -719,6 +853,19 @@
 </nav>
 <main>
 <div id="loadError"></div>
+
+  <section class="panel" id="panel-messages">
+    <nav class="subtabs" aria-label="Show messages" id="adminMsgSubtabs">
+      <button type="button" class="active" data-msgtab="unread">Unread</button>
+      <button type="button" data-msgtab="read">Read</button>
+    </nav>
+    <div class="toolbar">
+      <button class="btn secondary" type="button" id="btnMarkAllRead" onclick="markAllAdminMessagesRead()" hidden>Mark all as read</button>
+      <button class="btn secondary" type="button" id="btnDeleteAllRead" onclick="deleteAllReadAdminMessages()" hidden>Delete all</button>
+    </div>
+    <div id="adminMessageList"></div>
+    <div class="no-results" id="adminMessagesEmpty" hidden></div>
+  </section>
 
   <section class="panel" id="panel-changes">
     <p class="helptext" id="changesHelptext">The five most recent versions. Newest first.</p>
@@ -793,6 +940,16 @@
     <div class="no-results" id="planningNoResults" hidden>No one on the waiting list matches your search.</div>
   </section>
 
+  <section class="panel" id="panel-prayerlist">
+    <p class="helptext" id="prayerListHelp">Everyone with a booked session that hasn't been marked Completed yet, soonest session first. A person drops off once all of their sessions are Completed.</p>
+    <div class="search-row">
+      <div class="search-wrap"><input id="prayerListSearch" placeholder="Search by recipient or minister..." aria-label="Search the prayer list by recipient or minister"><button type="button" class="search-clear" aria-label="Clear search" hidden>&times;</button></div>
+    </div>
+    <div class="errbox" id="prayerListPrivateSetup" hidden style="margin-bottom:16px;"></div>
+    <div id="prayerListBox"></div>
+    <div class="no-results" id="prayerListEmpty" hidden></div>
+  </section>
+
   <section class="panel" id="panel-completed">
     <p class="helptext" id="completedHelptext">Grouped by recipient — most recently completed first.</p>
     <div class="stats-collapse" id="completedStatsCollapse">
@@ -819,7 +976,12 @@
       <button class="btn" id="btnAddMinister">+ Add Minister</button>
       <button class="btn secondary" id="rosterSortBtn" onclick="toggleRosterSort()" style="display:inline-flex;align-items:center;gap:4px;" aria-label="Toggle sort order, currently by next appointment"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h11M3 12h7M3 17h4"/><path d="M17 5v14M17 5l-4 4M17 5l4 4"/></svg> Next Appointment</button>
     </div>
-    <p class="helptext">Grouped by minister — tap a name for their stats and upcoming sessions, or use the icons to manage them.</p>
+    <div class="intake-linkrow no-print">
+      <button class="link-btn" type="button" id="btnOpenInstallGuide">Install guide for ministers</button>
+      <button class="link-btn" type="button" id="btnCopyInstallGuide">Copy Link to Install Guide</button>
+      <span class="helptext" id="installGuideCopiedMsg" style="display:none;">Link copied!</span>
+    </div>
+    <p class="helptext">Grouped by minister — tap a name for their stats and upcoming sessions, or use the icons to manage them. The install guide walks a minister through adding My FPHM to their home screen and turning notifications on — send them the link.</p>
     <div class="stats-collapse" id="overviewStatsCollapse">
       <button class="stats-toggle" onclick="toggleStatsCollapse(this)" aria-expanded="true">
         <span class="chevron"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>
@@ -838,6 +1000,7 @@
       <button class="active" data-substatus="Active">Active</button>
       <button data-substatus="Inactive">Inactive</button>
     </nav>
+    <div id="overviewNotif" hidden></div>
     <div id="overviewGroups"></div>
     <div class="no-results" id="overviewNoResults" hidden>No ministers match your search.</div>
   </section>
@@ -936,6 +1099,8 @@
       <button data-settingsview="locations">Locations</button>
       <button data-settingsview="defaultlocation">Sessions</button>
       <button data-settingsview="notes">Session Notes</button>
+      <button data-settingsview="prayerlist">Prayer List</button>
+      <button data-settingsview="notifications" id="settingsNotificationsTab" hidden>Notifications</button>
     </nav>
 
     <div class="settings-subview active" id="settingsTimeWindowsView">
@@ -976,6 +1141,35 @@
     <div class="settings-subview" id="settingsNotesView">
       <div class="errbox" id="notesSetupMsg" hidden style="margin:16px 0;"></div>
       <div id="notesQuestionsHost" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="settings-subview" id="settingsPrayerListView">
+      <div class="settings-card" style="margin-top:16px;">
+        <h2>Who can see the Prayer List</h2>
+        <p class="helptext">Tick the prayer ministers who may see the Prayer List in My FPHM, then Save. Anyone unticked doesn't see the tab there. Admins always see it here.</p>
+        <div class="errbox" id="prayerListSetupMsg" hidden></div>
+        <div id="prayerListAccessBody">
+          <div class="pl-access-tools">
+            <button type="button" class="link-btn" id="btnPlSelectAll">Select all</button>
+            <button type="button" class="link-btn" id="btnPlSelectNone">Clear all</button>
+            <span class="pl-access-count" id="prayerListAccessCount" role="status"></span>
+          </div>
+          <div class="pl-access-list" id="prayerListAccessList"></div>
+          <div class="toolbar" style="margin-top:16px;">
+            <button class="btn" id="btnSavePrayerListAccess">Save</button>
+          </div>
+          <p class="helptext" id="prayerListAccessMsg" role="status" style="margin:8px 0 0;"></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-subview" id="settingsNotificationsView">
+      <div class="settings-card" style="margin-top:16px;">
+        <h2>New intake forms</h2>
+        <p class="helptext">Get an alert on this device when a recipient submits an intake form. Tapping it opens the form. Turn it on separately on each phone or computer you use.</p>
+        <div class="push-row" id="adminPushRow"></div>
+        <p class="helptext" id="adminPushStatus" role="status"></p>
+      </div>
     </div>
 
     <div class="settings-subview" id="settingsDefaultLocationView">
@@ -1040,6 +1234,11 @@
       <p class="helptext" id="genderWarn" style="display:none;color:var(--danger);"></p>
     </fieldset>
     <div class="field"><label for="notes">Notes</label><textarea id="notes" rows="2"></textarea></div>
+    <div class="field" id="plPrivateField" hidden>
+      <label style="display:flex;align-items:flex-start;gap:8px;font-weight:700;">
+        <input type="checkbox" id="sessPlPrivate" style="width:auto;min-height:auto;margin-top:4px;"> <span>Private: keep off the Prayer List in My FPHM<span class="helptext" style="display:block;font-weight:400;margin:0;">For someone who doesn't want other prayer ministers to know they're having a session.</span></span>
+      </label>
+    </div>
     <div class="field waiting-only" id="priorityField" style="display:none;">
       <label style="display:flex;align-items:center;gap:8px;font-weight:700;">
         <input type="checkbox" id="sessPriority" style="width:auto;min-height:auto;"> Flag as priority (bumps to top of the waiting list)
@@ -1147,11 +1346,28 @@
   </div>
 </div>
 
+<div class="modal-bg" id="notesViewModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="notesViewTitle">
+    <div class="notes-view-head">
+      <h2 id="notesViewTitle">Session notes</h2>
+      <div class="head-btns">
+        <button type="button" class="icon-btn icon-btn-lg" onclick="changeNotesViewTextSize(-1)" title="Smaller text" aria-label="Make text smaller"><span class="a-sm" aria-hidden="true">A</span><span aria-hidden="true">&minus;</span></button>
+        <button type="button" class="icon-btn icon-btn-lg" onclick="changeNotesViewTextSize(1)" title="Larger text" aria-label="Make text larger"><span class="a-lg" aria-hidden="true">A</span><span aria-hidden="true">+</span></button>
+        <button class="btn" onclick="$('#notesViewModal').classList.remove('open')">Close</button>
+      </div>
+    </div>
+    <div class="notes-view-scroll">
+      <p class="helptext" style="margin-top:0;">Notes from this person's sessions, newest first.</p>
+      <div id="notesViewBody"></div>
+    </div>
+  </div>
+</div>
 <div class="modal-bg sheet" id="notesModal">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="notesTitle">
     <h2 id="notesTitle">Session Notes</h2>
     <p class="helptext" id="notesSub" style="margin:-6px 0 6px;"></p>
     <p class="errbox" role="alert" id="notesMsg" hidden></p>
+    <div id="notesEarlier" hidden></div>
     <div id="notesBody"></div>
     <div class="modal-actions">
       <button class="btn secondary" id="btnNotesDownload" onclick="downloadSessionNotesJson()" hidden>Download JSON</button>
@@ -1187,6 +1403,18 @@
      2026-09-29, at the user's request) - style="max-width:none" overrides
      the shared .modal class's 560px cap just for this one, since every
      other modal in the app should keep that cap. -->
+<div class="modal-bg guide-full" id="installGuideModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="installGuideTitle">
+    <div class="guide-bar">
+      <h2 id="installGuideTitle">Install guide</h2>
+      <div class="guide-bar-actions">
+        <button class="link-btn" type="button" id="btnCopyInstallGuideModal">Copy Link</button>
+        <button class="btn" type="button" id="btnCloseInstallGuide">Close</button>
+      </div>
+    </div>
+    <iframe class="guide-frame" id="installGuideFrame" title="Install guide for ministers"></iframe>
+  </div>
+</div>
 <div class="modal-bg" id="infoModal">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="infoModalTitle" style="max-width:none;">
     <h2 id="infoModalTitle"></h2>
@@ -1200,7 +1428,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-10-21.7";
+const APP_VERSION = "2026-11-09.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1257,6 +1485,308 @@ const WHATSAPP_NOTIFY = {
   dryRun: false
 };
 
+// Phone push notifications to ministers (added 2026-10-21). Sent by the
+// intake Worker (cloudflare-worker/, /api/push/session) to every device a
+// minister turned notifications on for in the portal. The Worker checks
+// the admin's own Graph token and reads the session's team and recipient
+// from SharePoint itself; we only say which session, who's new, and the
+// date/time in this browser's local time zone. Free to send, so it's
+// automatic on save - no button. Fails silently (console only) so a Worker
+// that isn't set up yet never gets in the way of saving a session.
+const PUSH_NOTIFY_URL = "https://fphm-intake-func.ajjamoore.workers.dev/api/push/session";
+
+/* ---- Admin notifications for new intake forms (added 2026-10-22) ----
+   Settings > Notifications turns them on for this device. The intake
+   Worker (/api/push/admin/*) keeps the device and pushes to it when a
+   recipient submits a form; sw.js shows it, and tapping it opens the form
+   here (?intake=<id> on a fresh window, a postMessage to an open one).
+   The sub-tab stays hidden until the Worker answers /api/push/key. */
+const ADMIN_PUSH_API = "https://fphm-intake-func.ajjamoore.workers.dev/api/push";
+const ADMIN_PUSH_SUPPORTED = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const IS_IOS_DEVICE = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+let adminPushKey = null;
+let adminPushBusy = false;
+async function adminPushApi(path, body){
+  const token = await getToken();
+  const res = await fetch(ADMIN_PUSH_API + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify(body || {})
+  });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+  return data;
+}
+function b64ToUint8(s){
+  s = s.replace(/-/g,'+').replace(/_/g,'/');
+  while(s.length % 4) s += '=';
+  return Uint8Array.from(atob(s), c=>c.charCodeAt(0));
+}
+async function adminPushSubscription(){
+  if(!ADMIN_PUSH_SUPPORTED) return null;
+  const reg = await navigator.serviceWorker.ready;
+  return reg.pushManager.getSubscription();
+}
+async function initAdminPush(){
+  try{
+    const res = await fetch(ADMIN_PUSH_API + '/key');
+    if(!res.ok) return;
+    adminPushKey = (await res.json()).publicKey || null;
+  }catch(e){ return; }
+  if(!adminPushKey) return;
+  $('#settingsNotificationsTab').hidden = false;
+  // Re-send an existing subscription quietly, in case the browser rotated it.
+  try{
+    const sub = await adminPushSubscription();
+    if(sub && Notification.permission === 'granted') adminPushApi('/admin/subscribe', { subscription: sub.toJSON() }).catch(()=>{});
+  }catch(e){}
+}
+async function renderAdminPush(msg){
+  const row = $('#adminPushRow');
+  if(!row) return;
+  let inner;
+  if(!ADMIN_PUSH_SUPPORTED){
+    inner = IS_IOS_DEVICE && !IS_STANDALONE
+      ? `<div class="helptext">To get notifications on iPhone, tap Share, then <em>Add to Home Screen</em>, and open the Scheduler from your Home Screen.</div>`
+      : `<div class="helptext">This browser can't show notifications.</div>`;
+  } else if(Notification.permission === 'denied'){
+    inner = `<div class="helptext">Notifications are blocked for this app. Allow them in your phone or browser settings to turn them on.</div>`;
+  } else {
+    const sub = await adminPushSubscription().catch(()=>null);
+    const on = !!(sub && Notification.permission === 'granted');
+    inner = `<label class="push-toggle"><input type="checkbox" role="switch" ${on?'checked':''} onchange="this.checked ? enableAdminPush() : disableAdminPush()"><span class="track" aria-hidden="true"></span>${on ? 'On' : 'Off'}</label>`
+      + (on ? `<button class="btn secondary" type="button" onclick="testAdminPush()">Send a test</button>` : '');
+  }
+  row.innerHTML = inner;
+  $('#adminPushStatus').textContent = msg || '';
+}
+window.enableAdminPush = async function(){
+  if(adminPushBusy) return;
+  adminPushBusy = true;
+  try{
+    const permission = await Notification.requestPermission();
+    if(permission !== 'granted'){ await renderAdminPush(permission === 'denied' ? '' : 'Notifications were not turned on.'); return; }
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToUint8(adminPushKey) });
+    await adminPushApi('/admin/subscribe', { subscription: sub.toJSON() });
+    await renderAdminPush('');
+  }catch(e){
+    await renderAdminPush('Could not turn on notifications: ' + e.message);
+  }finally{ adminPushBusy = false; }
+};
+window.disableAdminPush = async function(){
+  if(adminPushBusy) return;
+  adminPushBusy = true;
+  try{
+    const sub = await adminPushSubscription();
+    if(sub){
+      await adminPushApi('/admin/unsubscribe', { endpoint: sub.endpoint }).catch(()=>{});
+      await sub.unsubscribe();
+    }
+    await renderAdminPush('');
+  }catch(e){
+    await renderAdminPush('Could not turn off notifications: ' + e.message);
+  }finally{ adminPushBusy = false; }
+};
+window.testAdminPush = async function(){
+  try{
+    const sub = await adminPushSubscription();
+    const r = await adminPushApi('/admin/test', { endpoint: sub ? sub.endpoint : '' });
+    await renderAdminPush(r.sent ? 'Test sent. It should arrive in a few seconds.' : 'This device isn\'t registered. Try turning notifications off and on again.');
+  }catch(e){
+    await renderAdminPush('Test failed: ' + e.message);
+  }
+};
+/* ---- Admin Messages tab (added 2026-10-22) ----
+   The admins' shared inbox, kept by the intake Worker
+   (/api/messages/admin/*): one message per submitted intake form, saved
+   whether or not anyone has phone alerts on. Read/unread and deletes are
+   shared by all admins. The tab stays hidden until the Worker answers. */
+const ADMIN_MESSAGES_API = "https://fphm-intake-func.ajjamoore.workers.dev/api/messages/admin";
+let adminMessages = [];
+let adminMessageTab = 'unread';
+async function adminMessagesApi(path, body){
+  const token = await getToken();
+  const res = await fetch(ADMIN_MESSAGES_API + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify(body || {})
+  });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+  return data;
+}
+async function loadAdminMessages(){
+  try{ adminMessages = (await adminMessagesApi('/list')).messages || []; }
+  catch(e){ console.warn('Messages unavailable:', e.message); return; }
+  $('#navMessages').hidden = false;
+  renderAdminMessages();
+}
+function renderAdminMessages(){
+  const n = adminMessages.filter(m=>!m.read).length;
+  const badge = $('#msgBadge');
+  badge.hidden = !n;
+  badge.textContent = n > 99 ? '99+' : String(n);
+  $('#navMessages').setAttribute('aria-label', n ? `Messages, ${n} unread` : 'Messages');
+  try{
+    if(n && navigator.setAppBadge) navigator.setAppBadge(n);
+    else if(!n && navigator.clearAppBadge) navigator.clearAppBadge();
+  }catch(e){}
+  const unread = adminMessageTab === 'unread';
+  document.querySelectorAll('#adminMsgSubtabs [data-msgtab]').forEach(b=>{
+    b.classList.toggle('active', b.dataset.msgtab === adminMessageTab);
+    if(b.dataset.msgtab === 'unread') b.textContent = n ? `Unread (${n})` : 'Unread';
+  });
+  const shown = adminMessages.filter(m => unread ? !m.read : m.read);
+  const empty = $('#adminMessagesEmpty');
+  empty.hidden = shown.length > 0;
+  empty.textContent = unread
+    ? (adminMessages.length ? "You're all caught up. Earlier messages are under Read." : "No messages yet. You'll see one here whenever a new intake form is submitted.")
+    : 'No read messages yet.';
+  $('#btnMarkAllRead').hidden = !(unread && shown.length);
+  $('#btnDeleteAllRead').hidden = unread || !shown.length;
+  $('#adminMessageList').innerHTML = shown.map(m=>{
+    const d = new Date(m.created);
+    const when = isNaN(d) ? '' : `${d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})} · ${fmtTime(d)}`;
+    return `<div class="admin-msg${m.read?'':' unread'}">
+      <div class="admin-msg-top"><span class="admin-msg-name">${escapeHtml(m.body || 'Unnamed')}</span><span class="admin-msg-chip">New intake form</span></div>
+      ${when ? `<div class="admin-msg-when">Received ${escapeHtml(when)}</div>` : ''}
+      <div class="admin-msg-actions">
+        ${m.sessionId ? `<button type="button" class="btn" onclick="openAdminMessage(${m.id})">Open form</button>` : ''}
+        <button type="button" class="link-btn" onclick="setAdminMessagesRead([${m.id}], ${m.read ? 'false' : 'true'})">${m.read ? 'Mark as unread' : 'Mark as read'}</button>
+        <button type="button" class="link-btn" onclick="deleteAdminMessages([${m.id}])">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+window.setAdminMessagesRead = async function(ids, read){
+  const want = new Set(ids);
+  const changed = adminMessages.filter(m=>want.has(m.id) && m.read !== read).map(m=>m.id);
+  if(!changed.length) return;
+  adminMessages.forEach(m=>{ if(want.has(m.id)) m.read = read; });
+  renderAdminMessages();
+  try{ await adminMessagesApi('/read', read ? { ids: changed } : { ids: changed, unread: true }); }
+  catch(e){
+    adminMessages.forEach(m=>{ if(changed.includes(m.id)) m.read = !read; });
+    renderAdminMessages();
+    alert('Could not update: ' + e.message);
+  }
+};
+window.markAllAdminMessagesRead = function(){
+  return setAdminMessagesRead(adminMessages.filter(m=>!m.read).map(m=>m.id), true);
+};
+window.deleteAllReadAdminMessages = function(){
+  const ids = adminMessages.filter(m=>m.read).map(m=>m.id);
+  if(ids.length) return deleteAdminMessages(ids, (ids.length === 1 ? 'Delete the 1 read message?' : `Delete all ${ids.length} read messages?`) + " This only removes the message, not the intake form.");
+};
+window.deleteAdminMessages = async function(ids, prompt){
+  if(!(await askConfirm(prompt || 'Delete this message? This only removes the message, not the intake form.'))) return;
+  const want = new Set(ids);
+  const before = adminMessages;
+  adminMessages = adminMessages.filter(m=>!want.has(m.id));
+  renderAdminMessages();
+  try{ await adminMessagesApi('/delete', { ids }); }
+  catch(e){
+    adminMessages = before;
+    renderAdminMessages();
+    alert('Could not delete: ' + e.message);
+  }
+};
+// Open form marks the message read and shows the intake form, fetching
+// fresh data first if the form arrived after the last load.
+window.openAdminMessage = async function(id){
+  const m = adminMessages.find(x=>x.id===id);
+  if(!m) return;
+  setAdminMessagesRead([id], true);
+  if(!intakeResponses.some(x=>x.id===m.sessionId)){ try{ await loadAll(); }catch(e){} }
+  showIntakeForm(m.sessionId);
+};
+let adminMessagesWired = false;
+function initAdminMessages(){
+  loadAdminMessages();
+  if(adminMessagesWired) return;
+  adminMessagesWired = true;
+  document.querySelectorAll('#adminMsgSubtabs [data-msgtab]').forEach(b=>b.addEventListener('click', ()=>{ adminMessageTab = b.dataset.msgtab; renderAdminMessages(); }));
+  // New messages when the app comes back to the foreground.
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'visible' && account) loadAdminMessages(); });
+}
+function showIntakeForm(id){
+  const i = intakeResponses.find(x=>x.id===id);
+  if(!i){ showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Intake form not found</div><div>Try Refresh Data.</div>`); return; }
+  // Never close a form the admin is in the middle of.
+  if(document.querySelector('.modal-bg.open')){
+    showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">New intake form: ${escapeHtml(i.recipName||'unnamed')}</div><div>Close the open window, then find it on the Intake Forms tab.</div>`);
+    return;
+  }
+  switchTab('intake');
+  closeIntakeDetail();
+  openIntakeDetail(id);
+}
+// A tapped notification on a closed app opens ?intake=<id>.
+function openIntakeFromLink(){
+  const params = new URLSearchParams(location.search);
+  const id = parseInt(params.get('intake'), 10);
+  if(!id) return;
+  params.delete('intake');
+  const qs = params.toString();
+  history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
+  showIntakeForm(id);
+}
+// A tapped notification with the app already open: fetch the new form, then show it.
+if('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', async (e)=>{
+  if(e.data && e.data.type === 'push' && account){ loadAdminMessages(); return; }
+  if(!e.data || e.data.type !== 'open-intake' || !account) return;
+  const id = parseInt(e.data.intakeId, 10);
+  if(!id) return;
+  loadAdminMessages().then(()=>{ adminMessages.filter(m=>m.sessionId===id && !m.read).forEach(m=>setAdminMessagesRead([m.id], true)); });
+  if(!intakeResponses.some(x=>x.id===id) && !document.querySelector('.modal-bg.open')){
+    try{ await loadAll(); }catch(err){}
+  }
+  showIntakeForm(id);
+});
+async function pushNotifyMinisters(sessionId, ministerIds, kind, start, recipientName){
+  try{
+    const token = await getToken();
+    const res = await fetch(PUSH_NOTIFY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ sessionId, ministerIds, kind, recipientName, when: fmtDate(start) + ' at ' + fmt12(toHM(start.toISOString())) })
+    });
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok){ console.warn('Push notification not sent:', res.status, data.error); return { error: data.error || ('HTTP ' + res.status) }; }
+    return data;
+  }catch(e){ console.warn('Push notification not sent:', e.message); return { error: e.message }; }
+}
+// On-demand "booked" notice for a session's whole team, from the session
+// card - mainly for testing push (it also adds a message to each
+// minister's portal Messages tab, same as a real booking).
+window.sendAppNotification = async function(id){
+  const s = sessions.find(x=>x.id===id);
+  if(!s || !s.date || !s.time) return;
+  const ids = ministerIdsOf(s);
+  if(!ids.length) return;
+  const ok = await askConfirm(
+    `Send a "booked" app notification for ${s.recipName} to ${ids.length} minister${ids.length===1?'':'s'}? It also appears in their portal Messages.`,
+    { confirmLabel: 'Send', danger: false }
+  );
+  if(!ok) return;
+  const r = await pushNotifyMinisters(s.id, ids, 'booked', new Date(s.date+'T'+s.time), s.recipName);
+  if(r.error) alert('App notification not sent: ' + r.error);
+  else if(r.skipped) alert('Not sent: this session isn\'t Scheduled.');
+  else alert(`Sent to ${r.sent||0} device${r.sent===1?'':'s'}. Ministers without phone notifications turned on still get it in their portal Messages.`);
+};
+// Tells a removed session's team it's off (push + portal message). Call
+// with the session as it was BEFORE removal - removing it clears its team
+// and date. Skips sessions already in the past.
+function pushSessionCanceled(s){
+  if(!s || s.status!=='Scheduled' || !s.date || !s.time) return;
+  const start = new Date(s.date+'T'+s.time);
+  if(!(start>new Date())) return;
+  const ids = ministerIdsOf(s);
+  if(ids.length) pushNotifyMinisters(s.id, ids, 'canceled', start, s.recipName);
+}
+
 // List display names as created in SharePoint — edit here if yours differ.
 // "Prospects" is intentionally not listed here — Planning is now just
 // PrayerSessions filtered to Status="Waiting" (see CLAUDE.md for the
@@ -1276,7 +1806,8 @@ const LIST_NAMES = {
 // up separately and never make resolveSiteAndLists() throw.
 const OPTIONAL_LIST_NAMES = {
   notesSchema: "SessionNotesSchema",
-  notes: "SessionNotes"
+  notes: "SessionNotes",
+  pushSubs: "PushSubscriptions"
 };
 // Relative to this file's own location (preview/) - portal/ is a sibling of
 // the repo root, one level up from here.
@@ -1292,8 +1823,20 @@ let listIds = {};
 /* =========================================================================
    AUTH
 ========================================================================= */
+// True when opened from the Home Screen as an installed app. Popups are
+// unreliable there (iOS especially), so sign-in uses redirects instead -
+// same as the minister portal.
+const IS_STANDALONE = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+// Lets Chrome offer "Install app" (sw.js does nothing else).
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(e=>console.warn('Service worker not registered:', e.message));
 async function init(){
   await msalReady;
+  // Finishes a redirect sign-in. Skipped inside a sign-in popup so it can't
+  // swallow the popup's response.
+  if(!window.opener) try{
+    const redirectResult = await msalInstance.handleRedirectPromise();
+    if(redirectResult && redirectResult.account) msalInstance.setActiveAccount(redirectResult.account);
+  }catch(e){ document.getElementById('signinMsg').textContent = 'Sign-in failed: ' + e.message; }
   const accounts = msalInstance.getAllAccounts();
   if(accounts.length > 0){
     // Prefer the account last chosen (setActiveAccount, see doSignOut/sign-in)
@@ -1348,6 +1891,7 @@ document.getElementById('btnSignIn').addEventListener('click', async ()=>{
   btn.disabled = true;
   btn.textContent = 'Signing in…';
   try{
+    if(IS_STANDALONE){ await msalInstance.loginRedirect({ scopes: GRAPH_SCOPES }); return; }
     const result = await msalInstance.loginPopup({ scopes: GRAPH_SCOPES });
     account = result.account;
     msalInstance.setActiveAccount(account);
@@ -1371,6 +1915,7 @@ async function getToken(){
     const res = await msalInstance.acquireTokenSilent(req);
     return res.accessToken;
   }catch(e){
+    if(IS_STANDALONE){ await msalInstance.acquireTokenRedirect(req); return new Promise(()=>{}); }
     const res = await msalInstance.acquireTokenPopup(req);
     return res.accessToken;
   }
@@ -1420,6 +1965,9 @@ async function afterSignIn(){
   try{
     await loadAll();
     wireApp();
+    openIntakeFromLink();
+    initAdminPush();
+    initAdminMessages();
   }catch(e){
     document.getElementById('loadError').innerHTML = `<div class="errbox" role="alert">Could not load data: ${e.message}. Check the SharePoint site URL in setup and that your admin has granted consent for Sites.ReadWrite.All.</div>`;
   }
@@ -1463,11 +2011,27 @@ async function resolveSiteAndLists(){
     if(match) listIds[key] = match.id;
   }
   notesAvailable = !!(listIds.notesSchema && listIds.notes);
+  // Prayer List visibility is a Yes/No column on PrayerMinisters that has
+  // to be added by hand in SharePoint. Check it exists so Settings can show
+  // setup steps instead of failing on Save. Never blocks sign-in.
+  prayerListColumnReady = false;
+  try{
+    const cols = await graphFetch(`/sites/${siteId}/lists/${listIds.ministers}/columns?$select=name`);
+    prayerListColumnReady = !!(cols && Array.isArray(cols.value) && cols.value.some(c=>c.name===PRAYER_LIST_COLUMN));
+  }catch(e){ console.warn('Could not check PrayerMinisters columns:', e.message); }
+  // Same for the per-person "private" flag on PrayerSessions. Writing a
+  // column that doesn't exist fails the whole save, so only write it once
+  // it's there.
+  plPrivateColumnReady = false;
+  try{
+    const cols = await graphFetch(`/sites/${siteId}/lists/${listIds.sessions}/columns?$select=name`);
+    plPrivateColumnReady = !!(cols && Array.isArray(cols.value) && cols.value.some(c=>c.name===PL_PRIVATE_COLUMN));
+  }catch(e){ console.warn('Could not check PrayerSessions columns:', e.message); }
 }
 
 async function listItems(key){
   const resp = await graphFetch(`/sites/${siteId}/lists/${listIds[key]}/items?$expand=fields&$top=999`);
-  return resp.value.map(i => ({ ...i.fields, id: parseInt(i.id, 10), _created: i.createdDateTime,
+  return resp.value.map(i => ({ ...i.fields, id: parseInt(i.id, 10), _created: i.createdDateTime, _modified: i.lastModifiedDateTime,
     _createdByEmail: ((i.createdBy && i.createdBy.user && i.createdBy.user.email) || '').trim().toLowerCase() }));
 }
 async function createItem(key, fields){
@@ -1519,7 +2083,21 @@ let editingMinisterId=null;
 let blackoutEditId=null;
 let overviewSortMode='default'; // 'default' (next appointment) | 'az'
 let overviewSubStatus='Active';
+let overviewNotifFilter='all'; // 'all' | 'help' | 'on' - Prayer Ministers notification filter
+// Ministers' phone-notification devices, from the PushSubscriptions list
+// the intake Worker keeps. null = list not readable, so the notification
+// status UI stays hidden. See MINISTER NOTIFICATION STATUS below.
+let pushDevices = null;
 let sessionNumberMap = new Map(); // session id -> chronological "Session #N" for that recipient
+// Prayer List: which ministers may see it (PrayerMinisters.PrayerListAccess,
+// Yes/No). Admin-only for now; stored so My FPHM can use it later.
+const PRAYER_LIST_COLUMN = 'PrayerListAccess';
+let prayerListColumnReady = false;
+// Per-person privacy: a hand-made Yes/No column on PrayerSessions. A person
+// is left off the Prayer List if ANY of their Scheduled sessions has it.
+const PL_PRIVATE_COLUMN = 'PrayerListPrivate';
+let plPrivateColumnReady = false;
+let prayerListDraft = null; // Set of minister ids ticked in Settings, null = not edited
 
 async function loadAll(){
   const [rawMin, rawSess, rawBlack, rawLoc, rawSlots, rawTW, rawIntake, rawSchema] = await Promise.all([
@@ -1564,6 +2142,11 @@ async function loadAll(){
   } else if(!notesDraft){
     notesDraft = defaultNotesSchema();
   }
+  pushDevices = null;
+  if(listIds.pushSubs){
+    try{ pushDevices = await removeOldPushDevices(parsePushDevices(await listItems('pushSubs'))); }
+    catch(e){ console.warn('Could not load notification devices:', e.message); }
+  }
   // ResponsesJSON is the whole answers object, keyed by question id from
   // formConfig.js - parsed once here so every intake render just reads
   // .responses, never re-parses. A malformed/empty blob (e.g. a session
@@ -1577,7 +2160,7 @@ async function loadAll(){
       signatureDataUrl: i.SignatureDataUrl||'', responses
     };
   });
-  ministers = rawMin.map(m => ({ id: m.id, name: m.Title, email: m.Email||'', phone: m.Phone||'', signInEmail: m.SignInEmail||'', status: m.Status||'Active', gender: m.Gender||'' }));
+  ministers = rawMin.map(m => ({ id: m.id, name: m.Title, email: m.Email||'', phone: m.Phone||'', signInEmail: m.SignInEmail||'', status: m.Status||'Active', gender: m.Gender||'', prayerListAccess: m[PRAYER_LIST_COLUMN]===true }));
   locations = rawLoc.map(l => ({ id: l.id, name: l.Title }));
   timeWindows = rawTW.map(t => ({
     id: t.id, title: t.Title||'', kind: t.Kind||'',
@@ -1666,7 +2249,10 @@ async function loadAll(){
       // findIntakeForRecipient() falls back to when this is unset. Reads
       // null safely if the IntakeResponseId column doesn't exist in
       // SharePoint yet, same convention as Contacted/WaNotified above.
-      intakeResponseId: (s.IntakeResponseId!=null && s.IntakeResponseId!=='') ? parseInt(s.IntakeResponseId,10) : null
+      intakeResponseId: (s.IntakeResponseId!=null && s.IntakeResponseId!=='') ? parseInt(s.IntakeResponseId,10) : null,
+      // Private = keep this person off the Prayer List (My FPHM and the
+      // admin tab's count). Hand-made Yes/No column; reads false if missing.
+      plPrivate: s[PL_PRIVATE_COLUMN]===true
     };
   });
   // A slot's own team (ProposedMinisterIDs) is only the plan from when it
@@ -1697,7 +2283,7 @@ async function refreshDataKeepingPlace(){
     return;
   }
   try{
-    await withLoading($('#btnRefreshData'), 'Refreshing…', loadAll);
+    await withLoading($('#btnRefreshData'), 'Refreshing…', ()=>Promise.all([loadAll(), loadAdminMessages()]));
   }catch(e){
     showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Couldn't refresh</div><div>${escapeHtml(e.message||'Unknown error')}</div>`);
   }
@@ -1718,6 +2304,7 @@ const ICONS = {
   trash: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>',
   repeat: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>',
   refresh: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>',
+  bell: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>',
   chat: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>',
   check: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>',
   info: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="8" r=".5" fill="currentColor" stroke="none"/></svg>',
@@ -1807,7 +2394,7 @@ function groupRow(key, avatarText, name, countLabel, summaryHtml, bodyHtml, wasO
   </div>`;
 }
 
-function renderAll(){ renderSchedule(); renderPlanning(); renderCompleted(); renderOverview(); renderBlackouts(); renderSchedPlan(); renderTimeWindowsSettings(); renderLocationsSettings(); renderIntake(); renderFormEditor(); }
+function renderAll(){ renderSchedule(); renderPlanning(); renderCompleted(); renderOverview(); renderBlackouts(); renderSchedPlan(); renderTimeWindowsSettings(); renderLocationsSettings(); renderIntake(); renderFormEditor(); renderPrayerList(); renderPrayerListSettings(); }
 
 async function withLoading(btn, loadingText, fn){
   if(!btn) return fn();
@@ -1897,8 +2484,8 @@ function wireApp(){
   $('#btnTraining').addEventListener('click', ()=>openModal(null, null, {forceKind:'session', preset:'training'}));
   $('#btnCancel').addEventListener('click', ()=>{ $('#sessionModal').classList.remove('open'); hideConflictToast(); pendingBookSlotId = null; });
   $('#sessDate').addEventListener('change', ()=>{ renderMinisterList(); updateEndPreview(); renderSameDay(); renderConflictCheck(); renderDayLabel(); renderSlotButtons(); });
-  $('#sessTime').addEventListener('change', ()=>{ autoSetEndTime(); renderSlotButtons(); renderConflictCheck(); });
-  $('#sessEndTime').addEventListener('change', ()=>{ updateEndPreview(); renderConflictCheck(); });
+  $('#sessTime').addEventListener('change', ()=>{ autoSetEndTime(); renderSlotButtons(); renderMinisterList(); });
+  $('#sessEndTime').addEventListener('change', ()=>{ updateEndPreview(); renderMinisterList(); });
   $('#sessLocation').addEventListener('change', renderConflictCheck);
   $('#apptType').addEventListener('change', updateGroupSessionFields);
   $('#recipGender').addEventListener('change', renderMinisterList);
@@ -1930,6 +2517,17 @@ function wireApp(){
   wireSearchClear('intakeSearch');
   $('#btnOpenIntakeForm').href = absoluteIntakeUrl();
   $('#btnCopyIntakeLink').addEventListener('click', copyIntakeLink);
+  $('#btnCopyInstallGuide').addEventListener('click', ()=>copyInstallGuideLink('#installGuideCopiedMsg'));
+  $('#btnCopyInstallGuideModal').addEventListener('click', async (e)=>{
+    // No room for a separate "copied" note in the bar on a phone, so the button says it.
+    const btn = e.currentTarget;
+    try { await navigator.clipboard.writeText(INSTALL_GUIDE_URL); } catch (err) { window.prompt('Copy this link:', INSTALL_GUIDE_URL); return; }
+    btn.textContent = 'Copied!';
+    clearTimeout(btn._t);
+    btn._t = setTimeout(()=>{ btn.textContent = 'Copy Link'; }, 2500);
+  });
+  $('#btnOpenInstallGuide').addEventListener('click', openInstallGuide);
+  $('#btnCloseInstallGuide').addEventListener('click', ()=>$('#installGuideModal').classList.remove('open'));
   $('#btnFormEditorSave').addEventListener('click', ()=>withLoading($('#btnFormEditorSave'), 'Saving…', saveFormSchema));
   $('#btnFormEditorDiscard').addEventListener('click', discardFormSchemaChanges);
   $('#btnFormEditorAddSection').addEventListener('click', addFormSection);
@@ -1949,6 +2547,11 @@ function wireApp(){
   wireSearchClear('planningSearch');
   $('#prospectSort').addEventListener('change', renderPlanning);
   $('#completedSearch').addEventListener('input', renderCompleted);
+  $('#prayerListSearch').addEventListener('input', renderPrayerList);
+  wireSearchClear('prayerListSearch');
+  $('#btnPlSelectAll').addEventListener('click', ()=>setPrayerListAccessAll(true));
+  $('#btnPlSelectNone').addEventListener('click', ()=>setPrayerListAccessAll(false));
+  $('#btnSavePrayerListAccess').addEventListener('click', ()=>withLoading($('#btnSavePrayerListAccess'), 'Saving…', savePrayerListAccess));
   $('#schedFilterTabs').querySelectorAll('button[data-schedfilter]').forEach(b=>b.addEventListener('click', ()=>{ schedFilter = b.dataset.schedfilter; renderSchedPlan(); }));
   $('#completedSubtabs').querySelectorAll('button[data-completedview]').forEach(b=>b.addEventListener('click', ()=>{
     completedView = b.dataset.completedview;
@@ -1995,6 +2598,166 @@ function switchTab(tab){
     if(active) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
   });
   document.querySelectorAll('main .panel').forEach(p=>p.classList.toggle('active', p.id==='panel-'+tab));
+  if(tab === 'messages'){ adminMessageTab = 'unread'; renderAdminMessages(); }
+}
+
+/* ---- PRAYER LIST ----
+   One row per prayer recipient who has at least one Scheduled (booked)
+   session. Waiting entries and Tentative slots don't count - nothing is
+   booked yet. Drop-in/Training are group events, not a person, so they're
+   left out. A Scheduled session whose date has passed still counts until
+   it's marked Completed (that's what takes someone off the list). Name
+   match per recipient, same as every other grouping in this app. */
+function prayerListEntries(){
+  const active = sessions.filter(s=>s.status==='Scheduled' && s.apptType!=='Drop-in' && s.apptType!=='Training' && s.recipName.trim());
+  const today = todayISO();
+  return groupByRecipient(active).map(g=>{
+    const sorted = g.sessions.slice().sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
+    // Next = soonest session today or later; if every one is in the past
+    // (not marked Completed yet) show the latest of those instead.
+    const upcoming = sorted.filter(s=>(s.date||'')>=today);
+    const next = upcoming[0] || sorted[sorted.length-1];
+    return { key: g.key, name: g.name, sessions: sorted, next, overdue: !upcoming.length, upcomingCount: upcoming.length, private: sorted.some(x=>x.plPrivate) };
+  }).sort((a,b)=>{
+    // Upcoming first (soonest first), then the overdue ones (oldest first).
+    if(a.overdue!==b.overdue) return a.overdue ? 1 : -1;
+    return ((a.next.date||'')+(a.next.time||'')).localeCompare((b.next.date||'')+(b.next.time||''));
+  });
+}
+function todayISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function renderPrayerList(){
+  const box = $('#prayerListBox'), empty = $('#prayerListEmpty');
+  if(!box) return;
+  const q = $('#prayerListSearch').value.trim().toLowerCase();
+  const all = prayerListEntries();
+  const list = !q ? all : all.filter(e=> e.name.toLowerCase().includes(q) || e.sessions.some(s=>ministerNamesOf(s).toLowerCase().includes(q)));
+  const nPrivate = all.filter(e=>e.private).length;
+  $('#prayerListHelp').textContent = `${all.length} ${all.length===1?'person':'people'} with a booked session that hasn't been marked Completed yet, soonest session first. A person drops off once all of their sessions are Completed.`
+    + (nPrivate ? ` ${nPrivate} ${nPrivate===1?'is':'are'} marked Private, so prayer ministers don't see ${nPrivate===1?'them':'them'} in My FPHM.` : '');
+  const setup = $('#prayerListPrivateSetup');
+  if(setup){
+    setup.hidden = plPrivateColumnReady;
+    if(!plPrivateColumnReady) setup.innerHTML = `<strong>To keep someone private</strong> (off the Prayer List in My FPHM), add one column in SharePoint first:<br>
+      1. Open the <strong>${LIST_NAMES.sessions}</strong> list on the FreedomPrayer site.<br>
+      2. Add a column → <strong>Yes/No</strong>, named exactly <strong>${PL_PRIVATE_COLUMN}</strong> (no spaces), default value <strong>No</strong>.<br>
+      3. Come back here and click Refresh Data. A Private button then appears on each person.`;
+  }
+  if(!list.length){
+    box.innerHTML = '';
+    empty.hidden = false;
+    empty.textContent = q ? 'No one on the prayer list matches your search.' : 'No one has a booked session right now.';
+    return;
+  }
+  empty.hidden = true;
+  box.innerHTML = `<div class="pl-list" role="list">${list.map((e,i)=>{
+    const s = e.next;
+    const when = s.date ? `${fmtShortDay(s.date)}${s.time?' · '+fmt12(s.time):''}` : 'Date not set';
+    const more = e.upcomingCount>1 ? ` · ${e.upcomingCount} sessions booked` : '';
+    return `<div class="pl-row${e.private?' pl-private':''}" role="listitem">
+      <span class="pl-num" aria-hidden="true">${i+1}</span>
+      <div class="pl-main">
+        <div><span class="pl-name">${escapeHtml(e.name)}</span><span class="tag ${sessionNumberOf(s)===1?'first':''}">Session #${sessionNumberOf(s)}</span>${e.private?'<span class="tag pl-private-tag">Private</span>':''}</div>
+        <div class="pl-meta">${e.overdue ? `<span class="pl-overdue">Last session ${escapeHtml(when)} · not marked Completed yet</span>` : `Next session <strong>${escapeHtml(when)}</strong>${more}`}</div>
+        ${s.ministers.length ? `<div class="pl-meta">${escapeHtml(ministerNamesOf(s))}</div>` : ''}
+        ${e.private ? `<div class="pl-meta">Hidden from the Prayer List in My FPHM.</div>` : ''}
+      </div>
+      ${plPrivateColumnReady ? `<button type="button" class="btn secondary pl-private-btn" onclick="togglePrayerListPrivate(this, ${JSON.stringify(e.key).replace(/"/g,'&quot;')}, ${!e.private})">${e.private ? 'Show on Prayer List' : 'Make private'}</button>` : ''}
+    </div>`;
+  }).join('')}</div>`;
+}
+/* Make a person private (off the My FPHM Prayer List) or show them again.
+   Private: flags every Scheduled and Waiting session of theirs. Show again:
+   clears the flag on EVERY session with their name, so an old flag can't
+   come back through the session form's auto-fill on a later follow-up. */
+// The session form's Private box, as a fields fragment. Empty until the
+// SharePoint column exists (writing a missing column fails the save) and
+// for group sessions, which never appear on the Prayer List.
+function plPrivateField(){
+  if(!plPrivateColumnReady) return {};
+  const isGroup = $('#apptType').value==='Drop-in' || $('#apptType').value==='Training';
+  return { [PL_PRIVATE_COLUMN]: !isGroup && $('#sessPlPrivate').checked };
+}
+window.togglePrayerListPrivate = async function(btn, key, makePrivate){
+  const mine = sessions.filter(x=>x.recipName.trim().toLowerCase()===key);
+  const name = mine.length ? mine[0].recipName.trim() : key;
+  const targets = makePrivate
+    ? mine.filter(x=>(x.status==='Scheduled' || x.status==='Waiting') && !x.plPrivate)
+    : mine.filter(x=>x.plPrivate);
+  if(!targets.length) return;
+  const ok = await askConfirm(makePrivate
+    ? `Make ${name} private? Prayer ministers won't see them on the Prayer List in My FPHM. Their own team still sees the session on their schedule.`
+    : `Show ${name} on the Prayer List again? Prayer ministers with Prayer List access will see them in My FPHM.`,
+    { confirmLabel: makePrivate ? 'Make private' : 'Show on list', danger: false });
+  if(!ok) return;
+  await withLoading(btn, 'Saving…', async ()=>{
+    try{
+      for(const x of targets) await updateItem('sessions', x.id, { [PL_PRIVATE_COLUMN]: makePrivate });
+    }catch(err){ alert('Could not save: ' + err.message); }
+    await loadAll();
+  });
+};
+function fmtShortDay(iso){ return new Date(iso+'T00:00').toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric'}); }
+
+// Settings > Prayer List: tick which ministers may see the list. Active
+// ministers only are shown; an inactive minister keeps whatever was saved.
+function prayerListTicked(){ return prayerListDraft || new Set(ministers.filter(m=>m.prayerListAccess).map(m=>m.id)); }
+function renderPrayerListSettings(){
+  const list = $('#prayerListAccessList');
+  if(!list) return;
+  const setup = $('#prayerListSetupMsg'), body = $('#prayerListAccessBody');
+  if(!prayerListColumnReady){
+    setup.hidden = false;
+    setup.innerHTML = `<strong>This needs one new SharePoint column before it can be saved.</strong><br>
+      1. Open the <strong>PrayerMinisters</strong> list on the FreedomPrayer site.<br>
+      2. Add a column → <strong>Yes/No</strong>, named exactly <strong>${PRAYER_LIST_COLUMN}</strong> (no spaces), default value <strong>No</strong>.<br>
+      3. Reload this page.`;
+    body.hidden = true;
+    return;
+  }
+  setup.hidden = true; body.hidden = false;
+  const ticked = prayerListTicked();
+  const active = ministers.filter(m=>m.status==='Active').sort((a,b)=>a.name.localeCompare(b.name));
+  list.innerHTML = active.length ? active.map(m=>`<label class="pl-access-item"><input type="checkbox" data-mid="${m.id}" ${ticked.has(m.id)?'checked':''}><span>${escapeHtml(m.name)}</span></label>`).join('')
+    : '<p class="helptext">No active prayer ministers.</p>';
+  list.querySelectorAll('input[data-mid]').forEach(cb=>cb.addEventListener('change', ()=>{
+    const set = new Set(prayerListTicked());
+    const id = parseInt(cb.dataset.mid,10);
+    if(cb.checked) set.add(id); else set.delete(id);
+    prayerListDraft = set;
+    $('#prayerListAccessMsg').textContent = '';
+    updatePrayerListCount();
+  }));
+  updatePrayerListCount();
+}
+function updatePrayerListCount(){
+  const ticked = prayerListTicked();
+  const active = ministers.filter(m=>m.status==='Active');
+  const n = active.filter(m=>ticked.has(m.id)).length;
+  const unsaved = prayerListDraft && ministers.some(m=>m.prayerListAccess!==prayerListDraft.has(m.id));
+  $('#prayerListAccessCount').textContent = `${n} of ${active.length} active ministers${unsaved?' · not saved yet':''}`;
+}
+function setPrayerListAccessAll(on){
+  const set = new Set(prayerListTicked());
+  ministers.filter(m=>m.status==='Active').forEach(m=>{ if(on) set.add(m.id); else set.delete(m.id); });
+  prayerListDraft = set;
+  $('#prayerListAccessMsg').textContent = '';
+  renderPrayerListSettings();
+}
+async function savePrayerListAccess(){
+  const msg = $('#prayerListAccessMsg');
+  const ticked = prayerListTicked();
+  const changed = ministers.filter(m=>m.prayerListAccess!==ticked.has(m.id));
+  if(!changed.length){ msg.textContent = 'Nothing to save.'; return; }
+  try{
+    for(const m of changed) await updateItem('ministers', m.id, { [PRAYER_LIST_COLUMN]: ticked.has(m.id) });
+  }catch(e){
+    msg.textContent = 'Could not save: ' + e.message;
+    await loadAll();
+    return;
+  }
+  prayerListDraft = null;
+  await loadAll();
+  msg.textContent = `Saved. ${ministers.filter(m=>m.status==='Active' && m.prayerListAccess).length} active ministers can see the Prayer List.`;
 }
 
 /* ---- SCHEDULE ---- */
@@ -2103,6 +2866,7 @@ window.deleteSession = async function(id){
   if(!(await askConfirm(`Delete the session with ${s ? s.recipName : 'this recipient'}${s && s.date ? ' on '+s.date : ''}? This can't be undone.`))) return;
   const sendCancel = (s && s.status==='Scheduled') ? await offerCancellationNotice(s) : null;
   await deleteItem('sessions', id);
+  if(s) pushSessionCanceled(s);
   if(sendCancel) await sendCancel();
   await loadAll();
 };
@@ -2129,7 +2893,8 @@ window.toggleWa = async function(id){
 function waSectionHtml(s){
   return `<button type="button" class="wa-note ${s.waCreated?'on':''}" aria-pressed="${s.waCreated?'true':'false'}" onclick="toggleWa(${s.id})" style="cursor:pointer;background:none;border:none;padding:4px 0;font-family:inherit;">${ICONS.chat} ${s.waCreated?'WhatsApp group created':'No WhatsApp group yet — tap to mark created'}</button>
     ${s.waCreated && s.waLink ? ` · <a href="${escapeHtml(s.waLink)}" target="_blank" rel="noopener">open chat</a>` : ''}
-    ${s.waCreated && s.waLink && s.ministers.length ? `<br><button type="button" class="wa-note ${s.waNotified?'on':''}" onclick="notifyMinistersWhatsApp(${s.id})" style="cursor:pointer;background:none;border:none;padding:4px 0;font-family:inherit;">${ICONS.chat} ${s.waNotified?'Ministers notified — tap to re-send':'Notify ministers via WhatsApp'}</button>` : ''}`;
+    ${s.waCreated && s.waLink && s.ministers.length ? `<br><button type="button" class="wa-note ${s.waNotified?'on':''}" onclick="notifyMinistersWhatsApp(${s.id})" style="cursor:pointer;background:none;border:none;padding:4px 0;font-family:inherit;">${ICONS.chat} ${s.waNotified?'Ministers notified — tap to re-send':'Notify ministers via WhatsApp'}</button>` : ''}
+    ${s.status==='Scheduled' && s.ministers.length ? `<br><button type="button" class="wa-note" onclick="sendAppNotification(${s.id})" style="cursor:pointer;background:none;border:none;padding:4px 0;font-family:inherit;">${ICONS.bell} Send app notification</button>` : ''}`;
 }
 // Normalizes a minister's free-typed Phone field to E.164 for the WhatsApp
 // API. Assumes US numbers (10 digits, or 11 starting with a leading 1) since
@@ -2285,7 +3050,7 @@ function renderCompleted(){
   box.innerHTML = groups.map(g=>{
     const wasOpen = opened.has(g.key) ? opened.get(g.key) : false;
     return groupRow(g.key, initials(g.name), g.name, `${g.done.length} completed`, `Last: ${fmtShort(g.done[0].date)}`,
-      g.done.map(s=>completedSessionRow(s)).join(''), wasOpen);
+      recipientLinksRowFor(g.name) + g.done.map(s=>completedSessionRow(s)).join(''), wasOpen);
   }).join('');
   renderCompletedStats();
 }
@@ -2396,7 +3161,7 @@ function renderCompletedStats(){
         <div class="trend-title">Completed sessions by month</div>
         <div class="trend-legend"><span class="legend-dot this"></span>${now.getFullYear()}<span class="legend-dot last"></span>${now.getFullYear()-1}</div>
       </div>
-      <div class="trend-bars">${bars}</div>
+      <div class="trend-scroll"><div class="trend-bars">${bars}</div></div>
     </div>`;
 }
 
@@ -3011,6 +3776,7 @@ window.deleteUnlinkedSession = async function(sessionId){
   const sendCancel = isGroupSession ? null : await offerCancellationNotice(s);
   if(isGroupSession) await deleteItem('sessions', sessionId);
   else await revertSessionToWaiting(sessionId);
+  pushSessionCanceled(s);
   if(sendCancel && await sendCancel()) await updateItem('sessions', sessionId, { WaNotified: false });
   await loadAll();
 };
@@ -3184,29 +3950,31 @@ function renderManualPicker(sl, c){
   const pool = ministers.filter(m=>{
     if(m.status!=='Active') return false;
     if(blackedOut.has(m.name)) return false;
+    if(busy.has(m.id)) return false;
     if(c.genderPref==='Same-sex' && c.recipGender && m.gender!==c.recipGender) return false;
     return true;
   });
-  const rows = pool.map(m=>{
+  const lp = loadPickerSetup(pool, 'manual');
+  const rows = lp.head + lp.list.map(m=>{
     const sel = manualTeam.find(x=>x.id===m.id);
     const checked = !!sel;
-    const conflict = busy.has(m.id);
     return `<div class="minister-row ${checked?'checked':''}">
       <button type="button" class="minister-toggle" aria-pressed="${checked?'true':'false'}" onclick="toggleManualMinister(${m.id})">
         <span class="dot" aria-hidden="true">${checked?ICONS.check:''}</span>
         <span>${escapeHtml(m.name)}${m.gender?` <span class="helptext" style="display:inline;">(${m.gender})</span>`:''}</span>
       </button>
-      ${conflict?'<span class="flag">⚠ already booked this time</span>':''}
+      <div class="minister-row-right">
+      ${loadChipHtml(lp.loads.get(m.id), lp.avg)}
       ${checked?`<div class="role-toggle" role="group" aria-label="Role for ${escapeHtml(m.name)}">
         <button type="button" class="role-btn ${sel.role==='Lead'?'active':''}" aria-pressed="${sel.role==='Lead'?'true':'false'}" onclick="setManualRole(${m.id},'Lead')">Lead</button>
         <button type="button" class="role-btn ${sel.role!=='Lead'?'active':''}" aria-pressed="${sel.role!=='Lead'?'true':'false'}" onclick="setManualRole(${m.id},'Support')">Support</button>
       </div>`:''}
+      </div>
     </div>`;
   }).join('');
-  const genderNote = c.genderPref==='Same-sex' && c.recipGender ? ` — showing ${escapeHtml(c.recipGender)} ministers only, and only those not blacked out this date` : ' — showing ministers not blacked out this date';
   return `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
-    <div class="helptext" style="margin:0 0 6px;">Choose the team${genderNote}:</div>
-    ${pool.length ? rows : `<div class="picker-empty">No available${c.genderPref==='Same-sex'&&c.recipGender ? ' '+escapeHtml(c.recipGender) : ''} ministers for this slot's date.</div>`}
+    <div class="helptext" style="margin:0 0 6px;">Choose the team:</div>
+    ${pool.length ? rows : `<div class="picker-empty">No available${c.genderPref==='Same-sex'&&c.recipGender ? ' '+escapeHtml(c.recipGender) : ''} ministers for this slot.</div>`}
     ${pool.length ? `<div class="helptext" style="margin:6px 0;">${manualTeam.length} selected (choose 2 or more)</div>` : ''}
     <button class="claim-btn" ${manualTeam.length<2?'disabled':''} onclick="claimSlotManual(${sl.id},${c.id})">Claim with this team</button>
   </div>`;
@@ -3395,6 +4163,7 @@ window.deleteBookedSession = async function(slotId, sessionId){
   const sendCancel = isGroupSession ? null : await offerCancellationNotice(s);
   if(isGroupSession) await deleteItem('sessions', sessionId);
   else await revertSessionToWaiting(sessionId);
+  pushSessionCanceled(s);
   if(sendCancel && await sendCancel()) await updateItem('sessions', sessionId, { WaNotified: false });
   await updateItem('slots', slotId, { Status:'Open', ClaimedWaitingId:null, ClaimedDate:null, ProposedMinisterIDs:'', ProposedLeadIDs:'', LinkedSessionId:null });
   await loadAll();
@@ -3604,6 +4373,7 @@ function openModal(existing, followFrom, opts){
   $('#recipContact').value = existing ? existing.recipContact : (followFrom ? followFrom.recipContact : '');
   $('#recipGender').value = existing ? (existing.recipGender||'') : (followFrom ? (followFrom.recipGender||'') : '');
   $('#genderPref').value = existing ? (existing.genderPref||'Mixed') : (followFrom ? (followFrom.genderPref||'Mixed') : 'Mixed');
+  $('#sessPlPrivate').checked = existing ? !!existing.plPrivate : (followFrom ? !!followFrom.plPrivate : false);
   $('#sessDate').value = (existing && existing.status!=='Waiting') ? existing.date : (opts.dateIso || '');
   $('#sessTime').value = (existing && existing.status!=='Waiting') ? existing.time : '';
   $('#sessEndTime').value = (existing && existing.status!=='Waiting') ? existing.endTime : '';
@@ -3690,7 +4460,9 @@ function updateGroupSessionFields(){
   // Drop-In" and "Training" aren't individuals with a gender or a
   // same-sex-team need, same reasoning as hiding contact/WhatsApp above.
   $('#genderFieldRow').style.display = isGroup ? 'none' : '';
+  $('#plPrivateField').hidden = isGroup || !plPrivateColumnReady;
   if(isGroup){
+    $('#sessPlPrivate').checked = false;
     $('#recipContact').value=''; $('#waCreated').checked=false; $('#waLink').value='';
     $('#recipGender').value=''; $('#genderPref').value='Mixed';
   }
@@ -3749,7 +4521,7 @@ function renderRecipNameSuggestions(){
     const existing = byName.get(key);
     if(!existing || sortKey > existing.sortKey){
       byName.set(key, { name: s.recipName.trim(), contact: s.recipContact||'', sortKey,
-        recipGender: s.recipGender||'', genderPref: s.genderPref||'Mixed',
+        recipGender: s.recipGender||'', genderPref: s.genderPref||'Mixed', plPrivate: !!s.plPrivate,
         sessionId: s.id, ministers: s.ministers.map(m=>({...m})) });
     }
   });
@@ -3766,6 +4538,7 @@ window.pickRecipNameAt = function(i){
   if(r.contact) $('#recipContact').value = r.contact;
   if(r.recipGender) $('#recipGender').value = r.recipGender;
   $('#genderPref').value = r.genderPref || 'Mixed';
+  $('#sessPlPrivate').checked = !!r.plPrivate;
   // Team pre-fill now lives entirely in renderRecipientHistory (below) -
   // it applies the most recent real session's team the same way this used
   // to do inline, but as part of the visible history panel rather than a
@@ -3815,6 +4588,7 @@ function renderRecipientHistory(){
       if(allMatches[0].recipContact) $('#recipContact').value = allMatches[0].recipContact;
       if(allMatches[0].recipGender) $('#recipGender').value = allMatches[0].recipGender;
       $('#genderPref').value = allMatches[0].genderPref || 'Mixed';
+      $('#sessPlPrivate').checked = !!allMatches[0].plPrivate;
       if(!$('#waLink').value){
         const wa = personWaInfo(name, editingId);
         if(wa){ $('#waCreated').checked = true; $('#waLink').value = wa.waLink; setWaCarryNote(true); }
@@ -4012,37 +4786,110 @@ function switchSettingsSub(view){
   $('#settingsLocationsView').classList.toggle('active', view==='locations');
   $('#settingsDefaultLocationView').classList.toggle('active', view==='defaultlocation');
   $('#settingsNotesView').classList.toggle('active', view==='notes');
+  $('#settingsNotificationsView').classList.toggle('active', view==='notifications');
+  $('#settingsPrayerListView').classList.toggle('active', view==='prayerlist');
+  if(view==='prayerlist') renderPrayerListSettings();
   if(view==='notes') showNotesEditor();
+  if(view==='notifications') renderAdminPush();
 }
-function upcomingCountFor(ministerId){
-  const now = new Date();
-  return sessions.filter(s=>{
-    if(s.status==='Waiting') return false;
-    if(editingId && s.id===editingId) return false;
-    if(!ministerIdsOf(s).includes(ministerId)) return false;
-    return new Date(s.date+'T'+s.time) >= now;
-  }).length;
+// Load-balancing chip on both team pickers. Counts real commitments in
+// the next LOAD_WINDOW_DAYS: Scheduled sessions plus Tentative slots the
+// minister is proposed on. Drop-in/Training are left out - everyone is on
+// those, so they'd add the same number to every person. The session being
+// edited and the slot being booked are excluded so they don't count twice.
+const LOAD_WINDOW_DAYS = 28;
+function ministerLoad(ministerId){
+  const now = new Date(), cutoff = new Date(now.getTime() + LOAD_WINDOW_DAYS*86400000);
+  const dates = [];
+  sessions.forEach(s=>{
+    if(s.status!=='Scheduled') return;
+    if(s.apptType==='Drop-in' || s.apptType==='Training') return;
+    if(editingId && s.id===editingId) return;
+    if(!ministerIdsOf(s).includes(ministerId)) return;
+    dates.push(new Date(s.date+'T'+(s.time||'00:00')));
+  });
+  slots.forEach(sl=>{
+    if(sl.status!=='Tentative' || sl.id===pendingBookSlotId) return;
+    if(!sl.team.some(m=>m.id===ministerId)) return;
+    dates.push(new Date(sl.date+'T'+(sl.start||'00:00')));
+  });
+  const upcoming = dates.filter(d=>d>=now && d<=cutoff).sort((a,b)=>a-b);
+  return { count: upcoming.length, next: upcoming[0] || null };
+}
+// Green below the team average, amber 1.5+ above it, grey otherwise.
+// avg is computed over whichever pool the picker is showing.
+function loadChipHtml(load, avg){
+  const cls = load.count < avg ? 'light' : (load.count >= avg + 1.5 ? 'heavy' : '');
+  const next = load.next ? ` <small>· next ${load.next.toLocaleDateString('en-US',{month:'short',day:'numeric'})}</small>` : '';
+  return `<span class="load-chip ${cls}">${load.count} upcoming${next}</span>`;
+}
+// One button cycles A-Z -> fewest first -> most first -> back to A-Z.
+const PICKER_SORTS = { az:'Sort: A–Z', asc:'Sort: Fewest first', desc:'Sort: Most first' };
+let pickerSort = 'az';
+window.togglePickerSort = function(which){
+  pickerSort = pickerSort==='az' ? 'asc' : (pickerSort==='asc' ? 'desc' : 'az');
+  if(which==='manual') renderSlotWeeks(); else renderMinisterList();
+};
+// Returns the pool (sorted per pickerSort), each minister's load,
+// the team average and the header row (average + sort button).
+function loadPickerSetup(pool, which){
+  const loads = new Map(pool.map(m=>[m.id, ministerLoad(m.id)]));
+  const avg = pool.length ? [...loads.values()].reduce((a,l)=>a+l.count,0)/pool.length : 0;
+  const dir = pickerSort==='desc' ? -1 : 1;
+  const list = pool.slice().sort((a,b)=>
+    (pickerSort==='az' ? 0 : dir*(loads.get(a.id).count-loads.get(b.id).count)) || a.name.localeCompare(b.name));
+  const head = pool.length ? `<div class="load-sort-row">
+      <span class="helptext">Team average: ${avg.toFixed(1)} upcoming in the next 4 weeks</span>
+      <button type="button" class="load-sort-btn" title="Tap to change the order" onclick="togglePickerSort('${which}')">${PICKER_SORTS[pickerSort]}</button>
+    </div>` : '';
+  return { list, loads, avg, head };
+}
+// Minister ids on another session (any type) or Tentative/Booked/Drop-In
+// slot whose time overlaps the form's date + start/end. Empty until all
+// three are filled in.
+function modalBusyMinisterIds(){
+  const ids = new Set();
+  if(sessKind==='waiting') return ids;
+  const dateVal = $('#sessDate').value, t = $('#sessTime').value, et = $('#sessEndTime').value;
+  if(!dateVal || !t || !et) return ids;
+  const start = new Date(dateVal+'T'+t), end = new Date(dateVal+'T'+et);
+  if(!(end>start)) return ids;
+  sessions.forEach(s=>{
+    if(s.status==='Waiting' || s.date!==dateVal) return;
+    if(editingId && s.id===editingId) return;
+    const sS = new Date(s.date+'T'+s.time), sE = new Date(s.date+'T'+s.endTime);
+    if(start<sE && end>sS) ministerIdsOf(s).forEach(id=>ids.add(id));
+  });
+  busyMinisterIdsAt(dateVal, t, et, pendingBookSlotId).forEach(id=>ids.add(id));
+  return ids;
 }
 function renderMinisterList(){
   const dateVal = $('#sessDate').value;
   const blackedOutNames = new Set(blackouts.filter(b=> dateVal && b.date<=dateVal && (b.endDate||b.date)>=dateVal).map(b=>b.ministerName));
   const box = $('#ministerList');
-  const active = ministers.filter(m=>m.status==='Active');
-  box.innerHTML = active.map(m=>{
+  // Hide anyone already on another session or slot that overlaps this
+  // time. Someone already selected stays visible so they can be removed.
+  const busy = modalBusyMinisterIds();
+  const active = ministers.filter(m=>m.status==='Active' && (!busy.has(m.id) || selectedMinisters.some(x=>x.id===m.id)));
+  const lp = loadPickerSetup(active, 'modal');
+  box.innerHTML = lp.head + lp.list.map(m=>{
     const sel = selectedMinisters.find(x=>x.id===m.id);
     const checked = !!sel;
     const out = blackedOutNames.has(m.name);
-    const load = upcomingCountFor(m.id);
+    const load = lp.loads.get(m.id);
     return `<div class="minister-row ${checked?'checked':''}">
       <button type="button" class="minister-toggle" aria-pressed="${checked?'true':'false'}" onclick="toggleMinister(${m.id})">
         <span class="dot" aria-hidden="true">${checked?ICONS.check:''}</span>
         <span>${escapeHtml(m.name)}${m.gender?` <span class="helptext" style="display:inline;">(${m.gender})</span>`:''}</span>
       </button>
-      ${out?'<span class="flag">⚠ unavailable this date</span>':(checked?'':`<span class="workload-badge">${load} upcoming</span>`)}
+      <div class="minister-row-right">
+      ${out?'<span class="flag">⚠ unavailable this date</span>':''}
+      ${loadChipHtml(load, lp.avg)}
       ${checked?`<div class="role-toggle" role="group" aria-label="Role for ${escapeHtml(m.name)}">
         <button type="button" class="role-btn ${sel.role==='Lead'?'active':''}" aria-pressed="${sel.role==='Lead'?'true':'false'}" onclick="setRole(${m.id},'Lead')">Lead</button>
         <button type="button" class="role-btn ${sel.role!=='Lead'?'active':''}" aria-pressed="${sel.role!=='Lead'?'true':'false'}" onclick="setRole(${m.id},'Support')">Support</button>
       </div>`:''}
+      </div>
     </div>`;
   }).join('');
   $('#selCount').textContent = `${selectedMinisters.length} selected (choose 2 or more)`;
@@ -4229,6 +5076,7 @@ async function onSaveSession(){
       RecipientName: recipName, RecipientContact: recipContact,
       RecipientGender: $('#recipGender').value, GenderPreference: $('#genderPref').value,
       Notes: notes, Status: 'Waiting',
+      ...plPrivateField(),
       Priority: $('#sessPriority').checked, Contacted: existingWaiting ? existingWaiting.contacted : false,
       SessionDate: null, SessionEndDate: null,
       LocationName: '', AssignedMinisterIDs: '', LeadMinisterIDs: '',
@@ -4287,6 +5135,7 @@ async function onSaveSession(){
     SessionDate: start.toISOString(), SessionEndDate: end.toISOString(),
     LocationName: locationName(locationId),
     Notes: notes, ApptType: apptType, Status: status,
+    ...plPrivateField(),
     PreviousSessionId: prevId || null,
     WaCreated: $('#waCreated').checked, WaLink: $('#waLink').value.trim(),
     Priority: false,
@@ -4319,6 +5168,29 @@ async function onSaveSession(){
     }
     $('#sessionModal').classList.remove('open');
     hideConflictToast();
+    // Push the team: everyone on a new booking (including one booked from
+    // the waiting list) or when the date/time moved; only newly added
+    // ministers on any other edit. Past dates never push. Drop-ins and
+    // Training push too (2026-10-22, at the user's request).
+    if(status==='Scheduled' && start>new Date()){
+      const prev = editingId ? sessions.find(x=>x.id===editingId) : null;
+      if(!prev || prev.status==='Waiting'){
+        pushNotifyMinisters(sessionId, null, 'booked', start);
+      } else if(prev.status==='Scheduled'){
+        // Anyone taken off the team hears they're off it.
+        const removed = ministerIdsOf(prev).filter(id=>!selIds.includes(id));
+        if(removed.length && new Date(prev.date+'T'+prev.time)>new Date()){
+          pushNotifyMinisters(sessionId, removed, 'removed', new Date(prev.date+'T'+prev.time), prev.recipName);
+        }
+        if(prev.date!==date || prev.time!==time){
+          pushNotifyMinisters(sessionId, null, 'changed', start);
+        } else {
+          const before = new Set(ministerIdsOf(prev));
+          const added = selIds.filter(id=>!before.has(id));
+          if(added.length) pushNotifyMinisters(sessionId, added, 'booked', start);
+        }
+      }
+    }
     await loadAll();
   }catch(e){
     msg.innerHTML = `<div class="errbox" role="alert">Save failed: ${e.message}</div>`;
@@ -4332,6 +5204,8 @@ function renderOverview(){
   const now = new Date();
   const box = $('#overviewGroups'); const noResults = $('#overviewNoResults');
   const opened = openState(box);
+  const showNotif = !!pushDevices && overviewSubStatus==='Active';
+  renderNotifSummary(showNotif);
 
   const rows = ministers
     .filter(m=>m.status===overviewSubStatus)
@@ -4355,6 +5229,7 @@ function renderOverview(){
       return {m, led, supported, hours, upcoming};
     })
     .filter(x=> !q || x.m.name.toLowerCase().includes(q))
+    .filter(x=> !showNotif || overviewNotifFilter==='all' || (overviewNotifFilter==='on') === (notifStatusFor(x.m.id).state==='on'))
     .sort((a,b)=>{
       if(overviewSortMode==='az') return a.m.name.localeCompare(b.m.name);
       if(!!a.upcoming.length !== !!b.upcoming.length) return a.upcoming.length ? -1 : 1;
@@ -4393,6 +5268,7 @@ function renderOverview(){
               <span class="group-name">${escapeHtml(m.name)}</span>
               <span class="group-count">${countLabel}</span>
               ${m.status==='Inactive' ? '<span class="tag inactive">Inactive</span>' : ''}
+              ${showNotif ? notifChipHtml(m.id) : ''}
             </span>
             <span class="group-summary">${summary}</span>
           </span>
@@ -4404,12 +5280,131 @@ function renderOverview(){
           <button class="icon-btn danger" onclick="deleteMinister(${m.id})" title="Delete" aria-label="Delete ${escapeHtml(m.name)}">${ICONS.trash}</button>
         </div>
       </div>
-      <div class="group-body"><div class="group-body-inner">${body}</div></div>
+      <div class="group-body"><div class="group-body-inner">${showNotif ? notifDevicesHtml(m.id) : ''}${body}</div></div>
     </div>`;
   }).join('');
+  if(showNotif && !rows.length && !q) noResults.textContent = overviewNotifFilter==='help' ? 'Everyone has notifications on.' : 'No ministers match this filter.';
+  else noResults.textContent = 'No ministers match your search.';
 
   renderOverviewStats();
 }
+/* =========================================================================
+   MINISTER NOTIFICATION STATUS (added 2026-10-26)
+
+   Shows which prayer ministers have phone notifications working, so an
+   admin can help anyone who doesn't (new phone, turned off in settings,
+   never set up). Reads the PushSubscriptions list directly - one item per
+   device, kept by the intake Worker. My FPHM saves each device's type and
+   "last opened" date on every open, and marks it blocked when
+   notifications were turned off on the phone (the Worker's /checkin).
+   Devices registered before that change have no type until they next open
+   the app, so the push service's host stands in for it.
+     On    = at least one device opened in the last 30 days, not blocked
+     Check = has devices, but every one is blocked or not opened in 30 days
+     Off   = no devices
+   A device not opened in NOTIF_REMOVE_DAYS is deleted automatically each
+   time the Scheduler loads (an old phone, at the user's request), except a
+   minister's most recently opened device, which is always kept so someone
+   with one device (or only old ones) never drops off the list; an
+   admin can remove one by hand. The Worker separately deletes any device
+   the push service reports as gone (404/410) when it sends to it.
+========================================================================= */
+const NOTIF_STALE_DAYS = 30;
+const NOTIF_REMOVE_DAYS = 90;
+async function removeOldPushDevices(devices){
+  const cutoff = Date.now() - NOTIF_REMOVE_DAYS*86400000;
+  const seen = d=>{ const t = d.lastSeen ? Date.parse(d.lastSeen) : NaN; return isNaN(t) ? 0 : t; };
+  const newest = new Map();
+  devices.forEach(d=>{ const k = newest.get(d.ministerId); if(!k || seen(d) > seen(k)) newest.set(d.ministerId, d); });
+  const old = devices.filter(d=>{ const t = seen(d); return t && t < cutoff && newest.get(d.ministerId) !== d; });
+  if(!old.length) return devices;
+  const gone = new Set();
+  await Promise.all(old.map(d=>deleteItem('pushSubs', d.id).then(()=>gone.add(d.id)).catch(e=>console.warn('Could not remove old device:', e.message))));
+  return devices.filter(d=>!gone.has(d.id));
+}
+window.removePushDevice = async function(id){
+  const d = (pushDevices||[]).find(x=>x.id===id);
+  if(!d) return;
+  const m = ministers.find(x=>x.id===d.ministerId);
+  const ok = await askConfirm(`Remove ${d.label} from ${m ? m.name : 'this minister'}'s notification devices? That device stops getting phone notifications until they turn notifications on again in My FPHM.`, { confirmLabel: 'Remove', danger: true });
+  if(!ok) return;
+  try{
+    await deleteItem('pushSubs', id);
+    pushDevices = pushDevices.filter(x=>x.id!==id);
+    renderOverview();
+  }catch(e){ alert('Could not remove the device: ' + e.message); }
+};
+function parsePushDevices(items){
+  return items.map(i=>{
+    let sub = null;
+    try{ sub = JSON.parse(i.SubscriptionJSON || 'null'); }catch(e){}
+    const ministerId = parseInt(i.MinisterId, 10);
+    if(!sub || !sub.endpoint || !(ministerId > 0)) return null; // MinisterId 0 = an admin's own device
+    return {
+      id: i.id, ministerId,
+      label: sub.device || deviceFromEndpoint(sub.endpoint),
+      lastSeen: sub.lastSeen || i._modified || i._created || null,
+      blocked: !!sub.blocked
+    };
+  }).filter(Boolean);
+}
+function deviceFromEndpoint(endpoint){
+  let host = '';
+  try{ host = new URL(endpoint).hostname; }catch(e){}
+  if(/apple\.com$/.test(host)) return 'Apple device';
+  if(/googleapis\.com$/.test(host)) return 'Android or Chrome device';
+  if(/windows\.com$|microsoft\.com$/.test(host)) return 'Windows device';
+  if(/mozilla\.com$/.test(host)) return 'Firefox';
+  return 'Device';
+}
+function notifStatusFor(ministerId){
+  const cutoff = Date.now() - NOTIF_STALE_DAYS*86400000;
+  const devices = (pushDevices||[]).filter(d=>d.ministerId===ministerId).map(d=>{
+    const t = d.lastSeen ? Date.parse(d.lastSeen) : NaN;
+    return { ...d, stale: isNaN(t) || t < cutoff };
+  }).sort((a,b)=>String(b.lastSeen||'').localeCompare(String(a.lastSeen||'')));
+  const state = !devices.length ? 'off' : (devices.some(d=>!d.blocked && !d.stale) ? 'on' : 'check');
+  return { state, devices };
+}
+function notifWhen(iso){
+  const t = iso ? new Date(iso) : null;
+  if(!t || isNaN(t)) return 'last opened unknown';
+  const days = Math.floor((new Date().setHours(0,0,0,0) - new Date(t).setHours(0,0,0,0)) / 86400000);
+  if(days <= 0) return 'today';
+  if(days === 1) return 'yesterday';
+  return 'last opened ' + t.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+}
+const NOTIF_CHIPS = { on: '🔔 On', check: '🔔 Check', off: '🔕 Off' };
+function notifChipHtml(ministerId){
+  const s = notifStatusFor(ministerId).state;
+  return `<span class="tag notif-${s}" title="Phone notifications">${NOTIF_CHIPS[s]}</span>`;
+}
+function notifDevicesHtml(ministerId){
+  const { devices } = notifStatusFor(ministerId);
+  const lines = devices.length
+    ? devices.map(d=>`<div class="notif-dev${d.blocked||d.stale?' warn':''}"><span>${escapeHtml(d.label)} · ${d.blocked ? 'notifications turned off on this device' : notifWhen(d.lastSeen)}${!d.blocked && d.stale ? ' (maybe an old device)' : ''}</span><button type="button" class="link-btn" onclick="removePushDevice(${d.id})" aria-label="Remove ${escapeHtml(d.label)}">Remove</button></div>`).join('')
+    : `<div class="notif-dev">No devices. They haven't turned notifications on in My FPHM. They still see messages in My FPHM's Messages tab.</div>`;
+  return `<div class="notif-devs"><div class="notif-devs-title">Phone notifications</div>${lines}</div>`;
+}
+function renderNotifSummary(show){
+  const box = $('#overviewNotif');
+  box.hidden = !show;
+  if(!show){ box.innerHTML = ''; return; }
+  const counts = { on:0, check:0, off:0 };
+  const active = ministers.filter(m=>m.status==='Active');
+  active.forEach(m=>counts[notifStatusFor(m.id).state]++);
+  const help = counts.check + counts.off;
+  const btn = (f, label) => `<button type="button" class="${overviewNotifFilter===f?'on':''}" aria-pressed="${overviewNotifFilter===f}" onclick="setNotifFilter('${f}')">${label}</button>`;
+  box.innerHTML = `<div class="notif-summary">
+    <div class="notif-summary-line">🔔 ${counts.on} of ${active.length} active minister${active.length===1?'':'s'} ${counts.on===1?'has':'have'} notifications on
+      ${counts.check ? `<span class="tag notif-check">${counts.check} to check</span>` : ''}
+      ${counts.off ? `<span class="tag notif-off">${counts.off} off</span>` : ''}</div>
+    <div class="notif-filter" role="group" aria-label="Filter by phone notifications">${btn('all','All')}${btn('help',`Needs help (${help})`)}${btn('on',`On (${counts.on})`)}</div>
+    <p class="helptext" style="margin:0;">"Check" means every device has notifications turned off or hasn't opened My FPHM in ${NOTIF_STALE_DAYS} days, often an old phone. A device not opened in ${NOTIF_REMOVE_DAYS} days is removed automatically, unless it's the minister's only one.</p>
+  </div>`;
+}
+window.setNotifFilter = function(f){ overviewNotifFilter = f; renderOverview(); };
+
 function shiftYear(dateStr, delta){
   if(!dateStr) return dateStr;
   const [y,m,d] = dateStr.split('-').map(Number);
@@ -4814,6 +5809,28 @@ function renderBlackouts(){
 function absoluteIntakeUrl(){
   return new URL(INTAKE_URL, window.location.href).href;
 }
+const INSTALL_GUIDE_URL = 'https://fphm2026.github.io/prayer-scheduler/portal/install/';
+// Shown inside the Scheduler rather than navigating away: in the installed
+// app, leaving the page reloads the Scheduler and drops you at sign-in.
+function openInstallGuide(){
+  const frame = $('#installGuideFrame');
+  if(!frame.getAttribute('src')) frame.src = INSTALL_GUIDE_URL;
+  $('#installGuideModal').classList.add('open');
+  $('#btnCloseInstallGuide').focus();
+}
+async function copyInstallGuideLink(msgSel){
+  const msg = $(msgSel);
+  try {
+    await navigator.clipboard.writeText(INSTALL_GUIDE_URL);
+  } catch (e) {
+    window.prompt('Copy this link:', INSTALL_GUIDE_URL);
+    return;
+  }
+  msg.style.display = '';
+  clearTimeout(copyInstallGuideLink._t);
+  copyInstallGuideLink._t = setTimeout(()=>{ msg.style.display = 'none'; }, 2500);
+}
+
 async function copyIntakeLink(){
   const url = absoluteIntakeUrl();
   const msg = $('#intakeLinkCopiedMsg');
@@ -5066,10 +6083,14 @@ function renderIntake(){
   // regardless of visibility, so nothing else needs to know about it.
   const editingQuestions = intakeSubStatus === 'Questions';
   const importing = intakeSubStatus === 'Import';
-  $('#intakeQuestionsHost').hidden = !editingQuestions;
-  $('#intakeImportHost').hidden = !importing;
-  $('#intakeSearchWrap').hidden = editingQuestions || importing;
-  $('#intakeHelptext').hidden = editingQuestions || importing;
+  // While one form is open (openIntakeDetail), keep the Import and Edit
+  // Questions tools hidden even if that was the sub-tab last chosen - a
+  // re-render (e.g. after saving a redaction) must not bring them back.
+  const viewing = intakeDetailId != null;
+  $('#intakeQuestionsHost').hidden = !editingQuestions || viewing;
+  $('#intakeImportHost').hidden = !importing || viewing;
+  $('#intakeSearchWrap').hidden = editingQuestions || importing || viewing;
+  $('#intakeHelptext').hidden = editingQuestions || importing || viewing;
   if(importing){
     box.innerHTML = '';
     noResults.hidden = true;
@@ -5169,17 +6190,141 @@ window.deleteIntakeForm = async function(id){
   await deleteItem('intake', id);
   await loadAll();
 };
+// ---- Print from an iPhone/iPad Home Screen app (added 2026-11-08) --------
+// iOS Home Screen apps silently ignore window.print(), in the page and in
+// iframes alike (Andrew hit it on iOS 27.2; others report the same since
+// late Oct 2026). There, Print draws the printable content into a PDF
+// (html2canvas + jsPDF from cdnjs, loaded only when needed) and opens the
+// share sheet, whose Print action works. Safari tabs and computers keep
+// using window.print(). Duplicated in preview/index.html and
+// portal/index.html, same as other shared helpers.
+const PRINT_VIA_SHARE = window.navigator.standalone === true;
+function loadPrintLib(src, ready){
+  if(ready()) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('Could not load the PDF maker. Check your internet connection and try again.'));
+    document.head.appendChild(s);
+  });
+}
+function printShareDialog(){
+  let bg = document.getElementById('printShareModal');
+  if(!bg){
+    bg = document.createElement('div');
+    bg.className = 'modal-bg';
+    bg.id = 'printShareModal';
+    bg.style.zIndex = '200';
+    bg.innerHTML = `<div class="modal small" role="dialog" aria-modal="true" aria-labelledby="printShareTitle">
+      <h2 id="printShareTitle">Print</h2>
+      <p id="printShareMsg" style="margin:0 0 16px;"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn secondary" id="btnPrintShareClose">Close</button>
+        <button type="button" class="btn" id="btnPrintShareGo" hidden>Print or share PDF</button>
+      </div>
+    </div>`;
+    document.body.appendChild(bg);
+    bg.querySelector('#btnPrintShareClose').addEventListener('click', () => bg.classList.remove('open'));
+  }
+  return bg;
+}
+// el: a detached element holding what should print. title: shown in the
+// share sheet; also the file name.
+async function printViaShareSheet(el, title){
+  const bg = printShareDialog();
+  const msg = bg.querySelector('#printShareMsg');
+  const go = bg.querySelector('#btnPrintShareGo');
+  go.hidden = true;
+  msg.textContent = 'Preparing a PDF to print…';
+  bg.classList.add('open');
+  const W = 720, PAGE_H = 960; // 7.5in x 10in printable area at 96px/in
+  const host = document.createElement('div');
+  host.className = 'pdf-render';
+  host.style.cssText = 'position:absolute;left:0;top:0;width:'+W+'px;background:#fff;color:#222;z-index:-1;pointer-events:none;--ans-scale:1;';
+  host.appendChild(el);
+  document.body.appendChild(host);
+  let file;
+  try{
+    await loadPrintLib('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', () => !!window.html2canvas);
+    await loadPrintLib('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', () => !!(window.jspdf && window.jspdf.jsPDF));
+    await Promise.all([...host.querySelectorAll('img')].map(img => img.complete ? null : new Promise(r => { img.onload = img.onerror = r; })));
+    if(document.fonts && document.fonts.ready) await document.fonts.ready;
+    const r = host.getBoundingClientRect();
+    const top = r.top + window.scrollY, left = r.left + window.scrollX;
+    const total = Math.ceil(host.scrollHeight);
+    // Break pages only between rows/paragraphs, never through a line.
+    const cuts = [...host.querySelectorAll('.ans-row,.ans-subrow,.ans-section h3,h1,h2,h3,p,li,img,.legal-text')]
+      .map(n => Math.round(n.getBoundingClientRect().bottom - r.top)).filter(y => y > 0).sort((a,b) => a-b);
+    const pages = [];
+    for(let start = 0; start < total; ){
+      let end = start + PAGE_H;
+      if(end >= total) end = total;
+      else {
+        const fit = cuts.filter(y => y > start + PAGE_H/2 && y <= start + PAGE_H);
+        if(fit.length) end = fit[fit.length-1];
+      }
+      pages.push([start, end]);
+      start = end;
+    }
+    const pdf = new window.jspdf.jsPDF({ unit:'in', format:'letter' });
+    for(let k = 0; k < pages.length; k++){
+      msg.textContent = `Preparing a PDF to print… page ${k+1} of ${pages.length}`;
+      const [a, b] = pages[k];
+      const canvas = await window.html2canvas(host, { scale:2, backgroundColor:'#fff', useCORS:true, logging:false,
+        x:left, y:top + a, width:W, height:b - a, windowWidth:Math.max(W, document.documentElement.clientWidth) });
+      if(k) pdf.addPage();
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0.5, 0.5, 7.5, 7.5 * (b - a) / W);
+    }
+    const name = (title || 'Intake form').replace(/[^\w\- ]+/g, '').trim() || 'Intake form';
+    file = new File([pdf.output('blob')], name + '.pdf', { type:'application/pdf' });
+  }catch(err){
+    console.error(err);
+    msg.textContent = 'Sorry, the PDF could not be made. ' + (err && err.message ? err.message : '');
+    return;
+  }finally{
+    host.remove();
+  }
+  const share = async () => {
+    if(navigator.canShare && navigator.canShare({ files:[file] })){
+      await navigator.share({ files:[file], title: file.name });
+    } else {
+      // No file sharing: open the PDF itself; its own share button prints.
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(file); a.target = '_blank'; a.download = file.name;
+      document.body.appendChild(a); a.click(); a.remove();
+    }
+    bg.classList.remove('open');
+  };
+  msg.textContent = 'Your PDF is ready. Tap the button, then choose Print from the menu.';
+  go.hidden = false;
+  go.onclick = () => share().catch(err => { if(err && err.name !== 'AbortError') msg.textContent = 'Could not open the share menu. ' + (err.message || ''); });
+  // Opening the share menu needs a fresh tap; try now, and fall back to
+  // the button above if iOS says the tap is too old.
+  try{ await share(); }catch(err){ /* AbortError = cancelled; NotAllowedError = tap expired; the button stays */ }
+}
+// Print button on the intake detail view. Home Screen app on iPhone/iPad:
+// PDF + share sheet (printViaShareSheet above); everywhere else the
+// normal print dialog with the @media print rules.
+window.printIntakeDetail = function(){
+  if(!PRINT_VIA_SHARE){ window.print(); return; }
+  const i = intakeResponses.find(x=>x.id===intakeDetailId);
+  const copy = $('#intakeDetail').cloneNode(true);
+  copy.removeAttribute('id');
+  copy.querySelectorAll('.no-print,#redactPanel,#redactPickBar').forEach(n => n.remove());
+  printViaShareSheet(copy, ((i && i.recipName) ? i.recipName + ' ' : '') + 'intake form');
+};
 window.openIntakeDetail = function(id){
   const i = intakeResponses.find(x=>x.id===id);
   if(!i) return;
   intakeDetailId = id;
-  ['intakeGroups','intakeSubtabs','intakeSearch','intakeHelptext','intakeNoResults'].forEach(id=>{ const el=$('#'+id); if(el) el.hidden = true; });
+  ['intakeGroups','intakeSubtabs','intakeSearchWrap','intakeHelptext','intakeNoResults','intakeImportHost','intakeQuestionsHost'].forEach(id=>{ const el=$('#'+id); if(el) el.hidden = true; });
   const detail = $('#intakeDetail');
   detail.hidden = false;
   detail.innerHTML = `
     <div class="toolbar no-print">
       <button type="button" class="btn secondary" onclick="closeIntakeDetail()">&larr; ${intakeReturn ? 'Back to '+escapeHtml(intakeReturn.label) : 'Back to list'}</button>
-      <button type="button" class="btn" onclick="window.print()">Print / Save as PDF</button>
+      <button type="button" class="btn" onclick="printIntakeDetail()">Print / Save as PDF</button>
       ${i.status !== 'InProgress' ? `<button type="button" class="btn secondary" onclick="toggleRedactPanel(${i.id})">${redactPanelOpen ? 'Close redaction' : 'Redact personal info'}</button>` : ''}
     </div>
     <div class="intake-namerow">
@@ -5195,7 +6340,7 @@ window.openIntakeDetail = function(id){
         <button type="button" class="btn" id="btnRedactPicked" onclick="redactPickedWords(${i.id})">Redact chosen words</button>
         <button type="button" class="btn secondary" onclick="clearRedactPicks()">Clear</button>
       </div>` : ''}
-    ${FPHM.renderResponsesHtml(i.responses, { redact: 'mark' })}
+    ${FPHM.renderResponsesHtml(i.responses, { redact: 'mark', autoNames: true })}
     ${i.signatureDataUrl ? `<h3>Signature</h3><img src="${i.signatureDataUrl}" alt="Signature" style="max-width:300px;border:1px solid var(--border);border-radius:8px;background:#fff;">` : ''}
   `;
   applyIntakeTextSize();
@@ -5223,7 +6368,7 @@ function currentRedactions(i){
 }
 function redactPanelHtml(i){
   const red = currentRedactions(i);
-  const sugg = FPHM.suggestRedactions(i.responses);
+  const sugg = FPHM.suggestRedactions(i.responses, { autoNames: true });
   const redCount = Object.values(red).reduce((n, a) => n + a.length, 0);
   const suggHtml = sugg.length
     ? `<div class="redact-list">${sugg.map((x, k) => `
@@ -5241,6 +6386,7 @@ function redactPanelHtml(i){
   return `
     <h3>Redact personal info</h3>
     <p class="helptext">Prayer ministers will see &#9608;&#9608;&#9608;&#9608;&#9608;&#9608; in place of redacted words. You still see them here, highlighted. </p>
+    <p class="helptext">The recipient's name and the spouse or partner names are always hidden, wherever they appear. Other names need picking below.</p>
     <p class="redact-howto"><strong>To hide other words:</strong> tap them in the answers below - each one you tap turns red. Tap again to un-choose. Then press the <strong>Redact chosen words</strong> bar at the bottom of the screen.</p>
     <p class="errbox" role="alert" id="redactMsg" hidden></p>
     <h4>Suggested (${sugg.length})</h4>
@@ -5353,7 +6499,7 @@ window.redactPickedWords = async function(id){
 window.redactCheckedSuggestions = async function(id){
   const i = intakeResponses.find(x => x.id === id);
   if(!i) return;
-  const sugg = FPHM.suggestRedactions(i.responses);
+  const sugg = FPHM.suggestRedactions(i.responses, { autoNames: true });
   const picked = [...document.querySelectorAll('#redactPanel .redact-sugg:checked')].map(c => sugg[+c.dataset.k]).filter(Boolean);
   if(!picked.length) return redactMsg('Tick at least one suggestion first.');
   const red = currentRedactions(i);
@@ -5387,7 +6533,7 @@ window.closeIntakeDetail = function(){
   redactPanelOpen = false;
   const ret = intakeReturn; intakeReturn = null;
   intakeDetailId = null;
-  ['intakeGroups','intakeSubtabs','intakeSearch','intakeHelptext'].forEach(id=>{ const el=$('#'+id); if(el) el.hidden = false; });
+  ['intakeGroups','intakeSubtabs'].forEach(id=>{ const el=$('#'+id); if(el) el.hidden = false; });
   const detail = $('#intakeDetail');
   detail.hidden = true;
   detail.innerHTML = '';
@@ -6055,6 +7201,10 @@ window.sortQuestionList = function(sIdx, qIdx, field, dir){
   edSetDirty(true);
   renderFormEditor();
 };
+// Per-row notes boxes: on by default for a grid that pulls its rows from an
+// earlier grid (e.g. "Was there an effect?" listing the sequences used),
+// unless the editor's checkbox was unticked (rowNotes:false).
+function gridRowNotesOn(q){ return q.rowNotes===undefined ? !!q.rowsFrom : !!q.rowNotes; }
 function gridEditorHtml(q, sIdx, qIdx){
   const sources = questionsBefore(sIdx, qIdx).filter(x=>GRID_TYPES.includes(x.type));
   const fromMode = !!q.rowsFrom;
@@ -6089,6 +7239,9 @@ function gridEditorHtml(q, sIdx, qIdx){
       ${sortButtonsHtml(sIdx, qIdx, 'columns')}</div>
     <div class="field"><label style="display:flex;align-items:center;gap:6px;font-weight:400;">
       <input type="checkbox" ${q.limitPerColumn?'checked':''} onchange="updateQuestionField(${sIdx},${qIdx},'limitPerColumn',this.checked)"> Limit to one response per column
+    </label></div>
+    <div class="field"><label style="display:flex;align-items:center;gap:6px;font-weight:400;">
+      <input type="checkbox" ${gridRowNotesOn(q)?'checked':''} onchange="updateQuestionField(${sIdx},${qIdx},'rowNotes',this.checked)"> Add a notes box under each row
     </label></div>
     <div class="field"><label style="display:flex;align-items:center;gap:6px;font-weight:400;">
       <input type="checkbox" ${q.withNotes?'checked':''} onchange="updateQuestionFieldAndRerender(${sIdx},${qIdx},'withNotes',this.checked)"> Add a text box below the grid
@@ -6192,7 +7345,7 @@ window.onQuestionTypeChange = function(sIdx, qIdx, newType){
   if(GRID_TYPES.includes(newType)){
     if(!Array.isArray(q.rows)) q.rows = ['Row 1','Row 2'];
     if(!Array.isArray(q.columns)) q.columns = ['Column 1','Column 2','Column 3'];
-  } else { delete q.rows; delete q.columns; delete q.limitPerColumn; delete q.rowsFrom; delete q.withNotes; delete q.notesLabel; }
+  } else { delete q.rows; delete q.columns; delete q.limitPerColumn; delete q.rowsFrom; delete q.rowNotes; delete q.withNotes; delete q.notesLabel; }
   if(!TYPES_WITH_OPTIONS.includes(newType)){ delete q.options; delete q.otherOption; }
   if(newType!=='checkboxes') delete q.otherOption;
   if(newType!=='number'){ delete q.min; delete q.max; }
@@ -6432,6 +7585,92 @@ function notesButtonHtml(s){
   return `<button class="icon-btn${has?' success':''}" onclick="openSessionNotes(${s.id})" title="Session Notes" aria-label="${has?'View or edit':'Write'} session notes for ${escapeHtml(s.recipName)}">${ICONS.pencil}<span class="btn-label">${has?'Session Notes ✓':'Session Notes'}</span></button>`;
 }
 
+// Notes already written for this recipient's EARLIER sessions (matched by
+// name, newest first), so whoever writes up a follow-up can read what
+// happened before. Read-only; the minister portal shows the same notes on
+// the recipient's card (added 2026-10-28).
+function earlierNotesFor(s){
+  const key = (s.recipName||'').trim().toLowerCase();
+  if(!key) return [];
+  const mine = sessionSortKey(s);
+  return sessionNotes.map(n=>({ note:n, session: sessions.find(x=>x.id===n.sessionId) || null }))
+    .filter(x=>x.note.sessionId!==s.id && x.session && x.session.recipName.trim().toLowerCase()===key && sessionSortKey(x.session) < mine)
+    .sort((a,b)=> sessionSortKey(b.session).localeCompare(sessionSortKey(a.session)));
+}
+function renderEarlierNotes(s){
+  const box = $('#notesEarlier');
+  const list = earlierNotesFor(s);
+  box.hidden = !list.length;
+  box.innerHTML = list.length ? `<details class="notes-earlier"><summary>Notes from earlier sessions (${list.length})</summary><div class="notes-earlier-body">${
+    list.map(({note, session})=>`<div class="note-view">
+      <h4>${escapeHtml(fmtDate(new Date(session.date+'T00:00')))}</h4>
+      <p class="helptext">${escapeHtml(`Session #${sessionNumberOf(session)} · Team: ${ministerNamesOf(session)}`)}</p>
+      ${FPHM.renderNotesHtml(note.record)}
+    </div>`).join('')}</div></details>` : '';
+}
+
+// "View intake form" / "View session notes" buttons at the top of a
+// recipient's Completed Sessions card - the same pair ministers get in My
+// FPHM (2026-10-29, at the user's request). Intake = the form staff linked
+// to one of this recipient's sessions; notes = every saved note for them.
+function recipientLinksRowFor(name){
+  const key = (name||'').trim().toLowerCase();
+  const linkedId = sessions.filter(s=>s.recipName.trim().toLowerCase()===key).map(s=>s.intakeResponseId).find(id=>id!=null);
+  const intake = linkedId!=null ? intakeResponses.find(i=>i.id===linkedId) : null;
+  const notes = notesForRecipient(name);
+  if(!intake && !notes.length) return '';
+  return `<div class="recip-links-row">`
+    + (intake ? `<button type="button" class="btn secondary" onclick="viewLinkedIntake(${intake.id})">View intake form</button>` : '')
+    + (notes.length ? `<button type="button" class="btn secondary" onclick="openRecipientNotes(${escapeHtml(JSON.stringify(name))})">View session notes</button>` : '')
+    + `</div>`;
+}
+function notesForRecipient(name){
+  const key = (name||'').trim().toLowerCase();
+  if(!key || !sessionNotes.length) return [];
+  return sessionNotes.map(n=>({ note:n, session: sessions.find(x=>x.id===n.sessionId) || null }))
+    .filter(x=>((x.session ? x.session.recipName : (x.note.record.session||{}).recipName)||'').trim().toLowerCase()===key)
+    .sort((a,b)=>{
+      const k = x => x.session ? sessionSortKey(x.session) : ((x.note.record.session||{}).date||'');
+      return k(b).localeCompare(k(a));
+    });
+}
+// One collapsible card per session, newest open (same as My FPHM).
+window.openRecipientNotes = function(name){
+  const list = notesForRecipient(name);
+  if(!list.length) return;
+  $('#notesViewTitle').textContent = `Session notes: ${name}`;
+  const many = list.length > 1;
+  $('#notesViewBody').innerHTML = list.map(({note, session}, i)=>{
+    const rs = note.record.session||{};
+    const date = session ? session.date : (rs.date||'');
+    const team = session ? ministerNamesOf(session)
+      : (rs.ministers||[]).map(m=>m.name + (m.role==='Lead'?' (Lead)':'')).join(', ');
+    const meta = [session && session.apptType ? session.apptType : '', team ? 'Team: '+team : ''].filter(Boolean).join(' · ');
+    const head = `${session ? `<span class="nv-chip">Session #${sessionNumberOf(session)}</span>` : ''}<h3 class="nv-date">${escapeHtml(date ? fmtDate(new Date(date+'T00:00')) : 'Date unknown')}</h3>
+      ${meta ? `<p class="nv-meta">${escapeHtml(meta)}</p>` : ''}`;
+    if(!many) return `<article class="nv-card">${head}${FPHM.renderNotesHtml(note.record)}</article>`;
+    return `<details class="nv-card nv-fold"${i===0?' open':''}>
+      <summary><span class="nv-fold-text">${head}</span><span class="nv-fold-chev" aria-hidden="true">${ICONS.chevron}</span></summary>
+      <div class="nv-fold-body">${FPHM.renderNotesHtml(note.record)}</div>
+    </details>`;
+  }).join('');
+  applyNotesViewTextSize();
+  $('#notesViewModal').classList.add('open');
+};
+// Same remembered text size as the intake view.
+function applyNotesViewTextSize(){
+  let n = 1;
+  try{ n = parseFloat(localStorage.getItem('fphmIntakeTextScale')) || 1; }catch(e){}
+  $('#notesViewBody').style.setProperty('--ans-scale', n);
+}
+window.changeNotesViewTextSize = function(dir){
+  let n = 1;
+  try{ n = parseFloat(localStorage.getItem('fphmIntakeTextScale')) || 1; }catch(e){}
+  n = Math.min(2, Math.max(0.8, Math.round((n + dir*0.15)*100)/100));
+  try{ localStorage.setItem('fphmIntakeTextScale', n); }catch(e){}
+  applyNotesViewTextSize();
+};
+
 // Same rules as FPHM.evalCond, except that "equals"/"notEquals" against a
 // checkbox answer (an array) mean "includes" / "does not include" - a
 // checkbox answer can never be strictly equal to a single choice, so a
@@ -6464,6 +7703,7 @@ window.openSessionNotes = function(sessionId){
   $('#notesSub').textContent = `${s.recipName} · ${fmtShort(s.date)}${leadName ? ' · Lead: '+leadName : ''}`;
   $('#notesMsg').hidden = true;
   $('#btnNotesDownload').hidden = !existing;
+  renderEarlierNotes(s);
   renderNotesForm();
   $('#notesModal').classList.add('open');
 };
@@ -6581,10 +7821,13 @@ function notesQuestionHtml(q, si, qi){
     const rows = notesRowsOf(q), cols = q.columns||[];
     const ans = (v && typeof v==='object' && !Array.isArray(v)) ? v : {};
     const isRadio = q.type==='choicegrid';
-    input = `<div class="grid-wrap"><table class="nt-grid"><thead><tr><th></th>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((r,ri)=>`<tr><th scope="row">${escapeHtml(r)}</th>${cols.map((c,ci)=>{
+    // "A notes box under each row" (added 2026-10-30): its own text per row,
+    // saved as answers[id+'__rownotes'] = { rowLabel: text }.
+    const rn = notesCtx.answers[q.id+'__rownotes'] || {};
+    input = `<div class="grid-wrap"><table class="nt-grid"><thead><tr><th></th>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((r,ri)=>`<tr${gridRowNotesOn(q)?' class="has-rownote"':''}><th scope="row">${escapeHtml(r)}</th>${cols.map((c,ci)=>{
       const on = isRadio ? ans[r]===c : (Array.isArray(ans[r]) && ans[r].includes(c));
       return `<td><input type="${isRadio?'radio':'checkbox'}" name="${id}_${ri}" ${on?'checked':''} aria-label="${escapeHtml(r)}: ${escapeHtml(c)}" onchange="notesGridSet(${si},${qi},${ri},${ci},this.checked)"></td>`;
-    }).join('')}</tr>`).join('')}</tbody></table></div>`
+    }).join('')}</tr>${gridRowNotesOn(q) ? `<tr><td class="nt-rownote" colspan="${cols.length+1}"><textarea rows="2" placeholder="Notes on ${escapeHtml(r)}" aria-label="Notes on ${escapeHtml(r)}" oninput="notesSetRowNote(${si},${qi},${ri},this.value)">${escapeHtml(rn[r]||'')}</textarea></td></tr>` : ''}`).join('')}</tbody></table></div>`
       + (q.withNotes ? `<label class="qlabel" style="margin-top:14px;">${escapeHtml(q.notesLabel||'Notes')}</label><textarea rows="3" oninput="notesSetGridNotes(${si},${qi},this.value)">${escapeHtml(notesCtx.answers[q.id+'__notes']||'')}</textarea>` : '');
   } else {
     const type = q.type==='email' ? 'email' : q.type==='number' ? 'number' : 'text';
@@ -6641,6 +7884,13 @@ window.notesGridSet = function(si, qi, ri, ci, checked){
     }
   }));
   notesApplyVisibility();
+};
+window.notesSetRowNote = function(si, qi, ri, text){
+  const q = notesQ(si,qi), row = notesRowsOf(q)[ri];
+  const cur = notesCtx.answers[q.id+'__rownotes'];
+  const m = (cur && typeof cur==='object') ? cur : {};
+  m[row] = text;
+  notesCtx.answers[q.id+'__rownotes'] = m;
 };
 window.notesSetGridNotes = function(si, qi, text){
   notesCtx.answers[notesQ(si,qi).id + '__notes'] = text;
@@ -6736,6 +7986,12 @@ function notesVisibleAnswers(){
         if(Object.keys(clean).length) out[q.id] = clean;
         const gn = a[q.id + '__notes'];
         if(q.withNotes && gn && String(gn).trim()) out[q.id + '__notes'] = String(gn);
+        const rn = a[q.id + '__rownotes'];
+        if(gridRowNotesOn(q) && rn && typeof rn==='object'){
+          const keep = {};
+          rows.forEach(r=>{ if(rn[r] && String(rn[r]).trim()) keep[r] = String(rn[r]); });
+          if(Object.keys(keep).length) out[q.id + '__rownotes'] = keep;
+        }
         return;
       }
       const blank = v===undefined || v===null || v==='' || (Array.isArray(v) && v.length===0);
@@ -6773,6 +8029,7 @@ window.openNotesPreview = function(){
   $('#notesMsg').hidden = true;
   $('#btnNotesDownload').hidden = true;
   $('#btnNotesSave').hidden = true;
+  $('#notesEarlier').hidden = true;
   renderNotesForm();
   $('#notesModal').classList.add('open');
 };
@@ -7295,6 +8552,94 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Nov 9, 2026', version: '2026-11-09.1', items: [
+    'New: keep a person private. On the Prayer List tab, each person has a "Make private" button; a private person gets a Private tag and is left off the Prayer List in My FPHM, so other prayer ministers don\'t know they\'re having a session. Their own team still sees the session on their schedule. "Show on Prayer List" undoes it. The session form also has a "Private" box, which a follow-up session fills in automatically from the person\'s last session. Needs one new Yes/No column, PrayerListPrivate, on the PrayerSessions list in SharePoint; until it exists, the Prayer List tab shows the steps to add it.'
+  ]},
+  { date: 'Nov 8, 2026', version: '2026-11-08.1', items: [
+    'Fixed: printing an intake form from the installed app on an iPhone or iPad. Since recent iOS updates, the home-screen app ignores Print completely. Now, in the installed app, "Print / Save as PDF" makes a PDF of the form and opens the iPhone share menu; choose Print there (or Save to Files). If the menu doesn\'t open by itself, tap "Print or share PDF". In Safari and on a computer, Print works the same as before. My FPHM has the same fix (live now). To check: open a submitted form in Intake Forms in the installed FPHM Admin app and tap Print / Save as PDF.'
+  ]},
+  { date: 'Nov 7, 2026', version: '2026-11-07.2', items: [
+    'New: the Prayer List is in My FPHM (live now). Ministers ticked in Settings > Prayer List see a Prayer List tab with each person\'s full name, session number and next session date, soonest first. Everyone else doesn\'t see the tab. To check: tick a minister, Save, then sign in to My FPHM as them (or ask them to tap Refresh).'
+  ]},
+  { date: 'Nov 7, 2026', version: '2026-11-07.1', items: [
+    'New: a Prayer List tab, next to Schedule & Planning. It lists every prayer recipient who has a booked session that hasn\'t been marked Completed yet, with their next session\'s date and time, session number and team, soonest first. When all of a person\'s sessions are marked Completed, they drop off the list. Waiting-list entries and Tentative slots aren\'t on it (nothing is booked yet), and neither are Drop-in or Training. Someone whose session date has passed but wasn\'t marked Completed stays at the bottom with a note, so you can spot it. There\'s a search box for recipient or minister names.',
+    'New: Settings > Prayer List, where you tick which prayer ministers may see the list, then Save. My FPHM doesn\'t show the list yet; the choice is stored so it\'s ready later. It needs one new Yes/No column, PrayerListAccess, on the PrayerMinisters list in SharePoint; until it exists, the card shows the steps to add it.'
+  ]},
+  { date: 'Oct 30, 2026', version: '2026-10-30.2', items: [
+    'Changed: the per-sequence notes boxes are now on automatically. On the session notes form, "Was there an effect?" shows a notes box under each sequence listed, with no setting to change, including notes you reopen. To turn them off, untick "Add a notes box under each row" on that question in Settings > Session Notes.'
+  ]},
+];
+// Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
+// five most recent versions; at each promotion, anything beyond the newest
+// five moves here rather than being deleted - see the block comment above
+// for the maintenance rule.
+const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 30, 2026', version: '2026-10-30.1', items: [
+    'New: a notes box for each sequence. In Settings > Session Notes, open a grid question (for example "Was there an effect?") and tick "Add a notes box under each row". The session notes form then shows a notes box right under each row, so Forgiveness, Listening prayer and so on each get their own notes. Because "Was there an effect?" only lists the sequences marked Yes above it, only the sequences used get a box. The single text box below the grid is a separate option, so you can keep it as General notes or turn it off. Saved notes, and earlier notes in My FPHM, show each sequence\'s notes under its own name. Notes already saved stay exactly as they were written.'
+  ]},
+  { date: 'Oct 29, 2026', version: '2026-10-29.1', items: [
+    'New: "View intake form" and "View session notes" buttons at the top of each recipient\'s card on the Completed Sessions tab (By recipient), the same as prayer ministers have in My FPHM. View intake form opens the form that\'s linked to that person, and Back returns you to Completed Sessions. View session notes opens all of that person\'s notes full screen: one card per session, newest open, with the session number, a large date and the team on a light terracotta header. On phones the buttons are full width; on larger screens they\'re as wide as their labels. To check: open a recipient on Completed Sessions who has notes and a linked intake form.'
+  ]},
+  { date: 'Oct 29, 2026', version: '2026-10-28.2', items: [
+    'Changed: the 90-day clean-up on the Prayer Ministers tab never removes a minister\'s only device. If someone has just one phone or tablet, it stays on their "Phone notifications" list (showing Check) however long it has been, so you can still see it and follow up. When someone has more than one device, the old ones are still removed after 90 days, but their most recently opened device is always kept. The Remove link still works on any device.'
+  ]},
+  { date: 'Oct 28, 2026', version: '2026-10-28.1', items: [
+    'New: earlier session notes for follow-up sessions. In My FPHM (live now), a prayer recipient\'s card on Schedule and Completed Sessions has a "Session notes (N)" button whenever notes were written for any of that person\'s sessions, including ones with a different team. It opens the notes full screen, newest first, each with its date, session number and team. Here in the Scheduler, the Session Notes form for a follow-up shows "Notes from earlier sessions" above the questions (tap to open). To check: write notes on a past session, then open a later session for the same person in both places. Ministers need permission to read the SessionNotes list in SharePoint; if they don\'t have it, the button just doesn\'t appear.'
+  ]},
+  { date: 'Oct 27, 2026', version: '2026-10-27.1', items: [
+    'Changed: names are now hidden on intake forms automatically. In My FPHM, prayer ministers see \u2588\u2588\u2588\u2588\u2588\u2588 in place of the recipient\'s name and the spouse or partner name, everywhere they appear in the answers (full name, first name or last name), and a printed form is headed "Intake form" instead of the recipient\'s name. You don\'t have to pick these any more. Other names (children, friends, family named in answers) still need picking with Redact personal info. To check: open a submitted form in Intake Forms, tap Redact personal info, and see the recipient\'s and spouse\'s names highlighted; then open the same form from a minister\'s card in My FPHM.'
+  ]},
+  { date: 'Oct 26, 2026', version: '2026-10-26.5', items: [
+    'Changed: "Install guide for ministers" on the Prayer Ministers tab now opens the guide full screen inside the Scheduler instead of leaving it. Close takes you straight back to the Prayer Ministers tab, still signed in. Copy Link at the top copies the guide\'s address to send to a minister. In the installed app, check that the guide opens and Close returns you to where you were.'
+  ]},
+  { date: 'Oct 26, 2026', version: '2026-10-26.4', items: [
+    'Changed: the "Install guide for ministers" link on the Prayer Ministers tab now opens a page on our own site (the My FPHM address followed by install/), so ministers can open it without any sign-in. Copy Link to Install Guide copies that address.'
+  ]},
+  { date: 'Oct 26, 2026', version: '2026-10-26.3', items: [
+    'New: an install guide you can send to prayer ministers. The Prayer Ministers tab has an "Install guide for ministers" link at the top, plus "Copy Link to Install Guide" so you can paste it into an email or text. The guide walks them through adding My FPHM to the home screen on iPhone/iPad (Safari) and Android (Chrome), turning notifications on in My FPHM Settings and sending themselves a test, and what to do when it does not work. It explains that on an iPhone notifications only work once My FPHM is on the home screen.'
+  ]},
+  { date: 'Oct 26, 2026', version: '2026-10-26.2', items: [
+    'New: old phones and tablets clear themselves out of the notification list. On the Prayer Ministers tab, a device that hasn\'t opened My FPHM in 90 days is removed automatically. Each device in a minister\'s "Phone notifications" list also has a Remove link so you can clear one yourself, for example right after someone gets a new phone. A removed device stops getting phone notifications until they turn them on again in My FPHM. Devices the phone company reports as no longer existing were already removed automatically.'
+  ]},
+  { date: 'Oct 26, 2026', version: '2026-10-26.1', items: [
+    'New: the Prayer Ministers tab now shows who has phone notifications working. A box under Active / Inactive says how many active ministers have them on, with All, Needs help and On filters. Each minister gets a chip: On, Check (every device has notifications turned off, or hasn\'t opened My FPHM in 30 days, often an old phone) or Off (never turned on). Open a minister to see each device, like "iPhone · today". Device names and dates fill in as each minister next opens My FPHM; until then older devices show as "Apple device" or "Android or Chrome device". Choose Needs help to see who to follow up with.'
+  ]},
+  { date: 'Oct 23, 2026', version: '2026-10-23.4', items: [
+    'Fixed: on a phone, the "+ Quick Add Slots" button on Schedule & Planning now fills the full width of the screen, like the buttons below it. The (i) on its right still explains what it does.'
+  ]},
+  { date: 'Oct 23, 2026', version: '2026-10-23.3', items: [
+    'Fixed: on a phone, the "Completed sessions by month" chart on the Completed Sessions tab cut off the later months. The bars keep their size and you can now swipe the chart left and right to see every month.'
+  ]},
+  { date: 'Oct 23, 2026', version: '2026-10-23.2', items: [
+    'Changed: when picking a team, prayer ministers who are already booked at that time are now hidden instead of shown with a warning. This applies to the New Session form (once the date, start and end time are filled in) and to "Choose the team" when you claim a slot. Someone you had already selected stays in the list so you can take them off. The line under "Choose the team" no longer explains who is hidden.'
+  ]},
+  { date: 'Oct 23, 2026', version: '2026-10-23.1', items: [
+    'New: when picking a team, each prayer minister now shows how many sessions they have in the next 4 weeks and the date of their next one, for example "3 upcoming · next Oct 28". It counts booked sessions and Tentative slots, but not Drop-in or Training. The chip is green when they are below the team average and amber when they are well above it. A sort button above the list cycles between A–Z, Fewest first and Most first; tap it again to get back to A–Z. Check it in two places: the New Session form, and the "Choose the team" list when you claim a slot on Schedule & Planning. The count now stays visible after you select someone.'
+  ]},
+  { date: 'Oct 22, 2026', version: '2026-10-22.3', items: [
+    'New: a Messages tab for admins, next to Settings. Each new intake form that is submitted adds a message with the person\'s name and when it arrived, even if phone notifications are off. Open form shows the intake form and marks the message read. There are Unread and Read tabs, Mark as read / Mark as unread, Delete on each message, and Delete all on the Read tab. Deleting a message never deletes the intake form. The tab shows a count of unread messages. Messages are shared by all admins, so marking one read marks it read for everyone. Only forms submitted from now on appear. The tab shows up once the notification service has been updated.'
+  ]},
+  { date: 'Oct 22, 2026', version: '2026-10-22.2', items: [
+    'New: phone notifications for admins when a new intake form comes in. Go to Settings, then Notifications, turn the switch on and tap Send a test. Then submit a test intake form: you should get "New intake form received" with the person\'s name, and tapping it opens that form. Turn it on separately on each device. On iPhone it only works from the Scheduler installed on the Home Screen. The Notifications tab appears once the notification service has been updated.'
+  ]},
+  { date: 'Oct 22, 2026', version: '2026-10-22.1', items: [
+    'Changed: Sunday Drop-In and Training sessions now send phone notifications too, the same as regular sessions. Ministers on the team are told when one is booked, when its date or time changes, when they are added or taken off, and when it is removed. The Send app notification button also shows on Drop-In and Training cards.'
+  ]},
+  { date: 'Oct 21, 2026', version: '2026-10-21.12', items: [
+    'Fixed: Chrome on Android phones and tablets now offers Install app for the Scheduler (open the ⋮ menu, then Install app).'
+  ]},
+  { date: 'Oct 21, 2026', version: '2026-10-21.11', items: [
+    'New: the Scheduler can be installed as an app. On iPhone open it in Safari, tap Share, then Add to Home Screen; on Android or a computer use the browser\'s Install option. It gets its own dark "FPHM Admin" icon so you can tell it apart from the minister portal. Sign in once from the installed app to check it works.',
+    'New: a Send app notification button on each booked session card (under the WhatsApp line). It sends that session\'s team a "booked" phone notification and adds it to their portal Messages, then tells you how many devices it reached. Handy for testing.'
+  ]},
+  { date: 'Oct 21, 2026', version: '2026-10-21.10', items: [
+    'New: ministers are now told when a session is called off. Removing a booked session (Remove Booking, or deleting it) sends each minister on the team a "Prayer session canceled" notification, and it shows in their portal Messages. Taking a minister off a session\'s team sends that person a "taken off a prayer session" notice. Drop-in, Training and past sessions never notify. The WhatsApp cancellation prompt is unchanged.'
+  ]},  { date: 'Oct 21, 2026', version: '2026-10-21.9', items: [
+    'New: phone notifications for ministers. Booking a session (including from the waiting list) now automatically sends a notification to each minister on the team who has turned notifications on in their portal. Changing the date or time notifies the whole team again; adding a minister to an existing session notifies just that person. Drop-in, Training and past sessions never notify. The WhatsApp button still works as before.'
+  ]},
+  { date: 'Oct 21, 2026', version: '2026-10-21.8', items: [
+    'Fixed: opening an intake form no longer shows the spreadsheet import buttons (Choose spreadsheet, Import selected forms) underneath it. They now only appear on the Import sub-tab of Intake Forms.'
+  ]},
   { date: 'Oct 21, 2026', version: '2026-10-21.7', items: [
     'Changed: the WhatsApp group now carries forward for a returning recipient. A new session, a follow-up, or booking someone from the waiting list pre-fills Group created and the group link from their most recent session that has one (you can still change it). Ministers notified is not carried over, so each session still gets its own tap of the notify button.'
   ]},
@@ -7310,12 +8655,6 @@ const CHANGE_LOG = [
   { date: 'Oct 21, 2026', version: '2026-10-21.3', items: [
     'Fixed: the confirmation box on Intake Forms > Import now has a green Import button instead of a red Delete button. Nothing was ever deleted - it was only the wrong label.'
   ]},
-];
-// Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
-// five most recent versions; at each promotion, anything beyond the newest
-// five moves here rather than being deleted - see the block comment above
-// for the maintenance rule.
-const CHANGE_LOG_ARCHIVE = [
   { date: 'Oct 21, 2026', version: '2026-10-21.2', items: [
     'New (temporary): Intake Forms has an Import sub-tab for bringing in forms filled out on the old Microsoft Form. Choose the Excel export, tick the people you want, and press Import. Each one arrives under Unlinked as a Submitted form. People already in the app are marked "Already in the app", and anyone sharing an email with an existing form is flagged. Each row also lists anything to check, like answers saved under Other.'
   ]},

@@ -504,6 +504,8 @@
   .pl-meta{font-size:var(--fs-sm);color:var(--muted);margin-top:4px;overflow-wrap:anywhere;}
   .pl-meta strong{color:var(--text);font-weight:600;}
   .pl-overdue{color:#9a5b00;}
+  .pl-private-btn{flex:0 0 auto;align-self:center;white-space:nowrap;}
+  .tag.pl-private-tag{background:#ece7f3;color:#4b3a6b;}
   .pl-access-tools{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:8px;font-size:var(--fs-sm);}
   .pl-access-count{color:var(--muted);margin-left:auto;}
   .pl-access-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0 16px;}
@@ -513,6 +515,8 @@
     .pl-row{gap:8px;padding:16px 8px 16px 16px;}
     .pl-num{flex-basis:28px;height:28px;}
     .pl-access-count{margin-left:0;width:100%;}
+    .pl-row{flex-wrap:wrap;}
+    .pl-private-btn{flex:1 1 100%;margin-left:36px;}
   }
   .settings-card:last-child{margin-bottom:0;}
 
@@ -941,6 +945,7 @@
     <div class="search-row">
       <div class="search-wrap"><input id="prayerListSearch" placeholder="Search by recipient or minister..." aria-label="Search the prayer list by recipient or minister"><button type="button" class="search-clear" aria-label="Clear search" hidden>&times;</button></div>
     </div>
+    <div class="errbox" id="prayerListPrivateSetup" hidden style="margin-bottom:16px;"></div>
     <div id="prayerListBox"></div>
     <div class="no-results" id="prayerListEmpty" hidden></div>
   </section>
@@ -1229,6 +1234,11 @@
       <p class="helptext" id="genderWarn" style="display:none;color:var(--danger);"></p>
     </fieldset>
     <div class="field"><label for="notes">Notes</label><textarea id="notes" rows="2"></textarea></div>
+    <div class="field" id="plPrivateField" hidden>
+      <label style="display:flex;align-items:flex-start;gap:8px;font-weight:700;">
+        <input type="checkbox" id="sessPlPrivate" style="width:auto;min-height:auto;margin-top:4px;"> <span>Private: keep off the Prayer List in My FPHM<span class="helptext" style="display:block;font-weight:400;margin:0;">For someone who doesn't want other prayer ministers to know they're having a session.</span></span>
+      </label>
+    </div>
     <div class="field waiting-only" id="priorityField" style="display:none;">
       <label style="display:flex;align-items:center;gap:8px;font-weight:700;">
         <input type="checkbox" id="sessPriority" style="width:auto;min-height:auto;"> Flag as priority (bumps to top of the waiting list)
@@ -1418,7 +1428,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-11-08.1";
+const APP_VERSION = "2026-11-09.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -2009,6 +2019,14 @@ async function resolveSiteAndLists(){
     const cols = await graphFetch(`/sites/${siteId}/lists/${listIds.ministers}/columns?$select=name`);
     prayerListColumnReady = !!(cols && Array.isArray(cols.value) && cols.value.some(c=>c.name===PRAYER_LIST_COLUMN));
   }catch(e){ console.warn('Could not check PrayerMinisters columns:', e.message); }
+  // Same for the per-person "private" flag on PrayerSessions. Writing a
+  // column that doesn't exist fails the whole save, so only write it once
+  // it's there.
+  plPrivateColumnReady = false;
+  try{
+    const cols = await graphFetch(`/sites/${siteId}/lists/${listIds.sessions}/columns?$select=name`);
+    plPrivateColumnReady = !!(cols && Array.isArray(cols.value) && cols.value.some(c=>c.name===PL_PRIVATE_COLUMN));
+  }catch(e){ console.warn('Could not check PrayerSessions columns:', e.message); }
 }
 
 async function listItems(key){
@@ -2075,6 +2093,10 @@ let sessionNumberMap = new Map(); // session id -> chronological "Session #N" fo
 // Yes/No). Admin-only for now; stored so My FPHM can use it later.
 const PRAYER_LIST_COLUMN = 'PrayerListAccess';
 let prayerListColumnReady = false;
+// Per-person privacy: a hand-made Yes/No column on PrayerSessions. A person
+// is left off the Prayer List if ANY of their Scheduled sessions has it.
+const PL_PRIVATE_COLUMN = 'PrayerListPrivate';
+let plPrivateColumnReady = false;
 let prayerListDraft = null; // Set of minister ids ticked in Settings, null = not edited
 
 async function loadAll(){
@@ -2227,7 +2249,10 @@ async function loadAll(){
       // findIntakeForRecipient() falls back to when this is unset. Reads
       // null safely if the IntakeResponseId column doesn't exist in
       // SharePoint yet, same convention as Contacted/WaNotified above.
-      intakeResponseId: (s.IntakeResponseId!=null && s.IntakeResponseId!=='') ? parseInt(s.IntakeResponseId,10) : null
+      intakeResponseId: (s.IntakeResponseId!=null && s.IntakeResponseId!=='') ? parseInt(s.IntakeResponseId,10) : null,
+      // Private = keep this person off the Prayer List (My FPHM and the
+      // admin tab's count). Hand-made Yes/No column; reads false if missing.
+      plPrivate: s[PL_PRIVATE_COLUMN]===true
     };
   });
   // A slot's own team (ProposedMinisterIDs) is only the plan from when it
@@ -2592,7 +2617,7 @@ function prayerListEntries(){
     // (not marked Completed yet) show the latest of those instead.
     const upcoming = sorted.filter(s=>(s.date||'')>=today);
     const next = upcoming[0] || sorted[sorted.length-1];
-    return { key: g.key, name: g.name, sessions: sorted, next, overdue: !upcoming.length, upcomingCount: upcoming.length };
+    return { key: g.key, name: g.name, sessions: sorted, next, overdue: !upcoming.length, upcomingCount: upcoming.length, private: sorted.some(x=>x.plPrivate) };
   }).sort((a,b)=>{
     // Upcoming first (soonest first), then the overdue ones (oldest first).
     if(a.overdue!==b.overdue) return a.overdue ? 1 : -1;
@@ -2606,7 +2631,17 @@ function renderPrayerList(){
   const q = $('#prayerListSearch').value.trim().toLowerCase();
   const all = prayerListEntries();
   const list = !q ? all : all.filter(e=> e.name.toLowerCase().includes(q) || e.sessions.some(s=>ministerNamesOf(s).toLowerCase().includes(q)));
-  $('#prayerListHelp').textContent = `${all.length} ${all.length===1?'person':'people'} with a booked session that hasn't been marked Completed yet, soonest session first. A person drops off once all of their sessions are Completed.`;
+  const nPrivate = all.filter(e=>e.private).length;
+  $('#prayerListHelp').textContent = `${all.length} ${all.length===1?'person':'people'} with a booked session that hasn't been marked Completed yet, soonest session first. A person drops off once all of their sessions are Completed.`
+    + (nPrivate ? ` ${nPrivate} ${nPrivate===1?'is':'are'} marked Private, so prayer ministers don't see ${nPrivate===1?'them':'them'} in My FPHM.` : '');
+  const setup = $('#prayerListPrivateSetup');
+  if(setup){
+    setup.hidden = plPrivateColumnReady;
+    if(!plPrivateColumnReady) setup.innerHTML = `<strong>To keep someone private</strong> (off the Prayer List in My FPHM), add one column in SharePoint first:<br>
+      1. Open the <strong>${LIST_NAMES.sessions}</strong> list on the FreedomPrayer site.<br>
+      2. Add a column → <strong>Yes/No</strong>, named exactly <strong>${PL_PRIVATE_COLUMN}</strong> (no spaces), default value <strong>No</strong>.<br>
+      3. Come back here and click Refresh Data. A Private button then appears on each person.`;
+  }
   if(!list.length){
     box.innerHTML = '';
     empty.hidden = false;
@@ -2618,16 +2653,49 @@ function renderPrayerList(){
     const s = e.next;
     const when = s.date ? `${fmtShortDay(s.date)}${s.time?' · '+fmt12(s.time):''}` : 'Date not set';
     const more = e.upcomingCount>1 ? ` · ${e.upcomingCount} sessions booked` : '';
-    return `<div class="pl-row" role="listitem">
+    return `<div class="pl-row${e.private?' pl-private':''}" role="listitem">
       <span class="pl-num" aria-hidden="true">${i+1}</span>
       <div class="pl-main">
-        <div><span class="pl-name">${escapeHtml(e.name)}</span><span class="tag ${sessionNumberOf(s)===1?'first':''}">Session #${sessionNumberOf(s)}</span></div>
+        <div><span class="pl-name">${escapeHtml(e.name)}</span><span class="tag ${sessionNumberOf(s)===1?'first':''}">Session #${sessionNumberOf(s)}</span>${e.private?'<span class="tag pl-private-tag">Private</span>':''}</div>
         <div class="pl-meta">${e.overdue ? `<span class="pl-overdue">Last session ${escapeHtml(when)} · not marked Completed yet</span>` : `Next session <strong>${escapeHtml(when)}</strong>${more}`}</div>
         ${s.ministers.length ? `<div class="pl-meta">${escapeHtml(ministerNamesOf(s))}</div>` : ''}
+        ${e.private ? `<div class="pl-meta">Hidden from the Prayer List in My FPHM.</div>` : ''}
       </div>
+      ${plPrivateColumnReady ? `<button type="button" class="btn secondary pl-private-btn" onclick="togglePrayerListPrivate(this, ${JSON.stringify(e.key).replace(/"/g,'&quot;')}, ${!e.private})">${e.private ? 'Show on Prayer List' : 'Make private'}</button>` : ''}
     </div>`;
   }).join('')}</div>`;
 }
+/* Make a person private (off the My FPHM Prayer List) or show them again.
+   Private: flags every Scheduled and Waiting session of theirs. Show again:
+   clears the flag on EVERY session with their name, so an old flag can't
+   come back through the session form's auto-fill on a later follow-up. */
+// The session form's Private box, as a fields fragment. Empty until the
+// SharePoint column exists (writing a missing column fails the save) and
+// for group sessions, which never appear on the Prayer List.
+function plPrivateField(){
+  if(!plPrivateColumnReady) return {};
+  const isGroup = $('#apptType').value==='Drop-in' || $('#apptType').value==='Training';
+  return { [PL_PRIVATE_COLUMN]: !isGroup && $('#sessPlPrivate').checked };
+}
+window.togglePrayerListPrivate = async function(btn, key, makePrivate){
+  const mine = sessions.filter(x=>x.recipName.trim().toLowerCase()===key);
+  const name = mine.length ? mine[0].recipName.trim() : key;
+  const targets = makePrivate
+    ? mine.filter(x=>(x.status==='Scheduled' || x.status==='Waiting') && !x.plPrivate)
+    : mine.filter(x=>x.plPrivate);
+  if(!targets.length) return;
+  const ok = await askConfirm(makePrivate
+    ? `Make ${name} private? Prayer ministers won't see them on the Prayer List in My FPHM. Their own team still sees the session on their schedule.`
+    : `Show ${name} on the Prayer List again? Prayer ministers with Prayer List access will see them in My FPHM.`,
+    { confirmLabel: makePrivate ? 'Make private' : 'Show on list', danger: false });
+  if(!ok) return;
+  await withLoading(btn, 'Saving…', async ()=>{
+    try{
+      for(const x of targets) await updateItem('sessions', x.id, { [PL_PRIVATE_COLUMN]: makePrivate });
+    }catch(err){ alert('Could not save: ' + err.message); }
+    await loadAll();
+  });
+};
 function fmtShortDay(iso){ return new Date(iso+'T00:00').toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric'}); }
 
 // Settings > Prayer List: tick which ministers may see the list. Active
@@ -4305,6 +4373,7 @@ function openModal(existing, followFrom, opts){
   $('#recipContact').value = existing ? existing.recipContact : (followFrom ? followFrom.recipContact : '');
   $('#recipGender').value = existing ? (existing.recipGender||'') : (followFrom ? (followFrom.recipGender||'') : '');
   $('#genderPref').value = existing ? (existing.genderPref||'Mixed') : (followFrom ? (followFrom.genderPref||'Mixed') : 'Mixed');
+  $('#sessPlPrivate').checked = existing ? !!existing.plPrivate : (followFrom ? !!followFrom.plPrivate : false);
   $('#sessDate').value = (existing && existing.status!=='Waiting') ? existing.date : (opts.dateIso || '');
   $('#sessTime').value = (existing && existing.status!=='Waiting') ? existing.time : '';
   $('#sessEndTime').value = (existing && existing.status!=='Waiting') ? existing.endTime : '';
@@ -4391,7 +4460,9 @@ function updateGroupSessionFields(){
   // Drop-In" and "Training" aren't individuals with a gender or a
   // same-sex-team need, same reasoning as hiding contact/WhatsApp above.
   $('#genderFieldRow').style.display = isGroup ? 'none' : '';
+  $('#plPrivateField').hidden = isGroup || !plPrivateColumnReady;
   if(isGroup){
+    $('#sessPlPrivate').checked = false;
     $('#recipContact').value=''; $('#waCreated').checked=false; $('#waLink').value='';
     $('#recipGender').value=''; $('#genderPref').value='Mixed';
   }
@@ -4450,7 +4521,7 @@ function renderRecipNameSuggestions(){
     const existing = byName.get(key);
     if(!existing || sortKey > existing.sortKey){
       byName.set(key, { name: s.recipName.trim(), contact: s.recipContact||'', sortKey,
-        recipGender: s.recipGender||'', genderPref: s.genderPref||'Mixed',
+        recipGender: s.recipGender||'', genderPref: s.genderPref||'Mixed', plPrivate: !!s.plPrivate,
         sessionId: s.id, ministers: s.ministers.map(m=>({...m})) });
     }
   });
@@ -4467,6 +4538,7 @@ window.pickRecipNameAt = function(i){
   if(r.contact) $('#recipContact').value = r.contact;
   if(r.recipGender) $('#recipGender').value = r.recipGender;
   $('#genderPref').value = r.genderPref || 'Mixed';
+  $('#sessPlPrivate').checked = !!r.plPrivate;
   // Team pre-fill now lives entirely in renderRecipientHistory (below) -
   // it applies the most recent real session's team the same way this used
   // to do inline, but as part of the visible history panel rather than a
@@ -4516,6 +4588,7 @@ function renderRecipientHistory(){
       if(allMatches[0].recipContact) $('#recipContact').value = allMatches[0].recipContact;
       if(allMatches[0].recipGender) $('#recipGender').value = allMatches[0].recipGender;
       $('#genderPref').value = allMatches[0].genderPref || 'Mixed';
+      $('#sessPlPrivate').checked = !!allMatches[0].plPrivate;
       if(!$('#waLink').value){
         const wa = personWaInfo(name, editingId);
         if(wa){ $('#waCreated').checked = true; $('#waLink').value = wa.waLink; setWaCarryNote(true); }
@@ -5003,6 +5076,7 @@ async function onSaveSession(){
       RecipientName: recipName, RecipientContact: recipContact,
       RecipientGender: $('#recipGender').value, GenderPreference: $('#genderPref').value,
       Notes: notes, Status: 'Waiting',
+      ...plPrivateField(),
       Priority: $('#sessPriority').checked, Contacted: existingWaiting ? existingWaiting.contacted : false,
       SessionDate: null, SessionEndDate: null,
       LocationName: '', AssignedMinisterIDs: '', LeadMinisterIDs: '',
@@ -5061,6 +5135,7 @@ async function onSaveSession(){
     SessionDate: start.toISOString(), SessionEndDate: end.toISOString(),
     LocationName: locationName(locationId),
     Notes: notes, ApptType: apptType, Status: status,
+    ...plPrivateField(),
     PreviousSessionId: prevId || null,
     WaCreated: $('#waCreated').checked, WaLink: $('#waLink').value.trim(),
     Priority: false,
@@ -8477,6 +8552,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Nov 9, 2026', version: '2026-11-09.1', items: [
+    'New: keep a person private. On the Prayer List tab, each person has a "Make private" button; a private person gets a Private tag and is left off the Prayer List in My FPHM, so other prayer ministers don\'t know they\'re having a session. Their own team still sees the session on their schedule. "Show on Prayer List" undoes it. The session form also has a "Private" box, which a follow-up session fills in automatically from the person\'s last session. Needs one new Yes/No column, PrayerListPrivate, on the PrayerSessions list in SharePoint; until it exists, the Prayer List tab shows the steps to add it.'
+  ]},
   { date: 'Nov 8, 2026', version: '2026-11-08.1', items: [
     'Fixed: printing an intake form from the installed app on an iPhone or iPad. Since recent iOS updates, the home-screen app ignores Print completely. Now, in the installed app, "Print / Save as PDF" makes a PDF of the form and opens the iPhone share menu; choose Print there (or Save to Files). If the menu doesn\'t open by itself, tap "Print or share PDF". In Safari and on a computer, Print works the same as before. My FPHM has the same fix (live now). To check: open a submitted form in Intake Forms in the installed FPHM Admin app and tap Print / Save as PDF.'
   ]},
@@ -8490,15 +8568,15 @@ const CHANGE_LOG = [
   { date: 'Oct 30, 2026', version: '2026-10-30.2', items: [
     'Changed: the per-sequence notes boxes are now on automatically. On the session notes form, "Was there an effect?" shows a notes box under each sequence listed, with no setting to change, including notes you reopen. To turn them off, untick "Add a notes box under each row" on that question in Settings > Session Notes.'
   ]},
-  { date: 'Oct 30, 2026', version: '2026-10-30.1', items: [
-    'New: a notes box for each sequence. In Settings > Session Notes, open a grid question (for example "Was there an effect?") and tick "Add a notes box under each row". The session notes form then shows a notes box right under each row, so Forgiveness, Listening prayer and so on each get their own notes. Because "Was there an effect?" only lists the sequences marked Yes above it, only the sequences used get a box. The single text box below the grid is a separate option, so you can keep it as General notes or turn it off. Saved notes, and earlier notes in My FPHM, show each sequence\'s notes under its own name. Notes already saved stay exactly as they were written.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 30, 2026', version: '2026-10-30.1', items: [
+    'New: a notes box for each sequence. In Settings > Session Notes, open a grid question (for example "Was there an effect?") and tick "Add a notes box under each row". The session notes form then shows a notes box right under each row, so Forgiveness, Listening prayer and so on each get their own notes. Because "Was there an effect?" only lists the sequences marked Yes above it, only the sequences used get a box. The single text box below the grid is a separate option, so you can keep it as General notes or turn it off. Saved notes, and earlier notes in My FPHM, show each sequence\'s notes under its own name. Notes already saved stay exactly as they were written.'
+  ]},
   { date: 'Oct 29, 2026', version: '2026-10-29.1', items: [
     'New: "View intake form" and "View session notes" buttons at the top of each recipient\'s card on the Completed Sessions tab (By recipient), the same as prayer ministers have in My FPHM. View intake form opens the form that\'s linked to that person, and Back returns you to Completed Sessions. View session notes opens all of that person\'s notes full screen: one card per session, newest open, with the session number, a large date and the team on a light terracotta header. On phones the buttons are full width; on larger screens they\'re as wide as their labels. To check: open a recipient on Completed Sessions who has notes and a linked intake form.'
   ]},
