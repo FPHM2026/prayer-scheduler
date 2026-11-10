@@ -189,6 +189,38 @@
   .modal-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:4px;position:sticky;bottom:0;background:#fff;padding:10px 0 2px;box-shadow:0 -6px 10px -6px rgba(0,0,0,.12);}
   .modal-actions .btn{flex-shrink:0;}
   @media (min-width:640px){ .modal{padding:22px;max-height:92vh;} .modal.small{max-width:400px;} }
+  /* Session Notes form (Lead writes notes) - same rules as the admin app. */
+  #notesBody .nt-sec{background:#fff;border:1px solid var(--border);border-radius:12px;padding:18px 18px 4px;margin-top:16px;}
+  #notesBody .nt-sec:first-child{margin-top:4px;}
+  #notesBody .nt-sec h3{font-family:'Playfair Display',Georgia,serif;font-size:1.15rem;color:#8a4a30;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+  #notesBody .section-intro{background:#f0ede4;border-left:3px solid #aa5a3c;padding:10px 14px;border-radius:6px;font-size:var(--fs-sm);color:var(--muted);margin:0 0 16px;white-space:pre-wrap;}
+  #notesBody .nt-q{margin-bottom:20px;}
+  #notesBody .qlabel{display:block;font-weight:600;margin-bottom:8px;}
+  #notesBody .required-mark{color:#c0392b;margin-left:3px;}
+  #notesBody .choice-group{display:flex;flex-direction:column;gap:8px;}
+  #notesBody .choice-option{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:#fff;font-weight:400;}
+  #notesBody .choice-option:has(input:checked){border-color:#aa5a3c;background:#f3e7e0;}
+  #notesBody .choice-option input[type=radio],#notesBody .choice-option input[type=checkbox]{width:18px;height:18px;flex-shrink:0;}
+  #notesBody .choice-option .other-text{flex:1 1 100%;width:auto;min-width:0;}
+  #notesBody .rt-wrap{display:flex;flex-direction:column;gap:12px;}
+  #notesBody .rt-row{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:#fdfbf7;}
+  #notesBody .rt-row-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;}
+  #notesBody .rt-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px 14px;}
+  #notesBody .rt-field .qlabel{font-size:var(--fs-sm);margin-bottom:4px;}
+  #notesBody .grid-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px;}
+  #notesBody .nt-grid{width:100%;border-collapse:collapse;font-size:var(--fs-sm);}
+  #notesBody .nt-grid th,#notesBody .nt-grid td{padding:10px 12px;text-align:center;border-bottom:1px solid #e8e0d3;}
+  #notesBody .nt-grid thead th{font-weight:600;color:var(--muted);background:#faf6ee;}
+  #notesBody .nt-grid tbody th{text-align:left;font-weight:600;min-width:120px;}
+  #notesBody .nt-grid tbody tr:last-child th,#notesBody .nt-grid tbody tr:last-child td{border-bottom:none;}
+  #notesBody .nt-grid input{width:20px;height:20px;cursor:pointer;}
+  #notesBody .nt-grid tr.has-rownote th,#notesBody .nt-grid tr.has-rownote td{border-bottom:none;padding-bottom:4px;}
+  #notesBody .nt-grid td.nt-rownote{padding:0 12px 16px;text-align:left;}
+  #notesBody .nt-grid td.nt-rownote textarea{width:100%;min-height:64px;}
+  #notesBody .nt-grid tbody tr:last-child td.nt-rownote{padding-bottom:12px;}
+  #notesBody input[type=text],#notesBody input[type=email],#notesBody input[type=number],#notesBody textarea,#notesBody select{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:8px;font-size:1rem;font-family:inherit;background:#fff;box-sizing:border-box;}
+  #notesBody textarea{min-height:90px;resize:vertical;}
+  #notesBody .choice-option .other-text{flex:1 1 100%;width:auto;}
   .modal-bg.sheet{align-items:flex-end;padding:0;}
   .modal-bg.sheet .modal{max-width:none;width:100%;max-height:90vh;border-radius:16px 16px 0 0;animation:sheetSlideUp .25s ease;}
   @keyframes sheetSlideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
@@ -564,6 +596,19 @@
   </div>
 </div>
 
+<div class="modal-bg sheet" id="notesModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="notesTitle">
+    <h2 id="notesTitle">Session notes</h2>
+    <p class="helptext" id="notesSub" style="margin:-6px 0 8px;"></p>
+    <p class="errbox" role="alert" id="notesMsg" hidden></p>
+    <div id="notesBody"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn secondary" onclick="closeSessionNotes()">Cancel</button>
+      <button type="button" class="btn" id="btnNotesSave" onclick="saveSessionNotes()">Save notes</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="confirmModal">
   <div class="modal small" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
     <h2 id="confirmTitle">Please confirm</h2>
@@ -591,9 +636,9 @@ const MSAL_CONFIG = {
 };
 const GRAPH_SCOPES = ["Sites.ReadWrite.All", "User.Read"];
 const SITE_URL = "https://creeksidechurch.sharepoint.com/sites/FreedomPrayer";
-const LIST_NAMES = { ministers: "PrayerMinisters", sessions: "PrayerSessions", blackouts: "BlackoutDates", intake: "IntakeResponses", formSchema: "IntakeFormSchema", notes: "SessionNotes" };
+const LIST_NAMES = { ministers: "PrayerMinisters", sessions: "PrayerSessions", blackouts: "BlackoutDates", intake: "IntakeResponses", formSchema: "IntakeFormSchema", notes: "SessionNotes", notesSchema: "SessionNotesSchema" };
 // Lists the portal can do without: missing or unreadable just hides the feature.
-const OPTIONAL_LISTS = new Set(["notes"]);
+const OPTIONAL_LISTS = new Set(["notes", "notesSchema"]);
 
 const msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
 const msalReady = msalInstance.initialize();
@@ -851,6 +896,19 @@ async function loadAll(){
 // Optional: if the SessionNotes list is missing or this minister can't read
 // it, the portal just shows no notes.
 async function loadSessionNotes(){
+  notesSchema = null; notesSchemaVersion = 0;
+  if(listIds.notes && listIds.notesSchema){
+    // The current notes form, so a Lead can write a new note (2026-11-10).
+    // Unreadable or missing just leaves notesSchema null, which hides the
+    // Write button; reading notes still works.
+    try{
+      const ns = (await listItems('notesSchema'))[0];
+      if(ns){
+        const parsed = JSON.parse(ns.SchemaJSON||'');
+        if(parsed && Array.isArray(parsed.SECTIONS)){ notesSchema = parsed; notesSchemaVersion = ns.SchemaVersion || 0; }
+      }
+    }catch(e){ console.warn('Could not load the session notes form:', e.message); }
+  }
   if(!listIds.notes) return [];
   try{
     const raw = await listItems('notes');
@@ -865,6 +923,405 @@ async function loadSessionNotes(){
     return [];
   }
 }
+
+/* =========================================================================
+   WRITE SESSION NOTES (added 2026-11-10, at the user's request): the
+   session's Lead can write or edit that one session's notes here, same
+   form and same saved record as the admin Scheduler's Session Notes (see
+   preview/index.html's SESSION NOTES section). Each session has its own
+   note (SessionNotes.SessionId), so a follow-up gets its own. The form
+   code below is a copy of the admin app's; keep the two in step.
+   Needs Read on SessionNotesSchema and Contribute on SessionNotes for the
+   Prayer Ministers group in SharePoint. Lead-only is a client-side check,
+   same as everything else ministers can see here (gotcha #11).
+========================================================================= */
+let notesSchema = null, notesSchemaVersion = 0;
+const GRID_TYPES = ['choicegrid','checkboxgrid'];
+const TABLE_TYPE = 'rowtable';
+function gridRowNotesOn(q){ return q.rowNotes===undefined ? !!q.rowsFrom : !!q.rowNotes; }
+function sessionNotesFor(sessionId){ return sessionNotes.find(n=>n.sessionId===sessionId) || null; }
+function amLeadOf(s){ return !!(me && s.ministers.some(m=>m.id===me.id && m.role==='Lead')); }
+function canWriteNotes(s){
+  return !!(notesSchema && listIds.notes && s && s.apptType!=='Drop-in' && s.apptType!=='Training' && amLeadOf(s));
+}
+function writeNotesButtonHtml(s){
+  if(!canWriteNotes(s)) return '';
+  const has = !!sessionNotesFor(s.id);
+  return `<button type="button" class="btn${has?' secondary':''}" style="display:inline-flex;align-items:center;justify-content:center;gap:4px;width:100%;" onclick="openSessionNotes(${s.id})" aria-label="${has?'Edit':'Write'} session notes for ${escapeHtml(s.recipName)}, ${escapeHtml(fmtShort(s.date))}">${ICONS.pencil} ${has?'Edit session notes ✓':'Write session notes'}</button>`;
+}
+let notesCtx = null; // { session, schema, answers, existing, formVersion }
+window.openSessionNotes = function(sessionId){
+  const s = sessions.find(x=>x.id===sessionId);
+  if(!s || !canWriteNotes(s)) return;
+  const existing = sessionNotesFor(sessionId);
+  notesCtx = {
+    session: s, existing,
+    // An existing note reopens with the form it was written with.
+    schema: JSON.parse(JSON.stringify(existing ? existing.record.schema : notesSchema)),
+    formVersion: existing ? existing.record.formVersion : notesSchemaVersion,
+    answers: existing ? JSON.parse(JSON.stringify(existing.record.answers||{})) : {}
+  };
+  $('#notesSub').textContent = `${s.recipName} · Session #${sessionNumberOf(s)} · ${fmtShort(s.date)}`;
+  $('#notesMsg').hidden = true;
+  renderNotesForm();
+  $('#notesModal').classList.add('open');
+  $('#notesModal .modal').scrollTop = 0;
+};
+function renderNotesForm(){
+  const c = notesCtx;
+  const sections = c.schema.SECTIONS||[];
+  if(!sections.length || !sections.some(s=>(s.questions||[]).length)){
+    $('#notesBody').innerHTML = '<p class="helptext">This form has no questions yet. Ask an admin to add some.</p>';
+    return;
+  }
+  $('#notesBody').innerHTML = sections.map((sec,si)=>`
+    <div class="nt-sec" data-si="${si}">
+      <h3>${escapeHtml(sec.title||'')}</h3>
+      ${sec.intro ? `<div class="section-intro">${escapeHtml(sec.intro)}</div>` : ''}
+      ${(sec.questions||[]).map((q,qi)=>notesQuestionHtml(q,si,qi)).join('')}
+    </div>`).join('');
+  notesApplyVisibility();
+}
+// Same rules as FPHM.evalCond, except that "equals"/"notEquals" against a
+// checkbox answer (an array) mean "includes" / "does not include" - a
+// checkbox answer can never be strictly equal to a single choice, so a
+// condition set up that way would otherwise never show anything.
+function notesEvalCond(cond, answers){
+  if(cond && Array.isArray(answers[cond.id])){
+    const arr = answers[cond.id];
+    if(cond.equals!==undefined) return arr.includes(cond.equals);
+    if(cond.notEquals!==undefined) return !arr.includes(cond.notEquals);
+  }
+  return FPHM.evalCond(cond, answers);
+}
+// A grid's rows: its own list, or - when rowsFrom is set - the rows of an
+// earlier grid answered with the chosen value (e.g. only the "Yes" rows).
+function notesRowsOf(q){
+  if(!q.rowsFrom || !q.rowsFrom.id) return q.rows||[];
+  let src = null;
+  notesCtx.schema.SECTIONS.forEach(s=>(s.questions||[]).forEach(x=>{ if(x.id===q.rowsFrom.id) src = x; }));
+  if(!src) return [];
+  const ans = notesCtx.answers[src.id];
+  if(!ans || typeof ans!=='object' || Array.isArray(ans)) return [];
+  const want = q.rowsFrom.value;
+  return notesRowsOf(src).filter(r => src.type==='choicegrid' ? ans[r]===want : (Array.isArray(ans[r]) && ans[r].includes(want)));
+}
+// ---- Add-rows table (rowtable): answer = array of { columnId: value } ----
+// A Yes/No column with a text box shows it for the configured answer:
+// "Yes" (the default), "No", or "any" (either answer).
+function tableTextShown(c, val){
+  if(c.type!=='yesnotext' || (val!=='Yes' && val!=='No')) return false;
+  const when = c.textWhen || 'Yes';
+  return when==='any' || when===val;
+}
+function notesTableRows(q){
+  const v = notesCtx.answers[q.id];
+  return Array.isArray(v) && v.length ? v : [{}];
+}
+function notesTableHtml(q, si, qi){
+  const cols = q.tableColumns || [];
+  const rows = notesTableRows(q);
+  const yn = (ri, c, val) => ['Yes','No'].map(o=>`<label class="choice-option" style="padding:8px 12px;"><input type="radio" name="tb_${si}_${qi}_${ri}_${c.id}" ${val===o?'checked':''} onchange="notesTableSet(${si},${qi},${ri},'${escapeHtml(c.id)}','${o}',true)"> <span>${o}</span></label>`).join('');
+  return `<div class="rt-wrap">${rows.map((row,ri)=>`<div class="rt-row">
+      <div class="rt-row-head"><strong>Row ${ri+1}</strong>
+        <button type="button" class="btn secondary" style="width:auto;padding:6px 12px;" onclick="notesTableDel(${si},${qi},${ri})">Remove row</button></div>
+      <div class="rt-fields">${cols.map(c=>{
+        const val = row[c.id];
+        let ctl;
+        if(c.type==='number') ctl = `<input type="number" inputmode="decimal" value="${escapeHtml(val===undefined?'':val)}" oninput="notesTableSet(${si},${qi},${ri},'${escapeHtml(c.id)}',this.value,false)">`;
+        else if(c.type==='yesno' || c.type==='yesnotext') ctl = `<div class="choice-group" style="flex-direction:row;flex-wrap:wrap;">${yn(ri, c, val)}</div>`
+          + (tableTextShown(c, val) ? `<textarea rows="2" style="margin-top:8px;" placeholder="${escapeHtml(c.textLabel||'Details')}" aria-label="${escapeHtml(c.label)}: ${escapeHtml(c.textLabel||'Details')}" oninput="notesTableSet(${si},${qi},${ri},'${escapeHtml(c.id)}__text',this.value,false)">${escapeHtml(row[c.id+'__text']||'')}</textarea>` : '');
+        else ctl = `<input type="text" value="${escapeHtml(val===undefined?'':val)}" oninput="notesTableSet(${si},${qi},${ri},'${escapeHtml(c.id)}',this.value,false)">`;
+        return `<div class="rt-field" data-col="${escapeHtml(c.id)}"><label class="qlabel">${escapeHtml(c.label)}</label>${ctl}</div>`;
+      }).join('')}</div>
+    </div>`).join('')}
+    <button type="button" class="btn secondary" onclick="notesTableAdd(${si},${qi})">+ Add row</button></div>`;
+}
+function notesTableRerender(si, qi){
+  const q = notesQ(si, qi);
+  const el = $(`#notesBody .nt-q[data-si="${si}"][data-qi="${qi}"]`);
+  if(el) el.outerHTML = notesQuestionHtml(q, si, qi);
+  notesApplyVisibility();
+}
+window.notesTableAdd = function(si, qi){
+  const q = notesQ(si, qi);
+  const rows = notesTableRows(q).slice();
+  rows.push({});
+  notesCtx.answers[q.id] = rows;
+  notesTableRerender(si, qi);
+};
+window.notesTableDel = function(si, qi, ri){
+  const q = notesQ(si, qi);
+  const rows = notesTableRows(q).slice();
+  rows.splice(ri, 1);
+  notesCtx.answers[q.id] = rows.length ? rows : [{}];
+  notesTableRerender(si, qi);
+};
+window.notesTableSet = function(si, qi, ri, colId, value, rerender){
+  const q = notesQ(si, qi);
+  const rows = notesTableRows(q).slice();
+  rows[ri] = Object.assign({}, rows[ri] || {});
+  const col = (q.tableColumns||[]).find(c=>c.id===colId);
+  rows[ri][colId] = (col && col.type==='number') ? (value==='' ? '' : Number(value)) : value;
+  notesCtx.answers[q.id] = rows;
+  if(rerender) notesTableRerender(si, qi);
+};
+function notesQuestionHtml(q, si, qi){
+  const id = `nq_${si}_${qi}`;
+  const v = notesCtx.answers[q.id];
+  const isChoice = ['radio','checkboxes'].includes(q.type);
+  const label = `<label class="qlabel"${isChoice?'':` for="${id}"`}>${escapeHtml(q.label||'')}${q.required?'<span class="required-mark">*</span>':''}</label>`;
+  const esc = o => JSON.stringify(o).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  let input = '';
+  if(q.type==='textarea'){
+    input = `<textarea id="${id}" rows="4" oninput="notesSet(${si},${qi},this.value)">${escapeHtml(v||'')}</textarea>`;
+  } else if(q.type==='select'){
+    input = `<select id="${id}" onchange="notesSet(${si},${qi},this.value)"><option value="">— Select —</option>${(q.options||[]).map(o=>`<option value="${escapeHtml(o)}"${v===o?' selected':''}>${escapeHtml(o)}</option>`).join('')}</select>`;
+  } else if(q.type==='radio'){
+    input = `<div class="choice-group">${(q.options||[]).map(o=>`<label class="choice-option"><input type="radio" name="${id}" ${v===o?'checked':''} onchange="notesSet(${si},${qi},${esc(o)})"> <span>${escapeHtml(o)}</span></label>`).join('')}</div>`
+      + (q.textBox ? `<div class="nt-radio-text" data-si="${si}" data-qi="${qi}" hidden style="margin-top:12px;"><label class="qlabel">${escapeHtml(q.textBox.label||'Please explain')}</label><textarea rows="3" oninput="notesSetRadioText(${si},${qi},this.value)">${escapeHtml(notesCtx.answers[q.id+'__text']||'')}</textarea></div>` : '');
+  } else if(q.type==='checkboxes'){
+    const arr = Array.isArray(v) ? v : [];
+    const other = arr.find(x=>String(x).startsWith('__other__:'));
+    input = `<div class="choice-group">${(q.options||[]).map((o,oi)=>`<label class="choice-option"><input type="checkbox" ${arr.includes(o)?'checked':''} onchange="notesToggle(${si},${qi},${oi},this.checked)"> <span>${escapeHtml(o)}</span></label>`).join('')}`
+      + (q.otherOption ? `<label class="choice-option"><input type="checkbox" ${other!==undefined?'checked':''} onchange="notesOtherToggle(${si},${qi},this.checked,this)"> <span>Other:</span>
+          <input type="text" class="other-text" value="${escapeHtml(other?String(other).slice(10):'')}" oninput="notesOtherText(${si},${qi},this.value)"></label>` : '')
+      + `</div>`;
+  } else if(q.type===TABLE_TYPE){
+    input = notesTableHtml(q, si, qi);
+  } else if(GRID_TYPES.includes(q.type)){
+    const rows = notesRowsOf(q), cols = q.columns||[];
+    const ans = (v && typeof v==='object' && !Array.isArray(v)) ? v : {};
+    const isRadio = q.type==='choicegrid';
+    // "A notes box under each row" (added 2026-10-30): its own text per row,
+    // saved as answers[id+'__rownotes'] = { rowLabel: text }.
+    const rn = notesCtx.answers[q.id+'__rownotes'] || {};
+    input = `<div class="grid-wrap"><table class="nt-grid"><thead><tr><th></th>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((r,ri)=>`<tr${gridRowNotesOn(q)?' class="has-rownote"':''}><th scope="row">${escapeHtml(r)}</th>${cols.map((c,ci)=>{
+      const on = isRadio ? ans[r]===c : (Array.isArray(ans[r]) && ans[r].includes(c));
+      return `<td><input type="${isRadio?'radio':'checkbox'}" name="${id}_${ri}" ${on?'checked':''} aria-label="${escapeHtml(r)}: ${escapeHtml(c)}" onchange="notesGridSet(${si},${qi},${ri},${ci},this.checked)"></td>`;
+    }).join('')}</tr>${gridRowNotesOn(q) ? `<tr><td class="nt-rownote" colspan="${cols.length+1}"><textarea rows="2" placeholder="Notes on ${escapeHtml(r)}" aria-label="Notes on ${escapeHtml(r)}" oninput="notesSetRowNote(${si},${qi},${ri},this.value)">${escapeHtml(rn[r]||'')}</textarea></td></tr>` : ''}`).join('')}</tbody></table></div>`
+      + (q.withNotes ? `<label class="qlabel" style="margin-top:14px;">${escapeHtml(q.notesLabel||'Notes')}</label><textarea rows="3" oninput="notesSetGridNotes(${si},${qi},this.value)">${escapeHtml(notesCtx.answers[q.id+'__notes']||'')}</textarea>` : '');
+  } else {
+    const type = q.type==='email' ? 'email' : q.type==='number' ? 'number' : 'text';
+    input = `<input id="${id}" type="${type}" ${q.min!==undefined?`min="${q.min}"`:''} ${q.max!==undefined?`max="${q.max}"`:''} value="${escapeHtml(v===undefined?'':v)}" oninput="notesSet(${si},${qi},this.value)">`;
+  }
+  return `<div class="nt-q" data-si="${si}" data-qi="${qi}">${label}${input}</div>`;
+}
+function notesQ(si,qi){ return notesCtx.schema.SECTIONS[si].questions[qi]; }
+window.notesSet = function(si, qi, value){
+  const q = notesQ(si,qi);
+  if(q.type==='number') value = value==='' ? '' : Number(value);
+  notesCtx.answers[q.id] = value;
+  notesApplyVisibility();
+};
+window.notesToggle = function(si, qi, oi, checked){
+  const q = notesQ(si,qi), o = q.options[oi];
+  const arr = Array.isArray(notesCtx.answers[q.id]) ? notesCtx.answers[q.id].slice() : [];
+  const i = arr.indexOf(o);
+  if(checked && i<0) arr.push(o); if(!checked && i>=0) arr.splice(i,1);
+  notesCtx.answers[q.id] = arr;
+  notesApplyVisibility();
+};
+// Grid answers are objects: { rowLabel: column } for a multiple choice grid,
+// { rowLabel: [columns] } for a checkbox grid.
+window.notesGridSet = function(si, qi, ri, ci, checked){
+  const q = notesQ(si,qi), row = notesRowsOf(q)[ri], col = q.columns[ci];
+  const cur = notesCtx.answers[q.id];
+  const a = (cur && typeof cur==='object' && !Array.isArray(cur)) ? cur : {};
+  if(q.type==='choicegrid'){ a[row] = col; }
+  else {
+    const arr = Array.isArray(a[row]) ? a[row].slice() : [];
+    const i = arr.indexOf(col);
+    if(checked && i<0) arr.push(col);
+    if(!checked && i>=0) arr.splice(i,1);
+    if(arr.length) a[row] = arr; else delete a[row];
+  }
+  if(q.limitPerColumn && checked){
+    notesRowsOf(q).forEach(r2=>{
+      if(r2===row) return;
+      if(q.type==='choicegrid'){ if(a[r2]===col) delete a[r2]; }
+      else if(Array.isArray(a[r2])){ a[r2] = a[r2].filter(c=>c!==col); if(!a[r2].length) delete a[r2]; }
+    });
+  }
+  notesCtx.answers[q.id] = a;
+  if(q.limitPerColumn){
+    const el = $(`#notesBody .nt-q[data-si="${si}"][data-qi="${qi}"]`);
+    if(el) el.outerHTML = notesQuestionHtml(q, si, qi);
+  }
+  // Any grid that pulls its rows from this one must re-render with the new rows.
+  notesCtx.schema.SECTIONS.forEach((sec, s2)=>(sec.questions||[]).forEach((x, q2)=>{
+    if(x.rowsFrom && x.rowsFrom.id===q.id){
+      const el2 = $(`#notesBody .nt-q[data-si="${s2}"][data-qi="${q2}"]`);
+      if(el2) el2.outerHTML = notesQuestionHtml(x, s2, q2);
+    }
+  }));
+  notesApplyVisibility();
+};
+window.notesSetRowNote = function(si, qi, ri, text){
+  const q = notesQ(si,qi), row = notesRowsOf(q)[ri];
+  const cur = notesCtx.answers[q.id+'__rownotes'];
+  const m = (cur && typeof cur==='object') ? cur : {};
+  m[row] = text;
+  notesCtx.answers[q.id+'__rownotes'] = m;
+};
+window.notesSetGridNotes = function(si, qi, text){
+  notesCtx.answers[notesQ(si,qi).id + '__notes'] = text;
+};
+window.notesSetRadioText = function(si, qi, text){
+  notesCtx.answers[notesQ(si,qi).id + '__text'] = text;
+};
+// The radio's text box: "always" shows it once any answer is chosen;
+// "when" only while the chosen answer is the configured one.
+function notesRadioTextVisible(q){
+  if(!q.textBox) return false;
+  const a = notesCtx.answers[q.id];
+  if(a===undefined || a===null || a==='') return false;
+  return q.textBox.mode==='always' || a===q.textBox.value;
+}
+window.notesOtherToggle = function(si, qi, checked, el){
+  const q = notesQ(si,qi);
+  const arr = (Array.isArray(notesCtx.answers[q.id]) ? notesCtx.answers[q.id] : []).filter(x=>!String(x).startsWith('__other__:'));
+  if(checked) arr.push('__other__:' + (el.parentNode.querySelector('input[type=text]').value||''));
+  notesCtx.answers[q.id] = arr;
+  notesApplyVisibility();
+};
+window.notesOtherText = function(si, qi, text){
+  const q = notesQ(si,qi);
+  const arr = (Array.isArray(notesCtx.answers[q.id]) ? notesCtx.answers[q.id] : []).filter(x=>!String(x).startsWith('__other__:'));
+  arr.push('__other__:' + text);
+  notesCtx.answers[q.id] = arr;
+};
+// Branching: show/hide sections and questions in place (no re-render, so
+// typing never loses focus) according to each visibleIf.
+function notesApplyVisibility(){
+  const a = notesCtx.answers;
+  notesCtx.schema.SECTIONS.forEach((sec,si)=>{
+    const secEl = $(`#notesBody .nt-sec[data-si="${si}"]`);
+    if(!secEl) return;
+    secEl.hidden = !notesEvalCond(sec.visibleIf, a);
+    (sec.questions||[]).forEach((q,qi)=>{
+      const qEl = secEl.querySelector(`.nt-q[data-qi="${qi}"]`);
+      if(qEl){
+        qEl.hidden = !notesEvalCond(q.visibleIf, a) || (!!q.rowsFrom && notesRowsOf(q).length===0);
+        const tb = qEl.querySelector('.nt-radio-text');
+        if(tb) tb.hidden = !notesRadioTextVisible(q);
+        if(q.type===TABLE_TYPE){
+          qEl.querySelectorAll('.rt-field[data-col]').forEach(f=>{
+            const col = (q.tableColumns||[]).find(c=>c.id===f.dataset.col);
+            if(col) f.hidden = !notesEvalCond(col.visibleIf, a);
+          });
+        }
+      }
+    });
+  });
+}
+// Only answers to questions that are visible right now are kept.
+function notesVisibleAnswers(){
+  const a = notesCtx.answers, out = {}, missing = [];
+  notesCtx.schema.SECTIONS.forEach(sec=>{
+    if(!notesEvalCond(sec.visibleIf, a)) return;
+    (sec.questions||[]).forEach(q=>{
+      if(!notesEvalCond(q.visibleIf, a)) return;
+      const v = a[q.id];
+      if(q.type===TABLE_TYPE){
+        // Keep only known columns; the "Yes" text only when the answer is Yes;
+        // rows with nothing filled in are dropped. Required = at least one row.
+        const cols = q.tableColumns || [];
+        const cleaned = (Array.isArray(v) ? v : []).map(r=>{
+          const o = {};
+          cols.forEach(c=>{
+            if(!notesEvalCond(c.visibleIf, a)) return;   // column hidden by an earlier answer
+            const x = r[c.id];
+            if(x!==undefined && x!==null && String(x).trim()!=='') o[c.id] = x;
+            if(tableTextShown(c, x)){
+              const tx = r[c.id + '__text'];
+              if(tx && String(tx).trim()) o[c.id + '__text'] = String(tx);
+            }
+          });
+          return o;
+        }).filter(o=>Object.keys(o).length);
+        if(!cleaned.length){ if(q.required) missing.push(q.label + ' (add at least one row)'); return; }
+        out[q.id] = cleaned;
+        return;
+      }
+      if(GRID_TYPES.includes(q.type)){
+        // Keep only rows/columns that still exist; required = every row answered.
+        const rows = notesRowsOf(q), cols = q.columns||[];
+        const src = (v && typeof v==='object' && !Array.isArray(v)) ? v : {};
+        const clean = {};
+        rows.forEach(r=>{
+          if(q.type==='choicegrid'){ if(cols.includes(src[r])) clean[r] = src[r]; }
+          else if(Array.isArray(src[r])){ const keep = src[r].filter(c=>cols.includes(c)); if(keep.length) clean[r] = keep; }
+        });
+        if(q.rowsFrom && rows.length===0) return;
+        if(q.required && rows.some(r=>!(r in clean))){ missing.push(q.label + ' (every row)'); return; }
+        if(Object.keys(clean).length) out[q.id] = clean;
+        const gn = a[q.id + '__notes'];
+        if(q.withNotes && gn && String(gn).trim()) out[q.id + '__notes'] = String(gn);
+        const rn = a[q.id + '__rownotes'];
+        if(gridRowNotesOn(q) && rn && typeof rn==='object'){
+          const keep = {};
+          rows.forEach(r=>{ if(rn[r] && String(rn[r]).trim()) keep[r] = String(rn[r]); });
+          if(Object.keys(keep).length) out[q.id + '__rownotes'] = keep;
+        }
+        return;
+      }
+      const blank = v===undefined || v===null || v==='' || (Array.isArray(v) && v.length===0);
+      if(blank){ if(q.required) missing.push(q.label); return; }
+      out[q.id] = v;
+      if(q.type==='radio' && notesRadioTextVisible(q)){
+        const rt = a[q.id + '__text'];
+        if(rt && String(rt).trim()) out[q.id + '__text'] = String(rt);
+      }
+    });
+  });
+  return { answers: out, missing };
+}
+
+function notesRecord(answers){
+  const c = notesCtx, s = c.session;
+  const nameOf = id => (ministers.find(m=>m.id===id)||{}).name || '';
+  const lead = s.ministers.find(m=>m.role==='Lead');
+  return {
+    type: 'FPHMSessionNotes',
+    formVersion: c.formVersion,
+    savedAt: new Date().toISOString(),
+    session: { id: s.id, recipName: s.recipName, date: s.date, time: s.time, endTime: s.endTime,
+      lead: lead ? nameOf(lead.id) : '', ministers: s.ministers.map(m=>({ name: nameOf(m.id), role: m.role })) },
+    schema: c.schema,
+    answers
+  };
+}
+window.saveSessionNotes = async function(){
+  if(!notesCtx) return;
+  const msg = $('#notesMsg');
+  const { answers, missing } = notesVisibleAnswers();
+  if(missing.length){
+    msg.hidden = false;
+    msg.textContent = 'Please answer: ' + missing.join('; ');
+    $('#notesModal .modal').scrollTop = 0;
+    return;
+  }
+  const s = notesCtx.session;
+  const fields = { Title: `${s.recipName} — ${s.date}`, SessionId: s.id, NotesJSON: JSON.stringify(notesRecord(answers)) };
+  const btn = $('#btnNotesSave');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try{
+    if(notesCtx.existing) await updateItem('notes', notesCtx.existing.id, fields);
+    else await createItem('notes', fields);
+    closeSessionNotes();
+    await loadAll();
+  }catch(e){
+    msg.hidden = false;
+    msg.textContent = /\(403\)/.test(e.message)
+      ? "Couldn't save: your account doesn't have permission to save session notes yet. Ask an admin to give the Prayer Ministers group Contribute access to the SessionNotes list."
+      : "Couldn't save: " + e.message;
+    $('#notesModal .modal').scrollTop = 0;
+  }finally{
+    btn.disabled = false; btn.textContent = 'Save notes';
+  }
+};
+window.closeSessionNotes = function(){ $('#notesModal').classList.remove('open'); notesCtx = null; };
 /* =========================================================================
    PRAYER LIST - only for ministers an admin ticked in the Scheduler's
    Settings > Prayer List (PrayerMinisters.PrayerListAccess = Yes; blank or
@@ -1368,6 +1825,7 @@ function scheduleSessionRow(s){
         ${s.status==='Scheduled' ? `<button class="btn secondary" style="display:inline-flex;align-items:center;justify-content:center;gap:4px;width:100%;" onclick="addToCalendar(${s.id})">${ICONS.calendarPlus} Add to Calendar</button>` : ''}
         ${confirmBtn}
         ${declineBtn}
+        ${writeNotesButtonHtml(s)}
       </div>
     </div>
   </div>`;
@@ -1454,6 +1912,7 @@ function completedSessionRow(s, withName){
       <div class="sess-meta">${fmtDate(new Date(s.date+'T'+s.time))} · ${fmt12(s.time)}–${fmt12(s.endTime)} · ${escapeHtml(s.location)}</div>
       <div class="sess-meta">${escapeHtml(ministerNamesOf(s))}</div>
       ${s.notes ? `<div class="sess-meta">${escapeHtml(s.notes)}</div>` : ''}
+      ${writeNotesButtonHtml(s) ? `<div style="margin-top:8px;">${writeNotesButtonHtml(s)}</div>` : ''}
     </div>
   </div>`;
 }
@@ -2220,14 +2679,14 @@ function wireApp(){
   $('#btnNotesViewClose').addEventListener('click', ()=>$('#notesViewModal').classList.remove('open'));
   document.querySelectorAll('.modal-bg').forEach(bg=>{
     bg.addEventListener('click', (e)=>{
-      if(e.target!==bg) return;
+      if(e.target!==bg || bg.id==='notesModal') return;
       if(bg.id==='confirmModal') closeConfirm(false); else bg.classList.remove('open');
     });
   });
   document.addEventListener('keydown', (e)=>{
     if(e.key!=='Escape') return;
     if($('#confirmModal').classList.contains('open')) closeConfirm(false);
-    document.querySelectorAll('.modal-bg.open').forEach(bg=>bg.classList.remove('open'));
+    document.querySelectorAll('.modal-bg.open').forEach(bg=>{ if(bg.id!=='notesModal') bg.classList.remove('open'); });
   });
 }
 function switchTab(tab){

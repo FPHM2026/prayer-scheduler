@@ -1428,7 +1428,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-11-09.1";
+const APP_VERSION = "2026-11-10.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -8552,6 +8552,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Nov 10, 2026', version: '2026-11-10.1', items: [
+    'New: the Lead can write session notes in My FPHM (live now). Every session where you\'re the Lead now has its own "Write session notes" button, so a follow-up session gets its own notes, separate from the first. Once notes are saved the button reads "Edit session notes ✓" and reopens just that session\'s notes. Support ministers still only read notes, with "View session notes". These are the same notes you see and edit in the Scheduler. Needs two SharePoint permissions for the Prayer Ministers group: Read on the SessionNotesSchema list, and Contribute on the SessionNotes list (it had Read). Without the first, the button stays hidden; without the second, saving says so. To check: in My FPHM, open a person with two sessions where you\'re Lead; each session has its own button.'
+  ]},
   { date: 'Nov 9, 2026', version: '2026-11-09.1', items: [
     'New: keep a person private. On the Prayer List tab, each person has a "Make private" button; a private person gets a Private tag and is left off the Prayer List in My FPHM, so other prayer ministers don\'t know they\'re having a session. Their own team still sees the session on their schedule. "Show on Prayer List" undoes it. The session form also has a "Private" box, which a follow-up session fills in automatically from the person\'s last session. Needs one new Yes/No column, PrayerListPrivate, on the PrayerSessions list in SharePoint; until it exists, the Prayer List tab shows the steps to add it.'
   ]},
@@ -8565,15 +8568,15 @@ const CHANGE_LOG = [
     'New: a Prayer List tab, next to Schedule & Planning. It lists every prayer recipient who has a booked session that hasn\'t been marked Completed yet, with their next session\'s date and time, session number and team, soonest first. When all of a person\'s sessions are marked Completed, they drop off the list. Waiting-list entries and Tentative slots aren\'t on it (nothing is booked yet), and neither are Drop-in or Training. Someone whose session date has passed but wasn\'t marked Completed stays at the bottom with a note, so you can spot it. There\'s a search box for recipient or minister names.',
     'New: Settings > Prayer List, where you tick which prayer ministers may see the list, then Save. My FPHM doesn\'t show the list yet; the choice is stored so it\'s ready later. It needs one new Yes/No column, PrayerListAccess, on the PrayerMinisters list in SharePoint; until it exists, the card shows the steps to add it.'
   ]},
-  { date: 'Oct 30, 2026', version: '2026-10-30.2', items: [
-    'Changed: the per-sequence notes boxes are now on automatically. On the session notes form, "Was there an effect?" shows a notes box under each sequence listed, with no setting to change, including notes you reopen. To turn them off, untick "Add a notes box under each row" on that question in Settings > Session Notes.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Oct 30, 2026', version: '2026-10-30.2', items: [
+    'Changed: the per-sequence notes boxes are now on automatically. On the session notes form, "Was there an effect?" shows a notes box under each sequence listed, with no setting to change, including notes you reopen. To turn them off, untick "Add a notes box under each row" on that question in Settings > Session Notes.'
+  ]},
   { date: 'Oct 30, 2026', version: '2026-10-30.1', items: [
     'New: a notes box for each sequence. In Settings > Session Notes, open a grid question (for example "Was there an effect?") and tick "Add a notes box under each row". The session notes form then shows a notes box right under each row, so Forgiveness, Listening prayer and so on each get their own notes. Because "Was there an effect?" only lists the sequences marked Yes above it, only the sequences used get a box. The single text box below the grid is a separate option, so you can keep it as General notes or turn it off. Saved notes, and earlier notes in My FPHM, show each sequence\'s notes under its own name. Notes already saved stay exactly as they were written.'
   ]},
