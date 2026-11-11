@@ -261,6 +261,13 @@
   .guide-bar-actions .helptext{margin:0;}
   .guide-frame{flex:1 1 auto;width:100%;min-height:0;border:0;display:block;background:#faf8f4;}
   .modal-bg.sheet .modal{max-width:none;width:100%;max-height:90vh;border-radius:16px 16px 0 0;animation:sheetSlideUp .25s ease;}
+  /* iPhone: the text cursor didn't show in the session notes boxes (2026-11-11).
+     Give the sheet its own compositing layer (the usual iOS cure for a missing
+     caret in a scrolling, rounded panel), size it to the visible screen, keep
+     the page behind it from scrolling, and give the caret a strong colour. */
+  #notesModal .modal{max-height:90dvh;-webkit-transform:translateZ(0);transform:translateZ(0);}
+  body:has(#notesModal.open){overflow:hidden;}
+  #notesBody input,#notesBody textarea{caret-color:#aa5a3c;}
   @keyframes sheetSlideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
 
   .helptext{font-size:var(--fs-xs);color:var(--muted);}
@@ -1428,7 +1435,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-11-10.1";
+const APP_VERSION = "2026-11-11.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -8552,6 +8559,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Nov 11, 2026', version: '2026-11-11.1', items: [
+    'Fixed: on an iPhone, the text cursor didn\'t show in the session notes boxes (reported on "Chief prayer need"), even though typing worked. The notes sheet is now set up the way iPhones need to draw the cursor, and the page behind it no longer scrolls while it\'s open. Same fix in My FPHM (live now). To check: on an iPhone, open Write session notes and tap "Chief prayer need"; the cursor should blink.'
+  ]},
   { date: 'Nov 10, 2026', version: '2026-11-10.1', items: [
     'New: the Lead can write session notes in My FPHM (live now). Every session where you\'re the Lead now has its own "Write session notes" button, so a follow-up session gets its own notes, separate from the first. Once notes are saved the button reads "Edit session notes ✓" and reopens just that session\'s notes. Support ministers still only read notes, with "View session notes". These are the same notes you see and edit in the Scheduler. Needs two SharePoint permissions for the Prayer Ministers group: Read on the SessionNotesSchema list, and Contribute on the SessionNotes list (it had Read). Without the first, the button stays hidden; without the second, saving says so. To check: in My FPHM, open a person with two sessions where you\'re Lead; each session has its own button.'
   ]},
@@ -8564,16 +8574,16 @@ const CHANGE_LOG = [
   { date: 'Nov 7, 2026', version: '2026-11-07.2', items: [
     'New: the Prayer List is in My FPHM (live now). Ministers ticked in Settings > Prayer List see a Prayer List tab with each person\'s full name, session number and next session date, soonest first. Everyone else doesn\'t see the tab. To check: tick a minister, Save, then sign in to My FPHM as them (or ask them to tap Refresh).'
   ]},
-  { date: 'Nov 7, 2026', version: '2026-11-07.1', items: [
-    'New: a Prayer List tab, next to Schedule & Planning. It lists every prayer recipient who has a booked session that hasn\'t been marked Completed yet, with their next session\'s date and time, session number and team, soonest first. When all of a person\'s sessions are marked Completed, they drop off the list. Waiting-list entries and Tentative slots aren\'t on it (nothing is booked yet), and neither are Drop-in or Training. Someone whose session date has passed but wasn\'t marked Completed stays at the bottom with a note, so you can spot it. There\'s a search box for recipient or minister names.',
-    'New: Settings > Prayer List, where you tick which prayer ministers may see the list, then Save. My FPHM doesn\'t show the list yet; the choice is stored so it\'s ready later. It needs one new Yes/No column, PrayerListAccess, on the PrayerMinisters list in SharePoint; until it exists, the card shows the steps to add it.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Nov 7, 2026', version: '2026-11-07.1', items: [
+    'New: a Prayer List tab, next to Schedule & Planning. It lists every prayer recipient who has a booked session that hasn\'t been marked Completed yet, with their next session\'s date and time, session number and team, soonest first. When all of a person\'s sessions are marked Completed, they drop off the list. Waiting-list entries and Tentative slots aren\'t on it (nothing is booked yet), and neither are Drop-in or Training. Someone whose session date has passed but wasn\'t marked Completed stays at the bottom with a note, so you can spot it. There\'s a search box for recipient or minister names.',
+    'New: Settings > Prayer List, where you tick which prayer ministers may see the list, then Save. My FPHM doesn\'t show the list yet; the choice is stored so it\'s ready later. It needs one new Yes/No column, PrayerListAccess, on the PrayerMinisters list in SharePoint; until it exists, the card shows the steps to add it.'
+  ]},
   { date: 'Oct 30, 2026', version: '2026-10-30.2', items: [
     'Changed: the per-sequence notes boxes are now on automatically. On the session notes form, "Was there an effect?" shows a notes box under each sequence listed, with no setting to change, including notes you reopen. To turn them off, untick "Add a notes box under each row" on that question in Settings > Session Notes.'
   ]},

@@ -223,6 +223,13 @@
   #notesBody .choice-option .other-text{flex:1 1 100%;width:auto;}
   .modal-bg.sheet{align-items:flex-end;padding:0;}
   .modal-bg.sheet .modal{max-width:none;width:100%;max-height:90vh;border-radius:16px 16px 0 0;animation:sheetSlideUp .25s ease;}
+  /* iPhone: the text cursor didn't show in the session notes boxes (2026-11-11).
+     Give the sheet its own compositing layer (the usual iOS cure for a missing
+     caret in a scrolling, rounded panel), size it to the visible screen, keep
+     the page behind it from scrolling, and give the caret a strong colour. */
+  #notesModal .modal{max-height:90dvh;-webkit-transform:translateZ(0);transform:translateZ(0);}
+  body:has(#notesModal.open){overflow:hidden;}
+  #notesBody input,#notesBody textarea{caret-color:#aa5a3c;}
   @keyframes sheetSlideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
 
   /* Intake form answers - produced by FPHM.renderResponsesHtml() in
