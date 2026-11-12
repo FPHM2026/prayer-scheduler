@@ -1988,6 +1988,34 @@ function renderCompleted(){
 
   renderCompletedStats();
 }
+// New vs Returning (2026-11-12, same rule as the Scheduler): a recipient is
+// NEW in a period if their first-ever completed Freedom Session with the
+// ministry (any team, not just this minister's) falls on or after the
+// period's start, otherwise RETURNING. Worked out from dates, never the
+// saved ApptType. Replaces "First-time/Follow-up" (any saved Follow-up in
+// the period => follow-up).
+function recipientFirstEverDates(){
+  const first = new Map();
+  sessions.forEach(s=>{
+    if(s.status!=='Completed' || s.apptType==='Drop-in' || s.apptType==='Training' || !s.date) return;
+    const key = s.recipName.trim().toLowerCase();
+    if(!first.has(key) || s.date < first.get(key)) first.set(key, s.date);
+  });
+  return first;
+}
+function splitNewReturning(list, periodFrom, firstEver){
+  firstEver = firstEver || recipientFirstEverDates();
+  const seen = new Set();
+  let newCount=0, returning=0;
+  list.forEach(s=>{
+    const key = s.recipName.trim().toLowerCase();
+    if(seen.has(key)) return;
+    seen.add(key);
+    const f = firstEver.get(key) || s.date;
+    if(!periodFrom || f >= periodFrom) newCount++; else returning++;
+  });
+  return { newCount, returning, total: seen.size };
+}
 function completedStats(){
   const all = mySessions().filter(s=>s.status==='Completed');
   const now = new Date();
@@ -1997,33 +2025,23 @@ function completedStats(){
   const between = (start,end)=> all.filter(s=>{ const d=new Date(s.date+'T00:00'); return d>=start && d<=end; });
   const ytdThis = between(thisYearStart, now);
   const ytdLast = between(lastYearStart, lastYearSameDay);
-  // Per-recipient, not per-session: a recipient counts as "Follow-up" if any
-  // of their completed sessions in the period has ApptType "Follow-up",
-  // otherwise they're "First-time" - so the two counts add up to the total
-  // number of unique recipients, not the total number of sessions.
-  const classifyRecipients = list => {
-    const map = new Map();
-    list.forEach(s=>{
-      const key = s.recipName.trim().toLowerCase();
-      map.set(key, (map.get(key)||false) || s.apptType==='Follow-up');
-    });
-    let firstTime=0, followUp=0;
-    map.forEach(hadFollowUp => hadFollowUp ? followUp++ : firstTime++);
-    return { firstTime, followUp, total: map.size };
-  };
-  const recip = classifyRecipients(ytdThis);
-  const recipLast = classifyRecipients(ytdLast);
-  const recipLifetime = classifyRecipients(all);
+  // Per-recipient, not per-session: New vs Returning by first-ever session
+  // date, so the two add up to unique recipients, not total sessions.
+  const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const firstEver = recipientFirstEverDates();
+  const recip = splitNewReturning(ytdThis, ymd(thisYearStart), firstEver);
+  const recipLast = splitNewReturning(ytdLast, ymd(lastYearStart), firstEver);
+  const recipLifetime = splitNewReturning(all, null, firstEver);
   const monthCount = now.getMonth()+1;
   const monthly = Array.from({length:monthCount},(_,m)=> ytdThis.filter(s=> new Date(s.date+'T00:00').getMonth()===m).length);
   const monthlyLast = Array.from({length:monthCount},(_,m)=> ytdLast.filter(s=> new Date(s.date+'T00:00').getMonth()===m).length);
   return { ytdThis: ytdThis.length, ytdLast: ytdLast.length,
     uniqueRecipients: recip.total, uniqueRecipientsLast: recipLast.total,
-    firstTime: recip.firstTime, followUp: recip.followUp,
-    firstTimeLast: recipLast.firstTime, followUpLast: recipLast.followUp,
+    newRecip: recip.newCount, returningRecip: recip.returning,
+    newRecipLast: recipLast.newCount, returningRecipLast: recipLast.returning,
     lifetimeSessions: all.length,
     lifetimeUnique: recipLifetime.total,
-    firstTimeLifetime: recipLifetime.firstTime, followUpLifetime: recipLifetime.followUp,
+    newRecipLifetime: recipLifetime.newCount, returningRecipLifetime: recipLifetime.returning,
     firstSessionDate: all.length ? all.reduce((min,s)=> s.date<min ? s.date : min, all[0].date) : null,
     monthly, monthlyLast, now };
 }
@@ -2075,9 +2093,9 @@ function renderCompletedStats(){
         <span class="combo-value row-divider"><span class="combo-num">${st.lifetimeUnique}</span></span>
 
         <span class="combo-label"></span>
-        <span class="combo-split">${splitLine(st.firstTime,'first-time')}${splitLine(st.followUp,'follow-up',true)}</span>
-        <span class="combo-split">${splitLine(st.firstTimeLast,'first-time')}${splitLine(st.followUpLast,'follow-up',true)}</span>
-        <span class="combo-split">${splitLine(st.firstTimeLifetime,'first-time')}${splitLine(st.followUpLifetime,'follow-up',true)}</span>
+        <span class="combo-split">${splitLine(st.newRecip,'new')}${splitLine(st.returningRecip,'returning',true)}</span>
+        <span class="combo-split">${splitLine(st.newRecipLast,'new')}${splitLine(st.returningRecipLast,'returning',true)}</span>
+        <span class="combo-split">${splitLine(st.newRecipLifetime,'new')}${splitLine(st.returningRecipLifetime,'returning',true)}</span>
 
         <span class="combo-label"></span>
         <span class="combo-range">${rangeLabel}</span>

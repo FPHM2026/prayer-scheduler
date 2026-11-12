@@ -261,6 +261,13 @@
   .guide-bar-actions .helptext{margin:0;}
   .guide-frame{flex:1 1 auto;width:100%;min-height:0;border:0;display:block;background:#faf8f4;}
   .modal-bg.sheet .modal{max-width:none;width:100%;max-height:90vh;border-radius:16px 16px 0 0;animation:sheetSlideUp .25s ease;}
+  /* iPhone: the text cursor didn't show in the session notes boxes (2026-11-11).
+     Give the sheet its own compositing layer (the usual iOS cure for a missing
+     caret in a scrolling, rounded panel), size it to the visible screen, keep
+     the page behind it from scrolling, and give the caret a strong colour. */
+  #notesModal .modal{max-height:90dvh;-webkit-transform:translateZ(0);transform:translateZ(0);}
+  body:has(#notesModal.open){overflow:hidden;}
+  #notesBody input,#notesBody textarea{caret-color:#aa5a3c;}
   @keyframes sheetSlideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
 
   .helptext{font-size:var(--fs-xs);color:var(--muted);}
@@ -1428,7 +1435,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-11-10.1";
+const APP_VERSION = "2026-11-12.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3054,6 +3061,44 @@ function renderCompleted(){
   }).join('');
   renderCompletedStats();
 }
+// New vs Returning (2026-11-12, at the user's request - replaces the old
+// "First-time/Follow-up" split, which marked a recipient Follow-up if ANY of
+// their sessions in the period had the saved ApptType "Follow-up", so a
+// person who started this year and came back counted as follow-up, not new,
+// and lifetime "first-time" only counted people seen once). Worked out from
+// session DATES, never the saved ApptType: a recipient is NEW in a period if
+// their first-ever completed Freedom Session (any year, any team) falls on or
+// after the period's start; otherwise they're RETURNING. New + Returning =
+// Unique Recipients for every period, and lifetime is always all New.
+// Freedom Sessions only - Drop-in/Training are excluded (one shared group
+// event, not an individual), same filter as completedStats()/reports.
+function isFreedomCompleted(s){
+  return s.status==='Completed' && s.apptType!=='Drop-in' && s.apptType!=='Training' && !!s.date;
+}
+function recipientFirstEverDates(){
+  const first = new Map();
+  sessions.forEach(s=>{
+    if(!isFreedomCompleted(s)) return;
+    const key = s.recipName.trim().toLowerCase();
+    if(!first.has(key) || s.date < first.get(key)) first.set(key, s.date);
+  });
+  return first;
+}
+// list = sessions inside the period; periodFrom = the period's first day
+// (ISO 'YYYY-MM-DD'), or null for lifetime (everyone is new).
+function splitNewReturning(list, periodFrom, firstEver){
+  firstEver = firstEver || recipientFirstEverDates();
+  const seen = new Set();
+  let newCount=0, returning=0;
+  list.forEach(s=>{
+    const key = s.recipName.trim().toLowerCase();
+    if(seen.has(key)) return;
+    seen.add(key);
+    const f = firstEver.get(key) || s.date;
+    if(!periodFrom || f >= periodFrom) newCount++; else returning++;
+  });
+  return { newCount, returning, total: seen.size };
+}
 function completedStats(){
   // Sunday Drop-In / Training are group sessions every minister is assigned
   // to at once - counting them here would blow up "unique recipients" and
@@ -3068,33 +3113,23 @@ function completedStats(){
   const between = (start,end)=> all.filter(s=>{ const d=new Date(s.date+'T00:00'); return d>=start && d<=end; });
   const ytdThis = between(thisYearStart, now);
   const ytdLast = between(lastYearStart, lastYearSameDay);
-  // Per-recipient, not per-session: a recipient counts as "Follow-up" if any
-  // of their completed sessions in the period has ApptType "Follow-up",
-  // otherwise they're "First-time" - so the two counts add up to the total
-  // number of unique recipients, not the total number of sessions.
-  const classifyRecipients = list => {
-    const map = new Map();
-    list.forEach(s=>{
-      const key = s.recipName.trim().toLowerCase();
-      map.set(key, (map.get(key)||false) || s.apptType==='Follow-up');
-    });
-    let firstTime=0, followUp=0;
-    map.forEach(hadFollowUp => hadFollowUp ? followUp++ : firstTime++);
-    return { firstTime, followUp, total: map.size };
-  };
-  const recip = classifyRecipients(ytdThis);
-  const recipLast = classifyRecipients(ytdLast);
-  const recipLifetime = classifyRecipients(all);
+  // Per-recipient, not per-session: New vs Returning by first-ever session
+  // date (see splitNewReturning above), so the two add up to unique
+  // recipients, not total sessions.
+  const firstEver = recipientFirstEverDates();
+  const recip = splitNewReturning(ytdThis, isoDate(thisYearStart), firstEver);
+  const recipLast = splitNewReturning(ytdLast, isoDate(lastYearStart), firstEver);
+  const recipLifetime = splitNewReturning(all, null, firstEver);
   const monthCount = now.getMonth()+1;
   const monthly = Array.from({length:monthCount},(_,m)=> ytdThis.filter(s=> new Date(s.date+'T00:00').getMonth()===m).length);
   const monthlyLast = Array.from({length:monthCount},(_,m)=> ytdLast.filter(s=> new Date(s.date+'T00:00').getMonth()===m).length);
   return { ytdThis: ytdThis.length, ytdLast: ytdLast.length,
     uniqueRecipients: recip.total, uniqueRecipientsLast: recipLast.total,
-    firstTime: recip.firstTime, followUp: recip.followUp,
-    firstTimeLast: recipLast.firstTime, followUpLast: recipLast.followUp,
+    newRecip: recip.newCount, returningRecip: recip.returning,
+    newRecipLast: recipLast.newCount, returningRecipLast: recipLast.returning,
     lifetimeSessions: all.length,
     lifetimeUnique: recipLifetime.total,
-    firstTimeLifetime: recipLifetime.firstTime, followUpLifetime: recipLifetime.followUp,
+    newRecipLifetime: recipLifetime.newCount, returningRecipLifetime: recipLifetime.returning,
     firstSessionDate: all.length ? all.reduce((min,s)=> s.date<min ? s.date : min, all[0].date) : null,
     monthly, monthlyLast, now };
 }
@@ -3146,9 +3181,9 @@ function renderCompletedStats(){
         <span class="combo-value row-divider"><span class="combo-num">${st.lifetimeUnique}</span></span>
 
         <span class="combo-label"></span>
-        <span class="combo-split">${splitLine(st.firstTime,'first-time')}${splitLine(st.followUp,'follow-up',true)}</span>
-        <span class="combo-split">${splitLine(st.firstTimeLast,'first-time')}${splitLine(st.followUpLast,'follow-up',true)}</span>
-        <span class="combo-split">${splitLine(st.firstTimeLifetime,'first-time')}${splitLine(st.followUpLifetime,'follow-up',true)}</span>
+        <span class="combo-split">${splitLine(st.newRecip,'new')}${splitLine(st.returningRecip,'returning',true)}</span>
+        <span class="combo-split">${splitLine(st.newRecipLast,'new')}${splitLine(st.returningRecipLast,'returning',true)}</span>
+        <span class="combo-split">${splitLine(st.newRecipLifetime,'new')}${splitLine(st.returningRecipLifetime,'returning',true)}</span>
 
         <span class="combo-label"></span>
         <span class="combo-range">${rangeLabel}</span>
@@ -8119,22 +8154,15 @@ function reportSessionsFor(type, from, to){
     return false;
   });
 }
-// Same per-recipient (not per-session) classification completedStats()
-// uses - a recipient counts as Follow-up if ANY of their sessions in the
-// list has ApptType Follow-up, so the two counts add up to unique
-// recipients, not total sessions. Only called for Freedom Sessions -
+// Same per-recipient (not per-session) New/Returning split completedStats()
+// uses (splitNewReturning: new = first-ever session on/after periodFrom),
+// so the two counts add up to unique recipients, not total sessions.
+// Only called for Freedom Sessions -
 // Training/Drop-in share one literal recipName across every occurrence
 // ("Sunday Drop-In"/"Training"), so "unique recipients" isn't meaningful
 // there and callers skip this entirely for those two types.
-function reportRecipientSplit(list){
-  const map = new Map();
-  list.forEach(s=>{
-    const key = s.recipName.trim().toLowerCase();
-    map.set(key, (map.get(key)||false) || s.apptType==='Follow-up');
-  });
-  let firstTime=0, followUp=0;
-  map.forEach(hadFollowUp => hadFollowUp ? followUp++ : firstTime++);
-  return { firstTime, followUp, total: map.size };
+function reportRecipientSplit(list, periodFrom){
+  return splitNewReturning(list, periodFrom);
 }
 // Tags anyone no longer Active - the breakdown includes everyone with a
 // session in range regardless of current roster status, per the spec.
@@ -8146,7 +8174,7 @@ function reportRecipientSplit(list){
 // (same Unique Recipients/First-time/Follow-up stats the top-level year
 // row shows) - computed from just the sessions that minister was on, not
 // the whole list, so it lines up with "this minister's own recipients."
-function reportMinisterBreakdown(list, isIndividual){
+function reportMinisterBreakdown(list, isIndividual, periodFrom){
   const map = new Map();
   list.forEach(s=>{
     const hrs = durationHours(s);
@@ -8161,7 +8189,7 @@ function reportMinisterBreakdown(list, isIndividual){
     });
   });
   const rows = [...map.values()];
-  if(isIndividual) rows.forEach(r=>{ r.split = reportRecipientSplit(r.sessions); });
+  if(isIndividual) rows.forEach(r=>{ r.split = reportRecipientSplit(r.sessions, periodFrom); });
   rows.forEach(r=>{ delete r.sessions; });
   return rows.sort((a,b)=> b.count-a.count || a.name.localeCompare(b.name));
 }
@@ -8192,33 +8220,35 @@ function monthClampedRange(y, m, rangeFrom, rangeTo){
 // Monthly Unique Recipients are a COHORT, not a per-month distinct count: a
 // recipient is counted once, in the month of their FIRST session within the
 // year's range, so the month rows add up to the year row's total (e.g. 43
-// unique recipients for 2026 = the 12 months summed). Follow-up vs
-// first-time uses the same rule as the year row (any Follow-up session in
-// the year => Follow-up), so those two columns also sum to the year's.
+// unique recipients for 2026 = the 12 months summed). New vs Returning
+// uses the same rule as the year row (first-ever session on/after the
+// year's start => New), so those two columns also sum to the year's - a
+// month's New is exactly the people whose first-ever session was that month.
 // Sessions and Hours stay genuinely month-level. (Before 2026-09-30 each
 // month counted its own distinct recipients, so a recipient seen in three
 // months was counted three times and the column overshot the year total.)
-function reportCohortSplitByMonth(yearList){
+function reportCohortSplitByMonth(yearList, periodFrom){
+  const firstEver = recipientFirstEverDates();
   const cohort = new Map();
   yearList.forEach(s=>{
     const key = s.recipName.trim().toLowerCase();
-    const c = cohort.get(key) || { first: s.date, followUp: false };
+    const c = cohort.get(key) || { first: s.date, key };
     if(s.date < c.first) c.first = s.date;
-    if(s.apptType==='Follow-up') c.followUp = true;
     cohort.set(key, c);
   });
   const byMonth = new Map();
   cohort.forEach(c=>{
     const mk = c.first.slice(0,7);
-    const cur = byMonth.get(mk) || { firstTime:0, followUp:0, total:0 };
-    if(c.followUp) cur.followUp++; else cur.firstTime++;
+    const cur = byMonth.get(mk) || { newCount:0, returning:0, total:0 };
+    const f = firstEver.get(c.key) || c.first;
+    if(!periodFrom || f >= periodFrom) cur.newCount++; else cur.returning++;
     cur.total++;
     byMonth.set(mk, cur);
   });
-  return (y, m) => byMonth.get(`${y}-${String(m+1).padStart(2,'0')}`) || { firstTime:0, followUp:0, total:0 };
+  return (y, m) => byMonth.get(`${y}-${String(m+1).padStart(2,'0')}`) || { newCount:0, returning:0, total:0 };
 }
 function reportMonthRows(type, yFrom, yTo, isIndividual){
-  const splitFor = isIndividual ? reportCohortSplitByMonth(reportSessionsFor(type, yFrom, yTo)) : null;
+  const splitFor = isIndividual ? reportCohortSplitByMonth(reportSessionsFor(type, yFrom, yTo), yFrom) : null;
   return reportMonthsInRange(yFrom, yTo).map(({y,m})=>{
     const clamped = monthClampedRange(y, m, yFrom, yTo);
     const list = reportSessionsFor(type, clamped.from, clamped.to);
@@ -8231,7 +8261,7 @@ function reportMinisterMonthRows(type, ministerId, yFrom, yTo, isIndividual){
   // Same first-session cohort rule as reportMonthRows(), scoped to this
   // minister's own sessions, so their monthly recipients sum to their year.
   const splitFor = isIndividual
-    ? reportCohortSplitByMonth(reportSessionsFor(type, yFrom, yTo).filter(s=>s.ministers.some(x=>x.id===ministerId)))
+    ? reportCohortSplitByMonth(reportSessionsFor(type, yFrom, yTo).filter(s=>s.ministers.some(x=>x.id===ministerId)), yFrom)
     : null;
   return reportMonthsInRange(yFrom, yTo).map(({y,m})=>{
     const clamped = monthClampedRange(y, m, yFrom, yTo);
@@ -8288,8 +8318,8 @@ function buildReportSection(typeInfo, from, to){
 
     let extraCols = '';
     if(isIndividual){
-      const split = reportRecipientSplit(list);
-      extraCols = `<td>${split.total}</td><td>${split.firstTime}</td><td>${split.followUp}</td>`;
+      const split = reportRecipientSplit(list, yFrom);
+      extraCols = `<td>${split.total}</td><td>${split.newCount}</td><td>${split.returning}</td>`;
     }
 
     const yearHours = list.reduce((sum,s)=>sum+durationHours(s), 0);
@@ -8298,7 +8328,7 @@ function buildReportSection(typeInfo, from, to){
     const monthRowsHtml = monthRows.length ? monthRows.map(m=>{
       let mExtraCols = '';
       if(isIndividual){
-        mExtraCols = `<td>${m.split.total}</td><td>${m.split.firstTime}</td><td>${m.split.followUp}</td>`;
+        mExtraCols = `<td>${m.split.total}</td><td>${m.split.newCount}</td><td>${m.split.returning}</td>`;
       }
       return `
         <tr class="detail-row month-row" data-group="${yid}" hidden>
@@ -8308,23 +8338,23 @@ function buildReportSection(typeInfo, from, to){
     }).join('') : '';
 
     const ministerColCount = isIndividual ? 8 : 5;
-    const ministerRows = reportMinisterBreakdown(list, isIndividual);
+    const ministerRows = reportMinisterBreakdown(list, isIndividual, yFrom);
     const mbid = `mb-${type}-${y}`;
     const ministerHtml = ministerRows.length ? ministerRows.map(r=>{
       const mid = `m-${type}-${y}-${r.id}`;
       let rExtraCols = '';
       if(isIndividual){
-        rExtraCols = `<td>${r.split.total}</td><td>${r.split.firstTime}</td><td>${r.split.followUp}</td>`;
+        rExtraCols = `<td>${r.split.total}</td><td>${r.split.newCount}</td><td>${r.split.returning}</td>`;
       }
       const mMonthHtml = reportMinisterMonthRows(type, r.id, yFrom, yTo, isIndividual).map(m=>{
         let mmExtraCols = '';
         if(isIndividual){
-          mmExtraCols = `<td>${m.split.total}</td><td>${m.split.firstTime}</td><td>${m.split.followUp}</td>`;
+          mmExtraCols = `<td>${m.split.total}</td><td>${m.split.newCount}</td><td>${m.split.returning}</td>`;
         }
         return `<tr><td>${m.label}</td><td>${m.count}</td>${mmExtraCols}<td>${m.leadCount}</td><td>${m.hours.toFixed(1)}</td></tr>`;
       }).join('');
       const mMonthTheadCols = isIndividual
-        ? '<th>Month</th><th>Sessions</th><th>Unique Recipients</th><th>First-time</th><th>Follow-up</th><th>As Lead</th><th>Hours</th>'
+        ? '<th>Month</th><th>Sessions</th><th>Unique Recipients</th><th>New</th><th>Returning</th><th>As Lead</th><th>Hours</th>'
         : '<th>Month</th><th>Sessions</th><th>As Lead</th><th>Hours</th>';
       return `
         <tr class="sub-row" onclick="toggleRow('${mid}')">
@@ -8350,7 +8380,7 @@ function buildReportSection(typeInfo, from, to){
           <div id="${mbid}" class="minister-wrap" hidden>
             <div class="table-scroll">
             <table class="minister-table">
-              <thead><tr><th></th><th>Minister</th><th>Sessions</th>${isIndividual ? '<th>Unique Recipients</th><th>First-time</th><th>Follow-up</th>' : ''}<th>As Lead</th><th>Hours</th></tr></thead>
+              <thead><tr><th></th><th>Minister</th><th>Sessions</th>${isIndividual ? '<th>Unique Recipients</th><th>New</th><th>Returning</th>' : ''}<th>As Lead</th><th>Hours</th></tr></thead>
               <tbody>${ministerHtml}</tbody>
             </table>
             </div>
@@ -8364,8 +8394,8 @@ function buildReportSection(typeInfo, from, to){
     const totalHours = fullList.reduce((sum,s)=>sum+durationHours(s), 0);
     let totalExtraCols = '';
     if(isIndividual){
-      const split = reportRecipientSplit(fullList);
-      totalExtraCols = `<td>${split.total}</td><td>${split.firstTime}</td><td>${split.followUp}</td>`;
+      const split = reportRecipientSplit(fullList, from);
+      totalExtraCols = `<td>${split.total}</td><td>${split.newCount}</td><td>${split.returning}</td>`;
     }
     yearRowsHtml += `
       <tr class="total-row">
@@ -8375,7 +8405,7 @@ function buildReportSection(typeInfo, from, to){
   }
 
   const theadCols = isIndividual
-    ? '<th></th><th>Year</th><th>Sessions</th><th>Unique Recipients</th><th>First-time</th><th>Follow-up</th><th>Hours</th>'
+    ? '<th></th><th>Year</th><th>Sessions</th><th>Unique Recipients</th><th>New</th><th>Returning</th><th>Hours</th>'
     : '<th></th><th>Year</th><th>Sessions</th><th>Hours</th>';
 
   return `
@@ -8552,6 +8582,12 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Nov 12, 2026', version: '2026-11-12.1', items: [
+    'Changed: "first-time / follow-up" is now "new / returning", on the Completed Sessions card, in Reports (year, month, minister and Total rows) and on My FPHM\'s Completed Sessions card (live now). New = the person\'s first-ever completed Freedom Session falls in that period; returning = they had their first session before it. It is worked out from session dates, not the saved First/Follow-up type. New + returning always equals Unique Recipients, and Lifetime is all new. Before, anyone with a follow-up in the period counted as follow-up, so someone who started this year and came back wasn\'t counted as new. To check: Completed Sessions should show 2026 as 38 new and 12 returning, last year as 20 and 2, and Lifetime as 65 new.'
+  ]},
+  { date: 'Nov 11, 2026', version: '2026-11-11.1', items: [
+    'Fixed: on an iPhone, the text cursor didn\'t show in the session notes boxes (reported on "Chief prayer need"), even though typing worked. The notes sheet is now set up the way iPhones need to draw the cursor, and the page behind it no longer scrolls while it\'s open. Same fix in My FPHM (live now). To check: on an iPhone, open Write session notes and tap "Chief prayer need"; the cursor should blink.'
+  ]},
   { date: 'Nov 10, 2026', version: '2026-11-10.1', items: [
     'New: the Lead can write session notes in My FPHM (live now). Every session where you\'re the Lead now has its own "Write session notes" button, so a follow-up session gets its own notes, separate from the first. Once notes are saved the button reads "Edit session notes ✓" and reopens just that session\'s notes. Support ministers still only read notes, with "View session notes". These are the same notes you see and edit in the Scheduler. Needs two SharePoint permissions for the Prayer Ministers group: Read on the SessionNotesSchema list, and Contribute on the SessionNotes list (it had Read). Without the first, the button stays hidden; without the second, saving says so. To check: in My FPHM, open a person with two sessions where you\'re Lead; each session has its own button.'
   ]},
@@ -8561,6 +8597,12 @@ const CHANGE_LOG = [
   { date: 'Nov 8, 2026', version: '2026-11-08.1', items: [
     'Fixed: printing an intake form from the installed app on an iPhone or iPad. Since recent iOS updates, the home-screen app ignores Print completely. Now, in the installed app, "Print / Save as PDF" makes a PDF of the form and opens the iPhone share menu; choose Print there (or Save to Files). If the menu doesn\'t open by itself, tap "Print or share PDF". In Safari and on a computer, Print works the same as before. My FPHM has the same fix (live now). To check: open a submitted form in Intake Forms in the installed FPHM Admin app and tap Print / Save as PDF.'
   ]},
+];
+// Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
+// five most recent versions; at each promotion, anything beyond the newest
+// five moves here rather than being deleted - see the block comment above
+// for the maintenance rule.
+const CHANGE_LOG_ARCHIVE = [
   { date: 'Nov 7, 2026', version: '2026-11-07.2', items: [
     'New: the Prayer List is in My FPHM (live now). Ministers ticked in Settings > Prayer List see a Prayer List tab with each person\'s full name, session number and next session date, soonest first. Everyone else doesn\'t see the tab. To check: tick a minister, Save, then sign in to My FPHM as them (or ask them to tap Refresh).'
   ]},
@@ -8568,12 +8610,6 @@ const CHANGE_LOG = [
     'New: a Prayer List tab, next to Schedule & Planning. It lists every prayer recipient who has a booked session that hasn\'t been marked Completed yet, with their next session\'s date and time, session number and team, soonest first. When all of a person\'s sessions are marked Completed, they drop off the list. Waiting-list entries and Tentative slots aren\'t on it (nothing is booked yet), and neither are Drop-in or Training. Someone whose session date has passed but wasn\'t marked Completed stays at the bottom with a note, so you can spot it. There\'s a search box for recipient or minister names.',
     'New: Settings > Prayer List, where you tick which prayer ministers may see the list, then Save. My FPHM doesn\'t show the list yet; the choice is stored so it\'s ready later. It needs one new Yes/No column, PrayerListAccess, on the PrayerMinisters list in SharePoint; until it exists, the card shows the steps to add it.'
   ]},
-];
-// Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
-// five most recent versions; at each promotion, anything beyond the newest
-// five moves here rather than being deleted - see the block comment above
-// for the maintenance rule.
-const CHANGE_LOG_ARCHIVE = [
   { date: 'Oct 30, 2026', version: '2026-10-30.2', items: [
     'Changed: the per-sequence notes boxes are now on automatically. On the session notes form, "Was there an effect?" shows a notes box under each sequence listed, with no setting to change, including notes you reopen. To turn them off, untick "Add a notes box under each row" on that question in Settings > Session Notes.'
   ]},

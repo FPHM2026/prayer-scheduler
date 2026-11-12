@@ -610,6 +610,16 @@ ranges) includes the year, via the shared `fmtDate`/`fmtShort` helpers.
   per-month. Applied to both `reportMonthRows()` and each minister's own
   drill-down (`reportMinisterMonthRows()`, cohort scoped to that
   minister's sessions). Test only until promoted.
+- **New / Returning replaces First-time / Follow-up** (2026-11-12, at the
+  user's request, production 2026-11-12.1; portal live): the Completed
+  Sessions card, Reports (year, month, minister, minister-month, Total rows)
+  and My FPHM's Completed card split Unique Recipients by
+  `splitNewReturning(list, periodFrom)`: NEW if the recipient's first-ever
+  completed Freedom Session (`recipientFirstEverDates()`, any team, Drop-in/
+  Training excluded, name-matched) is on/after the period start, else
+  RETURNING. Uses dates, never the saved ApptType. Lifetime = all new.
+  Verified on real data: 2026 YTD 38/12, 2025 20/2 (to Nov 12), lifetime 65.
+  The waiting-list first-time/follow-up tiles are unchanged (different idea).
 - **Sign Out asks "Sign out or switch user?"** (2026-09-30, at the user's
   request, both `preview/index.html` and `portal/index.html`): the header
   button still just says "Sign Out" (the user briefly had it relabeled
