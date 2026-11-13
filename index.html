@@ -485,6 +485,53 @@
   .stat-sub{font-size:var(--fs-2xs);color:var(--muted);margin-top:auto;padding-top:10px;}
 
   /* ---- Settings: one card per distinct setting group ---- */
+  /* Statistics tab (ministry statistics report). Colours are the report's own approved palette. */
+  .st-report{max-width:980px;}
+  .st-page{background:#fff;border:1px solid #E9E5DC;border-radius:10px;padding:24px;margin:0 0 16px;color:#3F3F3F;overflow:hidden;}
+  .st-page h2{font-family:Georgia,serif;font-weight:700;color:#8B4E34;font-size:1.35rem;margin:24px 0 8px;}
+  .st-page h2:first-child,.st-label + h2{margin-top:0;}
+  .st-page h3{font-family:Georgia,serif;color:#8B4E34;font-size:1.05rem;margin:16px 0 8px;}
+  .st-page p{margin:0 0 8px;line-height:1.5;}
+  .st-title{font-family:Georgia,serif;font-weight:700;color:#8B4E34;font-size:1.6rem;line-height:1.2;}
+  .st-sub{font-family:Georgia,serif;font-size:1.05rem;}
+  .st-line{color:#7A7468;font-size:var(--fs-sm);padding-bottom:8px;border-bottom:2px solid #E28E35;margin:4px 0 16px;}
+  .st-label{font-size:var(--fs-xs);font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8B4E34;margin-bottom:4px;}
+  .st-cap,.st-foot{font-style:italic;color:#7A7468;font-size:var(--fs-sm);}
+  .st-note{white-space:pre-wrap;}
+  .st-dl{font-style:normal;white-space:nowrap;margin-left:8px;}
+  .st-fig img{display:block;width:100%;max-width:820px;height:auto;margin:8px auto;}
+  .st-card-wrap{border:1.5px solid #A39577;border-radius:16px;padding:8px 16px 8px;margin:16px 0 8px;overflow-x:auto;}
+  .st-card,.st-table{width:100%;border-collapse:collapse;}
+  .st-card th,.st-card td,.st-table th,.st-table td{padding:12px 8px;text-align:center;border-bottom:1px solid #E9E5DC;vertical-align:middle;}
+  .st-card tbody tr:last-child td,.st-card tbody tr:last-child th{border-bottom:none;}
+  .st-card thead th,.st-cmp thead th{font-size:1.05rem;border-bottom:2px solid #A39577;vertical-align:top;}
+  .st-card thead th span,.st-cmp thead th span,.st-card thead th em,.st-cmp thead th em{display:block;font-weight:400;font-size:var(--fs-xs);color:#7A7468;}
+  .st-card th[scope=row],.st-table th[scope=row]{text-align:left;font-weight:600;}
+  .st-card td.cy{font-size:1.6rem;font-weight:700;}
+  .st-card td.ly{font-size:1.15rem;font-weight:600;}
+  .st-card td small{display:block;font-size:var(--fs-xs);color:#7A7468;font-weight:400;}
+  .st-card td small.wk{color:#8B4E34;font-weight:600;}
+  .st-card .muted,.st-table .muted{color:#7A7468;font-weight:400;}
+  .st-pill{display:inline-block;border-radius:8px;padding:4px 8px;font-size:var(--fs-xs);font-weight:700;white-space:nowrap;}
+  .st-pill.up{background:#E6F2E3;color:#3C7A3C;}
+  .st-pill.down{background:#EFEDE8;color:#7A7468;}
+  .st-table{min-width:560px;font-size:var(--fs-sm);}
+  .st-table thead th{color:#7A7468;font-size:var(--fs-xs);border-bottom:2px solid #A39577;}
+  .st-min td,.st-min th{padding:8px;}
+  .st-total th,.st-total td{font-weight:700;border-top:2px solid #A39577;}
+  .st-nyr{color:#7A7468;font-style:italic;font-weight:400;}
+  .st-prov{background:#FFF3A3;padding:0 4px;border-radius:4px;}
+  .st-rec-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding:8px 0;border-top:1px solid var(--border);}
+  .st-rec-date{font-weight:700;min-width:11em;}
+  .st-rec-count{flex:1 1 10em;}
+  .st-rec-edit{min-height:auto;padding:8px 16px;}
+  #statNote{width:100%;box-sizing:border-box;}
+  @media (max-width:640px){
+    .st-page{padding:16px;}
+    .st-card{min-width:520px;}
+    .st-card td.cy{font-size:1.3rem;}
+    #statDownloads .btn{width:100%;}
+  }
   .settings-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:16px;box-shadow:var(--shadow-sm);}
   .settings-card h2{font-size:var(--fs-lg);margin:0 0 4px;color:var(--navy);}
   /* Admin push switch (Settings > Notifications), same look as the portal's. */
@@ -842,6 +889,7 @@
   <button data-tab="blackouts">Blackout Dates</button>
   <button data-tab="intake">Intake Forms</button>
   <button data-tab="reports">Reports</button>
+  <button data-tab="statistics">Statistics</button>
   <button data-tab="messages" id="navMessages" hidden>Messages<span class="nav-badge" id="msgBadge" hidden></span></button>
   <button data-tab="settings">Settings</button>
   <!-- Moved to the end of the tab list 2026-09-27, at the user's request -
@@ -1092,6 +1140,35 @@
     <p class="errbox" role="alert" id="reportMsg" hidden></p>
   </section>
 
+  <section class="panel" id="panel-statistics">
+    <p class="helptext">The ministry statistics report: this year to date beside the same dates last year. Pick the report date, check the numbers, then download the Word files.</p>
+    <div class="field-row st-controls">
+      <div class="field"><label for="statDate">Report date</label><input type="date" id="statDate"></div>
+    </div>
+    <div class="errbox" role="alert" id="statChecks" hidden></div>
+    <div class="settings-card">
+      <h2>Ministry Leader's Note</h2>
+      <p class="helptext">Optional: context leadership should know (e.g. changes in how teams are organised). Shown on page 1 under "From the ministry leader". Saved for this report date.</p>
+      <textarea id="statNote" maxlength="600" rows="4" placeholder="Optional: context leadership should know (e.g. changes in how teams are organised)."></textarea>
+      <div class="toolbar" style="margin-top:8px;">
+        <button class="btn secondary" id="btnSaveStatNote">Save note</button>
+        <span class="helptext" id="statNoteCount" style="margin:0;"></span>
+        <span class="helptext" id="statNoteMsg" role="status" style="margin:0;"></span>
+      </div>
+      <p class="helptext" id="statNoteSetup" hidden>To save notes and show them in the report, add a list in SharePoint named exactly <strong>ReportNotes</strong> with one extra column: <strong>Note</strong> (Multiple lines of text, Plain text). Until then the note box isn't used.</p>
+    </div>
+    <div class="toolbar" id="statDownloads">
+      <button class="btn" id="btnStatDocxLeadership">Download for leadership (pages 1–3)</button>
+      <button class="btn" id="btnStatDocxLeaders">Download leader's copy (pages 1–5)</button>
+      <button class="btn secondary" id="btnStatCharts">Download charts</button>
+    </div>
+    <p class="helptext" id="statMsg" role="status"></p>
+    <div id="statReport" class="st-report"></div>
+    <div class="section-title" style="margin:32px 0 8px;"><h2 style="font-size:var(--fs-lg);margin:0;color:var(--navy);">Drop-In and Journey to Freedom records</h2></div>
+    <p class="errbox" id="statAttendSetup" hidden>To record how many people came, add two columns to the <strong>PrayerSessions</strong> list in SharePoint: <strong>Attendees</strong> (Number, 0 decimal places) and <strong>AttendeesProvisional</strong> (Yes/No, default No). Then press Refresh Data.</p>
+    <div id="statRecords"></div>
+  </section>
+
   <section class="panel" id="panel-settings">
     <p class="helptext">Configure defaults used across scheduling — no code changes needed.</p>
     <nav class="subtabs" aria-label="Settings section" id="settingsSubtabs">
@@ -1127,6 +1204,21 @@
           <button class="btn" id="btnSaveDropInSettings">Save Drop-In Defaults</button>
         </div>
         <p class="helptext" id="settingsDropInMsg"></p>
+      </div>
+
+      <div class="settings-card">
+        <h2>Journey to Freedom</h2>
+        <p class="helptext">Usual day, time and location for a Journey to Freedom session. "+ Journey to Freedom session" on the Statistics tab fills these in; you can change them on each session.</p>
+        <div class="field-row">
+          <div class="field"><label for="settingsJourneyDay">Usual Day</label><select id="settingsJourneyDay"><option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option></select></div>
+          <div class="field"><label for="settingsJourneyStart">Start Time</label><input type="time" id="settingsJourneyStart"></div>
+          <div class="field"><label for="settingsJourneyEnd">End Time</label><input type="time" id="settingsJourneyEnd"></div>
+          <div class="field"><label for="settingsJourneyLocation">Location</label><select id="settingsJourneyLocation"></select></div>
+        </div>
+        <div class="toolbar" style="margin-top:8px;">
+          <button class="btn" id="btnSaveJourneySettings">Save Journey Defaults</button>
+        </div>
+        <p class="helptext" id="settingsJourneyMsg"></p>
       </div>
     </div>
 
@@ -1205,13 +1297,22 @@
     <div id="intakeMatchPanel" style="margin-top:-8px;margin-bottom:14px;"></div>
     <div class="field-row sched-only">
       <div class="field"><label for="apptType">Appointment Type</label>
-        <select id="apptType"><option value="First">First Appointment</option><option value="Follow-up">Follow-up</option><option value="Drop-in">Sunday Drop-In</option><option value="Training">Training</option></select>
+        <select id="apptType"><option value="First">First Appointment</option><option value="Follow-up">Follow-up</option><option value="Drop-in">Sunday Drop-In</option><option value="Training">Training</option><option value="Journey">Journey to Freedom</option></select>
       </div>
       <div class="field" id="statusField" style="display:none;">
         <label for="sessStatus">Status</label>
         <select id="sessStatus"><option value="Scheduled">Scheduled</option><option value="Completed">Completed</option></select>
       </div>
     </div>
+    <div class="field-row sched-only" id="attendeesRow" hidden>
+      <div class="field"><label for="sessAttendees" id="attendeesLabel">Prayer recipients</label><input type="number" min="0" step="1" inputmode="numeric" id="sessAttendees" placeholder="How many came"></div>
+      <div class="field" style="align-self:end;">
+        <label style="display:flex;align-items:center;gap:8px;font-weight:700;">
+          <input type="checkbox" id="sessAttendeesProvisional" style="width:auto;min-height:auto;"> Provisional (still to be confirmed)
+        </label>
+      </div>
+    </div>
+    <p class="helptext sched-only" id="attendeesSetupMsg" hidden></p>
     <div class="field-row sched-only">
       <div class="field"><label for="sessDate">Date *</label><input type="date" id="sessDate"><span class="helptext" id="dayLabel"></span></div>
       <div class="field"><label for="sessLocation">Location</label>
@@ -1428,7 +1529,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-11-12.1";
+const APP_VERSION = "2026-11-13.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1807,7 +1908,8 @@ const LIST_NAMES = {
 const OPTIONAL_LIST_NAMES = {
   notesSchema: "SessionNotesSchema",
   notes: "SessionNotes",
-  pushSubs: "PushSubscriptions"
+  pushSubs: "PushSubscriptions",
+  reportNotes: "ReportNotes"
 };
 // Relative to this file's own location (preview/) - portal/ is a sibling of
 // the repo root, one level up from here.
@@ -2026,6 +2128,7 @@ async function resolveSiteAndLists(){
   try{
     const cols = await graphFetch(`/sites/${siteId}/lists/${listIds.sessions}/columns?$select=name`);
     plPrivateColumnReady = !!(cols && Array.isArray(cols.value) && cols.value.some(c=>c.name===PL_PRIVATE_COLUMN));
+    attendeesColumnReady = !!(cols && Array.isArray(cols.value) && cols.value.some(c=>c.name===ATTENDEES_COLUMN) && cols.value.some(c=>c.name===ATTENDEES_PROV_COLUMN));
   }catch(e){ console.warn('Could not check PrayerSessions columns:', e.message); }
 }
 
@@ -2097,6 +2200,12 @@ let prayerListColumnReady = false;
 // is left off the Prayer List if ANY of their Scheduled sessions has it.
 const PL_PRIVATE_COLUMN = 'PrayerListPrivate';
 let plPrivateColumnReady = false;
+// Sunday Drop-In / Journey to Freedom head counts (Statistics tab). Two
+// hand-made columns on PrayerSessions; the form only writes them once they
+// exist, since writing a missing column fails the whole save.
+const ATTENDEES_COLUMN = 'Attendees';
+const ATTENDEES_PROV_COLUMN = 'AttendeesProvisional';
+let attendeesColumnReady = false;
 let prayerListDraft = null; // Set of minister ids ticked in Settings, null = not edited
 
 async function loadAll(){
@@ -2143,6 +2252,10 @@ async function loadAll(){
     notesDraft = defaultNotesSchema();
   }
   pushDevices = null;
+  if(listIds.reportNotes){
+    try{ reportNotes = (await listItems('reportNotes')).map(n=>({ id:n.id, date:String(n.Title||'').trim(), note:String(n.Note||'').replace(/<[^>]*>/g,'') })); }
+    catch(e){ console.warn('Could not load report notes:', e.message); }
+  }
   if(listIds.pushSubs){
     try{ pushDevices = await removeOldPushDevices(parsePushDevices(await listItems('pushSubs'))); }
     catch(e){ console.warn('Could not load notification devices:', e.message); }
@@ -2252,7 +2365,9 @@ async function loadAll(){
       intakeResponseId: (s.IntakeResponseId!=null && s.IntakeResponseId!=='') ? parseInt(s.IntakeResponseId,10) : null,
       // Private = keep this person off the Prayer List (My FPHM and the
       // admin tab's count). Hand-made Yes/No column; reads false if missing.
-      plPrivate: s[PL_PRIVATE_COLUMN]===true
+      plPrivate: s[PL_PRIVATE_COLUMN]===true,
+      attendees: (s[ATTENDEES_COLUMN]===null || s[ATTENDEES_COLUMN]===undefined || s[ATTENDEES_COLUMN]==='') ? null : Number(s[ATTENDEES_COLUMN]),
+      attendeesProvisional: s[ATTENDEES_PROV_COLUMN]===true
     };
   });
   // A slot's own team (ProposedMinisterIDs) is only the plan from when it
@@ -2394,7 +2509,7 @@ function groupRow(key, avatarText, name, countLabel, summaryHtml, bodyHtml, wasO
   </div>`;
 }
 
-function renderAll(){ renderSchedule(); renderPlanning(); renderCompleted(); renderOverview(); renderBlackouts(); renderSchedPlan(); renderTimeWindowsSettings(); renderLocationsSettings(); renderIntake(); renderFormEditor(); renderPrayerList(); renderPrayerListSettings(); }
+function renderAll(){ renderSchedule(); renderPlanning(); renderCompleted(); renderOverview(); renderBlackouts(); renderSchedPlan(); renderTimeWindowsSettings(); renderLocationsSettings(); renderIntake(); renderFormEditor(); renderPrayerList(); renderPrayerListSettings(); renderStatistics(); }
 
 async function withLoading(btn, loadingText, fn){
   if(!btn) return fn();
@@ -2488,6 +2603,8 @@ function wireApp(){
   $('#sessEndTime').addEventListener('change', ()=>{ updateEndPreview(); renderMinisterList(); });
   $('#sessLocation').addEventListener('change', renderConflictCheck);
   $('#apptType').addEventListener('change', updateGroupSessionFields);
+  $('#sessStatus').addEventListener('change', ()=>{ statusTouched = true; });
+  $('#sessDate').addEventListener('change', syncGroupStatusToDate);
   $('#recipGender').addEventListener('change', renderMinisterList);
   $('#genderPref').addEventListener('change', renderMinisterList);
   $('#recipName').addEventListener('input', ()=>{ renderRecipientHistory(); renderConflictCheck(); renderRecipNameSuggestions(); });
@@ -2501,6 +2618,7 @@ function wireApp(){
   $('#btnTwCancel').addEventListener('click', ()=>$('#timeWindowModal').classList.remove('open'));
   $('#btnTwSave').addEventListener('click', ()=>withLoading($('#btnTwSave'), 'Saving…', onSaveTimeWindow));
   $('#btnSaveDropInSettings').addEventListener('click', ()=>withLoading($('#btnSaveDropInSettings'), 'Saving…', saveDropInSettings));
+  $('#btnSaveJourneySettings').addEventListener('click', ()=>withLoading($('#btnSaveJourneySettings'), 'Saving…', saveJourneySettings));
   $('#btnSaveDefaultLocationSetting').addEventListener('click', ()=>withLoading($('#btnSaveDefaultLocationSetting'), 'Saving…', saveDefaultLocationSetting));
   $('#settingsSubtabs').querySelectorAll('button[data-settingsview]').forEach(b=>b.addEventListener('click', ()=>switchSettingsSub(b.dataset.settingsview)));
   $('#changesSubtabs').querySelectorAll('button[data-changesview]').forEach(b=>b.addEventListener('click', ()=>switchChangesSub(b.dataset.changesview)));
@@ -2573,6 +2691,12 @@ function wireApp(){
   $('#btnBlackoutCancel').addEventListener('click', ()=>$('#blackoutModal').classList.remove('open'));
   $('#btnBlackoutSave').addEventListener('click', ()=>withLoading($('#btnBlackoutSave'), 'Saving…', saveBlackout));
   $('#btnGenerateReport').addEventListener('click', generateReport);
+  $('#statDate').addEventListener('change', ()=>{ const v = $('#statDate').value; if(v){ statReportDate = v; renderStatistics(); } });
+  $('#statNote').addEventListener('input', updateStatNoteCount);
+  $('#btnSaveStatNote').addEventListener('click', ()=>withLoading($('#btnSaveStatNote'), 'Saving…', saveStatNote));
+  $('#btnStatDocxLeadership').addEventListener('click', ()=>withLoading($('#btnStatDocxLeadership'), 'Preparing…', ()=>downloadStatDocx(false)));
+  $('#btnStatDocxLeaders').addEventListener('click', ()=>withLoading($('#btnStatDocxLeaders'), 'Preparing…', ()=>downloadStatDocx(true)));
+  $('#btnStatCharts').addEventListener('click', ()=>withLoading($('#btnStatCharts'), 'Preparing…', downloadStatCharts));
   $('#btnConfirmCancel').addEventListener('click', ()=>closeConfirm(false));
   $('#btnConfirmOk').addEventListener('click', ()=>closeConfirm(true));
 }
@@ -2609,7 +2733,7 @@ function switchTab(tab){
    it's marked Completed (that's what takes someone off the list). Name
    match per recipient, same as every other grouping in this app. */
 function prayerListEntries(){
-  const active = sessions.filter(s=>s.status==='Scheduled' && s.apptType!=='Drop-in' && s.apptType!=='Training' && s.recipName.trim());
+  const active = sessions.filter(s=>s.status==='Scheduled' && !isGroupAppt(s.apptType) && s.recipName.trim());
   const today = todayISO();
   return groupByRecipient(active).map(g=>{
     const sorted = g.sessions.slice().sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
@@ -2672,9 +2796,27 @@ function renderPrayerList(){
 // The session form's Private box, as a fields fragment. Empty until the
 // SharePoint column exists (writing a missing column fails the save) and
 // for group sessions, which never appear on the Prayer List.
+// A new Drop-In / Journey session dated before today is almost always a
+// record of one already held (back-filling paper records), so default its
+// Status to Completed - until the admin picks a Status themselves.
+let statusTouched = false;
+function syncGroupStatusToDate(){
+  if(statusTouched || editingId || $('#statusField').style.display==='none') return;
+  const d = $('#sessDate').value;
+  $('#sessStatus').value = (d && d < localIsoToday()) ? 'Completed' : 'Scheduled';
+}
+function localIsoToday(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+// Head count fields, only for Drop-In/Journey and only once the columns exist.
+function attendeesFields(apptType){
+  if(!attendeesColumnReady) return {};
+  if(apptType!=='Drop-in' && apptType!=='Journey') return { [ATTENDEES_COLUMN]: null, [ATTENDEES_PROV_COLUMN]: false };
+  const raw = $('#sessAttendees').value.trim();
+  const n = raw==='' ? null : Math.max(0, Math.round(Number(raw)));
+  return { [ATTENDEES_COLUMN]: (n===null || isNaN(n)) ? null : n, [ATTENDEES_PROV_COLUMN]: $('#sessAttendeesProvisional').checked };
+}
 function plPrivateField(){
   if(!plPrivateColumnReady) return {};
-  const isGroup = $('#apptType').value==='Drop-in' || $('#apptType').value==='Training';
+  const isGroup = isGroupAppt($('#apptType').value);
   return { [PL_PRIVATE_COLUMN]: !isGroup && $('#sessPlPrivate').checked };
 }
 window.togglePrayerListPrivate = async function(btn, key, makePrivate){
@@ -3012,7 +3154,7 @@ function renderCompletedByDate(q){
             </span>
             <span class="slot-header-detail">
               <span class="slot-header-name">${escapeHtml(s.recipName)}</span>
-              ${s.apptType!=='Drop-in' && s.apptType!=='Training' ? `<span class="tag ${sessionNumberOf(s)===1?'first':''}">Session #${sessionNumberOf(s)}</span>` : ''}
+              ${!isGroupAppt(s.apptType) ? `<span class="tag ${sessionNumberOf(s)===1?'first':''}">Session #${sessionNumberOf(s)}</span>` : ''}
               ${ministerNamesOf(s) ? `<span class="slot-header-team">${escapeHtml(ministerNamesOf(s))}</span>` : ''}
             </span>
           </div>
@@ -3065,8 +3207,12 @@ function renderCompleted(){
 // Unique Recipients for every period, and lifetime is always all New.
 // Freedom Sessions only - Drop-in/Training are excluded (one shared group
 // event, not an individual), same filter as completedStats()/reports.
+// Group events everyone shares (Sunday Drop-In, Training, Journey to
+// Freedom): no individual recipient, so they're left out of Freedom Session
+// stats, session numbers, intake links and notes.
+function isGroupAppt(t){ return t==='Drop-in' || t==='Training' || t==='Journey'; }
 function isFreedomCompleted(s){
-  return s.status==='Completed' && s.apptType!=='Drop-in' && s.apptType!=='Training' && !!s.date;
+  return s.status==='Completed' && !isGroupAppt(s.apptType) && !!s.date;
 }
 function recipientFirstEverDates(){
   const first = new Map();
@@ -3098,7 +3244,7 @@ function completedStats(){
   // the first-time/follow-up split with what is really one shared event, so
   // they're excluded from every statistic even though the underlying session
   // records still show up normally in the grouped list above.
-  const all = sessions.filter(s=>s.status==='Completed' && s.apptType!=='Drop-in' && s.apptType!=='Training');
+  const all = sessions.filter(s=>s.status==='Completed' && !isGroupAppt(s.apptType));
   const now = new Date();
   const thisYearStart = new Date(now.getFullYear(),0,1);
   const lastYearStart = new Date(now.getFullYear()-1,0,1);
@@ -3722,6 +3868,7 @@ function icsEscape(s){ return String(s||'').replace(/\\/g,'\\\\').replace(/;/g,'
 function calendarEventTitle(s){
   if(s.apptType==='Drop-in') return 'FPHM Drop-in';
   if(s.apptType==='Training') return 'FPHM Training';
+  if(s.apptType==='Journey') return 'FPHM Journey to Freedom';
   const name = (s.recipName||'').trim();
   return name ? `FS: ${name}` : 'FS';
 }
@@ -3767,7 +3914,7 @@ function renderUnlinkedSessionCard(s){
       </span>
       <span class="slot-header-detail">
         <span class="slot-header-name">${escapeHtml(s.recipName)}</span>
-        ${s.apptType!=='Drop-in' && s.apptType!=='Training' ? `<span class="tag ${sessionNumberOf(s)===1?'first':''}">Session #${sessionNumberOf(s)}</span>` : ''}
+        ${!isGroupAppt(s.apptType) ? `<span class="tag ${sessionNumberOf(s)===1?'first':''}">Session #${sessionNumberOf(s)}</span>` : ''}
         ${ministerNamesOf(s) ? `<span class="slot-header-team">${escapeHtml(ministerNamesOf(s))}</span>` : ''}
       </span>
     </div>
@@ -3777,7 +3924,7 @@ function renderUnlinkedSessionCard(s){
       ${s.location?`<div class="slot-detail-row">${escapeHtml(sessionLocationDisplay(s))}</div>`:''}
       ${s.notes?`<div class="notes">${escapeHtml(s.notes)}</div>`:''}
       <div class="slot-detail-row">${waSectionHtml(s)}</div>
-      ${s.apptType!=='Drop-in' && s.apptType!=='Training' ? `<div class="slot-detail-row">${renderIntakeLinkBlock(s)}</div>` : ''}
+      ${!isGroupAppt(s.apptType) ? `<div class="slot-detail-row">${renderIntakeLinkBlock(s)}</div>` : ''}
       <div class="toolbar" style="margin-top:10px;">
         <button class="btn secondary" onclick="assignSlotToSession(${s.id},this)">Assign to a Slot</button>
         ${notesButtonHtml(s)}
@@ -3796,7 +3943,7 @@ function renderUnlinkedSessionCard(s){
 window.deleteUnlinkedSession = async function(sessionId){
   const s = sessions.find(x=>x.id===sessionId);
   if(!s) return;
-  const isGroupSession = s.apptType==='Drop-in' || s.apptType==='Training';
+  const isGroupSession = isGroupAppt(s.apptType);
   const msg = isGroupSession
     ? `Delete this ${s.apptType} session${s.date?' on '+s.date:''}? This can't be undone.`
     : `Remove the booked session for ${s.recipName}${s.date?' on '+s.date:''}? They'll go back on the waiting list.`;
@@ -3882,7 +4029,7 @@ function renderSlotCard(sl){
   // (see computeSessionNumbers), so the number there is just a running
   // count of group events, not a first-time/follow-up signal. Same
   // exclusion Completed Sessions already applies.
-  const showSessionNum = sessionForHeader && sessionForHeader.apptType!=='Drop-in' && sessionForHeader.apptType!=='Training';
+  const showSessionNum = sessionForHeader && !isGroupAppt(sessionForHeader.apptType);
   const teamForHeader = teamLabel(sl.team);
   // The Contacted toggle sits in the summary row so it's usable without
   // expanding the accordion - it's a sibling of the toggle button, not
@@ -4183,7 +4330,7 @@ async function revertSessionToWaiting(sessionId){
 window.deleteBookedSession = async function(slotId, sessionId){
   const s = sessions.find(x=>x.id===sessionId);
   if(!s) return;
-  const isGroupSession = s.apptType==='Drop-in' || s.apptType==='Training';
+  const isGroupSession = isGroupAppt(s.apptType);
   const msg = isGroupSession
     ? `Delete this ${s.apptType} session${s.date?' on '+s.date:''}? This can't be undone. The slot will reopen for someone else.`
     : `Remove the booked session for ${s.recipName}${s.date?' on '+s.date:''}? They'll go back on the waiting list, and the slot will reopen for someone else.`;
@@ -4394,7 +4541,7 @@ function openModal(existing, followFrom, opts){
   setSessKind(kind);
   $('#modalTitle').textContent = kind==='waiting'
     ? (existing ? 'Edit Waiting Entry' : 'Add to Waiting List')
-    : (existing ? (existing.status==='Waiting' ? 'Schedule Session' : 'Edit Session') : (followFrom ? 'Follow-up Session' : (opts.preset==='dropin' ? 'New Sunday Drop-In' : opts.preset==='training' ? 'New Training Session' : 'New Session')));
+    : (existing ? (existing.status==='Waiting' ? 'Schedule Session' : 'Edit Session') : (followFrom ? 'Follow-up Session' : (opts.preset==='dropin' ? 'New Sunday Drop-In' : opts.preset==='training' ? 'New Training Session' : opts.preset==='journey' ? 'New Journey to Freedom Session' : 'New Session')));
   $('#modalMsg').innerHTML='';
   $('#recipNameResults').innerHTML=''; recipNameMatches=[];
   $('#recipName').value = existing ? existing.recipName : (followFrom ? followFrom.recipName : '');
@@ -4436,9 +4583,12 @@ function openModal(existing, followFrom, opts){
   // become real) recomputes from what's actually on record.
   const priorCount = recipSessionCount($('#recipName').value, editingId);
   $('#apptType').value = (existing && existing.status!=='Waiting') ? existing.apptType : (priorCount>0 ? 'Follow-up' : 'First');
-  const showStatusDropdown = kind==='session' && !!existing && existing.status!=='Waiting';
+  const showStatusDropdown = kind==='session' && ((!!existing && existing.status!=='Waiting') || opts.preset==='dropin' || opts.preset==='journey');
   $('#statusField').style.display = showStatusDropdown ? 'block' : 'none';
   $('#sessStatus').value = (existing && existing.status!=='Waiting') ? existing.status : 'Scheduled';
+  statusTouched = !!existing;
+  $('#sessAttendees').value = (existing && existing.attendees!=null) ? existing.attendees : '';
+  $('#sessAttendeesProvisional').checked = !!(existing && existing.attendeesProvisional);
   selectedMinisters = (existing && existing.status!=='Waiting') ? existing.ministers.map(m=>({...m})) : (followFrom ? followFrom.ministers.map(m=>({...m})) : []);
   historyExpanded = false;
   historyAutoName = null;
@@ -4455,9 +4605,22 @@ function openModal(existing, followFrom, opts){
   // the admin to fill in. Only applies opening a brand-new session, never
   // when editing an existing one or building a follow-up.
   if(opts.preset && !existing && !followFrom){
-    $('#recipName').value = opts.preset==='dropin' ? 'Sunday Drop-In' : 'Training';
-    $('#apptType').value = opts.preset==='dropin' ? 'Drop-in' : 'Training';
-    selectedMinisters = ministers.filter(m=>m.status==='Active').map(m=>({id:m.id, role:'Support'}));
+    $('#recipName').value = opts.preset==='dropin' ? 'Sunday Drop-In' : opts.preset==='journey' ? 'Journey to Freedom' : 'Training';
+    $('#apptType').value = opts.preset==='dropin' ? 'Drop-in' : opts.preset==='journey' ? 'Journey' : 'Training';
+    // Journey: pick only the ministers who were actually there.
+    selectedMinisters = opts.preset==='journey' ? [] : ministers.filter(m=>m.status==='Active').map(m=>({id:m.id, role:'Support'}));
+    if(opts.preset==='journey'){
+      const jw = journeyWindow();
+      if(!opts.dateIso){
+        const dow = (jw && jw.dayOfWeek!=null) ? jw.dayOfWeek : 6, d = new Date();
+        d.setDate(d.getDate() + ((dow - d.getDay() + 7) % 7));
+        $('#sessDate').value = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+      }
+      $('#sessTime').value = jw ? jw.start : '09:00';
+      $('#sessEndTime').value = jw ? jw.end : '13:00';
+      const jLoc = (jw && jw.locationName) ? locations.find(l=>l.name.trim().toLowerCase()===jw.locationName.trim().toLowerCase()) : null;
+      if(jLoc) $('#sessLocation').value = jLoc.id;
+    }
     if(opts.preset==='dropin'){
       // Sunday Drop-In's time/location come from the DropIn-kind row in
       // Settings now, not hardcoded - default all three so date is the
@@ -4471,6 +4634,7 @@ function openModal(existing, followFrom, opts){
     }
   }
   updateGroupSessionFields();
+  syncGroupStatusToDate();
   renderMinisterList(); updateEndPreview(); renderSameDay(); renderRecipientHistory(); renderDayLabel(); renderSlotButtons();
   $('#sessionModal').classList.add('open');
   $('#recipName').focus();
@@ -4481,7 +4645,7 @@ function openModal(existing, followFrom, opts){
 // editing an existing Drop-in/Training session, or from manually changing
 // the dropdown on an otherwise-normal session.
 function updateGroupSessionFields(){
-  const isGroup = $('#apptType').value==='Drop-in' || $('#apptType').value==='Training';
+  const isGroup = isGroupAppt($('#apptType').value);
   $('#recipContactField').style.display = isGroup ? 'none' : '';
   $('#waField').style.display = isGroup ? 'none' : '';
   // Gender/team-preference make no sense for a group event - "Sunday
@@ -4489,6 +4653,13 @@ function updateGroupSessionFields(){
   // same-sex-team need, same reasoning as hiding contact/WhatsApp above.
   $('#genderFieldRow').style.display = isGroup ? 'none' : '';
   $('#plPrivateField').hidden = isGroup || !plPrivateColumnReady;
+  // Head count for Sunday Drop-In / Journey to Freedom (Statistics tab).
+  const counted = $('#apptType').value==='Drop-in' || $('#apptType').value==='Journey';
+  $('#attendeesRow').hidden = !counted || !attendeesColumnReady;
+  $('#attendeesLabel').textContent = $('#apptType').value==='Journey' ? 'Participants' : 'Prayer recipients';
+  const setupMsg = $('#attendeesSetupMsg');
+  setupMsg.hidden = !counted || attendeesColumnReady;
+  if(counted && !attendeesColumnReady) setupMsg.innerHTML = `To record how many came, add two columns to the PrayerSessions list in SharePoint first: <strong>${ATTENDEES_COLUMN}</strong> (Number) and <strong>${ATTENDEES_PROV_COLUMN}</strong> (Yes/No). Steps are on the Statistics tab.`;
   if(isGroup){
     $('#sessPlPrivate').checked = false;
     $('#recipContact').value=''; $('#waCreated').checked=false; $('#waLink').value='';
@@ -4524,7 +4695,7 @@ function personWaInfo(name, excludeId){
   const key = String(name||'').trim().toLowerCase();
   if(!key) return null;
   const hit = sessions
-    .filter(s=>s.id!==excludeId && s.waLink && s.apptType!=='Drop-in' && s.apptType!=='Training'
+    .filter(s=>s.id!==excludeId && s.waLink && !isGroupAppt(s.apptType)
       && String(s.recipName||'').trim().toLowerCase()===key)
     .sort((a,b)=>(b.date||b.added||'').localeCompare(a.date||a.added||''))[0];
   return hit ? { waLink: hit.waLink } : null;
@@ -4752,6 +4923,16 @@ function renderTimeWindowsSettings(){
     const match = locations.find(l=>l.name.trim().toLowerCase()===String(curName||'').trim().toLowerCase());
     if(match) dropInSelect.value = match.name;
   }
+  const jSelect = $('#settingsJourneyLocation');
+  if(jSelect){
+    const jw = journeyWindow();
+    $('#settingsJourneyDay').value = String(jw && jw.dayOfWeek!=null ? jw.dayOfWeek : 6);
+    $('#settingsJourneyStart').value = jw ? jw.start : '09:00';
+    $('#settingsJourneyEnd').value = jw ? jw.end : '13:00';
+    jSelect.innerHTML = '<option value="">— Not set —</option>' + locations.map(l=>`<option value="${escapeHtml(l.name)}">${escapeHtml(l.name)}</option>`).join('');
+    const match = jw ? locations.find(l=>l.name.trim().toLowerCase()===String(jw.locationName||'').trim().toLowerCase()) : null;
+    jSelect.value = match ? match.name : '';
+  }
   const defLocSelect = $('#settingsDefaultLocation');
   if(defLocSelect){
     const defLoc = defaultLocationSetting();
@@ -4769,6 +4950,17 @@ async function saveDropInSettings(){
   if(!start || !end || end<=start){ msg.innerHTML = '<div class="errbox" role="alert">End time must be after the start time.</div>'; return; }
   const existing = dropInWindow();
   const fields = { Title: 'Drop-In', Kind: 'DropIn', DayOfWeek: null, StartTime: start, EndTime: end, LocationName: locName };
+  if(existing) await updateItem('timeWindows', existing.id, fields);
+  else await createItem('timeWindows', fields);
+  await loadAll();
+  msg.textContent = 'Saved.';
+}
+async function saveJourneySettings(){
+  const msg = $('#settingsJourneyMsg'); msg.innerHTML = '';
+  const start = $('#settingsJourneyStart').value, end = $('#settingsJourneyEnd').value;
+  if(!start || !end || end<=start){ msg.innerHTML = '<div class="errbox" role="alert">End time must be after the start time.</div>'; return; }
+  const existing = journeyWindow();
+  const fields = { Title: 'Journey to Freedom', Kind: 'Journey', DayOfWeek: parseInt($('#settingsJourneyDay').value,10), StartTime: start, EndTime: end, LocationName: $('#settingsJourneyLocation').value };
   if(existing) await updateItem('timeWindows', existing.id, fields);
   else await createItem('timeWindows', fields);
   await loadAll();
@@ -4831,7 +5023,7 @@ function ministerLoad(ministerId){
   const dates = [];
   sessions.forEach(s=>{
     if(s.status!=='Scheduled') return;
-    if(s.apptType==='Drop-in' || s.apptType==='Training') return;
+    if(isGroupAppt(s.apptType)) return;
     if(editingId && s.id===editingId) return;
     if(!ministerIdsOf(s).includes(ministerId)) return;
     dates.push(new Date(s.date+'T'+(s.time||'00:00')));
@@ -4961,6 +5153,7 @@ function configuredWeekdays(){
 // (e.g. before the admin has visited Settings), with fallbacks used at
 // every call site so nothing breaks on a brand-new TimeWindows list.
 function dropInWindow(){ return timeWindows.find(t=>t.kind==='DropIn') || null; }
+function journeyWindow(){ return timeWindows.find(t=>t.kind==='Journey') || null; }
 function defaultLocationSetting(){ return timeWindows.find(t=>t.kind==='DefaultLocation') || null; }
 function slotStartsFor(dateStr){
   if(!dateStr) return [];
@@ -5123,7 +5316,7 @@ async function onSaveSession(){
   const date = $('#sessDate').value, time = $('#sessTime').value, endTime = $('#sessEndTime').value;
   const locationId = parseInt($('#sessLocation').value,10);
   const apptType = $('#apptType').value;
-  const status = (editingId && $('#statusField').style.display!=='none') ? $('#sessStatus').value : 'Scheduled';
+  const status = ($('#statusField').style.display!=='none') ? $('#sessStatus').value : 'Scheduled';
 
   if(!date||!time||!endTime){ msg.innerHTML='<div class="errbox" role="alert">Please fill in recipient name, date, start time, and end time.</div>'; return; }
   const start=new Date(date+'T'+time), end=new Date(date+'T'+endTime);
@@ -5164,6 +5357,7 @@ async function onSaveSession(){
     LocationName: locationName(locationId),
     Notes: notes, ApptType: apptType, Status: status,
     ...plPrivateField(),
+    ...attendeesFields(apptType),
     PreviousSessionId: prevId || null,
     WaCreated: $('#waCreated').checked, WaLink: $('#waLink').value.trim(),
     Priority: false,
@@ -5243,7 +5437,7 @@ function renderOverview(){
         // Drop-in/Training assign every minister to the same shared session -
         // excluded here too, or everyone's hours/led/supported counts would
         // include the same group event over and over.
-        if(s.apptType==='Drop-in' || s.apptType==='Training') return false;
+        if(isGroupAppt(s.apptType)) return false;
         if(!ministerIdsOf(s).includes(m.id)) return false;
         if(fromVal && s.date<fromVal) return false;
         if(toVal && s.date>toVal) return false;
@@ -5442,7 +5636,7 @@ function renderOverviewStats(){
   const fromVal = $('#statsFrom').value, toVal = $('#statsTo').value;
   const activeMins = ministers.filter(m=>m.status==='Active');
   // Drop-in/Training excluded here too - see the matching note in renderOverview().
-  const notGroupSession = s => s.apptType!=='Drop-in' && s.apptType!=='Training';
+  const notGroupSession = s => !isGroupAppt(s.apptType);
   const inRangeAll = sessions.filter(s=> s.status!=='Waiting' && notGroupSession(s) && (!fromVal || s.date>=fromVal) && (!toVal || s.date<=toVal));
   const lastYearFrom = shiftYear(fromVal,-1), lastYearTo = shiftYear(toVal,-1);
   const lastYearAll = sessions.filter(s=> s.status!=='Waiting' && notGroupSession(s) && (!lastYearFrom || s.date>=lastYearFrom) && (!lastYearTo || s.date<=lastYearTo));
@@ -7608,7 +7802,7 @@ function sessionNotesFor(sessionId){ return sessionNotes.find(n=>n.sessionId===s
 // Not offered on the shared Drop-in / Training events - there's no single
 // session team to write notes about.
 function notesButtonHtml(s){
-  if(!notesAvailable || !s || s.apptType==='Drop-in' || s.apptType==='Training') return '';
+  if(!notesAvailable || !s || isGroupAppt(s.apptType)) return '';
   const has = !!sessionNotesFor(s.id);
   return `<button class="icon-btn${has?' success':''}" onclick="openSessionNotes(${s.id})" title="Session Notes" aria-label="${has?'View or edit':'Write'} session notes for ${escapeHtml(s.recipName)}">${ICONS.pencil}<span class="btn-label">${has?'Session Notes ✓':'Session Notes'}</span></button>`;
 }
@@ -8141,7 +8335,7 @@ window.setReportRange = function(preset){
 function reportSessionsFor(type, from, to){
   return sessions.filter(s=>{
     if(s.status!=='Completed' || s.date<from || s.date>to) return false;
-    if(type==='sessions') return s.apptType!=='Drop-in' && s.apptType!=='Training';
+    if(type==='sessions') return !isGroupAppt(s.apptType);
     if(type==='training') return s.apptType==='Training';
     if(type==='dropin') return s.apptType==='Drop-in';
     return false;
@@ -8418,6 +8612,721 @@ function buildReportSection(typeInfo, from, to){
       </div>
     </section>`;
 }
+/* ---- STATISTICS TAB (ministry statistics report) ----
+   The leadership report: this year to date against the SAME dates last
+   year, with last year's full year for context only (never used for a %).
+   Built to the approved spec + Leader's Copy (2026-11-12):
+   - Freedom Sessions reuse isFreedomCompleted()/splitNewReturning(), the
+     same rules as the Completed card and Reports, so they can't disagree.
+   - Every sentence comes from a fixed template (no interpretation).
+   - Ministers are always alphabetical by last name and never ranked.
+   - Sunday Drop-In and Journey to Freedom read the Drop-in / Journey
+     group sessions and their Attendees count.
+   - Checks run first; if one fails, a banner lists it and the Word
+     downloads are hidden.
+   Two Word files: leadership (pages 1-3, no minister names) and the
+   leader's copy (pages 1-5). Charts are drawn here on a canvas. */
+const ST = { cy:'#E28E35', ly:'#B9B096', text:'#3F3F3F', muted:'#7A7468', brown:'#8B4E34', pillText:'#3C7A3C', pillBg:'#E6F2E3', border:'#A39577', grid:'#E9E5DC', axis:'#CFC8B8' };
+const ST_MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const ST_MONTH = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const ST_WORDS = ['zero','one','two','three','four','five','six','seven','eight','nine','ten'];
+const ST_ORD = ['first','second','third','fourth','fifth','sixth','seventh','eighth'];
+const DOCX_URL = 'https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js';
+let statReportDate = '';
+let statModel = null;
+let statFigs = {};           // figure key -> PNG data URL
+let reportNotes = [];        // [{id, date, note}] from the optional ReportNotes list
+let statNoteDate = '';       // which report date the note box was last filled for
+
+function stR1(x){ return Math.round(x*10)/10; }
+function stH(x){ return stR1(x).toFixed(1); }
+function stWeeks(h){ const w = Math.round(h/40*2)/2, whole = Math.floor(w); return (whole ? String(whole) : '') + (w-whole ? '½' : (whole ? '' : '0')); }
+function stNum(n, cap){ const w = (n>=0 && n<=10) ? ST_WORDS[n] : String(n); return cap ? w.charAt(0).toUpperCase()+w.slice(1) : w; }
+function stMd(iso){ return ST_MON[+iso.slice(5,7)-1] + ' ' + (+iso.slice(8,10)); }
+function stLong(iso){ return ST_MONTH[+iso.slice(5,7)-1] + ' ' + (+iso.slice(8,10)) + ', ' + iso.slice(0,4); }
+function stDow(iso){ return new Date(iso+'T12:00:00').getDay(); }
+function stLastFirst(name){ const p = String(name||'').trim().split(/\s+/); const last = p.length>1 ? p[p.length-1] : p[0]; return (last+' '+p.slice(0,-1).join(' ')).toLowerCase(); }
+function stByLastName(a,b){ return stLastFirst(a).localeCompare(stLastFirst(b)); }
+// G1: a % only when last year's value is 5 or more. G2: whole percent.
+function stPct(c,l){ return l>=5 ? Math.round((c-l)/l*100) : null; }
+// G5: "level" = within 10%, or within 1 when both are under 10.
+function stLevel(c,l){ if(c<10 && l<10) return Math.abs(c-l)<=1; if(!l) return c===0; return Math.abs(c-l)/l<=0.10; }
+
+function stPeriods(rep){
+  const cy = +rep.slice(0,4), ly = cy-1, md = rep.slice(5);
+  return { cy, ly, rep,
+    cur: { from: cy+'-01-01', to: rep },
+    cmp: { from: ly+'-01-01', to: ly+'-'+(md==='02-29' ? '02-28' : md) },
+    full:{ from: ly+'-01-01', to: ly+'-12-31' } };
+}
+function stFreedom(p){ return sessions.filter(s=>isFreedomCompleted(s) && s.date>=p.from && s.date<=p.to); }
+function stPeriodStats(p, firstEver){
+  const list = stFreedom(p);
+  const sp = splitNewReturning(list, p.from, firstEver);
+  return { list, sessions: list.length, recipients: sp.total, newCount: sp.newCount, returning: sp.returning,
+    hours: list.reduce((a,s)=>a+durationHours(s),0),
+    minHours: list.reduce((a,s)=>a+durationHours(s)*s.ministers.length,0) };
+}
+function stLeadCount(s){ return s.ministers.filter(m=>m.role==='Lead').length; }
+
+// Drop-In / Journey: group sessions already held (not Waiting, dated on
+// or before the report date).
+function stGroupHeld(type, from, to, rep){
+  return sessions.filter(s=>s.apptType===type && s.status!=='Waiting' && s.date && s.date>=from && s.date<=to && s.date<=rep)
+    .sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+}
+function stDropIn(p){
+  const list = stGroupHeld('Drop-in', p.from, p.to, statReportDate);
+  const counted = list.filter(s=>s.attendees!=null);
+  return { held: list.length,
+    recipients: counted.length ? counted.reduce((a,s)=>a+s.attendees,0) : null,
+    provisional: list.some(s=>s.attendees==null || s.attendeesProvisional) && counted.length>0,
+    list };
+}
+// Journey runs: sessions a few weeks apart belong to the same run; a run
+// never spans New Year. Named "2026, first run" by order in its year.
+function stJourneyRuns(P){
+  const all = sessions.filter(s=>s.apptType==='Journey' && s.status!=='Waiting' && s.date && s.date>=P.full.from && s.date<=P.cy+'-12-31')
+    .sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+  const runs = [];
+  all.forEach(s=>{
+    const prev = runs.length ? runs[runs.length-1] : null;
+    const last = prev ? prev.sessions[prev.sessions.length-1] : null;
+    const gapDays = last ? (new Date(s.date+'T12:00:00') - new Date(last.date+'T12:00:00'))/86400000 : Infinity;
+    if(prev && last.date.slice(0,4)===s.date.slice(0,4) && gapDays<=28) prev.sessions.push(s);
+    else runs.push({ year: +s.date.slice(0,4), sessions: [s] });
+  });
+  const perYear = {};
+  runs.forEach(r=>{
+    perYear[r.year] = (perYear[r.year]||0)+1;
+    r.name = r.year+', '+(ST_ORD[perYear[r.year]-1] || ('#'+perYear[r.year]))+' run';
+    r.held = r.sessions.filter(s=>s.date<=P.rep);
+    const ids = new Set(); r.held.forEach(s=>s.ministers.forEach(m=>ids.add(m.id)));
+    r.ministerCount = ids.size;
+    r.perSessionMinisters = r.held.map(s=>s.ministers.length);
+    r.counts = r.held.map(s=>s.attendees);
+    const known = r.counts.filter(c=>c!=null);
+    r.avg = known.length ? Math.round(known.reduce((a,c)=>a+c,0)/known.length) : null;
+    r.provisional = r.held.some(s=>s.attendeesProvisional);
+    r.datesText = stDatesText(r.sessions);
+  });
+  return runs;
+}
+// "Saturdays: Mar 7, 14, 21, 28" - month repeated only when it changes.
+// Mixed weekdays name each day instead.
+function stDatesText(list){
+  const days = new Set(list.map(s=>stDow(s.date)));
+  const DN = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  let prevMonth = '';
+  const parts = list.map(s=>{
+    const m = ST_MON[+s.date.slice(5,7)-1], d = +s.date.slice(8,10);
+    const dayPrefix = days.size>1 ? DN[stDow(s.date)].slice(0,3)+' ' : '';
+    const txt = dayPrefix + ((m!==prevMonth || days.size>1) ? m+' '+d : String(d));
+    prevMonth = m; return txt;
+  });
+  return (days.size===1 ? DN[[...days][0]]+'s: ' : '') + parts.join(', ');
+}
+
+function stMinisterRows(P, A){
+  const by = new Map();
+  const add = (list, key) => list.forEach(s=>{
+    const h = durationHours(s);
+    s.ministers.forEach(m=>{
+      if(!by.has(m.id)) by.set(m.id, { id:m.id, ly:{sessions:0,led:0,hours:0}, cy:{sessions:0,led:0,hours:0} });
+      const r = by.get(m.id)[key]; r.sessions++; if(m.role==='Lead') r.led++; r.hours += h;
+    });
+  });
+  add(A.cmp.list, 'ly'); add(A.cur.list, 'cy');
+  const fullIds = new Set(); A.full.list.forEach(s=>s.ministers.forEach(m=>fullIds.add(m.id)));
+  return [...by.values()].map(r=>{
+    const m = ministers.find(x=>x.id===r.id) || {};
+    return { ...r, name: m.name||'(unknown)', inactive: m.status && m.status!=='Active',
+      isNew: !fullIds.has(r.id) && r.cy.sessions>0 && !r.ly.sessions };
+  }).sort((a,b)=>stByLastName(a.name,b.name));
+}
+
+function stMonthly(P){
+  const n = +P.rep.slice(5,7);
+  const cy = Array(n).fill(0), ly = Array(n).fill(0);
+  stFreedom(P.cur).forEach(s=>{ cy[+s.date.slice(5,7)-1]++; });
+  stFreedom(P.cmp).forEach(s=>{ const i=+s.date.slice(5,7)-1; if(i<n) ly[i]++; });
+  const lastDay = new Date(P.cy, n, 0).getDate();
+  return { n, cy, ly, partial: +P.rep.slice(8,10) < lastDay };
+}
+
+// Seven checks from the spec; any failure hides the downloads.
+function stChecks(P, A, rows, mon){
+  const fails = [];
+  [['cur',P.cy+' to date'],['cmp',P.ly+' same dates'],['full',P.ly+' full year']].forEach(([k,label])=>{
+    const a = A[k]; if(a.newCount + a.returning !== a.recipients)
+      fails.push({ desc:'New + Returning must equal Unique recipients', details:`${label}: ${a.newCount} + ${a.returning} ≠ ${a.recipients}`, records:[] });
+  });
+  const life = splitNewReturning(sessions.filter(isFreedomCompleted), null);
+  if(life.newCount!==life.total || life.returning!==0)
+    fails.push({ desc:'Lifetime New must equal lifetime recipients', details:`${life.newCount} new, ${life.returning} returning, ${life.total} recipients`, records:[] });
+  [['cur','cy',P.cy+' to date'],['cmp','ly',P.ly+' same dates']].forEach(([k,rk,label])=>{
+    const led = rows.reduce((a,r)=>a+r[rk].led,0);
+    if(led!==A[k].sessions) fails.push({ desc:'Sessions led must add up to the number of sessions', details:`${label}: ${led} leads for ${A[k].sessions} sessions`, records:[] });
+    const hrs = rows.reduce((a,r)=>a+r[rk].hours,0);
+    if(Math.abs(hrs - A[k].minHours) > 0.05) fails.push({ desc:'Team total hours must equal the minister rows', details:`${label}: ${stH(hrs)} vs ${stH(A[k].minHours)}`, records:[] });
+  });
+  const sumCy = mon.cy.reduce((a,b)=>a+b,0), sumLy = mon.ly.reduce((a,b)=>a+b,0);
+  if(sumCy!==A.cur.sessions || sumLy!==A.cmp.sessions)
+    fails.push({ desc:'Monthly bars must add up to the period totals', details:`${P.cy}: ${sumCy} vs ${A.cur.sessions}; ${P.ly}: ${sumLy} vs ${A.cmp.sessions}`, records:[] });
+  const seen = new Set(), badLead = [];
+  [...A.cur.list, ...A.cmp.list, ...A.full.list].forEach(s=>{
+    if(seen.has(s.id)) return; seen.add(s.id);
+    const n = stLeadCount(s);
+    if(n!==1) badLead.push(`${s.recipName}, ${stLong(s.date)}: ${n} leads`);
+  });
+  if(badLead.length) fails.push({ desc:'Every session must have exactly one lead', details:`${badLead.length} session${badLead.length===1?'':'s'}`, records: badLead });
+  // Likely duplicates: a first-name-only recipient whose name is the first
+  // name of another recipient (e.g. "Wendy" and "Wendy Rutherford").
+  const names = new Map();
+  sessions.filter(isFreedomCompleted).forEach(s=>{ const k=s.recipName.trim().toLowerCase().replace(/\s+/g,' '); if(!names.has(k)) names.set(k, s.recipName.trim()); });
+  const dupes = [];
+  names.forEach((disp,k)=>{
+    if(k.includes(' ')) return;
+    names.forEach((d2,k2)=>{ if(k2!==k && k2.split(' ')[0]===k) dupes.push(`"${disp}" and "${d2}"`); });
+  });
+  if(dupes.length) fails.push({ desc:'A recipient may appear under two names', details:'Rename one in the sessions if they are the same person', records: dupes });
+  return fails;
+}
+
+/* ---- Sentence templates (section 6). Each returns [{t, b}] runs. ---- */
+function stChange(c, l, cText, lText, unit){
+  const p = stPct(c,l);
+  if(p===null) return `compared with ${lText}${unit||''}`;
+  if(p>0) return `up ${p}% from ${lText}${unit||''}`;
+  if(p<0) return `down ${-p}% from ${lText}${unit||''}`;
+  return `the same as ${lText}${unit||''}`;
+}
+function stS1(P, A, passMonth){
+  const c = A.cur.sessions, l = A.cmp.sessions;
+  let phrase;
+  if(l>0 && c/l>=2) phrase = 'more than double the same period last year';
+  else if(stLevel(c,l)) phrase = 'about the same as the same period last year';
+  else if(l<5) phrase = 'compared with the same period last year';
+  else if(c>l) phrase = `up ${stPct(c,l)}% from the same period last year`;
+  else phrase = `down ${-stPct(c,l)}% from the same period last year`;
+  const runs = [
+    { t:`From January 1 to ${stLong(P.rep).replace(/, \d{4}$/,'')}, ${P.cy}, the ministry completed ` },
+    { t:`${c} Freedom Session${c===1?'':'s'} with ${A.cur.recipients} ${A.cur.recipients===1?'person':'people'}`, b:true },
+    { t:`, ${phrase} (${l} session${l===1?'':'s'} with ${A.cmp.recipients} ${A.cmp.recipients===1?'person':'people'}).` }
+  ];
+  if(passMonth!=null) runs.push({ t:` By the end of ${ST_MONTH[passMonth]}, ${P.cy} had already passed the total for all of ${P.ly}.` });
+  return runs;
+}
+function stS2(P, A){
+  const a = A.cur, b = A.cmp;
+  const retWord = a.returning>b.returning ? 'up from' : a.returning<b.returning ? 'down from' : 'the same as';
+  return [
+    { t:`${a.newCount} of this year's ${a.recipients} recipients were new to the ministry`, b:true },
+    { t:`, ${stChange(a.newCount, b.newCount, a.newCount, b.newCount)} over the same dates last year. The other ${a.returning} were returning from earlier years, ${retWord} ${b.returning}. Recipients received ${stH(a.hours)} hours of prayer, ${stChange(stR1(a.hours), stR1(b.hours), stH(a.hours), stH(b.hours), ' hours')} over the same dates last year.` }
+  ];
+}
+function stS3(P, A){
+  const a = A.cur.minHours, b = A.cmp.minHours, f = A.full.minHours;
+  const p = stPct(stR1(a), stR1(b));
+  const chg = p===null ? `compared with the same dates last year (${stH(b)} hours)` : p>0 ? `up ${p}% from the same dates last year (${stH(b)} hours)` : p<0 ? `down ${-p}% from the same dates last year (${stH(b)} hours)` : `the same as the same dates last year (${stH(b)} hours)`;
+  return [
+    { t:'Because each session has a team of two to four ministers, the time the team gave is much larger: ' },
+    { t:`${stH(a)} hours so far in ${P.cy}, the equivalent of about ${stWeeks(a)} forty-hour work weeks`, b:true },
+    { t:`. That is ${chg}${stR1(a)>stR1(f) && f>0 ? ` and already beyond all of ${P.ly} (${stH(f)} hours)` : ''}. Administrative time is in addition to these hours.` }
+  ];
+}
+// Figure 2 caption: runs of consecutive months above / level / below.
+function stS4(P, mon){
+  const kind = mon.cy.map((c,i)=> stLevel(c, mon.ly[i]) ? 'level' : (c>mon.ly[i] ? 'ahead' : 'behind'));
+  const groups = [];
+  kind.forEach((k,i)=>{ const g = groups[groups.length-1]; if(g && g.k===k) g.to=i; else groups.push({k, from:i, to:i}); });
+  const cy = P.cy, ly = P.ly;
+  if(groups.length===1){
+    const k = groups[0].k;
+    return k==='level' ? 'Monthly totals have been level with last year every month so far.'
+      : `${cy} has run ${k} of ${ly} every month so far.`;
+  }
+  const clauses = groups.map((g,gi)=>{
+    const last = gi===groups.length-1 && g.to===mon.n-1 && g.from<g.to;
+    const span = g.from===g.to ? `in ${ST_MONTH[g.from]}` : `from ${ST_MONTH[g.from]} through ${ST_MONTH[g.to]}`;
+    if(last) return g.k==='level' ? `since ${ST_MONTH[g.from]}, monthly totals have been level with last year`
+      : `since ${ST_MONTH[g.from]}, ${cy} has run ${g.k} of ${ly}`;
+    return g.k==='level' ? `monthly totals were level with last year ${span}` : `${cy} ran ${g.k} of ${ly} ${span}`;
+  });
+  const txt = clauses.join('; ') + '.';
+  return txt.charAt(0).toUpperCase() + txt.slice(1);
+}
+function stS6(P, rows){
+  const n = rows.filter(r=>r.cy.led>0).length, l = rows.filter(r=>r.ly.led>0).length;
+  const cmp = n>l ? `up from ${stNum(l)}` : n<l ? `down from ${stNum(l)}` : `the same as ${stNum(l)}`;
+  return `${stNum(n,true)} minister${n===1?'':'s'} led at least one session in ${P.cy}, ${cmp} over the same dates in ${P.ly}.`;
+}
+function stS8(P, rows){
+  const list = arr => arr.length<=1 ? arr.join('') : arr.slice(0,-1).join(', ')+' and '+arr[arr.length-1];
+  const joined = rows.filter(r=>r.isNew).map(r=>r.name);
+  const gone = rows.filter(r=>r.inactive).map(r=>r.name);
+  const parts = [];
+  if(joined.length) parts.push(`${list(joined)} joined the team in ${P.cy}`);
+  if(gone.length) parts.push(`${list(gone)} ${gone.length===1?'is':'are'} no longer active`);
+  return parts.length ? parts.join('; ')+'.' : '';
+}
+
+function buildStatModel(rep){
+  const P = stPeriods(rep);
+  const firstEver = recipientFirstEverDates();
+  const A = { cur: stPeriodStats(P.cur, firstEver), cmp: stPeriodStats(P.cmp, firstEver), full: stPeriodStats(P.full, firstEver) };
+  const mon = stMonthly(P);
+  // Month this year's running total passed last year's full-year total.
+  let passMonth = null, run = 0;
+  for(let i=0;i<mon.n;i++){ run += mon.cy[i]; if(A.full.sessions>0 && run>A.full.sessions){ passMonth = i; break; } }
+  const rows = stMinisterRows(P, A);
+  const drop = { cur: stDropIn(P.cur), cmp: stDropIn(P.cmp), full: stDropIn(P.full) };
+  const runs = stJourneyRuns(P);
+  const checks = stChecks(P, A, rows, mon);
+  const note = (reportNotes.find(n=>n.date===rep)||{}).note || '';
+  return { P, A, mon, passMonth, rows, drop, runs, checks, note,
+    S1: stS1(P, A, passMonth), S2: stS2(P, A), S3: stS3(P, A), S4: stS4(P, mon), S6: stS6(P, rows), S8: stS8(P, rows) };
+}
+
+/* ---- Charts (canvas -> PNG). Logical size in CSS px; drawn at 2.5x so
+   a 6.4" figure is about 250 DPI in Word. ---- */
+const ST_SCALE = 2.5;
+const ST_FONT = '"Jost", "Segoe UI", Arial, sans-serif';
+function stCanvas(w, h){
+  const c = document.createElement('canvas'); c.width = Math.round(w*ST_SCALE); c.height = Math.round(h*ST_SCALE);
+  const x = c.getContext('2d'); x.scale(ST_SCALE, ST_SCALE); x.fillStyle = '#fff'; x.fillRect(0,0,w,h); x.textBaseline = 'alphabetic';
+  return { c, x, w, h };
+}
+function stFont(x, size, weight, italic){ x.font = `${italic?'italic ':''}${weight||400} ${size}px ${ST_FONT}`; }
+function stText(x, t, px, py, o){ o=o||{}; stFont(x, o.size||11, o.weight, o.italic); x.fillStyle = o.color||ST.text; x.textAlign = o.align||'left'; x.fillText(t, px, py); }
+function stRound(x, px, py, w, h, r){ x.beginPath(); x.moveTo(px+r,py); x.arcTo(px+w,py,px+w,py+h,r); x.arcTo(px+w,py+h,px,py+h,r); x.arcTo(px,py+h,px,py,r); x.arcTo(px,py,px+w,py,r); x.closePath(); }
+function stNiceStep(max){ const raw = Math.max(1,max)/5, p = Math.pow(10, Math.floor(Math.log10(raw))), m = raw/p; return (m<=1?1:m<=2?2:m<=2.5?2.5:m<=5?5:10)*p; }
+function stLegend(x, w, P){
+  [[P.ly, ST.ly],[P.cy, ST.cy]].forEach(([lab,col],i)=>{
+    const px = w - 150 + i*74;
+    x.fillStyle = col; x.fillRect(px, 18, 12, 12);
+    stText(x, String(lab), px+18, 29, { size:11.5 });
+  });
+}
+function stPill(x, cxp, cyp, pct){
+  if(pct===null || pct===0) return;
+  const t = (pct>0?'▲ ':'▼ ')+Math.abs(pct)+'%';
+  stFont(x, 10.5, 600); const tw = x.measureText(t).width;
+  stRound(x, cxp-tw/2-8, cyp-11, tw+16, 21, 8); x.fillStyle = pct>0 ? ST.pillBg : '#EFEDE8'; x.fill();
+  stText(x, t, cxp, cyp+4, { size:10.5, weight:600, align:'center', color: pct>0 ? ST.pillText : ST.muted });
+}
+function stDrawCard(M){
+  const { P, A } = M, W = 640, rowsDef = [
+    ['Sessions', a=>a.sessions, v=>String(v), true],
+    ['Unique recipients', a=>a.recipients, v=>String(v), true],
+    ['New to the ministry', a=>a.newCount, v=>String(v), true],
+    ['Returning from earlier years', a=>a.returning, v=>String(v), true],
+    ['Hours of prayer received', a=>stR1(a.hours), v=>v.toFixed(1), true],
+    ['Hours given by ministers', a=>stR1(a.minHours), v=>v.toFixed(1), true]
+  ];
+  const top = 104, rh = 58, H = top + rowsDef.length*rh + 52;
+  const { c, x } = stCanvas(W, H);
+  stRound(x, 6, 6, W-12, H-12, 14); x.strokeStyle = ST.border; x.lineWidth = 1.2; x.stroke();
+  const col = [268, 415, 556], pillX = 343;
+  const heads = [[String(P.cy), `Jan 1 – ${stMd(P.rep)}`],[String(P.ly), `Jan 1 – ${stMd(P.cmp.to)}`],[String(P.ly),'Full year']];
+  heads.forEach(([y,r],i)=>{
+    stText(x, y, col[i], 42, { size:16, weight:700, align:'center' });
+    stText(x, r, col[i], 61, { size:10.5, color:ST.muted, align:'center' });
+    x.strokeStyle = ST.border; x.lineWidth = 1; x.beginPath(); x.moveTo(col[i]-62, 72); x.lineTo(col[i]+62, 72); x.stroke();
+  });
+  stText(x, 'same dates, last year', col[1], 89, { size:9.5, italic:true, color:ST.muted, align:'center' });
+  rowsDef.forEach(([label, get, fmt], i)=>{
+    const y = top + i*rh + rh/2 + (i===rowsDef.length-1 ? -6 : 0);
+    if(i>0){ x.strokeStyle = ST.grid; x.lineWidth = 1; x.beginPath(); x.moveTo(26, top+i*rh); x.lineTo(W-26, top+i*rh); x.stroke(); }
+    stText(x, label, 32, y+5, { size:13, weight:600 });
+    const cv = get(A.cur), lv = get(A.cmp), fv = get(A.full);
+    stText(x, fmt(cv), col[0], y+8, { size: i<2 ? 24 : 20, weight:700, align:'center' });
+    stText(x, fmt(lv), col[1], y+6, { size:16, weight:600, align:'center' });
+    stText(x, fmt(fv), col[2], y+6, { size:16, color:ST.muted, align:'center' });
+    if(i!==3 || A.cmp.returning>=5) stPill(x, pillX, y+1, stPct(cv, lv));
+    if(i===rowsDef.length-1){
+      stText(x, `≈ ${stWeeks(A.cur.minHours)} work weeks`, col[0], y+27, { size:10, weight:600, color:ST.brown, align:'center' });
+      stText(x, `≈ ${stWeeks(A.cmp.minHours)} weeks`, col[1], y+27, { size:10, color:ST.muted, align:'center' });
+      stText(x, `≈ ${stWeeks(A.full.minHours)} weeks`, col[2], y+27, { size:10, color:ST.muted, align:'center' });
+    }
+  });
+  stText(x, `Growth % compares ${P.cy} with the same dates in ${P.ly}. Work weeks = 40 hours.`, 32, H-22, { size:10, italic:true, color:ST.muted });
+  return c.toDataURL('image/png');
+}
+function stDrawMonthly(M){
+  const { P, mon } = M, W = 640, H = 290;
+  const { c, x } = stCanvas(W, H);
+  stText(x, 'Completed Freedom Sessions by month', 32, 30, { size:14, weight:700 });
+  stLegend(x, W, P);
+  const x0 = 46, x1 = W-10, y0 = 62, y1 = 244;
+  const max = Math.max(1, ...mon.cy, ...mon.ly), step = stNiceStep(max), top = Math.ceil(max/step)*step;
+  const yOf = v => y1 - (v/top)*(y1-y0);
+  for(let v=0; v<=top+1e-9; v+=step){
+    x.strokeStyle = v===0 ? ST.axis : ST.grid; x.lineWidth = 1; x.beginPath(); x.moveTo(x0, yOf(v)); x.lineTo(x1, yOf(v)); x.stroke();
+    stText(x, String(v), x0-10, yOf(v)+4, { size:10.5, color:ST.muted, align:'right' });
+  }
+  const gw = (x1-x0)/12, bw = Math.min(18, gw*0.36);
+  for(let i=0;i<mon.n;i++){
+    const gx = x0 + gw*i + gw/2;
+    [[mon.ly[i], ST.ly, gx-bw-1, false],[mon.cy[i], ST.cy, gx+1, true]].forEach(([v,colr,bx,bold])=>{
+      if(!v) return;
+      x.fillStyle = colr; x.fillRect(bx, yOf(v), bw, y1-yOf(v));
+      stText(x, String(v), bx+bw/2, yOf(v)-4, { size: bold?10.5:9.5, weight: bold?700:400, color: bold?ST.text:ST.muted, align:'center' });
+    });
+    stText(x, ST_MON[i] + (i===mon.n-1 && mon.partial ? '*' : ''), gx, y1+17, { size:11, color:ST.muted, align:'center' });
+  }
+  if(mon.partial) stText(x, `*${ST_MONTH[mon.n-1]} counts are through ${stMd(P.rep)} in both years.`, 10, H-8, { size:9.5, italic:true, color:ST.muted });
+  return c.toDataURL('image/png');
+}
+function stDrawRunning(M){
+  const { P, A, mon, passMonth } = M, W = 640, H = 280;
+  const { c, x } = stCanvas(W, H);
+  stText(x, 'Running total of sessions', 32, 30, { size:14, weight:700 });
+  stLegend(x, W, P);
+  const cumC = [], cumL = []; let a=0, b=0;
+  for(let i=0;i<mon.n;i++){ a+=mon.cy[i]; b+=mon.ly[i]; cumC.push(a); cumL.push(b); }
+  const x0 = 46, x1 = W-60, y0 = 62, y1 = 244;
+  const max = Math.max(1, a, b, A.full.sessions), step = stNiceStep(max), top = Math.ceil(max*1.02/step)*step;
+  const yOf = v => y1 - (v/top)*(y1-y0), xOf = i => mon.n===1 ? (x0+x1)/2 : x0 + 6 + i*((x1-x0-12)/(mon.n-1));
+  for(let v=0; v<=top+1e-9; v+=step){
+    x.strokeStyle = v===0 ? ST.axis : ST.grid; x.lineWidth = 1; x.beginPath(); x.moveTo(x0, yOf(v)); x.lineTo(W-10, yOf(v)); x.stroke();
+    stText(x, String(v), x0-10, yOf(v)+4, { size:10.5, color:ST.muted, align:'right' });
+  }
+  for(let i=0;i<mon.n;i++) stText(x, ST_MON[i] + (i===mon.n-1 && mon.partial ? '*' : ''), xOf(i), y1+17, { size:11, color:ST.muted, align:'center' });
+  if(A.full.sessions>0){
+    x.setLineDash([5,4]); x.strokeStyle = ST.muted; x.lineWidth = 1.2; x.beginPath(); x.moveTo(x0, yOf(A.full.sessions)); x.lineTo(W-10, yOf(A.full.sessions)); x.stroke(); x.setLineDash([]);
+    stText(x, `All of ${P.ly}: ${A.full.sessions} sessions`, x0+8, yOf(A.full.sessions)-6, { size:10.5, color:ST.muted });
+  }
+  [[cumL, ST.ly, false],[cumC, ST.cy, true]].forEach(([arr,colr,bold])=>{
+    x.strokeStyle = colr; x.lineWidth = 3; x.lineJoin = 'round'; x.beginPath();
+    arr.forEach((v,i)=>{ i ? x.lineTo(xOf(i), yOf(v)) : x.moveTo(xOf(i), yOf(v)); }); x.stroke();
+    x.fillStyle = colr; arr.forEach((v,i)=>{ x.beginPath(); x.arc(xOf(i), yOf(v), 3.6, 0, Math.PI*2); x.fill(); });
+    stText(x, String(arr[arr.length-1]), xOf(arr.length-1)+10, yOf(arr[arr.length-1])+4, { size:11.5, weight: bold?700:400, color: bold?ST.text:ST.muted });
+  });
+  if(passMonth!=null){
+    const px = xOf(passMonth), py = yOf(cumC[passMonth]);
+    const tx = Math.max(x0+40, px-160), ty = Math.max(y0+6, py-80);
+    stText(x, `Passed all of ${P.ly}`, tx, ty, { size:10.5 });
+    stText(x, `by end of ${ST_MON[passMonth]} (${cumC[passMonth]})`, tx, ty+14, { size:10.5 });
+    x.strokeStyle = ST.muted; x.lineWidth = 1; x.beginPath(); x.moveTo(tx+70, ty+20); x.lineTo(px-3, py-3); x.stroke();
+  }
+  return c.toDataURL('image/png');
+}
+function stDrawLed(M){
+  const { P, rows } = M;
+  const list = rows.filter(r=>r.cy.led>0 || r.ly.led>0);
+  const W = 640, rowH = 30, top = 58, H = top + Math.max(1,list.length)*rowH + 48;
+  const { c, x } = stCanvas(W, H);
+  stFont(x, 12, 400);
+  const labW = Math.max(60, ...list.map(r=>x.measureText(r.name).width));
+  const x0 = Math.min(220, labW + 20), x1 = W-40;
+  stText(x, 'Sessions led, by minister', x0, 30, { size:14, weight:700 });
+  stLegend(x, W, P);
+  const max = Math.max(1, ...list.map(r=>Math.max(r.cy.led, r.ly.led))), step = stNiceStep(max), topV = Math.ceil(max/step)*step;
+  const xOf = v => x0 + (v/topV)*(x1-x0), yEnd = top + list.length*rowH;
+  for(let v=0; v<=topV+1e-9; v+=step){
+    x.strokeStyle = v===0 ? ST.axis : ST.grid; x.lineWidth = 1; x.beginPath(); x.moveTo(xOf(v), top-6); x.lineTo(xOf(v), yEnd+4); x.stroke();
+    stText(x, String(v), xOf(v), yEnd+20, { size:10.5, color:ST.muted, align:'center' });
+  }
+  list.forEach((r,i)=>{
+    const y = top + i*rowH;
+    stText(x, r.name, x0-8, y+19, { size:12, align:'right' });
+    [[r.ly.led, ST.ly, y+3, false],[r.cy.led, ST.cy, y+15, true]].forEach(([v,colr,by,bold])=>{
+      x.fillStyle = colr; x.fillRect(x0, by, xOf(v)-x0, 11);
+      stText(x, String(v), xOf(v)+5, by+10, { size: bold?11:10, weight: bold?700:400, color: bold?ST.text:ST.muted });
+    });
+  });
+  stText(x, `Both years: Jan 1 – ${stMd(P.rep)}.`, 10, H-8, { size:9.5, italic:true, color:ST.muted });
+  return c.toDataURL('image/png');
+}
+async function stDrawAll(M){
+  try{ if(document.fonts && document.fonts.load) await Promise.all(['400','600','700'].map(w=>document.fonts.load(`${w} 12px "Jost"`))); }catch(e){}
+  return { card: stDrawCard(M), monthly: stDrawMonthly(M), running: stDrawRunning(M), led: stDrawLed(M) };
+}
+
+/* ---- On-screen report ---- */
+function stRunsHtml(runs){ return runs.map(r=>r.b ? `<strong>${escapeHtml(r.t)}</strong>` : escapeHtml(r.t)).join(''); }
+function stPillHtml(p){ if(p===null || p===0) return ''; return `<span class="st-pill ${p>0?'up':'down'}">${p>0?'▲':'▼'} ${Math.abs(p)}%</span>`; }
+function stCell(v, prov){ return v===null || v===undefined ? '<span class="st-nyr">Not yet recorded</span>' : `<span class="${prov?'st-prov':''}">${escapeHtml(String(v))}</span>`; }
+function stJourneyRows(M){
+  if(!M.runs.length) return [{ name:'—', dates:null, ministers:null, perMin:null, counts:null, avg:null, prov:false }];
+  return M.runs.map(r=>{
+    if(!r.held.length) return { name:r.name, dates:'Scheduled', ministers:'—', perMin:'—', counts:'—', avg:'—', prov:false };
+    const recorded = r.counts.some(c=>c!=null);
+    return { name:r.name, dates:r.datesText, ministers:String(r.ministerCount), perMin:r.perSessionMinisters.join(', '),
+      counts: recorded ? r.counts.map(c=>c==null?'?':c).join(', ') : null,
+      avg: r.avg==null ? null : String(r.avg), prov: r.provisional || r.counts.some(c=>c==null) };
+  });
+}
+function stPage5Rows(M){
+  const out = [];
+  M.runs.forEach(r=>r.sessions.forEach((s,i)=>{
+    const names = s.ministers.map(m=>(ministers.find(x=>x.id===m.id)||{}).name).filter(Boolean).sort(stByLastName);
+    const held = s.date<=M.P.rep;
+    out.push({ run: i===0 ? r.name : '', date: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][stDow(s.date)]+' '+stMd(s.date)+', '+s.date.slice(0,4), names: held ? (names.join(', ') || 'Not yet recorded') : 'Scheduled' });
+  }));
+  return out;
+}
+function renderStatistics(){
+  const box = $('#statReport'); if(!box) return;
+  if(!statReportDate){ statReportDate = todayISO(); $('#statDate').value = statReportDate; }
+  const M = statModel = buildStatModel(statReportDate);
+  const { P, A } = M;
+  // Leader's Note box follows the report date unless it's being edited.
+  if(statNoteDate!==statReportDate){ $('#statNote').value = M.note; statNoteDate = statReportDate; updateStatNoteCount(); }
+  $('#statNoteSetup').hidden = !!listIds.reportNotes;
+  $('#btnSaveStatNote').hidden = !listIds.reportNotes;
+  // Checks banner + downloads
+  const banner = $('#statChecks');
+  if(M.checks.length){
+    banner.hidden = false;
+    banner.innerHTML = M.checks.map(f=>`<div><strong>Report not ready: ${escapeHtml(f.desc)}</strong> — ${escapeHtml(f.details)}${f.records.length ? `<ul>${f.records.slice(0,30).map(r=>`<li>${escapeHtml(r)}</li>`).join('')}</ul>` : ''}</div>`).join('');
+  } else { banner.hidden = true; banner.innerHTML = ''; }
+  $('#statDownloads').hidden = !!M.checks.length;
+  const d = M.drop, dPct = (d.cur.recipients!=null && d.cmp.recipients!=null) ? stPct(d.cur.recipients, d.cmp.recipients) : null;
+  const anyProv = d.cur.provisional || d.cmp.provisional || d.full.provisional || M.runs.some(r=>r.provisional);
+  const jRows = stJourneyRows(M);
+  const card = (k,v)=>v;
+  box.innerHTML = `
+    <div class="st-page" data-page="1">
+      <div class="st-title">Freedom Prayer Healing Ministry</div>
+      <div class="st-sub">Creekside Church</div>
+      <div class="st-line">Ministry statistics, ${P.cy} compared with ${P.ly} · ${stLong(P.rep)}</div>
+      <h2>Freedom Sessions</h2>
+      <p>${stRunsHtml(M.S1)}</p><p>${stRunsHtml(M.S2)}</p><p>${stRunsHtml(M.S3)}</p>
+      <div class="st-card-wrap"><table class="st-card">
+        <thead><tr><th></th><th>${P.cy}<span>Jan 1 – ${stMd(P.rep)}</span></th><th></th><th>${P.ly}<span>Jan 1 – ${stMd(P.cmp.to)}</span><em>same dates, last year</em></th><th class="muted">${P.ly}<span>Full year</span></th></tr></thead>
+        <tbody>${[
+          ['Sessions','sessions',0],['Unique recipients','recipients',0],['New to the ministry','newCount',0],['Returning from earlier years','returning',0],['Hours of prayer received','hours',1],['Hours given by ministers','minHours',1]
+        ].map(([lab,k,dec])=>{
+          const v = a => dec ? stR1(a[k]) : a[k], f = val => dec ? val.toFixed(1) : String(val);
+          const pill = (k==='returning' && A.cmp.returning<5) ? '' : stPillHtml(stPct(v(A.cur), v(A.cmp)));
+          const wk = k==='minHours';
+          return `<tr><th scope="row">${lab}</th><td class="cy">${f(v(A.cur))}${wk?`<small class="wk">≈ ${stWeeks(A.cur.minHours)} work weeks</small>`:''}</td><td>${pill}</td><td class="ly">${f(v(A.cmp))}${wk?`<small>≈ ${stWeeks(A.cmp.minHours)} weeks</small>`:''}</td><td class="muted">${f(v(A.full))}${wk?`<small>≈ ${stWeeks(A.full.minHours)} weeks</small>`:''}</td></tr>`;
+        }).join('')}</tbody></table>
+        <p class="st-foot">Growth % compares ${P.cy} with the same dates in ${P.ly}. Work weeks = 40 hours.</p></div>
+      <p class="st-cap">Figure 1. Freedom Sessions: ${P.cy} to date against the same dates in ${P.ly}, with the ${P.ly} full year for reference. <a href="#" class="st-dl" data-fig="card">Download PNG</a></p>
+      ${M.note.trim() ? `<h3>From the ministry leader</h3><p class="st-note">${escapeHtml(M.note.trim())}</p>` : ''}
+    </div>
+    <div class="st-page" data-page="2">
+      <div class="st-fig"><img id="stFigMonthly" alt="Figure 2: completed Freedom Sessions by month, ${P.ly} and ${P.cy}"></div>
+      <p class="st-cap">Figure 2. Sessions by month. ${escapeHtml(M.S4)} <a href="#" class="st-dl" data-fig="monthly">Download PNG</a></p>
+      <div class="st-fig"><img id="stFigRunning" alt="Figure 3: running total of sessions, ${P.ly} and ${P.cy}"></div>
+      <p class="st-cap">Figure 3. Running total of sessions.${M.passMonth!=null ? ` ${P.cy} passed the full-year ${P.ly} total (${A.full.sessions}) in ${ST_MONTH[M.passMonth]}.` : ''} <a href="#" class="st-dl" data-fig="running">Download PNG</a></p>
+    </div>
+    <div class="st-page" data-page="3">
+      <h2>Sunday Drop-In</h2>
+      <p>Prayer is also offered on a drop-in basis on Sundays.</p>
+      <div class="table-scroll"><table class="st-table st-cmp">
+        <thead><tr><th></th><th>${P.cy}<span>Jan 1 – ${stMd(P.rep)}</span></th><th></th><th>${P.ly}<span>Jan 1 – ${stMd(P.cmp.to)}</span><em>same dates, last year</em></th><th class="muted">${P.ly}<span>Full year</span></th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Sundays held</th><td>${stCell(d.cur.held||null)}</td><td>${d.cur.held && d.cmp.held ? stPillHtml(stPct(d.cur.held, d.cmp.held)) : ''}</td><td>${stCell(d.cmp.held||null)}</td><td class="muted">${stCell(d.full.held||null)}</td></tr>
+          <tr><th scope="row">Prayer recipients</th><td>${stCell(d.cur.recipients, d.cur.provisional)}</td><td>${stPillHtml(dPct)}</td><td>${stCell(d.cmp.recipients, d.cmp.provisional)}</td><td class="muted">${stCell(d.full.recipients, d.full.provisional)}</td></tr>
+        </tbody></table></div>
+      <p class="st-cap">${anyProv ? 'Highlighted figures are provisional and will be updated. ' : ''}Growth % compares the same dates in both years.</p>
+      <h2>Journey to Freedom</h2>
+      <p>The Journey to Freedom workshop runs twice a year over a series of weekly sessions.</p>
+      <div class="table-scroll"><table class="st-table">
+        <thead><tr><th>Run</th><th>Sessions</th><th>Prayer ministers (run)</th><th>Ministers each session</th><th>Participants each session</th><th>Average participants</th></tr></thead>
+        <tbody>${jRows.map(r=>`<tr><th scope="row">${escapeHtml(r.name)}</th><td>${stCell(r.dates)}</td><td>${stCell(r.ministers)}</td><td>${stCell(r.perMin)}</td><td>${stCell(r.counts, r.prov)}</td><td>${stCell(r.avg, r.prov)}</td></tr>`).join('')}</tbody></table></div>
+      <p class="st-cap">Participants are counted each session, so the same person attending every week is counted each time; the average shows typical attendance.</p>
+    </div>
+    <div class="st-page" data-page="4">
+      <div class="st-label">Ministry leader's copy</div>
+      <h2>Ministry Team</h2>
+      <p>${escapeHtml(M.S6)}</p>${M.S8 ? `<p>${escapeHtml(M.S8)}</p>` : ''}
+      <p class="st-cap">All comparisons on this page use the same dates in both years: January 1 to ${stLong(P.rep).replace(/, \d{4}$/,'')}.</p>
+      <div class="st-fig"><img id="stFigLed" alt="Figure 4: sessions led by each minister, ${P.ly} and ${P.cy}"></div>
+      <p class="st-cap">Figure 4. Sessions led by each minister, in alphabetical order. Ministers who have not led a session are omitted. <a href="#" class="st-dl" data-fig="led">Download PNG</a></p>
+      <div class="table-scroll"><table class="st-table st-min">
+        <thead><tr><th>Minister</th><th>Sessions ${P.ly}</th><th>Sessions ${P.cy}</th><th>Led ${P.ly}</th><th>Led ${P.cy}</th><th>Hours ${P.ly}</th><th>Hours ${P.cy}</th><th>Hours change</th></tr></thead>
+        <tbody>${stMinisterTable(M).map((r,i,arr)=>`<tr class="${i===arr.length-1?'st-total':''}">${r.map((c,j)=>j===0?`<th scope="row">${escapeHtml(c)}</th>`:`<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+      <p class="st-cap">"Sessions" counts every session a minister took part in, as lead or team member, so team totals exceed the number of sessions held. Both years run January 1 to ${stLong(P.rep).replace(/, \d{4}$/,'')}.</p>
+    </div>
+    <div class="st-page" data-page="5">
+      <div class="st-label">Ministry leader's copy</div>
+      <h2>Journey to Freedom: Ministers by Session</h2>
+      <p>Prayer ministers present at each session of each run.</p>
+      <div class="table-scroll"><table class="st-table">
+        <thead><tr><th>Run</th><th>Session</th><th>Prayer ministers present</th></tr></thead>
+        <tbody>${(stPage5Rows(M).length ? stPage5Rows(M) : [{run:'—', date:null, names:null}]).map(r=>`<tr><th scope="row">${escapeHtml(r.run)}</th><td>${stCell(r.date)}</td><td>${stCell(r.names)}</td></tr>`).join('')}</tbody></table></div>
+    </div>`;
+  box.querySelectorAll('.st-dl').forEach(a=>a.addEventListener('click', e=>{ e.preventDefault(); downloadStatFig(a.dataset.fig); }));
+  renderStatRecords();
+  stDrawAll(M).then(figs=>{
+    if(statModel!==M) return;
+    statFigs = figs;
+    const set = (id,k)=>{ const im = document.getElementById(id); if(im) im.src = figs[k]; };
+    set('stFigMonthly','monthly'); set('stFigRunning','running'); set('stFigLed','led');
+  });
+}
+// Minister table rows as plain strings (shared by screen and Word).
+function stMinisterTable(M){
+  const { P, rows } = M;
+  const dash = '—';
+  const out = rows.map(r=>{
+    const tag = r.inactive ? ' (inactive)' : r.isNew ? ` (new in ${P.cy})` : '';
+    const has = k => r[k].sessions>0;
+    const p = (has('ly') && has('cy')) ? stPct(stR1(r.cy.hours), stR1(r.ly.hours)) : null;
+    return [r.name+tag,
+      has('ly') ? String(r.ly.sessions) : dash, has('cy') ? String(r.cy.sessions) : dash,
+      has('ly') ? String(r.ly.led) : dash, has('cy') ? String(r.cy.led) : dash,
+      has('ly') ? stH(r.ly.hours) : dash, has('cy') ? stH(r.cy.hours) : dash,
+      p===null ? dash : (p>0?'+':p<0?'−':'')+Math.abs(p)+'%'];
+  });
+  const t = k => rows.reduce((a,r)=>a+r[k.split('.')[0]][k.split('.')[1]],0);
+  const tp = stPct(stR1(t('cy.hours')), stR1(t('ly.hours')));
+  out.push(['Team total', String(t('ly.sessions')), String(t('cy.sessions')), String(t('ly.led')), String(t('cy.led')), stH(t('ly.hours')), stH(t('cy.hours')), tp===null?dash:(tp>0?'+':tp<0?'−':'')+Math.abs(tp)+'%']);
+  return out;
+}
+
+/* ---- Drop-In / Journey records (where the counts get entered) ---- */
+function renderStatRecords(){
+  const box = $('#statRecords'); if(!box) return;
+  $('#statAttendSetup').hidden = attendeesColumnReady;
+  const yearFrom = (statModel ? statModel.P.ly : new Date().getFullYear()-1) + '-01-01';
+  const row = s => `<div class="st-rec-row">
+      <span class="st-rec-date">${escapeHtml(fmtShortDay(s.date))}${s.time ? ' · '+escapeHtml(fmt12(s.time)) : ''}</span>
+      <span class="st-rec-count">${s.attendees!=null ? `${s.attendees} ${s.apptType==='Journey'?'participants':'prayer recipients'}${s.attendeesProvisional?' <span class="tag">provisional</span>':''}` : '<span class="st-nyr">No count yet</span>'}</span>
+      ${s.apptType==='Journey' ? `<span class="st-rec-team helptext">${s.ministers.length} minister${s.ministers.length===1?'':'s'}</span>` : ''}
+      <button type="button" class="btn secondary st-rec-edit" onclick="openModal(${s.id}, null, {forceKind:'session'})">Edit</button>
+    </div>`;
+  const drops = sessions.filter(s=>s.apptType==='Drop-in' && s.status!=='Waiting' && s.date && s.date>=yearFrom).sort((a,b)=>b.date.localeCompare(a.date));
+  const journ = sessions.filter(s=>s.apptType==='Journey' && s.status!=='Waiting' && s.date && s.date>=yearFrom).sort((a,b)=>b.date.localeCompare(a.date));
+  box.innerHTML = `
+    <div class="settings-card"><h2>Sunday Drop-In</h2>
+      <p class="helptext">Each Sunday Drop-In since January ${yearFrom.slice(0,4)}. Edit one to enter how many prayer recipients came.</p>
+      <div class="toolbar"><button type="button" class="btn secondary" onclick="openModal(null, null, {forceKind:'session', preset:'dropin'})">+ Sunday Drop-In</button></div>
+      ${drops.length ? drops.map(row).join('') : '<p class="helptext">None recorded yet.</p>'}
+    </div>
+    <div class="settings-card"><h2>Journey to Freedom</h2>
+      <p class="helptext">Each Journey to Freedom session since January ${yearFrom.slice(0,4)}. Sessions a few weeks apart are grouped into one run automatically. Edit one to set the ministers who were there and how many participants came.</p>
+      <div class="toolbar"><button type="button" class="btn secondary" onclick="openModal(null, null, {forceKind:'session', preset:'journey'})">+ Journey to Freedom session</button></div>
+      ${journ.length ? journ.map(row).join('') : '<p class="helptext">None recorded yet.</p>'}
+    </div>`;
+}
+
+/* ---- Leader's Note (saved per report date in the ReportNotes list) ---- */
+function updateStatNoteCount(){ const n = $('#statNote').value.length; $('#statNoteCount').textContent = `${n} / 600`; }
+async function saveStatNote(){
+  const msg = $('#statNoteMsg'); msg.textContent = '';
+  if(!listIds.reportNotes) return;
+  const note = $('#statNote').value.slice(0,600);
+  const existing = reportNotes.find(n=>n.date===statReportDate);
+  const fields = { Title: statReportDate, Note: note };
+  if(existing) await updateItem('reportNotes', existing.id, fields);
+  else { const r = await createItem('reportNotes', fields); reportNotes.push({ id: parseInt(r.id,10), date: statReportDate, note }); }
+  if(existing) existing.note = note;
+  msg.textContent = 'Saved.';
+  renderStatistics();
+}
+
+/* ---- Downloads ---- */
+async function stSaveBlob(blob, name){
+  if(PRINT_VIA_SHARE && navigator.canShare){
+    const file = new File([blob], name, { type: blob.type });
+    if(navigator.canShare({ files:[file] })){ try{ await navigator.share({ files:[file], title:name }); return; }catch(e){ if(e && e.name==='AbortError') return; } }
+  }
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 4000);
+}
+function stDataUrlBytes(u){ const b = atob(u.split(',')[1]); const a = new Uint8Array(b.length); for(let i=0;i<b.length;i++) a[i]=b.charCodeAt(i); return a; }
+const ST_FIG_NAMES = { card:'Figure1_Freedom_Sessions', monthly:'Figure2_Sessions_by_month', running:'Figure3_Running_total', led:'Figure4_Sessions_led' };
+async function downloadStatFig(k){
+  if(!statFigs[k]) statFigs = await stDrawAll(statModel);
+  await stSaveBlob(new Blob([stDataUrlBytes(statFigs[k])], { type:'image/png' }), `FPHM_${ST_FIG_NAMES[k]}_${statReportDate}.png`);
+}
+async function downloadStatCharts(){
+  for(const k of Object.keys(ST_FIG_NAMES)){ await downloadStatFig(k); await new Promise(r=>setTimeout(r, 400)); }
+}
+function stLoadDocx(){
+  if(window.docx) return Promise.resolve();
+  return new Promise((res, rej)=>{ const s = document.createElement('script'); s.src = DOCX_URL; s.onload = ()=> window.docx ? res() : rej(new Error('Word library did not load')); s.onerror = ()=>rej(new Error('Could not load the Word library - check the internet connection')); document.head.appendChild(s); });
+}
+async function downloadStatDocx(leaders){
+  const msg = $('#statMsg'); msg.textContent = '';
+  const M = statModel; if(!M || M.checks.length) return;
+  try{ await stLoadDocx(); }catch(e){ msg.textContent = e.message; return; }
+  if(!statFigs.card) statFigs = await stDrawAll(M);
+  const D = window.docx, { P, A } = M;
+  const C = (h)=>h.replace('#','');
+  const run = (t, o)=> new D.TextRun({ text: t, font: o&&o.font || 'Calibri', size: (o&&o.size||11)*2, bold: o&&o.b, italics: o&&o.i, color: C(o&&o.color || ST.text), highlight: o&&o.hl ? 'yellow' : undefined });
+  const para = (runs, o)=> new D.Paragraph({ children: runs, spacing: { after: (o&&o.after!=null?o.after:8)*20, before: (o&&o.before||0)*20 }, pageBreakBefore: !!(o&&o.pageBreak), keepNext: !!(o&&o.keepNext), alignment: o&&o.align });
+  const body = runs => para(runs.map(r=>run(r.t, { b:r.b })), { after:8 });
+  const heading = (t, o)=> para([run(t, { font:'Georgia', size:16, b:true, color:ST.brown })], { before:o&&o.pageBreak?0:12, after:6, pageBreak: o&&o.pageBreak, keepNext:true });
+  const caption = t => para([run(t, { i:true, size:9.5, color:ST.muted })], { after:12 });
+  const img = (k, wIn, hIn)=> para([new D.ImageRun({ data: stDataUrlBytes(statFigs[k]), transformation: { width: Math.round(wIn*96), height: Math.round(hIn*96) } })], { after:2, keepNext:true });
+  const figH = (k, wIn)=>{ const im = new Image(); return new Promise(r=>{ im.onload=()=>r(wIn*im.naturalHeight/im.naturalWidth); im.src = statFigs[k]; }); };
+  const border = { style: D.BorderStyle.SINGLE, size: 4, color: 'E9E5DC' };
+  const none = { style: D.BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+  const cell = (t, o)=> new D.TableCell({ children: [para([run(String(t), { b:o&&o.b, size:o&&o.size||10, color:o&&o.color, hl:o&&o.hl, i:o&&o.i })], { after:0, align: o&&o.left ? D.AlignmentType.LEFT : D.AlignmentType.CENTER })],
+    margins: { top:60, bottom:60, left:80, right:80 }, shading: o&&o.fill ? { fill: C(o.fill), type: D.ShadingType.CLEAR, color:'auto' } : undefined,
+    borders: { top: none, left: none, right: none, bottom: border }, verticalAlign: D.VerticalAlign.CENTER });
+  const table = (rows, widths)=> new D.Table({ width: { size: 100, type: D.WidthType.PERCENTAGE }, columnWidths: widths, rows: rows.map(cells=>new D.TableRow({ children: cells })) });
+  const NYR = 'Not yet recorded';
+  const v = (x, prov)=> x===null || x===undefined ? { t:NYR, i:true, color:ST.muted } : { t:String(x), hl: !!prov };
+  const c2 = (o, extra)=> cell(o.t, { ...extra, i:o.i, color:o.color||(extra&&extra.color), hl:o.hl });
+  const pctTxt = p => p===null || p===0 ? '' : (p>0?'▲ ':'▼ ')+Math.abs(p)+'%';
+  const fig1H = await figH('card', 5.4), fig2H = await figH('monthly', 6.4), fig3H = await figH('running', 6.4), fig4H = await figH('led', 6.4);
+
+  const kids = [
+    para([run('Freedom Prayer Healing Ministry', { font:'Georgia', size:20, b:true, color:ST.brown })], { after:0 }),
+    para([run('Creekside Church', { font:'Georgia', size:13 })], { after:2 }),
+    new D.Paragraph({ children:[run(`Ministry statistics, ${P.cy} compared with ${P.ly} · ${stLong(P.rep)}`, { size:10.5, color:ST.muted })], spacing:{ after: 240 }, border: { bottom: { style: D.BorderStyle.SINGLE, size: 12, color: C(ST.cy), space: 6 } } }),
+    heading('Freedom Sessions'),
+    body(M.S1), body(M.S2), body(M.S3),
+    para([new D.ImageRun({ data: stDataUrlBytes(statFigs.card), transformation: { width: Math.round(5.4*96), height: Math.round(fig1H*96) } })], { after:2, keepNext:true, align: D.AlignmentType.CENTER }),
+    caption(`Figure 1. Freedom Sessions: ${P.cy} to date against the same dates in ${P.ly}, with the ${P.ly} full year for reference.`)
+  ];
+  if(M.note.trim()){ kids.push(heading('From the ministry leader')); M.note.trim().split(/\n+/).forEach(line=>kids.push(body([{ t: line }]))); }
+  kids.push(img('monthly', 6.4, fig2H), caption(`Figure 2. Sessions by month. ${M.S4}`));
+  kids.push(img('running', 6.4, fig3H), caption(`Figure 3. Running total of sessions.${M.passMonth!=null ? ` ${P.cy} passed the full-year ${P.ly} total (${A.full.sessions}) in ${ST_MONTH[M.passMonth]}.` : ''}`));
+  // Page 3
+  const d = M.drop;
+  const headCmp = ['', `${P.cy}\nJan 1 – ${stMd(P.rep)}`, '', `${P.ly}\nJan 1 – ${stMd(P.cmp.to)}`, `${P.ly}\nFull year`];
+  const headCell = (t, muted)=> new D.TableCell({ children: t.split('\n').map((ln,i)=>para([run(ln, { b:i===0, size:i===0?10.5:9, color: muted||i>0 ? ST.muted : ST.text })], { after:0, align:D.AlignmentType.CENTER })), margins:{ top:60, bottom:60, left:80, right:80 }, borders:{ top:none, left:none, right:none, bottom:{ style:D.BorderStyle.SINGLE, size:8, color:C(ST.border) } } });
+  kids.push(heading('Sunday Drop-In', { pageBreak:true }), body([{ t:'Prayer is also offered on a drop-in basis on Sundays.' }]));
+  kids.push(table([
+    headCmp.map((t,i)=>headCell(t, i===4)),
+    [cell('Sundays held', { b:true, left:true }), c2(v(d.cur.held||null)), cell(d.cur.held && d.cmp.held ? pctTxt(stPct(d.cur.held, d.cmp.held)) : '', { color:ST.pillText, b:true, size:9 }), c2(v(d.cmp.held||null)), c2(v(d.full.held||null), { color:ST.muted })],
+    [cell('Prayer recipients', { b:true, left:true }), c2(v(d.cur.recipients, d.cur.provisional)), cell(pctTxt((d.cur.recipients!=null && d.cmp.recipients!=null) ? stPct(d.cur.recipients, d.cmp.recipients) : null), { color:ST.pillText, b:true, size:9 }), c2(v(d.cmp.recipients, d.cmp.provisional)), c2(v(d.full.recipients, d.full.provisional), { color:ST.muted })]
+  ], [2600, 1900, 1000, 1900, 1900]));
+  const anyProv = d.cur.provisional || d.cmp.provisional || d.full.provisional || M.runs.some(r=>r.provisional);
+  kids.push(caption(`${anyProv ? 'Highlighted figures are provisional and will be updated. ' : ''}Growth % compares the same dates in both years.`));
+  kids.push(heading('Journey to Freedom'), body([{ t:'The Journey to Freedom workshop runs twice a year over a series of weekly sessions.' }]));
+  const jh = ['Run','Sessions','Prayer ministers (run)','Ministers each session','Participants each session','Average participants'];
+  kids.push(table([ jh.map(t=>headCell(t)), ...stJourneyRows(M).map(r=>[cell(r.name, { b:true, left:true }), c2(v(r.dates), { left:true }), c2(v(r.ministers)), c2(v(r.perMin)), c2(v(r.counts, r.prov)), c2(v(r.avg, r.prov))]) ], [1500, 2400, 1300, 1400, 1500, 1200]));
+  kids.push(caption('Participants are counted each session, so the same person attending every week is counted each time; the average shows typical attendance.'));
+  if(leaders){
+    const sameDates = `January 1 to ${stLong(P.rep).replace(/, \d{4}$/,'')}`;
+    kids.push(para([run("MINISTRY LEADER'S COPY", { b:true, size:9, color:ST.brown })], { pageBreak:true, after:2 }));
+    kids.push(heading('Ministry Team'), body([{ t:M.S6 }]));
+    if(M.S8) kids.push(body([{ t:M.S8 }]));
+    kids.push(caption(`All comparisons on this page use the same dates in both years: ${sameDates}.`));
+    kids.push(img('led', 6.4, fig4H), caption('Figure 4. Sessions led by each minister, in alphabetical order. Ministers who have not led a session are omitted.'));
+    const mt = stMinisterTable(M);
+    const mh = ['Minister', `Sessions ${P.ly}`, `Sessions ${P.cy}`, `Led ${P.ly}`, `Led ${P.cy}`, `Hours ${P.ly}`, `Hours ${P.cy}`, 'Hours change'];
+    kids.push(table([ mh.map(t=>headCell(t)), ...mt.map((r,i)=>r.map((c,j)=>cell(c, { left:j===0, b: i===mt.length-1, size:9.5 }))) ], [2200, 1000, 1000, 900, 900, 1000, 1000, 1000]));
+    kids.push(caption(`"Sessions" counts every session a minister took part in, as lead or team member, so team totals exceed the number of sessions held. Both years run ${sameDates}.`));
+    kids.push(para([run("MINISTRY LEADER'S COPY", { b:true, size:9, color:ST.brown })], { pageBreak:true, after:2 }));
+    kids.push(heading('Journey to Freedom: Ministers by Session'), body([{ t:'Prayer ministers present at each session of each run.' }]));
+    const p5 = stPage5Rows(M);
+    kids.push(table([ ['Run','Session','Prayer ministers present'].map(t=>headCell(t)), ...(p5.length ? p5 : [{ run:'—', date:null, names:null }]).map(r=>[cell(r.run, { b:true, left:true }), c2(v(r.date), { left:true }), c2(v(r.names), { left:true })]) ], [2000, 2000, 5800]));
+  }
+  const doc = new D.Document({
+    creator: 'FPHM Scheduler', title: 'Ministry statistics',
+    styles: { default: { document: { run: { font:'Calibri', size:22, color: C(ST.text) } } } },
+    sections: [{
+      properties: { page: { size: { width: 12240, height: 15840 }, margin: { top:1080, bottom:1080, left:1080, right:1080 } } },
+      footers: { default: new D.Footer({ children: [ new D.Paragraph({ alignment: D.AlignmentType.CENTER, children: [ run('Freedom Prayer Healing Ministry · Creekside Church · Page ', { size:9, color:ST.muted }), new D.TextRun({ children:[D.PageNumber.CURRENT], size:18, color:C(ST.muted), font:'Calibri' }) ] }) ] }) },
+      children: kids
+    }]
+  });
+  const blob = await D.Packer.toBlob(doc);
+  await stSaveBlob(blob, `FPHM_Ministry_Statistics_${P.rep}${leaders ? '_Leaders_Copy' : ''}.docx`);
+}
+
 function generateReport(){
   const msg = $('#reportMsg');
   msg.hidden = true;
@@ -8575,6 +9484,11 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Nov 13, 2026', version: '2026-11-13.1', items: [
+    'New: a Statistics tab with the ministry statistics report. It puts this year to date beside the same dates last year (with all of last year for reference): sessions, recipients, new and returning, hours, the monthly and running-total charts, and the Ministry Team page. Pick a report date at the top. "Download for leadership" makes the Word file without minister names (pages 1 to 3); "Download leader\'s copy" adds the Ministry Team and Journey pages. Each chart can be downloaded as a picture. If the numbers don\'t add up (for example a session with no lead), a red box says what to fix and the downloads are hidden until it is.',
+    'New: Journey to Freedom sessions. Add one from the bottom of the Statistics tab with "+ Journey to Freedom session": pick the date, start and end time, the ministers who were there and how many participants came. Sessions a few weeks apart are grouped into one run automatically. The usual day, time and location are set in Settings > Quick Slots. Journey sessions don\'t count in Freedom Session numbers or minister hours.',
+    'New: Sunday Drop-In sessions have a "Prayer recipients" box for how many came, and a "Provisional" tick for a number still to be confirmed (the report highlights those). The same list at the bottom of the Statistics tab shows every Drop-In with an Edit button. These two boxes appear once the Attendees and AttendeesProvisional columns are added in SharePoint; the Statistics tab shows the steps until then.',
+  ]},
   { date: 'Nov 12, 2026', version: '2026-11-12.1', items: [
     'Changed: "first-time / follow-up" is now "new / returning", on the Completed Sessions card, in Reports (year, month, minister and Total rows) and on My FPHM\'s Completed Sessions card (live now). New = the person\'s first-ever completed Freedom Session falls in that period; returning = they had their first session before it. It is worked out from session dates, not the saved First/Follow-up type. New + returning always equals Unique Recipients, and Lifetime is all new. Before, anyone with a follow-up in the period counted as follow-up, so someone who started this year and came back wasn\'t counted as new. To check: Completed Sessions should show 2026 as 38 new and 12 returning, last year as 20 and 2, and Lifetime as 65 new.'
   ]},
@@ -8587,15 +9501,15 @@ const CHANGE_LOG = [
   { date: 'Nov 9, 2026', version: '2026-11-09.1', items: [
     'New: keep a person private. On the Prayer List tab, each person has a "Make private" button; a private person gets a Private tag and is left off the Prayer List in My FPHM, so other prayer ministers don\'t know they\'re having a session. Their own team still sees the session on their schedule. "Show on Prayer List" undoes it. The session form also has a "Private" box, which a follow-up session fills in automatically from the person\'s last session. Needs one new Yes/No column, PrayerListPrivate, on the PrayerSessions list in SharePoint; until it exists, the Prayer List tab shows the steps to add it.'
   ]},
-  { date: 'Nov 8, 2026', version: '2026-11-08.1', items: [
-    'Fixed: printing an intake form from the installed app on an iPhone or iPad. Since recent iOS updates, the home-screen app ignores Print completely. Now, in the installed app, "Print / Save as PDF" makes a PDF of the form and opens the iPhone share menu; choose Print there (or Save to Files). If the menu doesn\'t open by itself, tap "Print or share PDF". In Safari and on a computer, Print works the same as before. My FPHM has the same fix (live now). To check: open a submitted form in Intake Forms in the installed FPHM Admin app and tap Print / Save as PDF.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Nov 8, 2026', version: '2026-11-08.1', items: [
+    'Fixed: printing an intake form from the installed app on an iPhone or iPad. Since recent iOS updates, the home-screen app ignores Print completely. Now, in the installed app, "Print / Save as PDF" makes a PDF of the form and opens the iPhone share menu; choose Print there (or Save to Files). If the menu doesn\'t open by itself, tap "Print or share PDF". In Safari and on a computer, Print works the same as before. My FPHM has the same fix (live now). To check: open a submitted form in Intake Forms in the installed FPHM Admin app and tap Print / Save as PDF.'
+  ]},
   { date: 'Nov 7, 2026', version: '2026-11-07.2', items: [
     'New: the Prayer List is in My FPHM (live now). Ministers ticked in Settings > Prayer List see a Prayer List tab with each person\'s full name, session number and next session date, soonest first. Everyone else doesn\'t see the tab. To check: tick a minister, Save, then sign in to My FPHM as them (or ask them to tap Refresh).'
   ]},

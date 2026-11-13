@@ -949,7 +949,7 @@ function gridRowNotesOn(q){ return q.rowNotes===undefined ? !!q.rowsFrom : !!q.r
 function sessionNotesFor(sessionId){ return sessionNotes.find(n=>n.sessionId===sessionId) || null; }
 function amLeadOf(s){ return !!(me && s.ministers.some(m=>m.id===me.id && m.role==='Lead')); }
 function canWriteNotes(s){
-  return !!(notesSchema && listIds.notes && s && s.apptType!=='Drop-in' && s.apptType!=='Training' && amLeadOf(s));
+  return !!(notesSchema && listIds.notes && s && s.apptType!=='Drop-in' && s.apptType!=='Training' && s.apptType!=='Journey' && amLeadOf(s));
 }
 function writeNotesButtonHtml(s){
   if(!canWriteNotes(s)) return '';
@@ -1357,7 +1357,7 @@ function renderPrayerList(){
   }
   const today = plTodayISO();
   const groups = new Map();
-  sessions.filter(s=>s.status==='Scheduled' && s.apptType!=='Drop-in' && s.apptType!=='Training' && s.recipName.trim()).forEach(s=>{
+  sessions.filter(s=>s.status==='Scheduled' && s.apptType!=='Drop-in' && s.apptType!=='Training' && s.apptType!=='Journey' && s.recipName.trim()).forEach(s=>{
     const key = s.recipName.trim().toLowerCase();
     if(!groups.has(key)) groups.set(key, { name: s.recipName.trim(), sessions: [] });
     groups.get(key).sessions.push(s);
@@ -1762,6 +1762,7 @@ function icsEscape(s){ return String(s||'').replace(/\\/g,'\\\\').replace(/;/g,'
 function calendarEventTitle(s){
   if(s.apptType==='Drop-in') return 'FPHM Drop-in';
   if(s.apptType==='Training') return 'FPHM Training';
+  if(s.apptType==='Journey') return 'FPHM Journey to Freedom';
   const name = (s.recipName||'').trim();
   return name ? `FS: ${name}` : 'FS';
 }
@@ -1997,7 +1998,7 @@ function renderCompleted(){
 function recipientFirstEverDates(){
   const first = new Map();
   sessions.forEach(s=>{
-    if(s.status!=='Completed' || s.apptType==='Drop-in' || s.apptType==='Training' || !s.date) return;
+    if(s.status!=='Completed' || s.apptType==='Drop-in' || s.apptType==='Training' || s.apptType==='Journey' || !s.date) return;
     const key = s.recipName.trim().toLowerCase();
     if(!first.has(key) || s.date < first.get(key)) first.set(key, s.date);
   });
