@@ -853,27 +853,31 @@
 
   /* ---- Design refresh (2026-11-13, Test only), from an Impeccable audit +
      Design with Intent review. Overrides earlier rules, so it sits last.
-     1. Primary nav: one quiet row of text tabs instead of 11 filled
-        terracotta blocks that wrapped to 2-4 rows (and, being sticky, ate
-        up to a quarter of a phone screen). Scrolls sideways below 1024px;
-        the active tab is scrolled into view (scrollNavToActive). */
-  nav[aria-label="Primary"]{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:0;padding:0 8px;border-bottom:1px solid var(--line);
-    -webkit-mask-image:linear-gradient(to right,transparent 0,#000 var(--fade-l,0px),#000 calc(100% - var(--fade-r,0px)),transparent 100%);
-            mask-image:linear-gradient(to right,transparent 0,#000 var(--fade-l,0px),#000 calc(100% - var(--fade-r,0px)),transparent 100%);}
-  nav[aria-label="Primary"].more-right{--fade-r:32px;}
-  nav[aria-label="Primary"].more-left{--fade-l:32px;}
-  nav[aria-label="Primary"]::-webkit-scrollbar{display:none;}
+     1. Primary nav: quiet text tabs with an underline on the current one,
+        instead of 11 filled terracotta blocks. Every tab is always visible
+        (Andrew: no sideways scrolling), so the row wraps; tabs are compact
+        so it wraps into as few lines as possible. */
+  nav[aria-label="Primary"]{flex-wrap:wrap;gap:0;padding:2px 4px;border-bottom:1px solid var(--line);}
+  /* Below 1200px the longer tab names drop their second word
+     ("Schedule & Planning" -> "Schedule") so the tabs fit in one row
+     (two on phones).
+     The full name is still the button's text for everything else. */
+  @media (max-width:1199px){ nav[aria-label="Primary"] .tab-more{display:none;} }
   nav[aria-label="Primary"] button,
   nav[aria-label="Primary"] button:hover,
   nav[aria-label="Primary"] button.active,
   nav[aria-label="Primary"] button.active:hover{background:none;}
-  nav[aria-label="Primary"] button{color:var(--text);font-weight:600;border-radius:0;border-bottom:3px solid transparent;margin:0;padding:12px 12px 9px;min-height:44px;font-size:var(--fs-sm);}
+  nav[aria-label="Primary"] button{color:var(--text);font-weight:600;border-radius:0;border-bottom:3px solid transparent;margin:0;padding:8px 7px 5px;min-height:36px;font-size:var(--fs-xs);}
   nav[aria-label="Primary"] button:hover{color:var(--gold-dark);border-bottom-color:var(--muted-bar);}
   nav[aria-label="Primary"] button.active{color:var(--gold-dark);font-weight:700;border-bottom-color:var(--gold);}
   nav[aria-label="Primary"] button:focus-visible{outline-offset:-3px;}
+  @media (min-width:640px){
+    nav[aria-label="Primary"]{padding:2px 8px;}
+    nav[aria-label="Primary"] button{padding:10px 8px 7px;min-height:40px;font-size:var(--fs-xs);}
+  }
   @media (min-width:1024px){
-    nav[aria-label="Primary"]{flex-wrap:wrap;overflow:visible;padding:0 16px;-webkit-mask-image:none;mask-image:none;}
-    nav[aria-label="Primary"] button{padding:14px 14px 11px;font-size:var(--fs-sm);min-height:48px;}
+    nav[aria-label="Primary"]{padding:2px 8px;}
+    nav[aria-label="Primary"] button{padding:12px 8px 9px;min-height:44px;font-size:var(--fs-xs);}
   }
   /* 2. Header actions: same weight as each other and smaller than the
      page title, instead of a solid charcoal Sign Out being the heaviest
@@ -928,12 +932,12 @@
        merged Schedule & Planning tab (panel-schedplan) replaces both, per
        the "no duplicated functionality" decision. Re-add these two buttons
        plus data-tab="schedule"/"planning" here to fall back if needed. -->
-  <button data-tab="schedplan" class="active" aria-current="page">Schedule &amp; Planning</button>
+  <button data-tab="schedplan" class="active" aria-current="page">Schedule<span class="tab-more"> &amp; Planning</span></button>
   <button data-tab="prayerlist">Prayer List</button>
-  <button data-tab="completed">Completed Sessions</button>
-  <button data-tab="overview">Prayer Ministers</button>
-  <button data-tab="blackouts">Blackout Dates</button>
-  <button data-tab="intake">Intake Forms</button>
+  <button data-tab="completed">Completed<span class="tab-more"> Sessions</span></button>
+  <button data-tab="overview"><span class="tab-more">Prayer </span>Ministers</button>
+  <button data-tab="blackouts">Blackout<span class="tab-more"> Dates</span></button>
+  <button data-tab="intake">Intake<span class="tab-more"> Forms</span></button>
   <button data-tab="reports">Reports</button>
   <button data-tab="statistics">Statistics</button>
   <button data-tab="messages" id="navMessages" hidden>Messages<span class="nav-badge" id="msgBadge" hidden></span></button>
@@ -2639,24 +2643,6 @@ function wireSearchClear(inputId){
 function syncNavHeight(){
   const nav = document.querySelector('nav[aria-label="Primary"]');
   if(nav) document.documentElement.style.setProperty('--nav-h', nav.offsetHeight + 'px');
-  syncNavFade();
-}
-// Below 1024px the tab row scrolls sideways; fade either edge while
-// more tabs are hidden there, so it's obvious the row keeps going.
-function syncNavFade(){
-  const nav = document.querySelector('nav[aria-label="Primary"]');
-  if(!nav) return;
-  nav.classList.toggle('more-right', nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 2);
-  nav.classList.toggle('more-left', nav.scrollLeft > 2);
-}
-function scrollNavToActive(){
-  const nav = document.querySelector('nav[aria-label="Primary"]');
-  const b = nav && nav.querySelector('button.active');
-  if(!b || nav.scrollWidth <= nav.clientWidth) return;
-  const left = b.offsetLeft - nav.offsetLeft, right = left + b.offsetWidth;
-  if(left < nav.scrollLeft + 24) nav.scrollLeft = Math.max(0, left - 24);
-  else if(right > nav.scrollLeft + nav.clientWidth - 40) nav.scrollLeft = right - nav.clientWidth + 40;
-  syncNavFade();
 }
 let appWired = false;
 function wireApp(){
@@ -2664,8 +2650,6 @@ function wireApp(){
   appWired = true;
   syncNavHeight();
   window.addEventListener('resize', syncNavHeight);
-  const navEl = document.querySelector('nav[aria-label="Primary"]');
-  if(navEl) navEl.addEventListener('scroll', syncNavFade, {passive:true});
   if(document.fonts && document.fonts.ready) document.fonts.ready.then(syncNavHeight);
   document.querySelectorAll('nav[aria-label="Primary"] button').forEach(b=>b.addEventListener('click', ()=>switchTab(b.dataset.tab)));
   $('#btnRefresh').addEventListener('click', ()=>withLoading($('#btnRefresh'), 'Refreshing…', loadAll));
@@ -2801,7 +2785,6 @@ function switchTab(tab){
     if(active) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
   });
   document.querySelectorAll('main .panel').forEach(p=>p.classList.toggle('active', p.id==='panel-'+tab));
-  scrollNavToActive();
   if(tab === 'messages'){ adminMessageTab = 'unread'; renderAdminMessages(); }
 }
 
@@ -9464,7 +9447,7 @@ function generateReport(){
 ========================================================================= */
 const CHANGE_LOG = [
   { date: 'Nov 13, 2026', version: '2026-11-13.5 (Test only)', items: [
-    'Changed (design try-out, Test only): the main tabs are now one row of plain text tabs with an underline under the current one, instead of filled terracotta blocks. On a phone or tablet the row slides sideways (a fade at the edge shows there are more tabs), so it no longer stacks into three or four rows at the top of the screen.',
+    'Changed (design try-out, Test only): the main tabs are now one row of plain text tabs with an underline under the current one, instead of filled terracotta blocks. Every tab is always visible with no sideways scrolling: one row on a computer or tablet, two rows on most phones (it used to be four). On smaller screens the longer names are shortened, for example "Schedule" for Schedule & Planning and "Ministers" for Prayer Ministers.',
     'Changed: Refresh Data and Sign Out are smaller and look the same, so Sign Out is no longer the darkest thing on the page.',
     'Changed: cards have a lighter outline, so the content inside them stands out more. Form boxes keep their darker outline.',
     'Changed: the initials in the round name badges are a little darker so they are easier to read, and several help lines under the tab titles are reworded more plainly.'
