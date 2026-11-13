@@ -1536,7 +1536,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-11-13.1";
+const APP_VERSION = "2026-11-13.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -9146,7 +9146,7 @@ function renderStatistics(){
       <div class="st-fig"><img id="stFigLed" alt="Figure 4: sessions led by each minister, ${P.ly} and ${P.cy}"></div>
       <p class="st-cap">Figure 4. Sessions led by each minister, in alphabetical order. Ministers who have not led a session are omitted. <a href="#" class="st-dl" data-fig="led">Download PNG</a></p>
       <div class="table-scroll"><table class="st-table st-min">
-        <thead><tr><th>Minister</th><th>Sessions ${P.ly}</th><th>Sessions ${P.cy}</th><th>Led ${P.ly}</th><th>Led ${P.cy}</th><th>Hours ${P.ly}</th><th>Hours ${P.cy}</th><th>Hours change</th></tr></thead>
+        <thead><tr><th>Minister</th><th>Sessions ${P.ly}</th><th>Sessions ${P.cy}</th><th>Led ${P.ly}</th><th>Led ${P.cy}</th><th>Hours ${P.ly}</th><th>Hours ${P.cy}</th></tr></thead>
         <tbody>${stMinisterTable(M).map((r,i,arr)=>`<tr class="${i===arr.length-1?'st-total':''}">${r.map((c,j)=>j===0?`<th scope="row">${escapeHtml(c)}</th>`:`<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
       <p class="st-cap">"Sessions" counts every session a minister took part in, as lead or team member, so team totals exceed the number of sessions held. Both years run January 1 to ${stLong(P.rep).replace(/, \d{4}$/,'')}.</p>
     </div>
@@ -9174,16 +9174,13 @@ function stMinisterTable(M){
   const out = rows.map(r=>{
     const tag = r.inactive ? ' (inactive)' : r.isNew ? ` (new in ${P.cy})` : '';
     const has = k => r[k].sessions>0;
-    const p = (has('ly') && has('cy')) ? stPct(stR1(r.cy.hours), stR1(r.ly.hours)) : null;
     return [r.name+tag,
       has('ly') ? String(r.ly.sessions) : dash, has('cy') ? String(r.cy.sessions) : dash,
       has('ly') ? String(r.ly.led) : dash, has('cy') ? String(r.cy.led) : dash,
-      has('ly') ? stH(r.ly.hours) : dash, has('cy') ? stH(r.cy.hours) : dash,
-      p===null ? dash : (p>0?'+':p<0?'−':'')+Math.abs(p)+'%'];
+      has('ly') ? stH(r.ly.hours) : dash, has('cy') ? stH(r.cy.hours) : dash];
   });
   const t = k => rows.reduce((a,r)=>a+r[k.split('.')[0]][k.split('.')[1]],0);
-  const tp = stPct(stR1(t('cy.hours')), stR1(t('ly.hours')));
-  out.push(['Team total', String(t('ly.sessions')), String(t('cy.sessions')), String(t('ly.led')), String(t('cy.led')), stH(t('ly.hours')), stH(t('cy.hours')), tp===null?dash:(tp>0?'+':tp<0?'−':'')+Math.abs(tp)+'%']);
+  out.push(['Team total', String(t('ly.sessions')), String(t('cy.sessions')), String(t('ly.led')), String(t('cy.led')), stH(t('ly.hours')), stH(t('cy.hours'))]);
   return out;
 }
 
@@ -9313,8 +9310,8 @@ async function downloadStatDocx(leaders){
     kids.push(caption(`All comparisons on this page use the same dates in both years: ${sameDates}.`));
     kids.push(img('led', 6.4, fig4H), caption('Figure 4. Sessions led by each minister, in alphabetical order. Ministers who have not led a session are omitted.'));
     const mt = stMinisterTable(M);
-    const mh = ['Minister', `Sessions ${P.ly}`, `Sessions ${P.cy}`, `Led ${P.ly}`, `Led ${P.cy}`, `Hours ${P.ly}`, `Hours ${P.cy}`, 'Hours change'];
-    kids.push(table([ mh.map(t=>headCell(t)), ...mt.map((r,i)=>r.map((c,j)=>cell(c, { left:j===0, b: i===mt.length-1, size:9.5 }))) ], [2200, 1000, 1000, 900, 900, 1000, 1000, 1000]));
+    const mh = ['Minister', `Sessions ${P.ly}`, `Sessions ${P.cy}`, `Led ${P.ly}`, `Led ${P.cy}`, `Hours ${P.ly}`, `Hours ${P.cy}`];
+    kids.push(table([ mh.map(t=>headCell(t)), ...mt.map((r,i)=>r.map((c,j)=>cell(c, { left:j===0, b: i===mt.length-1, size:9.5 }))) ], [2600, 1100, 1100, 1000, 1000, 1100, 1100]));
     kids.push(caption(`"Sessions" counts every session a minister took part in, as lead or team member, so team totals exceed the number of sessions held. Both years run ${sameDates}.`));
     kids.push(para([run("MINISTRY LEADER'S COPY", { b:true, size:9, color:ST.brown })], { pageBreak:true, after:2 }));
     kids.push(heading('Journey to Freedom: Ministers by Session'), body([{ t:'Prayer ministers present at each session of each run.' }]));
@@ -9491,6 +9488,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Nov 13, 2026', version: '2026-11-13.2', items: [
+    'Changed: on the Statistics tab, the Ministry Team table no longer has the "Hours change" column, on screen and in the Word leader\'s copy. A percentage on small numbers was misleading. The hours for both years are still shown side by side.',
+  ]},
   { date: 'Nov 13, 2026', version: '2026-11-13.1', items: [
     'New: a Statistics tab with the ministry statistics report. It puts this year to date beside the same dates last year (with all of last year for reference): sessions, recipients, new and returning, hours, the monthly and running-total charts, and the Ministry Team page. Pick a report date at the top. "Download for leadership" makes the Word file without minister names (pages 1 to 3); "Download leader\'s copy" adds the Ministry Team and Journey pages. Each chart can be downloaded as a picture. If the numbers don\'t add up (for example a session with no lead), a red box says what to fix and the downloads are hidden until it is.',
     'New: Journey to Freedom sessions. Add one from the bottom of the Statistics tab with "+ Journey to Freedom session": pick the date, start and end time, the ministers who were there and how many participants came. Sessions a few weeks apart are grouped into one run automatically. The usual day, time and location are set in Settings > Quick Slots. Journey sessions don\'t count in Freedom Session numbers or minister hours.',
@@ -9505,15 +9505,15 @@ const CHANGE_LOG = [
   { date: 'Nov 10, 2026', version: '2026-11-10.1', items: [
     'New: the Lead can write session notes in My FPHM (live now). Every session where you\'re the Lead now has its own "Write session notes" button, so a follow-up session gets its own notes, separate from the first. Once notes are saved the button reads "Edit session notes ✓" and reopens just that session\'s notes. Support ministers still only read notes, with "View session notes". These are the same notes you see and edit in the Scheduler. Needs two SharePoint permissions for the Prayer Ministers group: Read on the SessionNotesSchema list, and Contribute on the SessionNotes list (it had Read). Without the first, the button stays hidden; without the second, saving says so. To check: in My FPHM, open a person with two sessions where you\'re Lead; each session has its own button.'
   ]},
-  { date: 'Nov 9, 2026', version: '2026-11-09.1', items: [
-    'New: keep a person private. On the Prayer List tab, each person has a "Make private" button; a private person gets a Private tag and is left off the Prayer List in My FPHM, so other prayer ministers don\'t know they\'re having a session. Their own team still sees the session on their schedule. "Show on Prayer List" undoes it. The session form also has a "Private" box, which a follow-up session fills in automatically from the person\'s last session. Needs one new Yes/No column, PrayerListPrivate, on the PrayerSessions list in SharePoint; until it exists, the Prayer List tab shows the steps to add it.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Nov 9, 2026', version: '2026-11-09.1', items: [
+    'New: keep a person private. On the Prayer List tab, each person has a "Make private" button; a private person gets a Private tag and is left off the Prayer List in My FPHM, so other prayer ministers don\'t know they\'re having a session. Their own team still sees the session on their schedule. "Show on Prayer List" undoes it. The session form also has a "Private" box, which a follow-up session fills in automatically from the person\'s last session. Needs one new Yes/No column, PrayerListPrivate, on the PrayerSessions list in SharePoint; until it exists, the Prayer List tab shows the steps to add it.'
+  ]},
   { date: 'Nov 8, 2026', version: '2026-11-08.1', items: [
     'Fixed: printing an intake form from the installed app on an iPhone or iPad. Since recent iOS updates, the home-screen app ignores Print completely. Now, in the installed app, "Print / Save as PDF" makes a PDF of the form and opens the iPhone share menu; choose Print there (or Save to Files). If the menu doesn\'t open by itself, tap "Print or share PDF". In Safari and on a computer, Print works the same as before. My FPHM has the same fix (live now). To check: open a submitted form in Intake Forms in the installed FPHM Admin app and tap Print / Save as PDF.'
   ]},
