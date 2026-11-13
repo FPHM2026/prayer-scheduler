@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Freedom Prayer Healing Ministry — Intake Questionnaire</title>
-<link rel="stylesheet" href="css/styles.css?v=2026-10-31.2">
+<link rel="stylesheet" href="css/styles.css?v=2026-11-13.1">
 <script>
   // Apply the saved text size before the page draws, so it never flashes
   // at the normal size first. See TEXT_SCALES further down.
@@ -24,6 +24,33 @@
 <script src="../js/formEngine.js"></script>
 <script src="js/apiClient.js"></script>
 <script>
+// ---- Phone error toasts (same behaviour as the admin Scheduler) ----
+// On phones (640px and narrower) an error shows as a red message at the
+// top of the screen that hides itself after 3 seconds; the X closes it
+// sooner. Wider screens keep the old behaviour.
+const ERR_TOAST_MQ = window.matchMedia('(max-width:640px)');
+let errToastTimer = null;
+function isPhoneToast(){ return ERR_TOAST_MQ.matches; }
+function hideErrorToast(){
+  clearTimeout(errToastTimer); errToastTimer = null;
+  const t = document.getElementById('errToast'); if(t) t.classList.remove('show');
+}
+function showErrorToast(text){
+  clearTimeout(errToastTimer);
+  let t = document.getElementById('errToast');
+  if(!t){
+    t = document.createElement('div');
+    t.id = 'errToast'; t.setAttribute('role','alert');
+    t.innerHTML = '<div class="err-toast-body"></div><button type="button" class="err-toast-x" aria-label="Dismiss">&times;</button>';
+    t.querySelector('.err-toast-x').addEventListener('click', hideErrorToast);
+    document.body.appendChild(t);
+  }
+  t.querySelector('.err-toast-body').textContent = text;
+  t.classList.add('show');
+  errToastTimer = setTimeout(hideErrorToast, 3000);
+}
+// An error that used to be an alert(): a toast on phones, the alert elsewhere.
+function notifyError(text){ if(isPhoneToast()) showErrorToast(text); else alert(text); }
 /* =========================================================================
    PUBLIC INTAKE FORM — multi-step wizard over FPHM_INTAKE_CONFIG.SECTIONS,
    plus a fixed intro screen, a fixed final liability+signature screen, and
@@ -424,7 +451,7 @@ async function confirmAndDeleteForm() {
       // reachable since the delete option isn't shown once Submitted,
       // but could happen from a stale page open in another tab. Don't
       // touch local state; the form genuinely wasn't deleted.
-      alert("This form has already been submitted and can no longer be deleted.");
+      notifyError("This form has already been submitted and can no longer be deleted.");
       return;
     }
     // Any other failure (offline, etc.) - still reset below, the visitor
@@ -698,8 +725,10 @@ function markInvalid(missingIds) {
     const wrap = document.querySelector(`[data-qwrap="${id}"]`);
     if (wrap) wrap.classList.add("invalid");
     const err = document.getElementById("err_" + id);
-    if (err) err.textContent = "This question is required.";
+    // On phones the message goes in the toast instead; the red outline stays.
+    if (err) err.textContent = isPhoneToast() ? "" : "This question is required.";
   });
+  if (isPhoneToast()) showErrorToast(missingIds.length === 1 ? "Please answer the question marked in red." : `Please answer the ${missingIds.length} questions marked in red.`);
   const firstWrap = document.querySelector(`[data-qwrap="${missingIds[0]}"]`);
   if (firstWrap) firstWrap.scrollIntoView({ behavior: "smooth", block: "center" });
 }
@@ -784,7 +813,8 @@ async function onSubmit() {
     return;
   }
   if (state.signaturePad.isEmpty()) {
-    document.getElementById("err_signature").textContent = "Please sign before submitting.";
+    if (isPhoneToast()) showErrorToast("Please sign before submitting.");
+    else document.getElementById("err_signature").textContent = "Please sign before submitting.";
     return;
   }
   document.getElementById("err_signature").textContent = "";
@@ -804,7 +834,7 @@ async function onSubmit() {
       localStorage.setItem(localKey() + "_signature", signatureDataUrl);
     } catch (err) {}
     saveLocal();
-    alert("We couldn't reach the server to submit right now. Your answers and signature are saved on this device — please try Submit again once you're back online.");
+    notifyError("We couldn't reach the server to submit right now. Your answers and signature are saved on this device — please try Submit again once you're back online.");
     btn.disabled = false;
     btn.textContent = "Submit";
     return;

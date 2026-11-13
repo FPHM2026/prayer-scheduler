@@ -427,6 +427,11 @@
     .toolbar > *{width:auto;}
     .toolbar .search-wrap{flex:1 1 220px;}
   }
+  /* Phone error toasts: see showErrorToast() */
+  #errToast{position:fixed;top:calc(8px + env(safe-area-inset-top));left:50%;z-index:1000;width:520px;max-width:92vw;display:flex;align-items:flex-start;gap:8px;background:#fdecea;color:#c0392b;border:1px solid #f3c6c0;border-radius:8px;box-shadow:0 18px 50px rgba(35,28,20,.22);padding:12px 8px 12px 16px;font-size:15px;line-height:1.4;opacity:0;pointer-events:none;transform:translate(-50%,-16px);transition:opacity .2s ease,transform .2s ease;}
+  #errToast.show{opacity:1;pointer-events:auto;transform:translate(-50%,0);}
+  .err-toast-body{flex:1;padding-top:4px;}
+  .err-toast-x{background:none;border:none;color:#c0392b;font-size:24px;line-height:1;cursor:pointer;padding:0 8px;min-width:40px;min-height:32px;flex-shrink:0;}
 </style>
 </head>
 <body>
@@ -628,6 +633,39 @@
 </div>
 
 <script>
+// ---- Phone error toasts (same behaviour as the admin Scheduler) ----
+// On phones (640px and narrower) an error shows as a red message at the
+// top of the screen that hides itself after 3 seconds; the X closes it
+// sooner. Wider screens keep the old behaviour.
+const ERR_TOAST_MQ = window.matchMedia('(max-width:640px)');
+let errToastTimer = null;
+function isPhoneToast(){ return ERR_TOAST_MQ.matches; }
+function hideErrorToast(){
+  clearTimeout(errToastTimer); errToastTimer = null;
+  const t = document.getElementById('errToast'); if(t) t.classList.remove('show');
+}
+function showErrorToast(text){
+  clearTimeout(errToastTimer);
+  let t = document.getElementById('errToast');
+  if(!t){
+    t = document.createElement('div');
+    t.id = 'errToast'; t.setAttribute('role','alert');
+    t.innerHTML = '<div class="err-toast-body"></div><button type="button" class="err-toast-x" aria-label="Dismiss">&times;</button>';
+    t.querySelector('.err-toast-x').addEventListener('click', hideErrorToast);
+    document.body.appendChild(t);
+  }
+  t.querySelector('.err-toast-body').textContent = text;
+  t.classList.add('show');
+  errToastTimer = setTimeout(hideErrorToast, 3000);
+}
+// An error that used to be an alert(): a toast on phones, the alert elsewhere.
+function notifyError(text){ if(isPhoneToast()) showErrorToast(text); else alert(text); }
+// Puts a form error in its in-form box, or in the toast on phones.
+function showFormError(box, text){
+  if(isPhoneToast()){ if(box.tagName==='P'){ box.hidden = true; box.textContent=''; } else box.innerHTML=''; showErrorToast(text); return; }
+  if(box.tagName==='P'){ box.hidden = false; box.textContent = text; }
+  else box.innerHTML = `<span style="color:var(--danger);">${escapeHtml(text)}</span>`;
+}
 /* =========================================================================
    CONFIG — same Azure AD app registration as the main scheduler. Delegated
    Graph permissions only ever allow what the SIGNED-IN USER's own SharePoint
@@ -1304,9 +1342,8 @@ window.saveSessionNotes = async function(){
   const msg = $('#notesMsg');
   const { answers, missing } = notesVisibleAnswers();
   if(missing.length){
-    msg.hidden = false;
-    msg.textContent = 'Please answer: ' + missing.join('; ');
-    $('#notesModal .modal').scrollTop = 0;
+    showFormError(msg, 'Please answer: ' + missing.join('; '));
+    if(!isPhoneToast()) $('#notesModal .modal').scrollTop = 0;
     return;
   }
   const s = notesCtx.session;
@@ -1319,11 +1356,10 @@ window.saveSessionNotes = async function(){
     closeSessionNotes();
     await loadAll();
   }catch(e){
-    msg.hidden = false;
-    msg.textContent = /\(403\)/.test(e.message)
+    showFormError(msg, /\(403\)/.test(e.message)
       ? "Couldn't save: your account doesn't have permission to save session notes yet. Ask an admin to give the Prayer Ministers group Contribute access to the SessionNotes list."
-      : "Couldn't save: " + e.message;
-    $('#notesModal .modal').scrollTop = 0;
+      : "Couldn't save: " + e.message);
+    if(!isPhoneToast()) $('#notesModal .modal').scrollTop = 0;
   }finally{
     btn.disabled = false; btn.textContent = 'Save notes';
   }
@@ -1859,7 +1895,7 @@ window.setMyAttendance = async function(sessionId, want){
     await updateItem('sessions', sessionId, { ConfirmedMinisterIDs: [...nowConfirmed].join(','), DeclinedMinisterIDs: [...nowDeclined].join(',') });
     await loadAll();
   }catch(e){
-    alert(`Couldn't save your response: ${e.message}`);
+    notifyError(`Couldn't save your response: ${e.message}`);
   }
 };
 function renderSchedule(){
@@ -2201,10 +2237,10 @@ async function saveBlackout(){
   const endDate = isRange ? $('#boEndDate').value : null;
   const notes = $('#boNotes').value.trim();
   if(!date || (isRange && !endDate)){
-    msg.innerHTML = `<span style="color:var(--danger);">Please fill in the date${isRange?' range.':'.'}</span>`; return;
+    showFormError(msg, `Please fill in the date${isRange?' range.':'.'}`); return;
   }
   if(isRange && endDate < date){
-    msg.innerHTML = '<span style="color:var(--danger);">End date must be on or after the start date.</span>'; return;
+    showFormError(msg, 'End date must be on or after the start date.'); return;
   }
   const fields = { Title: me.name, BlackoutDate: new Date(date+'T00:00').toISOString(), EndDate: endDate ? new Date(endDate+'T00:00').toISOString() : null, Notes: notes };
   try{
@@ -2213,7 +2249,7 @@ async function saveBlackout(){
     $('#blackoutModal').classList.remove('open');
     await loadAll();
   }catch(e){
-    msg.innerHTML = `<span style="color:var(--danger);">Save failed: ${e.message}</span>`;
+    showFormError(msg, `Save failed: ${e.message}`);
   }
 }
 window.deleteBlackout = async function(id){
@@ -2521,7 +2557,7 @@ function viewSessionBtnHtml(m, cls){
 // clearing anything that would hide it, then scrolls to it and makes it glow.
 window.viewMessageSession = function(sessionId){
   const s = mySessions().find(x=>x.id===sessionId);
-  if(!s){ alert("That session isn't on your schedule any more."); return; }
+  if(!s){ notifyError("That session isn't on your schedule any more."); return; }
   const done = s.status === 'Completed';
   if(done){
     completedBy = 'recipient';
@@ -2630,7 +2666,7 @@ window.markMessagesUnread = async function(ids){
   catch(e){
     myMessages.forEach(m=>{ if(want.has(m.id)) m.read = true; });
     renderMessages();
-    alert('Could not mark as unread: ' + e.message);
+    notifyError('Could not mark as unread: ' + e.message);
   }
 };
 window.markAllMessagesRead = function(){
@@ -2651,7 +2687,7 @@ window.dismissMessages = async function(ids, prompt){
   catch(e){
     myMessages = before;
     renderMessages();
-    alert('Could not dismiss: ' + e.message);
+    notifyError('Could not dismiss: ' + e.message);
   }
 };
 // Header Refresh button: reloads sessions, time off and messages in place,
@@ -2663,7 +2699,7 @@ window.refreshPortalData = async function(){
   try{
     await Promise.all([loadAll(), loadMessages()]);
   }catch(e){
-    alert('Could not refresh: ' + e.message);
+    notifyError('Could not refresh: ' + e.message);
   }finally{ btn.disabled = false; label.textContent = 'Refresh Data'; }
 };
 let messagesWired = false;
