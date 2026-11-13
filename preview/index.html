@@ -1579,7 +1579,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-11-13.5";
+const APP_VERSION = "2026-11-13.6";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -9446,7 +9446,7 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
-  { date: 'Nov 13, 2026', version: '2026-11-13.5 (Test only)', items: [
+  { date: 'Nov 13, 2026', version: '2026-11-13.6 (Test only)', items: [
     'Changed (design try-out, Test only): the main tabs are now one row of plain text tabs with an underline under the current one, instead of filled terracotta blocks. Every tab is always visible with no sideways scrolling: one row on a computer or tablet, two rows on most phones (it used to be four). On smaller screens the longer names are shortened, for example "Schedule" for Schedule & Planning and "Ministers" for Prayer Ministers.',
     'Changed: Refresh Data and Sign Out are smaller and look the same, so Sign Out is no longer the darkest thing on the page.',
     'Changed: cards have a lighter outline, so the content inside them stands out more. Form boxes keep their darker outline.',
