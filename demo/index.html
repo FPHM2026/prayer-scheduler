@@ -30,7 +30,7 @@
   :root{
     --navy:#474747; --navy-dark:#333; --gold:#aa5a3c; --gold-dark:#8a4a30;
     --primary:#f28a00; --primary-dark:#ce7500; --on-primary:#1a1a1a;
-    --cream:#e7e2cf; --bg:#faf8f4; --card:#fff; --border:#9d8b67;
+    --cream:#e7e2cf; --bg:#faf8f4; --card:#fff; --border:#9d8b67; --line:#e2d9c6;
     --text:#565656; --muted:#636363; --muted-bar:#cdc4ac; --danger:#c0392b; --danger-bg:#fdecea;
     --ok:#2e7d32; --ok-bg:#e9f7ec;
     --shadow-sm:0 1px 2px rgba(35,28,20,.07),0 1px 1px rgba(35,28,20,.05);
@@ -313,7 +313,7 @@
      wraps to two lines and gets tall, that overlap fully covered the tabs
      once you scrolled. Letting the banner scroll away normally fixes it. */
   #previewModeBanner{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;background:var(--navy);color:#fff;padding:14px 20px;font-size:var(--fs-sm);text-align:center;border-bottom:3px solid var(--gold);}
-  #previewModeBanner strong{color:var(--gold);}
+  #previewModeBanner strong{color:#f3b48f;}
   #previewModeBanner a.btn{background:#fff;color:var(--navy);padding:7px 16px;min-height:auto;font-size:var(--fs-xs);font-weight:800;text-decoration:none;border-radius:6px;display:inline-block;}
   #previewModeBanner a.btn:hover{background:#f1ede4;}
   #conflictToast{position:fixed;top:14px;left:50%;z-index:100;width:520px;max-width:92vw;display:flex;align-items:flex-start;gap:10px;background:var(--danger-bg);color:var(--danger);border:1px solid #f3c6c0;border-radius:8px;box-shadow:var(--shadow-lg);padding:12px 14px;font-size:var(--fs-sm);opacity:0;pointer-events:none;transform:translate(-50%,-16px);transition:opacity .2s ease,transform .2s ease;}
@@ -850,6 +850,49 @@
     .toolbar > *{width:auto;}
     .toolbar .search-wrap{flex:1 1 220px;}
   }
+
+  /* ---- Design refresh (2026-11-13, Test only), from an Impeccable audit +
+     Design with Intent review. Overrides earlier rules, so it sits last.
+     1. Primary nav: quiet text tabs with an underline on the current one,
+        instead of 11 filled terracotta blocks. Every tab is always visible
+        (Andrew: no sideways scrolling), so the row wraps; tabs are compact
+        so it wraps into as few lines as possible. */
+  nav[aria-label="Primary"]{flex-wrap:wrap;gap:0;padding:2px 4px;border-bottom:1px solid var(--line);}
+  /* Below 1200px the longer tab names drop their second word
+     ("Schedule & Planning" -> "Schedule") so the tabs fit in one row
+     (two on phones).
+     The full name is still the button's text for everything else. */
+  @media (max-width:1199px){ nav[aria-label="Primary"] .tab-more{display:none;} }
+  nav[aria-label="Primary"] button,
+  nav[aria-label="Primary"] button:hover,
+  nav[aria-label="Primary"] button.active,
+  nav[aria-label="Primary"] button.active:hover{background:none;}
+  nav[aria-label="Primary"] button{color:var(--text);font-weight:600;border-radius:0;border-bottom:3px solid transparent;margin:0;padding:8px 7px 5px;min-height:36px;font-size:var(--fs-xs);}
+  nav[aria-label="Primary"] button:hover{color:var(--gold-dark);border-bottom-color:var(--muted-bar);}
+  nav[aria-label="Primary"] button.active{color:var(--gold-dark);font-weight:700;border-bottom-color:var(--gold);}
+  nav[aria-label="Primary"] button:focus-visible{outline-offset:-3px;}
+  @media (min-width:640px){
+    nav[aria-label="Primary"]{padding:2px 8px;}
+    nav[aria-label="Primary"] button{padding:10px 8px 7px;min-height:40px;font-size:var(--fs-xs);}
+  }
+  @media (min-width:1024px){
+    nav[aria-label="Primary"]{padding:2px 8px;}
+    nav[aria-label="Primary"] button{padding:12px 8px 9px;min-height:44px;font-size:var(--fs-xs);}
+  }
+  /* 2. Header actions: same weight as each other and smaller than the
+     page title, instead of a solid charcoal Sign Out being the heaviest
+     thing on screen. */
+  .hdr-actions button.btn{font-size:var(--fs-sm);font-weight:600;min-height:40px!important;}
+  #btnSignOut,#btnSignOut:hover:not(:disabled){background:#fff;color:var(--navy);border-color:var(--navy);}
+  #btnSignOut:hover:not(:disabled){background:#faf7f1;}
+  /* 3. Cards: a soft hairline instead of the dark tan input border, so
+     containers recede and the content inside them leads. Inputs keep
+     --border (form fields need 3:1 against the page). Status stripes on
+     slots / priority cards are left alone: they carry meaning. */
+  .group,.stat-tile,.settings-card,.pl-list,.stat-combo,.trend-chart,.admin-msg,.notes-earlier,.picker-cand,.history-body-inner{border-color:var(--line);}
+  .slot,.prospect-card{border-top-color:var(--line);border-right-color:var(--line);border-bottom-color:var(--line);}
+  /* 4. Contrast: initials on the cream avatar were 3.8:1. */
+  .group-avatar{color:var(--gold-dark);}
 </style>
 </head>
 <body>
@@ -889,12 +932,12 @@
        merged Schedule & Planning tab (panel-schedplan) replaces both, per
        the "no duplicated functionality" decision. Re-add these two buttons
        plus data-tab="schedule"/"planning" here to fall back if needed. -->
-  <button data-tab="schedplan" class="active" aria-current="page">Schedule &amp; Planning</button>
+  <button data-tab="schedplan" class="active" aria-current="page">Schedule<span class="tab-more"> &amp; Planning</span></button>
   <button data-tab="prayerlist">Prayer List</button>
-  <button data-tab="completed">Completed Sessions</button>
-  <button data-tab="overview">Prayer Ministers</button>
-  <button data-tab="blackouts">Blackout Dates</button>
-  <button data-tab="intake">Intake Forms</button>
+  <button data-tab="completed">Completed<span class="tab-more"> Sessions</span></button>
+  <button data-tab="overview"><span class="tab-more">Prayer </span>Ministers</button>
+  <button data-tab="blackouts">Blackout<span class="tab-more"> Dates</span></button>
+  <button data-tab="intake">Intake<span class="tab-more"> Forms</span></button>
   <button data-tab="reports">Reports</button>
   <button data-tab="statistics">Statistics</button>
   <button data-tab="messages" id="navMessages" hidden>Messages<span class="nav-badge" id="msgBadge" hidden></span></button>
@@ -932,7 +975,7 @@
   </section>
 
   <section class="panel active" id="panel-schedplan">
-    <p class="helptext">Every state lives here — open slots to fill, tentative claims to review, and booked sessions to look back on.</p>
+    <p class="helptext">Open slots to fill, tentative claims to review and booked sessions, all in one place.</p>
     <div class="stats-collapse" id="schedPlanStatsCollapse">
       <button class="stats-toggle" onclick="toggleStatsCollapse(this)" aria-expanded="true">
         <span class="chevron"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>
@@ -969,13 +1012,13 @@
       <select id="range" aria-label="Filter sessions by date range"><option>Upcoming</option><option>All</option><option>Past</option></select>
       <button class="btn secondary" id="btnRefresh" style="display:inline-flex;align-items:center;gap:4px;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Refresh</button>
     </div>
-    <p class="helptext">Grouped by recipient — tap a name to see their full history, soonest first.</p>
+    <p class="helptext">Grouped by recipient. Tap a name to see their full history, soonest first.</p>
     <div id="scheduleGroups"></div>
     <div class="no-results" id="scheduleNoResults" hidden>No recipients match your search.</div>
   </section>
 
   <section class="panel" id="panel-planning">
-    <p class="helptext">People who've asked for a session but aren't scheduled yet — same list as Schedule, just filtered to status "Waiting." Priority-flagged entries always stay at the top.</p>
+    <p class="helptext">People who've asked for a session but aren't scheduled yet. It's the same list as Schedule, filtered to "Waiting." Priority-flagged entries always stay at the top.</p>
     <div class="stats-collapse" id="planningStatsCollapse">
       <button class="stats-toggle" onclick="toggleStatsCollapse(this)" aria-expanded="true">
         <span class="chevron"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>
@@ -1006,7 +1049,7 @@
   </section>
 
   <section class="panel" id="panel-completed">
-    <p class="helptext" id="completedHelptext">Grouped by recipient — most recently completed first.</p>
+    <p class="helptext" id="completedHelptext">Grouped by recipient, most recently completed first.</p>
     <div class="stats-collapse" id="completedStatsCollapse">
       <button class="stats-toggle" onclick="toggleStatsCollapse(this)" aria-expanded="true">
         <span class="chevron"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>
@@ -1036,7 +1079,7 @@
       <button class="link-btn" type="button" id="btnCopyInstallGuide">Copy Link to Install Guide</button>
       <span class="helptext" id="installGuideCopiedMsg" style="display:none;">Link copied!</span>
     </div>
-    <p class="helptext">Grouped by minister — tap a name for their stats and upcoming sessions, or use the icons to manage them. The install guide walks a minister through adding My FPHM to their home screen and turning notifications on — send them the link.</p>
+    <p class="helptext">Grouped by minister. Tap a name for their stats and upcoming sessions, or use the buttons to manage them. The install guide walks a minister through adding My FPHM to their home screen and turning notifications on, so send them the link.</p>
     <div class="stats-collapse" id="overviewStatsCollapse">
       <button class="stats-toggle" onclick="toggleStatsCollapse(this)" aria-expanded="true">
         <span class="chevron"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>
@@ -1109,7 +1152,7 @@
 
     <div id="intakeQuestionsHost" hidden>
     <div id="intakeQuestionsView">
-      <p class="helptext" id="formEditorHelp">Edit the intake questionnaire's sections, questions and wording. Changes take effect for anyone opening the public form as soon as you save — no deploy needed.</p>
+      <p class="helptext" id="formEditorHelp">Edit the intake questionnaire's sections, questions and wording. Changes take effect for anyone opening the public form as soon as you save.</p>
       <div class="editor-sticky no-print" id="formEditorSticky">
       <div class="toolbar">
         <button class="btn" id="btnFormEditorSave">Save changes</button>
@@ -1130,7 +1173,7 @@
   </section>
 
   <section class="panel" id="panel-reports">
-    <p class="helptext">Pick a date range, then Generate opens a statistics report in a new tab — Freedom Sessions, Drop-In, and Training as three separate sections, ready to review or print.</p>
+    <p class="helptext">Pick a date range, then Generate opens a statistics report in a new tab with Freedom Sessions, Drop-In, and Training as three separate sections, ready to review or print.</p>
     <div class="range-presets">
       <button type="button" class="range-preset" onclick="setReportRange('thisyear')">This Year</button>
       <button type="button" class="range-preset" onclick="setReportRange('lastyear')">Last Year</button>
@@ -1177,7 +1220,7 @@
   </section>
 
   <section class="panel" id="panel-settings">
-    <p class="helptext">Configure defaults used across scheduling — no code changes needed.</p>
+    <p class="helptext">Defaults used across scheduling.</p>
     <nav class="subtabs" aria-label="Settings section" id="settingsSubtabs">
       <button class="active" data-settingsview="timewindows">Quick Slots</button>
       <button data-settingsview="locations">Locations</button>
@@ -1188,7 +1231,7 @@
     </nav>
 
     <div class="settings-subview active" id="settingsTimeWindowsView">
-      <p class="helptext">These two cards together are what the "+ Quick Add Slots" button offers — the default days for Freedom Sessions, and the separate Sunday Drop-In defaults.</p>
+      <p class="helptext">These two cards together are what the "+ Quick Add Slots" button offers: the default days for Freedom Sessions, and the separate Sunday Drop-In defaults.</p>
 
       <div class="settings-card">
         <h2>Default Days</h2>
@@ -1233,7 +1276,7 @@
       <div class="toolbar" style="margin:16px 0 10px;">
         <button class="btn" id="btnSettingsAddLocation">+ Add Location</button>
       </div>
-      <p class="helptext">Deleting a location removes it from the dropdown for new sessions — sessions that already used it keep showing its original name.</p>
+      <p class="helptext">Deleting a location removes it from the dropdown for new sessions. Sessions that already used it keep showing its original name.</p>
       <div id="settingsLocationsList"></div>
     </div>
 
@@ -1378,12 +1421,12 @@
       <label style="display:flex;align-items:center;gap:8px;font-weight:700;">
         <input type="checkbox" id="minCreateAccount" checked style="width:auto;min-height:auto;"> Also create their sign-in account
       </label>
-      <p class="helptext" style="margin:5px 0 0;">Creates an unlicensed Microsoft 365 account at the Sign-In Email above — no seat cost, just enough to sign into the portal. Requires your own account to have the User Administrator role in Entra.</p>
+      <p class="helptext" style="margin:5px 0 0;">Creates an unlicensed Microsoft 365 account at the Sign-In Email above. There's no seat cost; it's just enough to sign into the portal. Requires your own account to have the User Administrator role in Entra.</p>
     </div>
     <div class="field" id="minPasswordField">
       <label for="minPassword" id="minPasswordLabel">Temporary Portal Password</label>
       <input id="minPassword" type="text" autocomplete="off">
-      <p class="helptext" id="minPasswordHelp" style="margin:5px 0 0;">Give this to the minister to sign in with — Microsoft makes them pick their own new password the first time they use it, so this is never their real, ongoing password. Not sensitive enough to mask or store.</p>
+      <p class="helptext" id="minPasswordHelp" style="margin:5px 0 0;">Give this to the minister to sign in with. Microsoft makes them pick their own new password the first time they use it, so this is never their real, ongoing password. Not sensitive enough to mask or store.</p>
     </div>
     <div class="field" id="minResetPasswordField" style="display:none;">
       <button type="button" class="btn secondary" id="btnMinResetPassword">Reset to a new temporary password</button>
@@ -1536,7 +1579,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-11-13.4";
+const APP_VERSION = "2026-11-13.6";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3104,7 +3147,7 @@ function renderCompleted(){
   $('#completedDates').hidden = !byDate;
   $('#completedHelptext').textContent = byDate
     ? 'Grouped by week and day — most recent first, with the prayer ministers on each session.'
-    : 'Grouped by recipient — most recently completed first.';
+    : 'Grouped by recipient, most recently completed first.';
   if(byDate){ renderCompletedByDate(q); renderCompletedStats(); return; }
   const box = $('#completedGroups'); const noResults = $('#completedNoResults');
   const opened = openState(box);
@@ -5719,7 +5762,7 @@ function openMinisterModal(m){
   $('#minCreateAccountField').style.display = hasAccount ? 'none' : '';
   $('#minCreateAccount').checked = !hasAccount;
   $('#minPasswordLabel').textContent = 'Temporary Portal Password (for the new account)';
-  $('#minPasswordHelp').textContent = 'Give this to the minister to sign in with — Microsoft makes them pick their own new password the first time they use it, so this is never their real, ongoing password. Not sensitive enough to mask or store.';
+  $('#minPasswordHelp').textContent = 'Give this to the minister to sign in with. Microsoft makes them pick their own new password the first time they use it, so this is never their real, ongoing password. Not sensitive enough to mask or store.';
   // Editing an existing minister starts with the password field hidden and
   // the Reset button shown instead - resetMinPassword() reveals the field
   // (prefilled with this year's default) only once the admin actually asks
@@ -6918,7 +6961,7 @@ function showEditor(which){
   const notes = which==='notes';
   $('#formEditorHelp').textContent = notes
     ? 'Edit the questions prayer ministers answer in Session Notes (opened from a session card): sections, questions, answer types and "show only if" branching. Each saved note keeps its own copy of the form it was filled in with, so changing questions later never alters notes already written.'
-    : "Edit the intake questionnaire's sections, questions and wording. Changes take effect for anyone opening the public form as soon as you save — no deploy needed.";
+    : "Edit the intake questionnaire's sections, questions and wording. Changes take effect for anyone opening the public form as soon as you save.";
   $('#formEditorIntro').hidden = notes;
   $('#btnFormEditorPreview').hidden = !notes;
   $('#formEditorLiability').hidden = notes;
@@ -9403,6 +9446,12 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Nov 13, 2026', version: '2026-11-13.6', items: [
+    'Changed: the main tabs are now one row of plain text tabs with an underline under the current one, instead of filled terracotta blocks. Every tab is always visible with no sideways scrolling: one row on a computer or tablet, two rows on most phones (it used to be four). On smaller screens the longer names are shortened, for example "Schedule" for Schedule & Planning and "Ministers" for Prayer Ministers.',
+    'Changed: Refresh Data and Sign Out are smaller and look the same, so Sign Out is no longer the darkest thing on the page.',
+    'Changed: cards have a lighter outline, so the content inside them stands out more. Form boxes keep their darker outline.',
+    'Changed: the initials in the round name badges are a little darker so they are easier to read, and several help lines under the tab titles are reworded more plainly.'
+  ]},
   { date: 'Nov 13, 2026', version: '2026-11-13.4', items: [
     'Changed: on a booked session card, "Send app notification" now turns green and says "Notification sent (date) at (time) — tap to re-send" once the team has been notified, whether you sent it from the card or it went out automatically when you booked or moved the session. To keep this after a reload, add a "AppNotifiedAt" (Date and Time) column to the PrayerSessions list in SharePoint; until then it shows only until the page is reloaded.'
   ]},
@@ -9416,16 +9465,16 @@ const CHANGE_LOG = [
     'New: a Statistics tab with the ministry statistics report. It puts this year to date beside the same dates last year (with all of last year for reference): sessions, recipients, new and returning, hours, the monthly and running-total charts, and the Ministry Team page. Pick a report date at the top. "Download for leadership" makes the Word file without minister names (pages 1 to 3); "Download leader\'s copy" adds the Ministry Team and Journey pages. Each chart can be downloaded as a picture. If the numbers don\'t add up (for example a session with no lead), a red box says what to fix and the downloads are hidden until it is.',
     'New: Journey to Freedom sessions. Add one from the bottom of the Statistics tab with "+ Journey to Freedom session": pick the date, start and end time, the ministers who were there and how many participants came. Sessions a few weeks apart are grouped into one run automatically. The usual day, time and location are set in Settings > Quick Slots. Journey sessions don\'t count in Freedom Session numbers or minister hours.',
     'New: Sunday Drop-In sessions have a "Prayer recipients" box for how many came, and a "Provisional" tick for a number still to be confirmed (the report highlights those). The same list at the bottom of the Statistics tab shows every Drop-In with an Edit button. These two boxes appear once the Attendees and AttendeesProvisional columns are added in SharePoint; the Statistics tab shows the steps until then.',
-  ]},
-  { date: 'Nov 12, 2026', version: '2026-11-12.1', items: [
-    'Changed: "first-time / follow-up" is now "new / returning", on the Completed Sessions card, in Reports (year, month, minister and Total rows) and on My FPHM\'s Completed Sessions card (live now). New = the person\'s first-ever completed Freedom Session falls in that period; returning = they had their first session before it. It is worked out from session dates, not the saved First/Follow-up type. New + returning always equals Unique Recipients, and Lifetime is all new. Before, anyone with a follow-up in the period counted as follow-up, so someone who started this year and came back wasn\'t counted as new. To check: Completed Sessions should show 2026 as 38 new and 12 returning, last year as 20 and 2, and Lifetime as 65 new.'
-  ]},
+  ]}
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Nov 12, 2026', version: '2026-11-12.1', items: [
+    'Changed: "first-time / follow-up" is now "new / returning", on the Completed Sessions card, in Reports (year, month, minister and Total rows) and on My FPHM\'s Completed Sessions card (live now). New = the person\'s first-ever completed Freedom Session falls in that period; returning = they had their first session before it. It is worked out from session dates, not the saved First/Follow-up type. New + returning always equals Unique Recipients, and Lifetime is all new. Before, anyone with a follow-up in the period counted as follow-up, so someone who started this year and came back wasn\'t counted as new. To check: Completed Sessions should show 2026 as 38 new and 12 returning, last year as 20 and 2, and Lifetime as 65 new.'
+  ]},
   { date: 'Nov 11, 2026', version: '2026-11-11.1', items: [
     'Fixed: on an iPhone, the text cursor didn\'t show in the session notes boxes (reported on "Chief prayer need"), even though typing worked. The notes sheet is now set up the way iPhones need to draw the cursor, and the page behind it no longer scrolls while it\'s open. Same fix in My FPHM (live now). To check: on an iPhone, open Write session notes and tap "Chief prayer need"; the cursor should blink.'
   ]},
