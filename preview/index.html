@@ -318,6 +318,13 @@
   #previewModeBanner a.btn:hover{background:#f1ede4;}
   #conflictToast{position:fixed;top:14px;left:50%;z-index:100;width:520px;max-width:92vw;display:flex;align-items:flex-start;gap:10px;background:var(--danger-bg);color:var(--danger);border:1px solid #f3c6c0;border-radius:8px;box-shadow:var(--shadow-lg);padding:12px 14px;font-size:var(--fs-sm);opacity:0;pointer-events:none;transform:translate(-50%,-16px);transition:opacity .2s ease,transform .2s ease;}
   #conflictToast.show{opacity:1;pointer-events:auto;transform:translate(-50%,0);}
+  /* Phones: error messages show in the toast above (auto-hides after 3s,
+     X dismisses) instead of in the form, where they were often out of view. */
+  @media (max-width:640px){
+    #conflictToast{top:calc(8px + env(safe-area-inset-top));z-index:200;}
+    .errbox.toasted{display:none !important;}
+    .conflict-toast-dismiss{padding:0 8px;margin:-4px -8px -4px 0;min-width:40px;min-height:32px;}
+  }
   .conflict-toast-body{flex:1;}
   .conflict-toast-dismiss{background:none;border:none;color:var(--danger);font-size:22px;line-height:1;cursor:pointer;padding:0 2px;flex-shrink:0;min-height:auto;}
 
@@ -1579,7 +1586,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-11-13.7";
+const APP_VERSION = "2026-11-13.8";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1805,7 +1812,7 @@ window.setAdminMessagesRead = async function(ids, read){
   catch(e){
     adminMessages.forEach(m=>{ if(changed.includes(m.id)) m.read = !read; });
     renderAdminMessages();
-    alert('Could not update: ' + e.message);
+    notifyError('Could not update: ' + e.message);
   }
 };
 window.markAllAdminMessagesRead = function(){
@@ -1825,7 +1832,7 @@ window.deleteAdminMessages = async function(ids, prompt){
   catch(e){
     adminMessages = before;
     renderAdminMessages();
-    alert('Could not delete: ' + e.message);
+    notifyError('Could not delete: ' + e.message);
   }
 };
 // Open form marks the message read and shows the intake form, fetching
@@ -1848,10 +1855,10 @@ function initAdminMessages(){
 }
 function showIntakeForm(id){
   const i = intakeResponses.find(x=>x.id===id);
-  if(!i){ showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Intake form not found</div><div>Try Refresh Data.</div>`); return; }
+  if(!i){ showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Intake form not found</div><div>Try Refresh Data.</div>`, true); return; }
   // Never close a form the admin is in the middle of.
   if(document.querySelector('.modal-bg.open')){
-    showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">New intake form: ${escapeHtml(i.recipName||'unnamed')}</div><div>Close the open window, then find it on the Intake Forms tab.</div>`);
+    showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">New intake form: ${escapeHtml(i.recipName||'unnamed')}</div><div>Close the open window, then find it on the Intake Forms tab.</div>`, true);
     return;
   }
   switchTab('intake');
@@ -1933,8 +1940,8 @@ window.sendAppNotification = async function(id){
   );
   if(!ok) return;
   const r = await pushNotifyMinisters(s.id, ids, 'booked', new Date(s.date+'T'+s.time), s.recipName);
-  if(r.error) alert('App notification not sent: ' + r.error);
-  else if(r.skipped) alert('Not sent: this session isn\'t Scheduled.');
+  if(r.error) notifyError('App notification not sent: ' + r.error);
+  else if(r.skipped) notifyError('Not sent: this session isn\'t Scheduled.');
   else alert(`Sent to ${r.sent||0} device${r.sent===1?'':'s'}. Ministers without phone notifications turned on still get it in their portal Messages.`);
 };
 // Tells a removed session's team it's off (push + portal message). Call
@@ -2457,13 +2464,13 @@ async function loadAll(){
 // draft is already protected separately by schemaDirty in loadAll()).
 async function refreshDataKeepingPlace(){
   if(document.querySelector('.modal-bg.open')){
-    showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Finish or close the open window first</div><div>Refreshing while a form is open could disturb what you're working on.</div>`);
+    showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Finish or close the open window first</div><div>Refreshing while a form is open could disturb what you're working on.</div>`, true);
     return;
   }
   try{
     await withLoading($('#btnRefreshData'), 'Refreshing…', ()=>Promise.all([loadAll(), loadAdminMessages()]));
   }catch(e){
-    showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Couldn't refresh</div><div>${escapeHtml(e.message||'Unknown error')}</div>`);
+    showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Couldn't refresh</div><div>${escapeHtml(e.message||'Unknown error')}</div>`, true);
   }
 }
 function toHM(iso){
@@ -2897,7 +2904,7 @@ window.togglePrayerListPrivate = async function(btn, key, makePrivate){
   await withLoading(btn, 'Saving…', async ()=>{
     try{
       for(const x of targets) await updateItem('sessions', x.id, { [PL_PRIVATE_COLUMN]: makePrivate });
-    }catch(err){ alert('Could not save: ' + err.message); }
+    }catch(err){ notifyError('Could not save: ' + err.message); }
     await loadAll();
   });
 };
@@ -3958,7 +3965,7 @@ window.assignSlotToSession = async function(sessionId, btn){
     await updateItem('slots', slotId, { LinkedSessionId: s.id });
     await loadAll();
   }catch(e){
-    showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Couldn't assign a slot</div><div>${escapeHtml(e.message||'Unknown error')}</div>`);
+    showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Couldn't assign a slot</div><div>${escapeHtml(e.message||'Unknown error')}</div>`, true);
   }finally{
     if(btn){ btn.disabled = false; btn.textContent = 'Assign to a Slot'; }
   }
@@ -4187,7 +4194,7 @@ window.reconnectSlot = async function(slotId, sessionId){
     await updateItem('slots', slotId, { LinkedSessionId: sessionId });
     await loadAll();
   }catch(e){
-    showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Couldn't reconnect</div><div>${escapeHtml(e.message||'Unknown error')}</div>`);
+    showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Couldn't reconnect</div><div>${escapeHtml(e.message||'Unknown error')}</div>`, true);
   }
 };
 window.useTeamFromHistoryReal = async function(slotId, idx){
@@ -4350,7 +4357,7 @@ function allUnusedSlots(){
 window.removeAllUnusedSlots = async function(btn){
   const unused = allUnusedSlots();
   if(!unused.length){
-    showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Nothing to remove</div><div>There are no unused (Open or unbooked Drop-In) slots right now.</div>`);
+    showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Nothing to remove</div><div>There are no unused (Open or unbooked Drop-In) slots right now.</div>`, true);
     return;
   }
   const ok = await askConfirm(`Remove all ${unused.length} unused slot${unused.length===1?'':'s'} (Open or unbooked Drop-In, any date)? Tentative claims and Booked sessions are never touched.`, {confirmLabel:'Remove All', danger:true});
@@ -4362,7 +4369,7 @@ window.removeAllUnusedSlots = async function(btn){
     }
     await loadAll();
   }catch(e){
-    showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Couldn't remove all slots</div><div>${escapeHtml(e.message||'Unknown error')}</div>`);
+    showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Couldn't remove all slots</div><div>${escapeHtml(e.message||'Unknown error')}</div>`, true);
   }finally{
     if(btn){ btn.disabled = false; btn.textContent = 'Remove Unused Slots'; }
   }
@@ -5167,7 +5174,14 @@ function renderSameDay(){
       `<div>${fmt12(s.time)}–${fmt12(s.endTime)} — ${escapeHtml(s.recipName)} <span class="helptext">(${escapeHtml(ministerNamesOf(s))}, ${escapeHtml(sessionLocationDisplay(s))})</span></div>`
     ).join('') + `</div>`;
 }
-function showConflictToast(html){
+// transient = a one-off message (an error or notice), not the live
+// double-booking warning. On phones a transient toast hides itself after
+// 3 seconds; the X closes any toast at once.
+const TOAST_MOBILE_MQ = window.matchMedia('(max-width:640px)');
+let toastTimer = null;
+function isMobileToast(){ return TOAST_MOBILE_MQ.matches; }
+function showConflictToast(html, transient){
+  clearTimeout(toastTimer); toastTimer = null;
   let toast = document.getElementById('conflictToast');
   if(!toast){
     toast = document.createElement('div');
@@ -5179,8 +5193,51 @@ function showConflictToast(html){
   }
   toast.querySelector('.conflict-toast-body').innerHTML = html;
   toast.classList.add('show');
+  if(transient && isMobileToast()) toastTimer = setTimeout(hideConflictToast, 3000);
 }
+function showErrorToast(text){ showConflictToast(`<div>${escapeHtml(text)}</div>`, true); }
+// Error that used to be an alert(): a toast on phones, the alert elsewhere.
+function notifyError(text){ if(isMobileToast()) showErrorToast(text); else alert(text); }
+// On phones, every in-form error box (.errbox with role="alert") is shown
+// as a toast and hidden in place. Setup/instruction boxes (no role="alert"),
+// the statistics checks and the page-load error stay where they are.
+(function watchErrorBoxes(){
+  const SKIP = '#statChecks, #loadError';
+  const seen = new Set();
+  const consider = el=>{ if(el && el.nodeType===1 && el.matches('.errbox[role="alert"]')) seen.add(el); };
+  const flush = ()=>{
+    const list = [...seen]; seen.clear();
+    if(!isMobileToast()) return;
+    list.forEach(el=>{
+      if(!el.isConnected || el.hidden || el.closest('[hidden]') || el.closest(SKIP)) return;
+      const bg = el.closest('.modal-bg'); if(bg && !bg.classList.contains('open')) return;
+      const text = el.textContent.trim(); if(!text) return;
+      el.classList.add('toasted');
+      showErrorToast(text);
+    });
+  };
+  const sameIgnoringToasted = (a,b)=>{
+    const norm = v=>(v||'').split(/\s+/).filter(c=>c && c!=='toasted').sort().join(' ');
+    return norm(a)===norm(b);
+  };
+  const start = ()=>{
+    new MutationObserver(muts=>{
+      muts.forEach(m=>{
+        if(m.type==='attributes'){
+          if(m.attributeName==='class' && sameIgnoringToasted(m.oldValue, m.target.className)) return;
+          consider(m.target); return;
+        }
+        const host = m.target.nodeType===1 ? m.target : m.target.parentElement;
+        consider(host && host.closest('.errbox[role="alert"]'));
+        m.addedNodes.forEach(n=>{ if(n.nodeType!==1) return; consider(n); n.querySelectorAll && n.querySelectorAll('.errbox[role="alert"]').forEach(consider); });
+      });
+      if(seen.size) flush();
+    }).observe(document.body, { subtree:true, childList:true, characterData:true, attributes:true, attributeFilter:['hidden','class'], attributeOldValue:true });
+  };
+  if(document.body) start(); else document.addEventListener('DOMContentLoaded', start);
+})();
 function hideConflictToast(){
+  clearTimeout(toastTimer); toastTimer = null;
   const toast = document.getElementById('conflictToast');
   if(toast) toast.classList.remove('show');
 }
@@ -5519,7 +5576,7 @@ window.removePushDevice = async function(id){
     await deleteItem('pushSubs', id);
     pushDevices = pushDevices.filter(x=>x.id!==id);
     renderOverview();
-  }catch(e){ alert('Could not remove the device: ' + e.message); }
+  }catch(e){ notifyError('Could not remove the device: ' + e.message); }
 };
 function parsePushDevices(items){
   return items.map(i=>{
@@ -9446,6 +9503,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Nov 13, 2026', version: '2026-11-13.8', items: [
+    'Changed: on a phone, error messages (for example "Please select at least 2 prayer ministers" or "Save failed") now pop up as a red message at the top of the screen instead of somewhere in the form where you might not see it. It disappears by itself after 3 seconds, or tap the × to close it sooner. Computers and tablets are unchanged.'
+  ]},
   { date: 'Nov 13, 2026', version: '2026-11-13.7', items: [
     'Changed: the main tab names are slightly larger, and every tab is still visible without scrolling.'
   ]},
@@ -9461,15 +9521,15 @@ const CHANGE_LOG = [
   { date: 'Nov 13, 2026', version: '2026-11-13.3', items: [
     'Removed: the "Notify ministers via WhatsApp" button on booked sessions, and the "send a WhatsApp cancellation?" question when a booked session is removed. The paid WhatsApp number is being shut down. Use "Send app notification" instead (ministers also get app notifications automatically when you book or change a session). The "WhatsApp group created" toggle and "open chat" link stay as they were.'
   ]},
-  { date: 'Nov 13, 2026', version: '2026-11-13.2', items: [
-    'Changed: on the Statistics tab, the Ministry Team table no longer has the "Hours change" column, on screen and in the Word leader\'s copy. A percentage on small numbers was misleading. The hours for both years are still shown side by side.',
-  ]}
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Nov 13, 2026', version: '2026-11-13.2', items: [
+    'Changed: on the Statistics tab, the Ministry Team table no longer has the "Hours change" column, on screen and in the Word leader\'s copy. A percentage on small numbers was misleading. The hours for both years are still shown side by side.',
+  ]},
   { date: 'Nov 13, 2026', version: '2026-11-13.1', items: [
     'New: a Statistics tab with the ministry statistics report. It puts this year to date beside the same dates last year (with all of last year for reference): sessions, recipients, new and returning, hours, the monthly and running-total charts, and the Ministry Team page. Pick a report date at the top. "Download for leadership" makes the Word file without minister names (pages 1 to 3); "Download leader\'s copy" adds the Ministry Team and Journey pages. Each chart can be downloaded as a picture. If the numbers don\'t add up (for example a session with no lead), a red box says what to fix and the downloads are hidden until it is.',
     'New: Journey to Freedom sessions. Add one from the bottom of the Statistics tab with "+ Journey to Freedom session": pick the date, start and end time, the ministers who were there and how many participants came. Sessions a few weeks apart are grouped into one run automatically. The usual day, time and location are set in Settings > Quick Slots. Journey sessions don\'t count in Freedom Session numbers or minister hours.',
