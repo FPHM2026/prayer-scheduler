@@ -1536,7 +1536,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-11-13.2";
+const APP_VERSION = "2026-11-13.3";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1576,22 +1576,6 @@ const ENTRA_MINISTERS_GROUP_ID = "dbee503e-a287-42c8-a4f3-ae67feecdec7";
 // Domain new minister sign-in accounts are created under - see
 // generateSignInEmail() below.
 const PORTAL_ACCOUNT_DOMAIN = "creeksidechurch.ca";
-
-// WhatsApp booking notifications — calls the fphm-whatsapp-notify Cloudflare
-// Worker, which holds the real Meta WhatsApp credentials server-side. This
-// shared secret is a bearer token the Worker requires from callers; since
-// this is a public static file, anyone could read it out of the page source
-// and call the Worker themselves — an accepted, low-stakes tradeoff (worst
-// case: a few cents of spam template messages), not a real access boundary.
-const WHATSAPP_NOTIFY = {
-  workerUrl: "https://fphm-whatsapp-notify.ajjamoore.workers.dev/notify",
-  sharedSecret: "b1c2a40435ceb1ce60e247c16c0fe2d3aa75ee53f2c6acf6",
-  // The "prayer_session_booked" template was approved in WhatsApp Manager
-  // and live-tested (2026-09-25, real send to a verified test number via
-  // curl) before this was flipped to false. Set back to true to validate
-  // without actually sending, e.g. while testing a change to this section.
-  dryRun: false
-};
 
 // Phone push notifications to ministers (added 2026-10-21). Sent by the
 // intake Worker (cloudflare-worker/, /api/push/session) to every device a
@@ -2346,11 +2330,6 @@ async function loadAll(){
       apptType: s.ApptType||'First', status: s.Status||'Scheduled',
       prevId: s.PreviousSessionId||null,
       waCreated: !!s.WaCreated, waLink: s.WaLink||'',
-      // Whether the assigned ministers have been sent a WhatsApp booking
-      // notification for this session. Reads false/undefined safely if the
-      // WaNotified column doesn't exist in SharePoint yet (same convention
-      // as Contacted below).
-      waNotified: !!s.WaNotified,
       priority: !!s.Priority,
       // Contacted: whether the admin has reached out to this waiting entry -
       // a manual record of an external action, same pattern as WaCreated.
@@ -2368,7 +2347,7 @@ async function loadAll(){
       // "Intake form linking" below) - overrides the plain name-match
       // findIntakeForRecipient() falls back to when this is unset. Reads
       // null safely if the IntakeResponseId column doesn't exist in
-      // SharePoint yet, same convention as Contacted/WaNotified above.
+      // SharePoint yet, same convention as Contacted above.
       intakeResponseId: (s.IntakeResponseId!=null && s.IntakeResponseId!=='') ? parseInt(s.IntakeResponseId,10) : null,
       // Private = keep this person off the Prayer List (My FPHM and the
       // admin tab's count). Hand-made Yes/No column; reads false if missing.
@@ -2972,51 +2951,11 @@ function renderSchedule(){
       g.vis.map(s=>scheduleSessionRow(s)).join(''), wasOpen);
   }).join('');
 }
-// ---- Cancellation WhatsApp notice ----
-// When a booked session is removed/deleted and its ministers had already
-// been notified through WhatsApp (WaNotified), offer to tell them it's off.
-// Must run BEFORE the removal: reverting a session to Waiting clears its
-// minister ids and date, so the recipients and wording are captured here
-// first. Returns a function that does the sending (call after the removal
-// succeeds), or null if there's nothing to send / the admin said no.
-async function offerCancellationNotice(s){
-  if(!s || !s.waNotified || !s.date || !s.time) return null;
-  const to = s.ministers.map(ref=>ministers.find(x=>x.id===ref.id)).filter(Boolean)
-    .map(m=>({ m, to: toE164(m.phone) })).filter(x=>x.to);
-  if(!to.length) return null;
-  const when = fmtDate(new Date(s.date+'T'+s.time)), at = fmt12(s.time);
-  const ok = await askConfirm(
-    `These ministers were already notified on WhatsApp. Send ${to.length} minister${to.length===1?'':'s'} a message that ${s.recipName}'s session on ${when} at ${at} was canceled?${WHATSAPP_NOTIFY.dryRun?' (dry run - nothing will actually be sent)':''}`,
-    { confirmLabel: 'Send cancellation', cancelLabel: "Don't send", danger: false }
-  );
-  if(!ok) return null;
-  return async function(){
-    const results = await Promise.all(to.map(async ({m, to})=>{
-      try{
-        const resp = await fetch(WHATSAPP_NOTIFY.workerUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + WHATSAPP_NOTIFY.sharedSecret },
-          body: JSON.stringify({ type: 'cancel', to, recipientName: s.recipName, sessionDate: when, sessionTime: at, dryRun: WHATSAPP_NOTIFY.dryRun })
-        });
-        return { m, ok: resp.ok, data: await resp.json() };
-      }catch(e){ return { m, ok: false, data: { error: e.message } }; }
-    }));
-    const failed = results.filter(r=>!r.ok);
-    if(failed.length){
-      showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">${failed.length} cancellation message${failed.length===1?'':'s'} failed</div>${failed.map(f=>`<div>${escapeHtml(f.m.name)}: ${escapeHtml(f.data.error||'Unknown error')}</div>`).join('')}`);
-    } else if(WHATSAPP_NOTIFY.dryRun){
-      showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Dry run OK</div><div>Would send cancellation to: ${results.map(r=>escapeHtml(r.m.name)).join(', ')}</div>`);
-    }
-    return !WHATSAPP_NOTIFY.dryRun && results.some(r=>r.ok);
-  };
-}
 window.deleteSession = async function(id){
   const s = sessions.find(x=>x.id===id);
   if(!(await askConfirm(`Delete the session with ${s ? s.recipName : 'this recipient'}${s && s.date ? ' on '+s.date : ''}? This can't be undone.`))) return;
-  const sendCancel = (s && s.status==='Scheduled') ? await offerCancellationNotice(s) : null;
   await deleteItem('sessions', id);
   if(s) pushSessionCanceled(s);
-  if(sendCancel) await sendCancel();
   await loadAll();
 };
 window.markComplete = async function(id){
@@ -3035,69 +2974,15 @@ window.toggleWa = async function(id){
   await updateItem('sessions', id, { WaCreated: newVal, WaLink: newVal ? s.waLink : '' });
   await loadAll();
 };
-// The WhatsApp-group toggle/link plus the "Notify ministers" button - shared
+// The WhatsApp-group toggle/link plus the "Send app notification" button - shared
 // markup used by every place a session's details are shown (the live Booked
 // slot card, the unlinked-session fallback card, and the old Schedule tab's
 // row), so the three don't drift out of sync with each other.
 function waSectionHtml(s){
   return `<button type="button" class="wa-note ${s.waCreated?'on':''}" aria-pressed="${s.waCreated?'true':'false'}" onclick="toggleWa(${s.id})" style="cursor:pointer;background:none;border:none;padding:4px 0;font-family:inherit;">${ICONS.chat} ${s.waCreated?'WhatsApp group created':'No WhatsApp group yet — tap to mark created'}</button>
     ${s.waCreated && s.waLink ? ` · <a href="${escapeHtml(s.waLink)}" target="_blank" rel="noopener">open chat</a>` : ''}
-    ${s.waCreated && s.waLink && s.ministers.length ? `<br><button type="button" class="wa-note ${s.waNotified?'on':''}" onclick="notifyMinistersWhatsApp(${s.id})" style="cursor:pointer;background:none;border:none;padding:4px 0;font-family:inherit;">${ICONS.chat} ${s.waNotified?'Ministers notified — tap to re-send':'Notify ministers via WhatsApp'}</button>` : ''}
     ${s.status==='Scheduled' && s.ministers.length ? `<br><button type="button" class="wa-note" onclick="sendAppNotification(${s.id})" style="cursor:pointer;background:none;border:none;padding:4px 0;font-family:inherit;">${ICONS.bell} Send app notification</button>` : ''}`;
 }
-// Normalizes a minister's free-typed Phone field to E.164 for the WhatsApp
-// API. Assumes US numbers (10 digits, or 11 starting with a leading 1) since
-// that's this ministry's roster; a number already starting with "+" is
-// trusted as-is. Returns null if nothing usable is on file.
-function toE164(raw){
-  const digits = (raw||'').replace(/\D/g,'');
-  if(raw && raw.trim().startsWith('+') && digits.length>=7) return raw.trim();
-  if(digits.length===10) return '+1'+digits;
-  if(digits.length===11 && digits[0]==='1') return '+'+digits;
-  return null;
-}
-window.notifyMinistersWhatsApp = async function(id){
-  const s = sessions.find(x=>x.id===id);
-  if(!s || !s.waLink) return;
-  const assigned = s.ministers.map(ref=>ministers.find(x=>x.id===ref.id)).filter(Boolean);
-  const withPhone = assigned.map(m=>({m, to: toE164(m.phone)})).filter(x=>x.to);
-  const withoutPhone = assigned.filter(m=>!toE164(m.phone));
-  if(!withPhone.length){
-    showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">No WhatsApp numbers on file</div><div>None of the assigned ministers have a usable phone number.</div>`);
-    return;
-  }
-  const ok = await askConfirm(
-    `Send a WhatsApp notification to ${withPhone.length} minister${withPhone.length===1?'':'s'} for ${s.recipName}'s session${withoutPhone.length?` (skipping ${withoutPhone.length} with no phone on file)`:''}?${WHATSAPP_NOTIFY.dryRun?' (dry run — no message will actually be sent)':''}`,
-    { confirmLabel: 'Notify', danger: false }
-  );
-  if(!ok) return;
-  const results = await Promise.all(withPhone.map(async ({m, to})=>{
-    try{
-      const resp = await fetch(WHATSAPP_NOTIFY.workerUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + WHATSAPP_NOTIFY.sharedSecret },
-        body: JSON.stringify({
-          to, recipientName: s.recipName, sessionDate: fmtDate(new Date(s.date+'T'+s.time)),
-          sessionTime: fmt12(s.time), groupLink: s.waLink, dryRun: WHATSAPP_NOTIFY.dryRun
-        })
-      });
-      const data = await resp.json();
-      return { m, ok: resp.ok, data };
-    }catch(e){
-      return { m, ok: false, data: { error: e.message } };
-    }
-  }));
-  const failed = results.filter(r=>!r.ok);
-  if(failed.length){
-    showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">${failed.length} notification${failed.length===1?'':'s'} failed</div>${failed.map(f=>`<div>${escapeHtml(f.m.name)}: ${escapeHtml(f.data.error||'Unknown error')}</div>`).join('')}`);
-  } else if(WHATSAPP_NOTIFY.dryRun){
-    showConflictToast(`<div style="font-weight:700;margin-bottom:4px;">Dry run OK</div><div>Would notify: ${results.map(r=>escapeHtml(r.m.name)).join(', ')}</div>`);
-  }
-  if(!WHATSAPP_NOTIFY.dryRun && results.some(r=>r.ok)){
-    await updateItem('sessions', id, { WaNotified: true });
-    await loadAll();
-  }
-};
 window.editSession = function(id){ openModal(sessions.find(s=>s.id===id)); };
 window.openFollowup = function(id){ openModal(null, sessions.find(s=>s.id===id), {forceKind:'session'}); };
 
@@ -3955,11 +3840,9 @@ window.deleteUnlinkedSession = async function(sessionId){
     ? `Delete this ${s.apptType} session${s.date?' on '+s.date:''}? This can't be undone.`
     : `Remove the booked session for ${s.recipName}${s.date?' on '+s.date:''}? They'll go back on the waiting list.`;
   if(!(await askConfirm(msg, {confirmLabel: isGroupSession?'Delete':'Remove Booking', danger:true}))) return;
-  const sendCancel = isGroupSession ? null : await offerCancellationNotice(s);
   if(isGroupSession) await deleteItem('sessions', sessionId);
   else await revertSessionToWaiting(sessionId);
   pushSessionCanceled(s);
-  if(sendCancel && await sendCancel()) await updateItem('sessions', sessionId, { WaNotified: false });
   await loadAll();
 };
 // Creates a real PlanningSlots record for a session that predates this
@@ -4342,11 +4225,9 @@ window.deleteBookedSession = async function(slotId, sessionId){
     ? `Delete this ${s.apptType} session${s.date?' on '+s.date:''}? This can't be undone. The slot will reopen for someone else.`
     : `Remove the booked session for ${s.recipName}${s.date?' on '+s.date:''}? They'll go back on the waiting list, and the slot will reopen for someone else.`;
   if(!(await askConfirm(msg, {confirmLabel: isGroupSession?'Delete':'Remove Booking', danger:true}))) return;
-  const sendCancel = isGroupSession ? null : await offerCancellationNotice(s);
   if(isGroupSession) await deleteItem('sessions', sessionId);
   else await revertSessionToWaiting(sessionId);
   pushSessionCanceled(s);
-  if(sendCancel && await sendCancel()) await updateItem('sessions', sessionId, { WaNotified: false });
   await updateItem('slots', slotId, { Status:'Open', ClaimedWaitingId:null, ClaimedDate:null, ProposedMinisterIDs:'', ProposedLeadIDs:'', LinkedSessionId:null });
   await loadAll();
 };
@@ -9488,6 +9369,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Nov 13, 2026', version: '2026-11-13.3', items: [
+    'Removed: the "Notify ministers via WhatsApp" button on booked sessions, and the "send a WhatsApp cancellation?" question when a booked session is removed. The paid WhatsApp number is being shut down. Use "Send app notification" instead (ministers also get app notifications automatically when you book or change a session). The "WhatsApp group created" toggle and "open chat" link stay as they were.'
+  ]},
   { date: 'Nov 13, 2026', version: '2026-11-13.2', items: [
     'Changed: on the Statistics tab, the Ministry Team table no longer has the "Hours change" column, on screen and in the Word leader\'s copy. A percentage on small numbers was misleading. The hours for both years are still shown side by side.',
   ]},
@@ -9502,15 +9386,15 @@ const CHANGE_LOG = [
   { date: 'Nov 11, 2026', version: '2026-11-11.1', items: [
     'Fixed: on an iPhone, the text cursor didn\'t show in the session notes boxes (reported on "Chief prayer need"), even though typing worked. The notes sheet is now set up the way iPhones need to draw the cursor, and the page behind it no longer scrolls while it\'s open. Same fix in My FPHM (live now). To check: on an iPhone, open Write session notes and tap "Chief prayer need"; the cursor should blink.'
   ]},
-  { date: 'Nov 10, 2026', version: '2026-11-10.1', items: [
-    'New: the Lead can write session notes in My FPHM (live now). Every session where you\'re the Lead now has its own "Write session notes" button, so a follow-up session gets its own notes, separate from the first. Once notes are saved the button reads "Edit session notes ✓" and reopens just that session\'s notes. Support ministers still only read notes, with "View session notes". These are the same notes you see and edit in the Scheduler. Needs two SharePoint permissions for the Prayer Ministers group: Read on the SessionNotesSchema list, and Contribute on the SessionNotes list (it had Read). Without the first, the button stays hidden; without the second, saving says so. To check: in My FPHM, open a person with two sessions where you\'re Lead; each session has its own button.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Nov 10, 2026', version: '2026-11-10.1', items: [
+    'New: the Lead can write session notes in My FPHM (live now). Every session where you\'re the Lead now has its own "Write session notes" button, so a follow-up session gets its own notes, separate from the first. Once notes are saved the button reads "Edit session notes ✓" and reopens just that session\'s notes. Support ministers still only read notes, with "View session notes". These are the same notes you see and edit in the Scheduler. Needs two SharePoint permissions for the Prayer Ministers group: Read on the SessionNotesSchema list, and Contribute on the SessionNotes list (it had Read). Without the first, the button stays hidden; without the second, saving says so. To check: in My FPHM, open a person with two sessions where you\'re Lead; each session has its own button.'
+  ]},
   { date: 'Nov 9, 2026', version: '2026-11-09.1', items: [
     'New: keep a person private. On the Prayer List tab, each person has a "Make private" button; a private person gets a Private tag and is left off the Prayer List in My FPHM, so other prayer ministers don\'t know they\'re having a session. Their own team still sees the session on their schedule. "Show on Prayer List" undoes it. The session form also has a "Private" box, which a follow-up session fills in automatically from the person\'s last session. Needs one new Yes/No column, PrayerListPrivate, on the PrayerSessions list in SharePoint; until it exists, the Prayer List tab shows the steps to add it.'
   ]},
