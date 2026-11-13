@@ -1815,3 +1815,6 @@ otesButtonHtml) appears on booked/unlinked session cards and Completed rows (bot
 - **Attendees** (Number) and **AttendeesProvisional** (Yes/No): two hand-made PrayerSessions columns for Drop-In "Prayer recipients" / Journey "Participants" (`attendeesColumnReady`, checked via `/columns`; form fields hidden and nothing written until both exist). A new Drop-In/Journey session with a past date defaults to Completed (`syncGroupStatusToDate()`).
 - **Leader's Note**: optional list `ReportNotes` (Title = report date ISO, Note = plain-text multiline), one item per report date; without the list the Save button is hidden.
 - 2026-11-13.2: the Ministry Team table has no "Hours change" column (Andrew: percentages on small numbers mislead, e.g. +200%). Don't add per-minister percentage changes back.
+
+## "Notification sent" on session cards (2026-11-13.4)
+- `appNotifyButtonHtml(s)` (used by `waSectionHtml()`) shows "Send app notification" until the team is notified, then green "Notification sent <date> at <time> — tap to re-send". `pushNotifyMinisters()` calls `markAppNotified()` on any successful `booked`/`changed` send (manual or automatic on save). Stored in an optional hand-made PrayerSessions column **AppNotifiedAt** (Date and Time, `appNotifiedColumnReady` via `/columns`); without it the state lives only in memory (`appNotifiedLocal`) until reload.

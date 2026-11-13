@@ -1536,7 +1536,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-11-13.3";
+const APP_VERSION = "2026-11-13.4";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1847,8 +1847,34 @@ async function pushNotifyMinisters(sessionId, ministerIds, kind, start, recipien
     });
     const data = await res.json().catch(()=>({}));
     if(!res.ok){ console.warn('Push notification not sent:', res.status, data.error); return { error: data.error || ('HTTP ' + res.status) }; }
+    if(!data.skipped && (kind==='booked' || kind==='changed')) markAppNotified(sessionId);
     return data;
   }catch(e){ console.warn('Push notification not sent:', e.message); return { error: e.message }; }
+}
+// Records that the session's team was just notified, so the card's
+// "Send app notification" link turns into "Notification sent ...". Kept
+// in memory at once, and saved to SharePoint when the column exists.
+function markAppNotified(sessionId){
+  const at = new Date().toISOString();
+  appNotifiedLocal[sessionId] = at;
+  const s = sessions.find(x=>x.id===sessionId);
+  if(s) s.appNotifiedAt = at;
+  try{ renderSchedPlan(); renderSchedule(); }catch(e){}
+  if(appNotifiedColumnReady) updateItem('sessions', sessionId, { [APP_NOTIFIED_COLUMN]: at }).catch(e=>console.warn('Could not save AppNotifiedAt:', e.message));
+}
+function appNotifiedAtOf(s){
+  const a = appNotifiedLocal[s.id], b = s.appNotifiedAt;
+  if(!a) return b || null;
+  if(!b) return a;
+  return new Date(a) > new Date(b) ? a : b;
+}
+function appNotifyButtonHtml(s){
+  const at = appNotifiedAtOf(s);
+  const when = at ? new Date(at) : null;
+  const label = when && !isNaN(when)
+    ? `Notification sent ${when.toLocaleDateString(undefined,{month:'short',day:'numeric'})} at ${fmt12(toHM(when.toISOString()))} — tap to re-send`
+    : 'Send app notification';
+  return `<button type="button" class="wa-note ${at?'on':''}" onclick="sendAppNotification(${s.id})" style="cursor:pointer;background:none;border:none;padding:4px 0;font-family:inherit;text-align:left;">${at?ICONS.checkCircle:ICONS.bell} ${label}</button>`;
 }
 // On-demand "booked" notice for a session's whole team, from the session
 // card - mainly for testing push (it also adds a message to each
@@ -2120,6 +2146,7 @@ async function resolveSiteAndLists(){
     const cols = await graphFetch(`/sites/${siteId}/lists/${listIds.sessions}/columns?$select=name`);
     plPrivateColumnReady = !!(cols && Array.isArray(cols.value) && cols.value.some(c=>c.name===PL_PRIVATE_COLUMN));
     attendeesColumnReady = !!(cols && Array.isArray(cols.value) && cols.value.some(c=>c.name===ATTENDEES_COLUMN) && cols.value.some(c=>c.name===ATTENDEES_PROV_COLUMN));
+    appNotifiedColumnReady = !!(cols && Array.isArray(cols.value) && cols.value.some(c=>c.name===APP_NOTIFIED_COLUMN));
   }catch(e){ console.warn('Could not check PrayerSessions columns:', e.message); }
 }
 
@@ -2196,6 +2223,12 @@ let plPrivateColumnReady = false;
 // exist, since writing a missing column fails the whole save.
 const ATTENDEES_COLUMN = 'Attendees';
 const ATTENDEES_PROV_COLUMN = 'AttendeesProvisional';
+// When the session's team was last sent an app notification (a hand-made
+// Date and Time column on PrayerSessions). Optional: until it exists the
+// "sent" label on the card only lasts until the page is reloaded.
+const APP_NOTIFIED_COLUMN = 'AppNotifiedAt';
+let appNotifiedColumnReady = false;
+const appNotifiedLocal = {};
 let attendeesColumnReady = false;
 let prayerListDraft = null; // Set of minister ids ticked in Settings, null = not edited
 
@@ -2352,6 +2385,7 @@ async function loadAll(){
       // Private = keep this person off the Prayer List (My FPHM and the
       // admin tab's count). Hand-made Yes/No column; reads false if missing.
       plPrivate: s[PL_PRIVATE_COLUMN]===true,
+      appNotifiedAt: s[APP_NOTIFIED_COLUMN] || null,
       attendees: (s[ATTENDEES_COLUMN]===null || s[ATTENDEES_COLUMN]===undefined || s[ATTENDEES_COLUMN]==='') ? null : Number(s[ATTENDEES_COLUMN]),
       attendeesProvisional: s[ATTENDEES_PROV_COLUMN]===true
     };
@@ -2981,7 +3015,7 @@ window.toggleWa = async function(id){
 function waSectionHtml(s){
   return `<button type="button" class="wa-note ${s.waCreated?'on':''}" aria-pressed="${s.waCreated?'true':'false'}" onclick="toggleWa(${s.id})" style="cursor:pointer;background:none;border:none;padding:4px 0;font-family:inherit;">${ICONS.chat} ${s.waCreated?'WhatsApp group created':'No WhatsApp group yet — tap to mark created'}</button>
     ${s.waCreated && s.waLink ? ` · <a href="${escapeHtml(s.waLink)}" target="_blank" rel="noopener">open chat</a>` : ''}
-    ${s.status==='Scheduled' && s.ministers.length ? `<br><button type="button" class="wa-note" onclick="sendAppNotification(${s.id})" style="cursor:pointer;background:none;border:none;padding:4px 0;font-family:inherit;">${ICONS.bell} Send app notification</button>` : ''}`;
+    ${s.status==='Scheduled' && s.ministers.length ? `<br>${appNotifyButtonHtml(s)}` : ''}`;
 }
 window.editSession = function(id){ openModal(sessions.find(s=>s.id===id)); };
 window.openFollowup = function(id){ openModal(null, sessions.find(s=>s.id===id), {forceKind:'session'}); };
@@ -9369,6 +9403,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Nov 13, 2026', version: '2026-11-13.4', items: [
+    'Changed: on a booked session card, "Send app notification" now turns green and says "Notification sent (date) at (time) — tap to re-send" once the team has been notified, whether you sent it from the card or it went out automatically when you booked or moved the session. To keep this after a reload, add a "AppNotifiedAt" (Date and Time) column to the PrayerSessions list in SharePoint; until then it shows only until the page is reloaded.'
+  ]},
   { date: 'Nov 13, 2026', version: '2026-11-13.3', items: [
     'Removed: the "Notify ministers via WhatsApp" button on booked sessions, and the "send a WhatsApp cancellation?" question when a booked session is removed. The paid WhatsApp number is being shut down. Use "Send app notification" instead (ministers also get app notifications automatically when you book or change a session). The "WhatsApp group created" toggle and "open chat" link stay as they were.'
   ]},
@@ -9383,15 +9420,15 @@ const CHANGE_LOG = [
   { date: 'Nov 12, 2026', version: '2026-11-12.1', items: [
     'Changed: "first-time / follow-up" is now "new / returning", on the Completed Sessions card, in Reports (year, month, minister and Total rows) and on My FPHM\'s Completed Sessions card (live now). New = the person\'s first-ever completed Freedom Session falls in that period; returning = they had their first session before it. It is worked out from session dates, not the saved First/Follow-up type. New + returning always equals Unique Recipients, and Lifetime is all new. Before, anyone with a follow-up in the period counted as follow-up, so someone who started this year and came back wasn\'t counted as new. To check: Completed Sessions should show 2026 as 38 new and 12 returning, last year as 20 and 2, and Lifetime as 65 new.'
   ]},
-  { date: 'Nov 11, 2026', version: '2026-11-11.1', items: [
-    'Fixed: on an iPhone, the text cursor didn\'t show in the session notes boxes (reported on "Chief prayer need"), even though typing worked. The notes sheet is now set up the way iPhones need to draw the cursor, and the page behind it no longer scrolls while it\'s open. Same fix in My FPHM (live now). To check: on an iPhone, open Write session notes and tap "Chief prayer need"; the cursor should blink.'
-  ]},
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Nov 11, 2026', version: '2026-11-11.1', items: [
+    'Fixed: on an iPhone, the text cursor didn\'t show in the session notes boxes (reported on "Chief prayer need"), even though typing worked. The notes sheet is now set up the way iPhones need to draw the cursor, and the page behind it no longer scrolls while it\'s open. Same fix in My FPHM (live now). To check: on an iPhone, open Write session notes and tap "Chief prayer need"; the cursor should blink.'
+  ]},
   { date: 'Nov 10, 2026', version: '2026-11-10.1', items: [
     'New: the Lead can write session notes in My FPHM (live now). Every session where you\'re the Lead now has its own "Write session notes" button, so a follow-up session gets its own notes, separate from the first. Once notes are saved the button reads "Edit session notes ✓" and reopens just that session\'s notes. Support ministers still only read notes, with "View session notes". These are the same notes you see and edit in the Scheduler. Needs two SharePoint permissions for the Prayer Ministers group: Read on the SessionNotesSchema list, and Contribute on the SessionNotes list (it had Read). Without the first, the button stays hidden; without the second, saving says so. To check: in My FPHM, open a person with two sessions where you\'re Lead; each session has its own button.'
   ]},
