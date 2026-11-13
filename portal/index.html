@@ -2425,7 +2425,15 @@ async function renderPushCard(msg){
 window.testPush = async function(){
   try{
     const r = await pushApi('/test');
-    await renderPushCard(r.sent ? 'Test sent. It should arrive in a few seconds.' : 'No devices found for you. Try turning notifications off and on again.');
+    // r.results (Worker 2026-11-13+) says what each device's push service
+    // answered, so a refusal (e.g. from Apple) is visible instead of silent.
+    const refused = (r.results||[]).filter(x=>!x.ok);
+    let msg;
+    if(!r.devices && !r.sent && !(r.results||[]).length) msg = 'No devices found for you. Try turning notifications off and on again.';
+    else if(r.sent) msg = 'Test sent. It should arrive in a few seconds. ' + (IS_IOS ? 'On iPhone, lock your phone or go to the Home Screen to see it. If nothing appears, open the iPhone Settings app, tap Notifications, then My FPHM, and turn on Allow Notifications and Lock Screen and Banners.' : 'If nothing appears, check that notifications are allowed for this app in your device settings.');
+    else msg = 'Test not delivered.';
+    if(refused.length) msg += ' Refused: ' + refused.map(x=>`${x.device||'device'} (${x.status||'no answer'}${x.reason?' '+x.reason:''})`).join(', ') + '. Try turning notifications off and on again; if it still fails, tell your admin this message.';
+    await renderPushCard(msg);
   }catch(e){
     await renderPushCard('Test failed: ' + e.message);
   }

@@ -1586,7 +1586,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-11-13.8";
+const APP_VERSION = "2026-11-13.9";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1942,7 +1942,10 @@ window.sendAppNotification = async function(id){
   const r = await pushNotifyMinisters(s.id, ids, 'booked', new Date(s.date+'T'+s.time), s.recipName);
   if(r.error) notifyError('App notification not sent: ' + r.error);
   else if(r.skipped) notifyError('Not sent: this session isn\'t Scheduled.');
-  else alert(`Sent to ${r.sent||0} device${r.sent===1?'':'s'}. Ministers without phone notifications turned on still get it in their portal Messages.`);
+  else {
+    const failed = (r.failed||[]).map(f=>`${f.device}: ${f.status||'no answer'}${f.reason?' '+f.reason:''}`);
+    alert(`Sent to ${r.sent||0} device${r.sent===1?'':'s'}.${failed.length ? ` Refused by ${failed.length}: ${failed.join('; ')}.` : ''} Ministers without phone notifications turned on still get it in their portal Messages.`);
+  }
 };
 // Tells a removed session's team it's off (push + portal message). Call
 // with the session as it was BEFORE removal - removing it clears its team
@@ -5588,7 +5591,8 @@ function parsePushDevices(items){
       id: i.id, ministerId,
       label: sub.device || deviceFromEndpoint(sub.endpoint),
       lastSeen: sub.lastSeen || i._modified || i._created || null,
-      blocked: !!sub.blocked
+      blocked: !!sub.blocked,
+      lastPush: sub.lastPush || null // the Worker's last send to this device (added 2026-11-13)
     };
   }).filter(Boolean);
 }
@@ -5607,7 +5611,9 @@ function notifStatusFor(ministerId){
     const t = d.lastSeen ? Date.parse(d.lastSeen) : NaN;
     return { ...d, stale: isNaN(t) || t < cutoff };
   }).sort((a,b)=>String(b.lastSeen||'').localeCompare(String(a.lastSeen||'')));
-  const state = !devices.length ? 'off' : (devices.some(d=>!d.blocked && !d.stale) ? 'on' : 'check');
+  // A device whose last alert was refused by its push service (e.g. Apple)
+  // isn't really working, even if it was opened recently.
+  const state = !devices.length ? 'off' : (devices.some(d=>!d.blocked && !d.stale && !(d.lastPush && !d.lastPush.ok)) ? 'on' : 'check');
   return { state, devices };
 }
 function notifWhen(iso){
@@ -5626,9 +5632,18 @@ function notifChipHtml(ministerId){
 function notifDevicesHtml(ministerId){
   const { devices } = notifStatusFor(ministerId);
   const lines = devices.length
-    ? devices.map(d=>`<div class="notif-dev${d.blocked||d.stale?' warn':''}"><span>${escapeHtml(d.label)} · ${d.blocked ? 'notifications turned off on this device' : notifWhen(d.lastSeen)}${!d.blocked && d.stale ? ' (maybe an old device)' : ''}</span><button type="button" class="link-btn" onclick="removePushDevice(${d.id})" aria-label="Remove ${escapeHtml(d.label)}">Remove</button></div>`).join('')
+    ? devices.map(d=>`<div class="notif-dev${d.blocked||d.stale||(d.lastPush&&!d.lastPush.ok)?' warn':''}"><span>${escapeHtml(d.label)} · ${d.blocked ? 'notifications turned off on this device' : notifWhen(d.lastSeen)}${!d.blocked && d.stale ? ' (maybe an old device)' : ''}${notifLastPushText(d.lastPush)}</span><button type="button" class="link-btn" onclick="removePushDevice(${d.id})" aria-label="Remove ${escapeHtml(d.label)}">Remove</button></div>`).join('')
     : `<div class="notif-dev">No devices. They haven't turned notifications on in My FPHM. They still see messages in My FPHM's Messages tab.</div>`;
   return `<div class="notif-devs"><div class="notif-devs-title">Phone notifications</div>${lines}</div>`;
+}
+// What happened to the last alert sent to a device (added 2026-11-13, to
+// find out why iPhones weren't showing alerts).
+function notifLastPushText(p){
+  if(!p || !p.at) return '';
+  const when = new Date(p.at);
+  const w = isNaN(when) ? '' : ' ' + when.toLocaleDateString(undefined,{month:'short',day:'numeric'});
+  if(p.ok) return ` · last alert accepted${w}`;
+  return ` · last alert REFUSED${w} (${escapeHtml(String(p.status||'no answer'))}${p.reason ? ': ' + escapeHtml(p.reason) : ''})`;
 }
 function renderNotifSummary(show){
   const box = $('#overviewNotif');
@@ -9503,6 +9518,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Nov 13, 2026', version: '2026-11-13.9', items: [
+    'New: to find out why iPhones aren\'t showing notification alerts, each minister\'s device list on the Prayer Ministers tab now says whether the last alert to that device was accepted or REFUSED (with the reason), and a device whose alerts are refused counts as "Check". "Send app notification" also lists any device that refused it. This starts working once the Worker is updated.'
+  ]},
   { date: 'Nov 13, 2026', version: '2026-11-13.8', items: [
     'Changed: on a phone, error messages (for example "Please select at least 2 prayer ministers" or "Save failed") now pop up as a red message at the top of the screen instead of somewhere in the form where you might not see it. It disappears by itself after 3 seconds, or tap the × to close it sooner. Computers and tablets are unchanged.'
   ]},
@@ -9517,16 +9535,16 @@ const CHANGE_LOG = [
   ]},
   { date: 'Nov 13, 2026', version: '2026-11-13.4', items: [
     'Changed: on a booked session card, "Send app notification" now turns green and says "Notification sent (date) at (time) — tap to re-send" once the team has been notified, whether you sent it from the card or it went out automatically when you booked or moved the session. To keep this after a reload, add a "AppNotifiedAt" (Date and Time) column to the PrayerSessions list in SharePoint; until then it shows only until the page is reloaded.'
-  ]},
-  { date: 'Nov 13, 2026', version: '2026-11-13.3', items: [
-    'Removed: the "Notify ministers via WhatsApp" button on booked sessions, and the "send a WhatsApp cancellation?" question when a booked session is removed. The paid WhatsApp number is being shut down. Use "Send app notification" instead (ministers also get app notifications automatically when you book or change a session). The "WhatsApp group created" toggle and "open chat" link stay as they were.'
-  ]},
+  ]}
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
 // five most recent versions; at each promotion, anything beyond the newest
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Nov 13, 2026', version: '2026-11-13.3', items: [
+    'Removed: the "Notify ministers via WhatsApp" button on booked sessions, and the "send a WhatsApp cancellation?" question when a booked session is removed. The paid WhatsApp number is being shut down. Use "Send app notification" instead (ministers also get app notifications automatically when you book or change a session). The "WhatsApp group created" toggle and "open chat" link stay as they were.'
+  ]},
   { date: 'Nov 13, 2026', version: '2026-11-13.2', items: [
     'Changed: on the Statistics tab, the Ministry Team table no longer has the "Hours change" column, on screen and in the Word leader\'s copy. A percentage on small numbers was misleading. The hours for both years are still shown side by side.',
   ]},

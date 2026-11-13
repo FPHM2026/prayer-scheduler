@@ -429,8 +429,10 @@ async function vapidAuthorization(env, endpoint) {
   return `vapid t=${header}.${claims}.${bytesToB64u(sig)}, k=${env.VAPID_PUBLIC_KEY}`;
 }
 
-// Returns the push service's HTTP status; 404/410 mean the subscription is
-// gone for good (app removed, permission revoked) and should be deleted.
+// Returns the push service's HTTP status and, on a refusal, its reason
+// (Apple sends JSON like {"reason":"BadJwtToken"}, Google/Mozilla plain
+// text). 404/410 mean the subscription is gone for good (app removed,
+// permission revoked) and should be deleted.
 async function sendPush(env, subscription, message) {
   const body = await encryptPushPayload(subscription, te.encode(JSON.stringify(message)));
   const res = await fetch(subscription.endpoint, {
@@ -444,7 +446,14 @@ async function sendPush(env, subscription, message) {
     },
     body
   });
-  return res.status;
+  let reason = "";
+  if (res.status >= 300) {
+    const text = await res.text().catch(() => "");
+    try { reason = JSON.parse(text).reason || ""; } catch (e) {}
+    if (!reason) reason = text.replace(/\s+/g, " ").trim();
+    reason = reason.slice(0, 120);
+  }
+  return { status: res.status, reason };
 }
 
 function requirePushConfigured(env) {
@@ -518,19 +527,34 @@ async function pushListItem(env, method, itemId, fields) {
 }
 
 // Sends one message to many subscriptions, deleting any the push service
-// says are gone. Returns how many were delivered.
+// says are gone. Returns how many were delivered plus one result per
+// device. Each device's last result is also saved in its SubscriptionJSON
+// (lastPush, added 2026-11-13) so the Scheduler's device list can show a
+// device whose alerts are being refused, e.g. by Apple's push service.
 async function pushToSubscriptions(env, subs, message) {
   let sent = 0;
+  const results = [];
   await Promise.all(subs.map(async (s) => {
+    const host = (() => { try { return new URL(s.sub.endpoint).host; } catch (e) { return ""; } })();
+    let r;
     try {
-      const status = await sendPush(env, s.sub, message);
-      if (status >= 200 && status < 300) sent++;
-      else if (status === 404 || status === 410) await pushListItem(env, "DELETE", s.itemId).catch(() => {});
+      r = await sendPush(env, s.sub, message);
     } catch (e) {
       // One bad subscription shouldn't stop the rest.
+      r = { status: 0, reason: String(e && e.message || e).slice(0, 120) };
     }
+    const ok = r.status >= 200 && r.status < 300;
+    if (ok) sent++;
+    results.push({ device: s.sub.device || host, host, status: r.status, reason: r.reason, ok });
+    if (r.status === 404 || r.status === 410) {
+      await pushListItem(env, "DELETE", s.itemId).catch(() => {});
+      return;
+    }
+    const lastPush = { at: new Date().toISOString(), status: r.status, ok };
+    if (r.reason) lastPush.reason = r.reason;
+    await pushListItem(env, "PATCH", s.itemId, { SubscriptionJSON: JSON.stringify({ ...s.sub, lastPush }) }).catch(() => {});
   }));
-  return sent;
+  return { sent, results };
 }
 
 async function handlePushKey(env) {
@@ -609,12 +633,12 @@ async function handlePushTest(env, request) {
   const { minister, error } = await ministerForCaller(env, request);
   if (error) return error;
   const subs = (await pushSubscriptions(env)).filter((s) => s.ministerId === minister.id);
-  const sent = await pushToSubscriptions(env, subs, {
+  const { sent, results } = await pushToSubscriptions(env, subs, {
     title: "Notifications are working",
     body: "You'll get a notification like this when you're booked for a prayer session.",
     tag: "fphm-test"
   });
-  return { ok: true, sent };
+  return { ok: true, sent, devices: subs.length, results };
 }
 
 // Called by the Scheduler after a session is saved or removed.
@@ -678,8 +702,8 @@ async function handlePushSession(env, request) {
   ));
   const subs = (await pushSubscriptions(env)).filter((s) => targets.has(s.ministerId));
   if (!subs.length) return { ok: true, sent: 0 };
-  const sent = await pushToSubscriptions(env, subs, message);
-  return { ok: true, sent };
+  const { sent, results } = await pushToSubscriptions(env, subs, message);
+  return { ok: true, sent, devices: subs.length, failed: results.filter((r) => !r.ok) };
 }
 
 /* =========================================================================
@@ -752,12 +776,12 @@ async function handleAdminTest(env, request) {
   const { error } = await adminForCaller(env, request);
   if (error) return error;
   const subs = (await adminSubscriptions(env)).filter((s) => s.sub.endpoint === body.endpoint);
-  const sent = await pushToSubscriptions(env, subs, {
+  const { sent, results } = await pushToSubscriptions(env, subs, {
     title: "Notifications are working",
     body: "You'll get a notification like this when a new intake form is submitted.",
     tag: "fphm-admin-test"
   });
-  return { ok: true, sent };
+  return { ok: true, sent, devices: subs.length, results };
 }
 
 // Saves the admins' Messages-tab entry (added 2026-10-22: MinisterMessages
