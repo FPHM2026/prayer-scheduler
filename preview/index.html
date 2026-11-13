@@ -867,17 +867,17 @@
   nav[aria-label="Primary"] button:hover,
   nav[aria-label="Primary"] button.active,
   nav[aria-label="Primary"] button.active:hover{background:none;}
-  nav[aria-label="Primary"] button{color:var(--text);font-weight:600;border-radius:0;border-bottom:3px solid transparent;margin:0;padding:8px 7px 5px;min-height:36px;font-size:var(--fs-xs);}
+  nav[aria-label="Primary"] button{color:var(--text);font-weight:600;border-radius:0;border-bottom:3px solid transparent;margin:0;padding:8px 5px 5px;min-height:36px;font-size:14px;}
   nav[aria-label="Primary"] button:hover{color:var(--gold-dark);border-bottom-color:var(--muted-bar);}
   nav[aria-label="Primary"] button.active{color:var(--gold-dark);font-weight:700;border-bottom-color:var(--gold);}
   nav[aria-label="Primary"] button:focus-visible{outline-offset:-3px;}
   @media (min-width:640px){
     nav[aria-label="Primary"]{padding:2px 8px;}
-    nav[aria-label="Primary"] button{padding:10px 8px 7px;min-height:40px;font-size:var(--fs-xs);}
+    nav[aria-label="Primary"] button{padding:10px 6px 7px;min-height:40px;font-size:14.5px;}
   }
   @media (min-width:1024px){
     nav[aria-label="Primary"]{padding:2px 8px;}
-    nav[aria-label="Primary"] button{padding:12px 8px 9px;min-height:44px;font-size:var(--fs-xs);}
+    nav[aria-label="Primary"] button{padding:12px 6px 9px;min-height:44px;font-size:15px;}
   }
   /* 2. Header actions: same weight as each other and smaller than the
      page title, instead of a solid charcoal Sign Out being the heaviest
@@ -1579,7 +1579,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-11-13.6";
+const APP_VERSION = "2026-11-13.7";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -9446,6 +9446,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Nov 13, 2026', version: '2026-11-13.7', items: [
+    'Changed: the main tab names are slightly larger, and every tab is still visible without scrolling.'
+  ]},
   { date: 'Nov 13, 2026', version: '2026-11-13.6', items: [
     'Changed: the main tabs are now one row of plain text tabs with an underline under the current one, instead of filled terracotta blocks. Every tab is always visible with no sideways scrolling: one row on a computer or tablet, two rows on most phones (it used to be four). On smaller screens the longer names are shortened, for example "Schedule" for Schedule & Planning and "Ministers" for Prayer Ministers.',
     'Changed: Refresh Data and Sign Out are smaller and look the same, so Sign Out is no longer the darkest thing on the page.',
@@ -9460,11 +9463,6 @@ const CHANGE_LOG = [
   ]},
   { date: 'Nov 13, 2026', version: '2026-11-13.2', items: [
     'Changed: on the Statistics tab, the Ministry Team table no longer has the "Hours change" column, on screen and in the Word leader\'s copy. A percentage on small numbers was misleading. The hours for both years are still shown side by side.',
-  ]},
-  { date: 'Nov 13, 2026', version: '2026-11-13.1', items: [
-    'New: a Statistics tab with the ministry statistics report. It puts this year to date beside the same dates last year (with all of last year for reference): sessions, recipients, new and returning, hours, the monthly and running-total charts, and the Ministry Team page. Pick a report date at the top. "Download for leadership" makes the Word file without minister names (pages 1 to 3); "Download leader\'s copy" adds the Ministry Team and Journey pages. Each chart can be downloaded as a picture. If the numbers don\'t add up (for example a session with no lead), a red box says what to fix and the downloads are hidden until it is.',
-    'New: Journey to Freedom sessions. Add one from the bottom of the Statistics tab with "+ Journey to Freedom session": pick the date, start and end time, the ministers who were there and how many participants came. Sessions a few weeks apart are grouped into one run automatically. The usual day, time and location are set in Settings > Quick Slots. Journey sessions don\'t count in Freedom Session numbers or minister hours.',
-    'New: Sunday Drop-In sessions have a "Prayer recipients" box for how many came, and a "Provisional" tick for a number still to be confirmed (the report highlights those). The same list at the bottom of the Statistics tab shows every Drop-In with an Edit button. These two boxes appear once the Attendees and AttendeesProvisional columns are added in SharePoint; the Statistics tab shows the steps until then.',
   ]}
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
@@ -9472,6 +9470,11 @@ const CHANGE_LOG = [
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Nov 13, 2026', version: '2026-11-13.1', items: [
+    'New: a Statistics tab with the ministry statistics report. It puts this year to date beside the same dates last year (with all of last year for reference): sessions, recipients, new and returning, hours, the monthly and running-total charts, and the Ministry Team page. Pick a report date at the top. "Download for leadership" makes the Word file without minister names (pages 1 to 3); "Download leader\'s copy" adds the Ministry Team and Journey pages. Each chart can be downloaded as a picture. If the numbers don\'t add up (for example a session with no lead), a red box says what to fix and the downloads are hidden until it is.',
+    'New: Journey to Freedom sessions. Add one from the bottom of the Statistics tab with "+ Journey to Freedom session": pick the date, start and end time, the ministers who were there and how many participants came. Sessions a few weeks apart are grouped into one run automatically. The usual day, time and location are set in Settings > Quick Slots. Journey sessions don\'t count in Freedom Session numbers or minister hours.',
+    'New: Sunday Drop-In sessions have a "Prayer recipients" box for how many came, and a "Provisional" tick for a number still to be confirmed (the report highlights those). The same list at the bottom of the Statistics tab shows every Drop-In with an Edit button. These two boxes appear once the Attendees and AttendeesProvisional columns are added in SharePoint; the Statistics tab shows the steps until then.',
+  ]},
   { date: 'Nov 12, 2026', version: '2026-11-12.1', items: [
     'Changed: "first-time / follow-up" is now "new / returning", on the Completed Sessions card, in Reports (year, month, minister and Total rows) and on My FPHM\'s Completed Sessions card (live now). New = the person\'s first-ever completed Freedom Session falls in that period; returning = they had their first session before it. It is worked out from session dates, not the saved First/Follow-up type. New + returning always equals Unique Recipients, and Lifetime is all new. Before, anyone with a follow-up in the period counted as follow-up, so someone who started this year and came back wasn\'t counted as new. To check: Completed Sessions should show 2026 as 38 new and 12 returning, last year as 20 and 2, and Lifetime as 65 new.'
   ]},
