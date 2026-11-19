@@ -533,6 +533,9 @@
   .st-rec-count{flex:1 1 10em;}
   .st-rec-edit{min-height:auto;padding:8px 16px;}
   #statNote{width:100%;box-sizing:border-box;}
+  #statSectionsList{grid-template-columns:repeat(auto-fill,minmax(280px,1fr));}
+  .st-sec-item{padding:8px 0;}
+  .st-sec-item small{display:block;color:var(--muted);font-size:var(--fs-xs);}
   @media (max-width:640px){
     .st-page{padding:16px;}
     .st-card{min-width:520px;}
@@ -1197,6 +1200,16 @@
     </div>
     <div class="errbox" role="alert" id="statChecks" hidden></div>
     <div class="settings-card">
+      <h2>Sections to include</h2>
+      <p class="helptext">Untick a section to leave it out of the report below, the Word files and the chart downloads. Your choice is remembered on this device.</p>
+      <div class="pl-access-tools">
+        <button type="button" class="link-btn" id="btnStatSecAll">Select all</button>
+        <button type="button" class="link-btn" id="btnStatSecNone">Clear all</button>
+        <span class="pl-access-count" id="statSectionsCount" role="status"></span>
+      </div>
+      <div class="pl-access-list" id="statSectionsList"></div>
+    </div>
+    <div class="settings-card">
       <h2>Ministry Leader's Note</h2>
       <p class="helptext">Optional: context leadership should know (e.g. changes in how teams are organised). Shown on page 1 under "From the ministry leader". Saved for this report date.</p>
       <textarea id="statNote" maxlength="600" rows="4" placeholder="Optional: context leadership should know (e.g. changes in how teams are organised)."></textarea>
@@ -1208,8 +1221,8 @@
       <p class="helptext" id="statNoteSetup" hidden>To save notes and show them in the report, add a list in SharePoint named exactly <strong>ReportNotes</strong> with one extra column: <strong>Note</strong> (Multiple lines of text, Plain text). Until then the note box isn't used.</p>
     </div>
     <div class="toolbar" id="statDownloads">
-      <button class="btn" id="btnStatDocxLeadership">Download for leadership (pages 1–3)</button>
-      <button class="btn" id="btnStatDocxLeaders">Download leader's copy (pages 1–5)</button>
+      <button class="btn" id="btnStatDocxLeadership">Download for leadership (no minister names)</button>
+      <button class="btn" id="btnStatDocxLeaders">Download leader's copy (with team pages)</button>
       <button class="btn secondary" id="btnStatCharts">Download charts</button>
     </div>
     <p class="helptext" id="statMsg" role="status"></p>
@@ -1579,7 +1592,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-11-13.9";
+const APP_VERSION = "2026-11-19.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -2762,6 +2775,9 @@ function wireApp(){
   $('#btnSaveStatNote').addEventListener('click', ()=>withLoading($('#btnSaveStatNote'), 'Saving…', saveStatNote));
   $('#btnStatDocxLeadership').addEventListener('click', ()=>withLoading($('#btnStatDocxLeadership'), 'Preparing…', ()=>downloadStatDocx(false)));
   $('#btnStatDocxLeaders').addEventListener('click', ()=>withLoading($('#btnStatDocxLeaders'), 'Preparing…', ()=>downloadStatDocx(true)));
+  $('#btnStatSecAll').addEventListener('click', ()=>setAllStatSections(true));
+  $('#btnStatSecNone').addEventListener('click', ()=>setAllStatSections(false));
+  renderStatSections();
   $('#btnStatCharts').addEventListener('click', ()=>withLoading($('#btnStatCharts'), 'Preparing…', downloadStatCharts));
   $('#btnConfirmCancel').addEventListener('click', ()=>closeConfirm(false));
   $('#btnConfirmOk').addEventListener('click', ()=>closeConfirm(true));
@@ -8655,7 +8671,9 @@ function buildReportSection(typeInfo, from, to){
    - Checks run first; if one fails, a banner lists it and the Word
      downloads are hidden.
    Two Word files: leadership (pages 1-3, no minister names) and the
-   leader's copy (pages 1-5). Charts are drawn here on a canvas. */
+   leader's copy (pages 1-5). Charts are drawn here on a canvas.
+   "Sections to include" (ST_SECTIONS) can leave any part out of the
+   screen, both Word files and the chart downloads; figures renumber. */
 const ST = { cy:'#E28E35', ly:'#B9B096', text:'#3F3F3F', muted:'#7A7468', brown:'#8B4E34', pillText:'#3C7A3C', pillBg:'#E6F2E3', border:'#A39577', grid:'#E9E5DC', axis:'#CFC8B8' };
 const ST_MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const ST_MONTH = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -8667,6 +8685,59 @@ let statModel = null;
 let statFigs = {};           // figure key -> PNG data URL
 let reportNotes = [];        // [{id, date, note}] from the optional ReportNotes list
 let statNoteDate = '';       // which report date the note box was last filled for
+// Sections the admin can leave out of the report (screen, Word files and
+// chart downloads). The title block always shows. The choice is remembered
+// in this browser as the list of sections turned OFF, so a section added
+// later starts ticked.
+const ST_SECTIONS = [
+  { k:'summary',    label:'Freedom Sessions summary', hint:'Opening sentences and Figure 1' },
+  { k:'note',       label:'From the ministry leader', hint:'Your saved note, if any' },
+  { k:'monthly',    label:'Sessions by month', hint:'Chart' },
+  { k:'running',    label:'Running total of sessions', hint:'Chart' },
+  { k:'dropin',     label:'Sunday Drop-In', hint:'Table' },
+  { k:'journey',    label:'Journey to Freedom', hint:'Table of runs' },
+  { k:'team',       label:'Ministry Team', hint:"Leader's copy only" },
+  { k:'journeyMin', label:'Journey to Freedom: ministers by session', hint:"Leader's copy only" }
+];
+const ST_LEADER_ONLY = ['team','journeyMin'];
+const ST_SECTIONS_KEY = 'fphm_stat_sections_off';
+let statSectionsOff = (()=>{ try{ const a = JSON.parse(localStorage.getItem(ST_SECTIONS_KEY)||'[]'); return new Set(Array.isArray(a) ? a : []); }catch(e){ return new Set(); } })();
+function stOn(k){ return !statSectionsOff.has(k); }
+function stSaveSections(){ try{ localStorage.setItem(ST_SECTIONS_KEY, JSON.stringify([...statSectionsOff])); }catch(e){} }
+// Figure numbers follow the sections that are included, so they never skip.
+function stFigNumbers(){
+  const fn = {}; let n = 0;
+  [['card','summary'],['monthly','monthly'],['running','running'],['led','team']].forEach(([f,k])=>{ if(stOn(k)) fn[f] = ++n; });
+  return fn;
+}
+function renderStatSections(){
+  const list = $('#statSectionsList'); if(!list) return;
+  list.innerHTML = ST_SECTIONS.map(x=>`<label class="pl-access-item st-sec-item"><input type="checkbox" data-sec="${x.k}" ${stOn(x.k)?'checked':''}><span>${escapeHtml(x.label)}<small>${escapeHtml(x.hint)}</small></span></label>`).join('');
+  list.querySelectorAll('input[data-sec]').forEach(cb=>cb.addEventListener('change', ()=>{
+    if(cb.checked) statSectionsOff.delete(cb.dataset.sec); else statSectionsOff.add(cb.dataset.sec);
+    stSaveSections(); updateStatSectionCount(); renderStatistics();
+  }));
+  updateStatSectionCount();
+}
+function updateStatSectionCount(){
+  const n = ST_SECTIONS.filter(x=>stOn(x.k)).length;
+  $('#statSectionsCount').textContent = n===ST_SECTIONS.length ? 'All sections included' : n ? `${n} of ${ST_SECTIONS.length} sections included` : 'No sections ticked';
+}
+function setAllStatSections(include){
+  statSectionsOff = include ? new Set() : new Set(ST_SECTIONS.map(x=>x.k));
+  stSaveSections(); renderStatSections(); renderStatistics();
+}
+// Show only the downloads that would contain something.
+function stSyncDownloads(M){
+  const anyLeadership = ST_SECTIONS.some(x=>!ST_LEADER_ONLY.includes(x.k) && stOn(x.k));
+  const anyLeader = ST_LEADER_ONLY.some(stOn);
+  const anyFig = Object.keys(stFigNumbers()).length > 0;
+  $('#statDownloads').hidden = !!M.checks.length || !(anyLeadership || anyLeader);
+  $('#btnStatDocxLeadership').hidden = !anyLeadership;
+  $('#btnStatDocxLeaders').hidden = !anyLeader;
+  $('#btnStatCharts').hidden = !anyFig;
+  $('#statMsg').textContent = !(anyLeadership || anyLeader) ? 'Tick at least one section to download the report.' : '';
+}
 
 function stR1(x){ return Math.round(x*10)/10; }
 function stH(x){ return stR1(x).toFixed(1); }
@@ -9112,17 +9183,17 @@ function renderStatistics(){
     banner.hidden = false;
     banner.innerHTML = M.checks.map(f=>`<div><strong>Report not ready: ${escapeHtml(f.desc)}</strong> — ${escapeHtml(f.details)}${f.records.length ? `<ul>${f.records.slice(0,30).map(r=>`<li>${escapeHtml(r)}</li>`).join('')}</ul>` : ''}</div>`).join('');
   } else { banner.hidden = true; banner.innerHTML = ''; }
-  $('#statDownloads').hidden = !!M.checks.length;
   const d = M.drop, dPct = (d.cur.recipients!=null && d.cmp.recipients!=null) ? stPct(d.cur.recipients, d.cmp.recipients) : null;
   const anyProv = d.cur.provisional || d.cmp.provisional || d.full.provisional || M.runs.some(r=>r.provisional);
   const jRows = stJourneyRows(M);
-  const card = (k,v)=>v;
-  box.innerHTML = `
+  const on = stOn, fn = stFigNumbers();
+  const pages = [];
+  pages.push(`
     <div class="st-page" data-page="1">
       <div class="st-title">Freedom Prayer Healing Ministry</div>
       <div class="st-sub">Creekside Church</div>
       <div class="st-line">Ministry statistics, ${P.cy} compared with ${P.ly} · ${stLong(P.rep)}</div>
-      <h2>Freedom Sessions</h2>
+      ${on('summary') ? `<h2>Freedom Sessions</h2>
       <p>${stRunsHtml(M.S1)}</p><p>${stRunsHtml(M.S2)}</p><p>${stRunsHtml(M.S3)}</p>
       <div class="st-card-wrap"><table class="st-card">
         <thead><tr><th></th><th>${P.cy}<span>Jan 1 – ${stMd(P.rep)}</span></th><th></th><th>${P.ly}<span>Jan 1 – ${stMd(P.cmp.to)}</span><em>same dates, last year</em></th><th class="muted">${P.ly}<span>Full year</span></th></tr></thead>
@@ -9135,17 +9206,19 @@ function renderStatistics(){
           return `<tr><th scope="row">${lab}</th><td class="cy">${f(v(A.cur))}${wk?`<small class="wk">≈ ${stWeeks(A.cur.minHours)} work weeks</small>`:''}</td><td>${pill}</td><td class="ly">${f(v(A.cmp))}${wk?`<small>≈ ${stWeeks(A.cmp.minHours)} weeks</small>`:''}</td><td class="muted">${f(v(A.full))}${wk?`<small>≈ ${stWeeks(A.full.minHours)} weeks</small>`:''}</td></tr>`;
         }).join('')}</tbody></table>
         <p class="st-foot">Growth % compares ${P.cy} with the same dates in ${P.ly}. Work weeks = 40 hours.</p></div>
-      <p class="st-cap">Figure 1. Freedom Sessions: ${P.cy} to date against the same dates in ${P.ly}, with the ${P.ly} full year for reference. <a href="#" class="st-dl" data-fig="card">Download PNG</a></p>
-      ${M.note.trim() ? `<h3>From the ministry leader</h3><p class="st-note">${escapeHtml(M.note.trim())}</p>` : ''}
-    </div>
+      <p class="st-cap">Figure ${fn.card}. Freedom Sessions: ${P.cy} to date against the same dates in ${P.ly}, with the ${P.ly} full year for reference. <a href="#" class="st-dl" data-fig="card">Download PNG</a></p>` : ''}
+      ${on('note') && M.note.trim() ? `<h3>From the ministry leader</h3><p class="st-note">${escapeHtml(M.note.trim())}</p>` : ''}
+    </div>`);
+  if(on('monthly') || on('running')) pages.push(`
     <div class="st-page" data-page="2">
-      <div class="st-fig"><img id="stFigMonthly" alt="Figure 2: completed Freedom Sessions by month, ${P.ly} and ${P.cy}"></div>
-      <p class="st-cap">Figure 2. Sessions by month. ${escapeHtml(M.S4)} <a href="#" class="st-dl" data-fig="monthly">Download PNG</a></p>
-      <div class="st-fig"><img id="stFigRunning" alt="Figure 3: running total of sessions, ${P.ly} and ${P.cy}"></div>
-      <p class="st-cap">Figure 3. Running total of sessions.${M.passMonth!=null ? ` ${P.cy} passed the full-year ${P.ly} total (${A.full.sessions}) in ${ST_MONTH[M.passMonth]}.` : ''} <a href="#" class="st-dl" data-fig="running">Download PNG</a></p>
-    </div>
+      ${on('monthly') ? `<div class="st-fig"><img id="stFigMonthly" alt="Figure ${fn.monthly}: completed Freedom Sessions by month, ${P.ly} and ${P.cy}"></div>
+      <p class="st-cap">Figure ${fn.monthly}. Sessions by month. ${escapeHtml(M.S4)} <a href="#" class="st-dl" data-fig="monthly">Download PNG</a></p>` : ''}
+      ${on('running') ? `<div class="st-fig"><img id="stFigRunning" alt="Figure ${fn.running}: running total of sessions, ${P.ly} and ${P.cy}"></div>
+      <p class="st-cap">Figure ${fn.running}. Running total of sessions.${M.passMonth!=null ? ` ${P.cy} passed the full-year ${P.ly} total (${A.full.sessions}) in ${ST_MONTH[M.passMonth]}.` : ''} <a href="#" class="st-dl" data-fig="running">Download PNG</a></p>` : ''}
+    </div>`);
+  if(on('dropin') || on('journey')) pages.push(`
     <div class="st-page" data-page="3">
-      <h2>Sunday Drop-In</h2>
+      ${on('dropin') ? `<h2>Sunday Drop-In</h2>
       <p>Prayer is also offered on a drop-in basis on Sundays.</p>
       <div class="table-scroll"><table class="st-table st-cmp">
         <thead><tr><th></th><th>${P.cy}<span>Jan 1 – ${stMd(P.rep)}</span></th><th></th><th>${P.ly}<span>Jan 1 – ${stMd(P.cmp.to)}</span><em>same dates, last year</em></th><th class="muted">${P.ly}<span>Full year</span></th></tr></thead>
@@ -9153,26 +9226,28 @@ function renderStatistics(){
           <tr><th scope="row">Sundays held</th><td>${stCell(d.cur.held||null)}</td><td>${d.cur.held && d.cmp.held ? stPillHtml(stPct(d.cur.held, d.cmp.held)) : ''}</td><td>${stCell(d.cmp.held||null)}</td><td class="muted">${stCell(d.full.held||null)}</td></tr>
           <tr><th scope="row">Prayer recipients</th><td>${stCell(d.cur.recipients, d.cur.provisional)}</td><td>${stPillHtml(dPct)}</td><td>${stCell(d.cmp.recipients, d.cmp.provisional)}</td><td class="muted">${stCell(d.full.recipients, d.full.provisional)}</td></tr>
         </tbody></table></div>
-      <p class="st-cap">${anyProv ? 'Highlighted figures are provisional and will be updated. ' : ''}Growth % compares the same dates in both years.</p>
-      <h2>Journey to Freedom</h2>
+      <p class="st-cap">${anyProv ? 'Highlighted figures are provisional and will be updated. ' : ''}Growth % compares the same dates in both years.</p>` : ''}
+      ${on('journey') ? `<h2>Journey to Freedom</h2>
       <p>The Journey to Freedom workshop runs twice a year over a series of weekly sessions.</p>
       <div class="table-scroll"><table class="st-table">
         <thead><tr><th>Run</th><th>Sessions</th><th>Prayer ministers (run)</th><th>Ministers each session</th><th>Participants each session</th><th>Average participants</th></tr></thead>
         <tbody>${jRows.map(r=>`<tr><th scope="row">${escapeHtml(r.name)}</th><td>${stCell(r.dates)}</td><td>${stCell(r.ministers)}</td><td>${stCell(r.perMin)}</td><td>${stCell(r.counts, r.prov)}</td><td>${stCell(r.avg, r.prov)}</td></tr>`).join('')}</tbody></table></div>
-      <p class="st-cap">Participants are counted each session, so the same person attending every week is counted each time; the average shows typical attendance.</p>
-    </div>
+      <p class="st-cap">${anyProv && !on('dropin') ? 'Highlighted figures are provisional and will be updated. ' : ''}Participants are counted each session, so the same person attending every week is counted each time; the average shows typical attendance.</p>` : ''}
+    </div>`);
+  if(on('team')) pages.push(`
     <div class="st-page" data-page="4">
       <div class="st-label">Ministry leader's copy</div>
       <h2>Ministry Team</h2>
       <p>${escapeHtml(M.S6)}</p>${M.S8 ? `<p>${escapeHtml(M.S8)}</p>` : ''}
       <p class="st-cap">All comparisons on this page use the same dates in both years: January 1 to ${stLong(P.rep).replace(/, \d{4}$/,'')}.</p>
-      <div class="st-fig"><img id="stFigLed" alt="Figure 4: sessions led by each minister, ${P.ly} and ${P.cy}"></div>
-      <p class="st-cap">Figure 4. Sessions led by each minister, in alphabetical order. Ministers who have not led a session are omitted. <a href="#" class="st-dl" data-fig="led">Download PNG</a></p>
+      <div class="st-fig"><img id="stFigLed" alt="Figure ${fn.led}: sessions led by each minister, ${P.ly} and ${P.cy}"></div>
+      <p class="st-cap">Figure ${fn.led}. Sessions led by each minister, in alphabetical order. Ministers who have not led a session are omitted. <a href="#" class="st-dl" data-fig="led">Download PNG</a></p>
       <div class="table-scroll"><table class="st-table st-min">
         <thead><tr><th>Minister</th><th>Sessions ${P.ly}</th><th>Sessions ${P.cy}</th><th>Led ${P.ly}</th><th>Led ${P.cy}</th><th>Hours ${P.ly}</th><th>Hours ${P.cy}</th></tr></thead>
         <tbody>${stMinisterTable(M).map((r,i,arr)=>`<tr class="${i===arr.length-1?'st-total':''}">${r.map((c,j)=>j===0?`<th scope="row">${escapeHtml(c)}</th>`:`<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
       <p class="st-cap">"Sessions" counts every session a minister took part in, as lead or team member, so team totals exceed the number of sessions held. Both years run January 1 to ${stLong(P.rep).replace(/, \d{4}$/,'')}.</p>
-    </div>
+    </div>`);
+  if(on('journeyMin')) pages.push(`
     <div class="st-page" data-page="5">
       <div class="st-label">Ministry leader's copy</div>
       <h2>Journey to Freedom: Ministers by Session</h2>
@@ -9180,7 +9255,9 @@ function renderStatistics(){
       <div class="table-scroll"><table class="st-table">
         <thead><tr><th>Run</th><th>Session</th><th>Prayer ministers present</th></tr></thead>
         <tbody>${(stPage5Rows(M).length ? stPage5Rows(M) : [{run:'—', date:null, names:null}]).map(r=>`<tr><th scope="row">${escapeHtml(r.run)}</th><td>${stCell(r.date)}</td><td>${stCell(r.names)}</td></tr>`).join('')}</tbody></table></div>
-    </div>`;
+    </div>`);
+  box.innerHTML = pages.join('');
+  stSyncDownloads(M);
   box.querySelectorAll('.st-dl').forEach(a=>a.addEventListener('click', e=>{ e.preventDefault(); downloadStatFig(a.dataset.fig); }));
   renderStatRecords();
   stDrawAll(M).then(figs=>{
@@ -9259,13 +9336,15 @@ async function stSaveBlob(blob, name){
   setTimeout(()=>URL.revokeObjectURL(url), 4000);
 }
 function stDataUrlBytes(u){ const b = atob(u.split(',')[1]); const a = new Uint8Array(b.length); for(let i=0;i<b.length;i++) a[i]=b.charCodeAt(i); return a; }
-const ST_FIG_NAMES = { card:'Figure1_Freedom_Sessions', monthly:'Figure2_Sessions_by_month', running:'Figure3_Running_total', led:'Figure4_Sessions_led' };
+const ST_FIG_NAMES = { card:'Freedom_Sessions', monthly:'Sessions_by_month', running:'Running_total', led:'Sessions_led' };
 async function downloadStatFig(k){
   if(!statFigs[k]) statFigs = await stDrawAll(statModel);
-  await stSaveBlob(new Blob([stDataUrlBytes(statFigs[k])], { type:'image/png' }), `FPHM_${ST_FIG_NAMES[k]}_${statReportDate}.png`);
+  const n = stFigNumbers()[k];
+  await stSaveBlob(new Blob([stDataUrlBytes(statFigs[k])], { type:'image/png' }), `FPHM_${n ? 'Figure'+n+'_' : ''}${ST_FIG_NAMES[k]}_${statReportDate}.png`);
 }
 async function downloadStatCharts(){
-  for(const k of Object.keys(ST_FIG_NAMES)){ await downloadStatFig(k); await new Promise(r=>setTimeout(r, 400)); }
+  const fn = stFigNumbers();
+  for(const k of Object.keys(ST_FIG_NAMES).filter(k=>fn[k])){ await downloadStatFig(k); await new Promise(r=>setTimeout(r, 400)); }
 }
 function stLoadDocx(){
   if(window.docx) return Promise.resolve();
@@ -9295,51 +9374,62 @@ async function downloadStatDocx(leaders){
   const v = (x, prov)=> x===null || x===undefined ? { t:NYR, i:true, color:ST.muted } : { t:String(x), hl: !!prov };
   const c2 = (o, extra)=> cell(o.t, { ...extra, i:o.i, color:o.color||(extra&&extra.color), hl:o.hl });
   const pctTxt = p => p===null || p===0 ? '' : (p>0?'▲ ':'▼ ')+Math.abs(p)+'%';
+  const on = stOn, fn = stFigNumbers();
   const fig1H = await figH('card', 5.4), fig2H = await figH('monthly', 6.4), fig3H = await figH('running', 6.4), fig4H = await figH('led', 6.4);
 
   const kids = [
     para([run('Freedom Prayer Healing Ministry', { font:'Georgia', size:20, b:true, color:ST.brown })], { after:0 }),
     para([run('Creekside Church', { font:'Georgia', size:13 })], { after:2 }),
     new D.Paragraph({ children:[run(`Ministry statistics, ${P.cy} compared with ${P.ly} · ${stLong(P.rep)}`, { size:10.5, color:ST.muted })], spacing:{ after: 240 }, border: { bottom: { style: D.BorderStyle.SINGLE, size: 12, color: C(ST.cy), space: 6 } } }),
-    heading('Freedom Sessions'),
+  ];
+  const TITLE_LEN = kids.length;
+  const brk = ()=> kids.length > TITLE_LEN;   // page break only when something came before
+  if(on('summary')) kids.push(heading('Freedom Sessions'),
     body(M.S1), body(M.S2), body(M.S3),
     para([new D.ImageRun({ data: stDataUrlBytes(statFigs.card), transformation: { width: Math.round(5.4*96), height: Math.round(fig1H*96) } })], { after:2, keepNext:true, align: D.AlignmentType.CENTER }),
-    caption(`Figure 1. Freedom Sessions: ${P.cy} to date against the same dates in ${P.ly}, with the ${P.ly} full year for reference.`)
-  ];
-  if(M.note.trim()){ kids.push(heading('From the ministry leader')); M.note.trim().split(/\n+/).forEach(line=>kids.push(body([{ t: line }]))); }
-  kids.push(img('monthly', 6.4, fig2H), caption(`Figure 2. Sessions by month. ${M.S4}`));
-  kids.push(img('running', 6.4, fig3H), caption(`Figure 3. Running total of sessions.${M.passMonth!=null ? ` ${P.cy} passed the full-year ${P.ly} total (${A.full.sessions}) in ${ST_MONTH[M.passMonth]}.` : ''}`));
+    caption(`Figure ${fn.card}. Freedom Sessions: ${P.cy} to date against the same dates in ${P.ly}, with the ${P.ly} full year for reference.`));
+  if(on('note') && M.note.trim()){ kids.push(heading('From the ministry leader')); M.note.trim().split(/\n+/).forEach(line=>kids.push(body([{ t: line }]))); }
+  if(on('monthly')) kids.push(img('monthly', 6.4, fig2H), caption(`Figure ${fn.monthly}. Sessions by month. ${M.S4}`));
+  if(on('running')) kids.push(img('running', 6.4, fig3H), caption(`Figure ${fn.running}. Running total of sessions.${M.passMonth!=null ? ` ${P.cy} passed the full-year ${P.ly} total (${A.full.sessions}) in ${ST_MONTH[M.passMonth]}.` : ''}`));
   // Page 3
   const d = M.drop;
   const headCmp = ['', `${P.cy}\nJan 1 – ${stMd(P.rep)}`, '', `${P.ly}\nJan 1 – ${stMd(P.cmp.to)}`, `${P.ly}\nFull year`];
   const headCell = (t, muted)=> new D.TableCell({ children: t.split('\n').map((ln,i)=>para([run(ln, { b:i===0, size:i===0?10.5:9, color: muted||i>0 ? ST.muted : ST.text })], { after:0, align:D.AlignmentType.CENTER })), margins:{ top:60, bottom:60, left:80, right:80 }, borders:{ top:none, left:none, right:none, bottom:{ style:D.BorderStyle.SINGLE, size:8, color:C(ST.border) } } });
-  kids.push(heading('Sunday Drop-In', { pageBreak:true }), body([{ t:'Prayer is also offered on a drop-in basis on Sundays.' }]));
+  const anyProv = d.cur.provisional || d.cmp.provisional || d.full.provisional || M.runs.some(r=>r.provisional);
+  if(on('dropin')){
+  kids.push(heading('Sunday Drop-In', { pageBreak:brk() }), body([{ t:'Prayer is also offered on a drop-in basis on Sundays.' }]));
   kids.push(table([
     headCmp.map((t,i)=>headCell(t, i===4)),
     [cell('Sundays held', { b:true, left:true }), c2(v(d.cur.held||null)), cell(d.cur.held && d.cmp.held ? pctTxt(stPct(d.cur.held, d.cmp.held)) : '', { color:ST.pillText, b:true, size:9 }), c2(v(d.cmp.held||null)), c2(v(d.full.held||null), { color:ST.muted })],
     [cell('Prayer recipients', { b:true, left:true }), c2(v(d.cur.recipients, d.cur.provisional)), cell(pctTxt((d.cur.recipients!=null && d.cmp.recipients!=null) ? stPct(d.cur.recipients, d.cmp.recipients) : null), { color:ST.pillText, b:true, size:9 }), c2(v(d.cmp.recipients, d.cmp.provisional)), c2(v(d.full.recipients, d.full.provisional), { color:ST.muted })]
   ], [2600, 1900, 1000, 1900, 1900]));
-  const anyProv = d.cur.provisional || d.cmp.provisional || d.full.provisional || M.runs.some(r=>r.provisional);
   kids.push(caption(`${anyProv ? 'Highlighted figures are provisional and will be updated. ' : ''}Growth % compares the same dates in both years.`));
-  kids.push(heading('Journey to Freedom'), body([{ t:'The Journey to Freedom workshop runs twice a year over a series of weekly sessions.' }]));
+  }
+  if(on('journey')){
+  kids.push(heading('Journey to Freedom', { pageBreak: !on('dropin') && brk() }), body([{ t:'The Journey to Freedom workshop runs twice a year over a series of weekly sessions.' }]));
   const jh = ['Run','Sessions','Prayer ministers (run)','Ministers each session','Participants each session','Average participants'];
   kids.push(table([ jh.map(t=>headCell(t)), ...stJourneyRows(M).map(r=>[cell(r.name, { b:true, left:true }), c2(v(r.dates), { left:true }), c2(v(r.ministers)), c2(v(r.perMin)), c2(v(r.counts, r.prov)), c2(v(r.avg, r.prov))]) ], [1500, 2400, 1300, 1400, 1500, 1200]));
-  kids.push(caption('Participants are counted each session, so the same person attending every week is counted each time; the average shows typical attendance.'));
+  kids.push(caption(`${anyProv && !on('dropin') ? 'Highlighted figures are provisional and will be updated. ' : ''}Participants are counted each session, so the same person attending every week is counted each time; the average shows typical attendance.`));
+  }
   if(leaders){
     const sameDates = `January 1 to ${stLong(P.rep).replace(/, \d{4}$/,'')}`;
-    kids.push(para([run("MINISTRY LEADER'S COPY", { b:true, size:9, color:ST.brown })], { pageBreak:true, after:2 }));
+    if(on('team')){
+    kids.push(para([run("MINISTRY LEADER'S COPY", { b:true, size:9, color:ST.brown })], { pageBreak:brk(), after:2 }));
     kids.push(heading('Ministry Team'), body([{ t:M.S6 }]));
     if(M.S8) kids.push(body([{ t:M.S8 }]));
     kids.push(caption(`All comparisons on this page use the same dates in both years: ${sameDates}.`));
-    kids.push(img('led', 6.4, fig4H), caption('Figure 4. Sessions led by each minister, in alphabetical order. Ministers who have not led a session are omitted.'));
+    kids.push(img('led', 6.4, fig4H), caption(`Figure ${fn.led}. Sessions led by each minister, in alphabetical order. Ministers who have not led a session are omitted.`));
     const mt = stMinisterTable(M);
     const mh = ['Minister', `Sessions ${P.ly}`, `Sessions ${P.cy}`, `Led ${P.ly}`, `Led ${P.cy}`, `Hours ${P.ly}`, `Hours ${P.cy}`];
     kids.push(table([ mh.map(t=>headCell(t)), ...mt.map((r,i)=>r.map((c,j)=>cell(c, { left:j===0, b: i===mt.length-1, size:9.5 }))) ], [2600, 1100, 1100, 1000, 1000, 1100, 1100]));
     kids.push(caption(`"Sessions" counts every session a minister took part in, as lead or team member, so team totals exceed the number of sessions held. Both years run ${sameDates}.`));
-    kids.push(para([run("MINISTRY LEADER'S COPY", { b:true, size:9, color:ST.brown })], { pageBreak:true, after:2 }));
+    }
+    if(on('journeyMin')){
+    kids.push(para([run("MINISTRY LEADER'S COPY", { b:true, size:9, color:ST.brown })], { pageBreak:brk(), after:2 }));
     kids.push(heading('Journey to Freedom: Ministers by Session'), body([{ t:'Prayer ministers present at each session of each run.' }]));
     const p5 = stPage5Rows(M);
     kids.push(table([ ['Run','Session','Prayer ministers present'].map(t=>headCell(t)), ...(p5.length ? p5 : [{ run:'—', date:null, names:null }]).map(r=>[cell(r.run, { b:true, left:true }), c2(v(r.date), { left:true }), c2(v(r.names), { left:true })]) ], [2000, 2000, 5800]));
+    }
   }
   const doc = new D.Document({
     creator: 'FPHM Scheduler', title: 'Ministry statistics',
@@ -9511,6 +9601,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Nov 19, 2026', version: '2026-11-19.1', items: [
+    'New: on the Statistics tab, a "Sections to include" box lets you tick which parts go in the report (Freedom Sessions summary, your note, the two charts, Sunday Drop-In, Journey to Freedom, and the two leader\'s copy pages). Anything unticked is left out of the report on screen, both Word downloads and Download charts, and the figure numbers close up so they never skip. Your choice is remembered on this device; Select all puts everything back.'
+  ]},
   { date: 'Nov 13, 2026', version: '2026-11-13.9', items: [
     'New: to find out why iPhones aren\'t showing notification alerts, each minister\'s device list on the Prayer Ministers tab now says whether the last alert to that device was accepted or REFUSED (with the reason), and a device whose alerts are refused counts as "Check". "Send app notification" also lists any device that refused it. This starts working once the Worker is updated.'
   ]},
@@ -9525,9 +9618,6 @@ const CHANGE_LOG = [
     'Changed: Refresh Data and Sign Out are smaller and look the same, so Sign Out is no longer the darkest thing on the page.',
     'Changed: cards have a lighter outline, so the content inside them stands out more. Form boxes keep their darker outline.',
     'Changed: the initials in the round name badges are a little darker so they are easier to read, and several help lines under the tab titles are reworded more plainly.'
-  ]},
-  { date: 'Nov 13, 2026', version: '2026-11-13.4', items: [
-    'Changed: on a booked session card, "Send app notification" now turns green and says "Notification sent (date) at (time) — tap to re-send" once the team has been notified, whether you sent it from the card or it went out automatically when you booked or moved the session. To keep this after a reload, add a "AppNotifiedAt" (Date and Time) column to the PrayerSessions list in SharePoint; until then it shows only until the page is reloaded.'
   ]}
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
@@ -9535,6 +9625,9 @@ const CHANGE_LOG = [
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Nov 13, 2026', version: '2026-11-13.4', items: [
+    'Changed: on a booked session card, "Send app notification" now turns green and says "Notification sent (date) at (time) — tap to re-send" once the team has been notified, whether you sent it from the card or it went out automatically when you booked or moved the session. To keep this after a reload, add a "AppNotifiedAt" (Date and Time) column to the PrayerSessions list in SharePoint; until then it shows only until the page is reloaded.'
+  ]},
   { date: 'Nov 13, 2026', version: '2026-11-13.3', items: [
     'Removed: the "Notify ministers via WhatsApp" button on booked sessions, and the "send a WhatsApp cancellation?" question when a booked session is removed. The paid WhatsApp number is being shut down. Use "Send app notification" instead (ministers also get app notifications automatically when you book or change a session). The "WhatsApp group created" toggle and "open chat" link stay as they were.'
   ]},

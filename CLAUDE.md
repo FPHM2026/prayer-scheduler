@@ -1816,6 +1816,8 @@ otesButtonHtml) appears on booked/unlinked session cards and Completed rows (bot
 - **Leader's Note**: optional list `ReportNotes` (Title = report date ISO, Note = plain-text multiline), one item per report date; without the list the Save button is hidden.
 - 2026-11-13.2: the Ministry Team table has no "Hours change" column (Andrew: percentages on small numbers mislead, e.g. +200%). Don't add per-minister percentage changes back.
 
+- **Sections to include** (2026-11-19.1, at Andrew's request): a checkbox card (`ST_SECTIONS`, `renderStatSections()`, `stOn(k)`) picks which parts appear: summary, note, monthly chart, running chart, Drop-In, Journey, Ministry Team, Journey ministers by session (last two leader's copy only). Unticked parts are left out of the screen report, both Word files (page breaks only when something precedes) and Download charts; figure numbers renumber (`stFigNumbers()`). Stored per browser in localStorage `fphm_stat_sections_off` as the sections turned OFF, so new sections start ticked. `stSyncDownloads()` hides a download that would be empty.
+
 ## "Notification sent" on session cards (2026-11-13.4)
 - `appNotifyButtonHtml(s)` (used by `waSectionHtml()`) shows "Send app notification" until the team is notified, then green "Notification sent <date> at <time> — tap to re-send". `pushNotifyMinisters()` calls `markAppNotified()` on any successful `booked`/`changed` send (manual or automatic on save). Stored in an optional hand-made PrayerSessions column **AppNotifiedAt** (Date and Time, `appNotifiedColumnReady` via `/columns`); without it the state lives only in memory (`appNotifiedLocal`) until reload.
 
