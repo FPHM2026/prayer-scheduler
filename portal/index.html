@@ -177,6 +177,11 @@
   .toggle-pair button.active{background:#fff;border-color:var(--gold);color:var(--gold);}
   .errbox{background:var(--danger-bg);color:var(--danger);border-radius:6px;padding:10px 12px;font-size:var(--fs-sm);margin-bottom:10px;}
   .helptext{font-size:var(--fs-xs);color:var(--muted);}
+  /* Shown when this device's notifications were turned off without the
+     minister doing it (iPhone drops the subscription after some updates). */
+  #pushLostBanner{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;background:#fdf3e7;border:1px solid #e9c9a3;border-radius:8px;padding:12px 16px;margin:0 0 16px;}
+  #pushLostBanner[hidden]{display:none;}
+  #pushLostBanner p{margin:0;flex:1 1 240px;}
 
   .modal-bg{display:none;position:fixed;inset:0;background:rgba(35,30,24,.55);align-items:center;justify-content:center;z-index:50;padding:12px;}
   .modal-bg.open{display:flex;}
@@ -465,6 +470,10 @@
   <button data-tab="settings" id="navSettings" hidden>Settings</button>
 </nav>
 <main>
+  <div id="pushLostBanner" role="status" hidden>
+    <p>Phone notifications were turned off on this device. This can happen after an iPhone or app update.</p>
+    <button class="btn" type="button" onclick="restorePush()">Turn notifications back on</button>
+  </div>
   <div id="loadError"></div>
   <div id="notFoundMsg" style="display:none;" class="errbox">
     We couldn't find a prayer minister profile matching your sign-in email. Ask the scheduling admin to check that your Sign-In Email is on file correctly, then try again.
@@ -2363,6 +2372,11 @@ async function registerPushSubscription(sub){
 let lastPushCheckin = 0;
 async function pushCheckin(){
   if(!pushPublicKey || !PUSH_SUPPORTED) return;
+  // Every open: make sure a device that had notifications on still does.
+  // iPhone can drop the subscription (or reset permission) after an iOS or
+  // app update while the minister never touched the switch (2026-11-21).
+  const restored = await ensurePushStillOn().catch(()=>false);
+  if(restored) return;
   if(Date.now() - lastPushCheckin < 6*3600*1000) return;
   lastPushCheckin = Date.now();
   try{
@@ -2372,10 +2386,42 @@ async function pushCheckin(){
     if(old){
       const r = await pushApi('/checkin', { endpoint: old, blocked: true, device: pushDeviceLabel() });
       // The admin's list no longer has it (removed after a failed alert).
-      if(!r.found) storePushEndpoint('');
+      // Keep it while permission isn't denied, so #pushLostBanner can still
+      // offer to turn notifications back on (see ensurePushStillOn).
+      if(!r.found && Notification.permission === 'denied') storePushEndpoint('');
     }
   }catch(e){}
 }
+// Returns true when it re-subscribed this device. Only acts when this
+// device had notifications on (a stored endpoint) and now has no
+// subscription: with permission still granted it subscribes again quietly;
+// if permission went back to "ask" it shows #pushLostBanner so one tap
+// turns them back on (iPhone only allows asking from a tap).
+async function ensurePushStillOn(){
+  const banner = $('#pushLostBanner');
+  const old = storedPushEndpoint();
+  const sub = await currentPushSubscription();
+  if(sub || !old){ banner.hidden = true; return false; }
+  if(Notification.permission === 'granted'){
+    try{
+      const reg = await navigator.serviceWorker.ready;
+      const fresh = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToUint8(pushPublicKey) });
+      await registerPushSubscription(fresh); // replaces the old endpoint
+      banner.hidden = true;
+      renderPushCard('');
+      return true;
+    }catch(e){
+      // Some browsers only subscribe from a tap; fall through to the banner.
+    }
+  }
+  banner.hidden = Notification.permission === 'denied';
+  return false;
+}
+window.restorePush = async function(){
+  $('#pushLostBanner').hidden = true;
+  await enablePush();
+  if(!(await currentPushSubscription().catch(()=>null)) && Notification.permission !== 'denied') $('#pushLostBanner').hidden = false;
+};
 function urlB64ToUint8(s){
   s = s.replace(/-/g,'+').replace(/_/g,'/');
   while(s.length % 4) s += '=';
@@ -2465,6 +2511,7 @@ window.disablePush = async function(){
     const old = storedPushEndpoint();
     if(old && (!sub || old !== sub.endpoint)) await pushApi('/unsubscribe', { endpoint: old }).catch(()=>{});
     storePushEndpoint('');
+    $('#pushLostBanner').hidden = true;
     await renderPushCard('');
   }catch(e){
     await renderPushCard('Could not turn off notifications: ' + e.message);
