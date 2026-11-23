@@ -1136,7 +1136,13 @@ function notesQuestionHtml(q, si, qi){
   const label = `<label class="qlabel"${isChoice?'':` for="${id}"`}>${escapeHtml(q.label||'')}${q.required?'<span class="required-mark">*</span>':''}</label>`;
   const esc = o => JSON.stringify(o).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
   let input = '';
-  if(q.type==='textarea'){
+  if(q.type==='toggle'){
+    // Yes/No toggle (2026-11-23): an on/off switch, saved as "Yes" or "No";
+    // starts off, so an untouched toggle saves "No".
+    if(v!=='Yes' && v!=='No') notesCtx.answers[q.id] = 'No';
+    const on = notesCtx.answers[q.id]==='Yes';
+    input = `<div><label class="push-toggle nt-toggle"><input id="${id}" type="checkbox" role="switch" ${on?'checked':''} onchange="notesSet(${si},${qi},this.checked?'Yes':'No');this.parentNode.querySelector('.nt-toggle-text').textContent=this.checked?'Yes':'No'"><span class="track" aria-hidden="true"></span><span class="nt-toggle-text">${on?'Yes':'No'}</span></label></div>`;
+  } else if(q.type==='textarea'){
     input = `<textarea id="${id}" rows="4" oninput="notesSet(${si},${qi},this.value)">${escapeHtml(v||'')}</textarea>`;
   } else if(q.type==='select'){
     input = `<select id="${id}" onchange="notesSet(${si},${qi},this.value)"><option value="">— Select —</option>${(q.options||[]).map(o=>`<option value="${escapeHtml(o)}"${v===o?' selected':''}>${escapeHtml(o)}</option>`).join('')}</select>`;

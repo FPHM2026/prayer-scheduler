@@ -1607,7 +1607,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-11-23.4";
+const APP_VERSION = "2026-11-23.5";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -7101,7 +7101,7 @@ const QUESTION_TYPES = ['text','email','number','textarea','radio','select','che
 // public intake form's renderer doesn't know them. choicegrid = one pick per
 // row (Google's 'multiple choice grid'); checkboxgrid = any number per row.
 const GRID_TYPES = ['choicegrid','checkboxgrid'];
-const GRID_LABELS = { choicegrid:'multiple choice grid', checkboxgrid:'checkbox grid', rowtable:'add-rows table' };
+const GRID_LABELS = { choicegrid:'multiple choice grid', checkboxgrid:'checkbox grid', rowtable:'add-rows table', toggle:'Yes/No toggle' };
 // Add-rows table: the minister adds/removes rows themselves; every column has
 // its own kind (text, number, yes/no, or yes/no that opens a text box on Yes).
 const TABLE_TYPE = 'rowtable';
@@ -7120,7 +7120,8 @@ function defaultTableColumns(){
     { id:'removed',   label:'Removed',    type:'yesno' }
   ];
 }
-function questionTypesForEditor(){ return activeEditor!=='intake' ? QUESTION_TYPES.concat(GRID_TYPES, [TABLE_TYPE]) : QUESTION_TYPES; }
+// 'toggle' = a Yes/No on/off switch (2026-11-23), notes forms only.
+function questionTypesForEditor(){ return activeEditor!=='intake' ? QUESTION_TYPES.concat(['toggle'], GRID_TYPES, [TABLE_TYPE]) : QUESTION_TYPES; }
 const TYPES_WITH_OPTIONS = ['radio','select','checkboxes'];
 
 /* One editor UI, two forms: the same DOM block (#intakeQuestionsView) is
@@ -7326,7 +7327,7 @@ function visibleIfPickerHtml(kind, sIdx, qIdx, cond, candidateQuestions){
   // the delegated-free inline handlers below.
   const target = cond ? findQuestionById(cond.id) : null;
   const condType = !cond ? 'always' : cond.equals!==undefined ? 'equals' : cond.notEquals!==undefined ? 'notEquals' : cond.in ? 'in' : cond.includes!==undefined ? 'includes' : 'always';
-  const optionsForTarget = target && Array.isArray(target.options) ? target.options : null;
+  const optionsForTarget = target && target.type==='toggle' ? ['Yes','No'] : target && Array.isArray(target.options) ? target.options : null;
 
   const targetSelect = `<select onchange="onVisibleIfTargetChange('${kind}',${sIdx},${qIdx===null?'null':qIdx},this.value)">
     <option value="">Select a question…</option>
@@ -7675,7 +7676,7 @@ function renderQuestionEditor(q, sIdx, qIdx, sec, opened){
   const visSummary = describeVisibleIf(q.visibleIf);
   const summaryHtml = escapeHtml([q.required ? 'Required' : 'Optional', visSummary || 'Always shown', q.firstSessionOnly ? 'First session only' : null].filter(Boolean).join(' · '))
     + (activeEditor==='call' ? ' ' + pmVisTagHtml(q) : '');
-  const avatar = { text:'Ab', email:'@', number:'#', textarea:'¶', radio:'◉', select:'▾', checkboxes:'☑', choicegrid:'▦', checkboxgrid:'▦', rowtable:'▤' }[q.type] || '?';
+  const avatar = { text:'Ab', email:'@', number:'#', textarea:'¶', radio:'◉', select:'▾', checkboxes:'☑', choicegrid:'▦', checkboxgrid:'▦', rowtable:'▤', toggle:'⏻' }[q.type] || '?';
   const actions = `
     <button class="icon-btn icon-btn-lg" title="Move up" onclick="moveQuestion(${sIdx},${qIdx},-1)" ${qIdx===0?'disabled':''}>${ICONS.arrowUp}</button>
     <button class="icon-btn icon-btn-lg" title="Move down" onclick="moveQuestion(${sIdx},${qIdx},1)" ${qIdx===sec.questions.length-1?'disabled':''}>${ICONS.arrowDown}</button>
@@ -8298,7 +8299,13 @@ function notesQuestionHtml(q, si, qi){
   const label = `<label class="qlabel"${isChoice?'':` for="${id}"`}>${escapeHtml(q.label||'')}${q.required?'<span class="required-mark">*</span>':''}${notesCtx.kind==='call' ? pmVisTagHtml(q) : ''}</label>`;
   const esc = o => JSON.stringify(o).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
   let input = '';
-  if(q.type==='textarea'){
+  if(q.type==='toggle'){
+    // Yes/No toggle (2026-11-23): an on/off switch, saved as "Yes" or "No";
+    // starts off, so an untouched toggle saves "No".
+    if(v!=='Yes' && v!=='No') notesCtx.answers[q.id] = 'No';
+    const on = notesCtx.answers[q.id]==='Yes';
+    input = `<div><label class="push-toggle nt-toggle"><input id="${id}" type="checkbox" role="switch" ${on?'checked':''} onchange="notesSet(${si},${qi},this.checked?'Yes':'No');this.parentNode.querySelector('.nt-toggle-text').textContent=this.checked?'Yes':'No'"><span class="track" aria-hidden="true"></span><span class="nt-toggle-text">${on?'Yes':'No'}</span></label></div>`;
+  } else if(q.type==='textarea'){
     input = `<textarea id="${id}" rows="4" oninput="notesSet(${si},${qi},this.value)">${escapeHtml(v||'')}</textarea>`;
   } else if(q.type==='select'){
     input = `<select id="${id}" onchange="notesSet(${si},${qi},this.value)"><option value="">— Select —</option>${(q.options||[]).map(o=>`<option value="${escapeHtml(o)}"${v===o?' selected':''}>${escapeHtml(o)}</option>`).join('')}</select>`;
@@ -9850,6 +9857,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Nov 23, 2026', version: '2026-11-23.5', items: [
+    'New: a "Yes/No toggle" answer type for the Session and Intake call notes forms (Settings > Session Notes, open a question, Answer type). It shows as an on/off switch that starts at No; switch it on for Yes. "Show only if" can use it: pick the toggle question and Yes or No. Works in My FPHM too when the Lead writes session notes.'
+  ]},
   { date: 'Nov 23, 2026', version: '2026-11-23.4', items: [
     'New: intake call notes. Settings > Session Notes now has two tabs, "Session" (the session notes form, unchanged) and "Intake call", where you set the questions for your notes after the intake call. Open a question and tick "Visible to prayer ministers" if ministers should see that answer; the rest stay with admins. Each question shows "Visible to PMs" or "Admin only".',
     'New: on a Pre-Intake card, tap "Intake call notes" after the call to fill in the form. Once saved, the card shows a green "Call notes saved" tag and the button reads "Intake call notes ✓" (it stays on the card after they move to the Waiting List). Admins see all the answers under "View session notes" and in "Notes from earlier sessions" when writing session notes.',
@@ -9865,9 +9875,6 @@ const CHANGE_LOG = [
   { date: 'Nov 23, 2026', version: '2026-11-23.1', items: [
     'New: a session notes question (or a whole section) can be set to show only on the recipient\'s first session. In Settings > Session Notes, open a question and tick "Only on the recipient\'s first session". On Session #2 and later it is hidden and nothing is saved for it. Works in the Scheduler and in My FPHM.',
     'Changed: a multiple choice grid with just one column (for example only "Yes") now shows a tick box on each row, and an unticked row means no. Use it for the sequences list by deleting "No" from its columns. Notes already saved keep showing their Yes and No answers as before.'
-  ]},
-  { date: 'Nov 19, 2026', version: '2026-11-19.1', items: [
-    'New: on the Statistics tab, a "Sections to include" box lets you tick which parts go in the report (Freedom Sessions summary, your note, the two charts, Sunday Drop-In, Journey to Freedom, and the two leader\'s copy pages). Anything unticked is left out of the report on screen, both Word downloads and Download charts, and the figure numbers close up so they never skip. Your choice is remembered on this device; Select all puts everything back.'
   ]}
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
@@ -9875,6 +9882,9 @@ const CHANGE_LOG = [
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Nov 19, 2026', version: '2026-11-19.1', items: [
+    'New: on the Statistics tab, a "Sections to include" box lets you tick which parts go in the report (Freedom Sessions summary, your note, the two charts, Sunday Drop-In, Journey to Freedom, and the two leader\'s copy pages). Anything unticked is left out of the report on screen, both Word downloads and Download charts, and the figure numbers close up so they never skip. Your choice is remembered on this device; Select all puts everything back.'
+  ]},
   { date: 'Nov 13, 2026', version: '2026-11-13.9', items: [
     'New: to find out why iPhones aren\'t showing notification alerts, each minister\'s device list on the Prayer Ministers tab now says whether the last alert to that device was accepted or REFUSED (with the reason), and a device whose alerts are refused counts as "Check". "Send app notification" also lists any device that refused it. This starts working once the Worker is updated.'
   ]},
