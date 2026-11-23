@@ -1599,7 +1599,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-11-23.2";
+const APP_VERSION = "2026-11-23.3";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3368,7 +3368,9 @@ function intakeLinkSentAtOf(s){
 window.toggleIntakeLinkSent = async function(id){
   const s = sessions.find(x=>x.id===id);
   if(!s) return;
-  const at = intakeLinkSentAtOf(s) ? null : new Date().toISOString();
+  // Date-only: today's local date at local midnight, the same way blackout
+  // dates are written, so a Date column never shifts by a day.
+  const at = intakeLinkSentAtOf(s) ? null : new Date(localIsoToday()+'T00:00').toISOString();
   intakeLinkSentLocal[id] = at;
   s.intakeLinkSentAt = at;
   renderSchedPlan();
@@ -3681,7 +3683,9 @@ function renderCandidateCards(listBox, rows, isPre){
     const num = sessionNumberOf(s);
     const key = 'wl-' + s.id;
     const sentAt = isPre ? intakeLinkSentAtOf(s) : null;
-    const sentDate = sentAt ? new Date(sentAt) : null;
+    // Read just the date part (works for a Date or a Date and Time column).
+    const sentDay = sentAt ? String(sentAt).split('T')[0] : '';
+    const sentDate = sentDay ? new Date(sentDay+'T00:00') : null;
     const sentLabel = sentDate && !isNaN(sentDate) ? sentDate.toLocaleDateString(undefined,{month:'short',day:'numeric'}) : '';
     const intake = isPre ? null : submittedIntakeOf(s);
     const summary = `${s.priority?'<span class="tag priority">Priority</span>':''}${sentAt?`<span class="tag linksent">Link sent${sentLabel?' '+escapeHtml(sentLabel):''}</span>`:''}${s.contacted?'<span class="tag contacted">Contacted</span>':''}${s.genderPref==='Same-sex' ? `<span class="tag">${escapeHtml(s.recipGender||'Same-sex')} only</span>` : ''}Waiting ${waiting} day${waiting===1?'':'s'}`;
@@ -3690,7 +3694,7 @@ function renderCandidateCards(listBox, rows, isPre){
       : '';
     const body = `<div class="wl-body">
       <div class="helptext" style="margin:0;">${escapeHtml(s.recipContact||'No contact info')} · added ${fmtShort(s.added||s.date)}${intake?` · intake submitted ${fmtShort((intake.submittedAt||'').split('T')[0])}`:''}</div>
-      ${isPre && !intakeLinkSentColumnReady ? `<p class="helptext" style="margin:8px 0 0;">"Link sent" is only kept until the page reloads. To keep it, add an "${INTAKE_LINK_SENT_COLUMN}" (Date and Time) column to the PrayerSessions list in SharePoint.</p>` : ''}
+      ${isPre && !intakeLinkSentColumnReady ? `<p class="helptext" style="margin:8px 0 0;">"Link sent" is only kept until the page reloads. To keep it, add an "${INTAKE_LINK_SENT_COLUMN}" (Date) column to the PrayerSessions list in SharePoint.</p>` : ''}
       ${s.notes?`<div class="notes">${escapeHtml(s.notes)}</div>`:''}
       ${renderIntakeLinkBlock(s)}
       <div class="toolbar" style="margin-top:10px;">
@@ -9694,9 +9698,12 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Nov 23, 2026', version: '2026-11-23.3', items: [
+    'Fixed: the "Link sent" date on Pre-Intake cards is saved as a plain date, so it never shows a day early or late. The IntakeLinkSentAt column in SharePoint can be a Date column (no time needed).'
+  ]},
   { date: 'Nov 23, 2026', version: '2026-11-23.2', items: [
     'New: on Schedule & Planning, people waiting for a session are split in two. "Waiting" (the Waiting List) is everyone whose submitted intake form is linked; their days waiting now count from the day the form was submitted. The new "Pre-Intake" tab is everyone with no intake form linked yet; their days count from when they were added. Linking someone\'s form moves them from Pre-Intake to the Waiting List.',
-    'New: on a Pre-Intake card, tap "Mark link sent" once you\'ve sent them the intake form link. It shows "Link sent" with the date (on the card and as a green tag when collapsed); tap again to undo. To keep this after a reload, add an "IntakeLinkSentAt" (Date and Time) column to the PrayerSessions list in SharePoint.'
+    'New: on a Pre-Intake card, tap "Mark link sent" once you\'ve sent them the intake form link. It shows "Link sent" with the date (on the card and as a green tag when collapsed); tap again to undo. To keep this after a reload, add an "IntakeLinkSentAt" (Date) column to the PrayerSessions list in SharePoint.'
   ]},
   { date: 'Nov 23, 2026', version: '2026-11-23.1', items: [
     'New: a session notes question (or a whole section) can be set to show only on the recipient\'s first session. In Settings > Session Notes, open a question and tick "Only on the recipient\'s first session". On Session #2 and later it is hidden and nothing is saved for it. Works in the Scheduler and in My FPHM.',
@@ -9707,9 +9714,6 @@ const CHANGE_LOG = [
   ]},
   { date: 'Nov 13, 2026', version: '2026-11-13.9', items: [
     'New: to find out why iPhones aren\'t showing notification alerts, each minister\'s device list on the Prayer Ministers tab now says whether the last alert to that device was accepted or REFUSED (with the reason), and a device whose alerts are refused counts as "Check". "Send app notification" also lists any device that refused it. This starts working once the Worker is updated.'
-  ]},
-  { date: 'Nov 13, 2026', version: '2026-11-13.8', items: [
-    'Changed: on a phone, error messages (for example "Please select at least 2 prayer ministers" or "Save failed") now pop up as a red message at the top of the screen instead of somewhere in the form where you might not see it. It disappears by itself after 3 seconds, or tap the × to close it sooner. Computers and tablets are unchanged.'
   ]}
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
@@ -9717,6 +9721,9 @@ const CHANGE_LOG = [
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Nov 13, 2026', version: '2026-11-13.8', items: [
+    'Changed: on a phone, error messages (for example "Please select at least 2 prayer ministers" or "Save failed") now pop up as a red message at the top of the screen instead of somewhere in the form where you might not see it. It disappears by itself after 3 seconds, or tap the × to close it sooner. Computers and tablets are unchanged.'
+  ]},
   { date: 'Nov 13, 2026', version: '2026-11-13.7', items: [
     'Changed: the main tab names are slightly larger, and every tab is still visible without scrolling.'
   ]},
