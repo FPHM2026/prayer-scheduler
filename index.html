@@ -372,6 +372,7 @@
   .notes-view-scroll{flex:1;overflow-y:auto;padding:12px 16px 24px;}
   .nv-card{border:1px solid var(--border);border-left:4px solid var(--gold);border-radius:8px;background:#fff;padding:16px;margin-bottom:24px;box-shadow:0 1px 4px rgba(0,0,0,.06);overflow:hidden;}
   .nv-chip{display:inline-block;font-size:var(--fs-xs);font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--gold-dark);margin-bottom:4px;}
+  .nv-chip.nv-chip-call{color:var(--ok);}
   .nv-date{font-family:'Playfair Display',Georgia,serif;margin:0 0 4px;font-size:var(--fs-lg);color:var(--navy);line-height:1.25;}
   .nv-meta{margin:0 0 16px;font-size:var(--fs-sm);color:var(--muted);}
   .nv-fold{padding:0;}
@@ -760,6 +761,9 @@
   .wl-body .notes{font-size:var(--fs-sm);white-space:pre-wrap;margin-top:6px;}
   .group.wl-priority{border-left:4px solid var(--primary);}
   .tag.linksent{background:var(--ok-bg);color:var(--ok);}
+  .tag.pmvis{background:var(--ok-bg);color:var(--ok);}
+  .tag.adminonly{background:#f1ede4;color:var(--muted);}
+  .qlabel .tag{margin-left:4px;vertical-align:middle;}
   .flag-btn{color:var(--muted);}
   .flag-btn.active{color:var(--primary);}
   .flag-btn.active:hover{background:rgba(242,138,0,.14);color:var(--primary-dark);}
@@ -1301,6 +1305,10 @@
     </div>
 
     <div class="settings-subview" id="settingsNotesView">
+      <nav class="subtabs" aria-label="Which notes form" id="notesFormSubtabs" style="margin-top:12px;" hidden>
+        <button class="active" data-notesform="notes" onclick="switchNotesSettingsForm('notes')">Session</button>
+        <button data-notesform="call" onclick="switchNotesSettingsForm('call')">Intake call</button>
+      </nav>
       <div class="errbox" id="notesSetupMsg" hidden style="margin:16px 0;"></div>
       <div id="notesQuestionsHost" style="margin-top:12px;"></div>
     </div>
@@ -1599,7 +1607,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-11-23.3";
+const APP_VERSION = "2026-11-23.4";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -2260,6 +2268,16 @@ let schemaItemId = null, schemaVersion = 0, schemaDraft = null, schemaDirty = fa
 // SESSION NOTES section for the stored JSON shape).
 let notesAvailable = false, notesSchemaItemId = null, notesSchemaVersion = 0, notesSchema = null, notesDraft = null, notesDirty = false;
 let sessionNotes = [];
+// Intake call notes (2026-11-23): an admin's notes from the intake call with
+// someone on the Pre-Intake list. Same lists as Session Notes - the form is a
+// second SessionNotesSchema item (Title "intakecall"), each saved call is a
+// SessionNotes item whose NotesJSON has type 'FPHMIntakeCallNotes' (kept out
+// of sessionNotes). Questions marked pmVisible are shown to ministers in My
+// FPHM; the rest are hidden there on screen only (Andrew's choice - ministers
+// can read the SessionNotes list, gotcha #11).
+const CALL_SCHEMA_TITLE = 'intakecall';
+let callSchemaItemId = null, callSchemaVersion = 0, callSchema = null, callDraft = null, callDirty = false;
+let callNotes = [];
 let editingId=null, prevId=null, selectedMinisters=[]; // selectedMinisters: [{id, role}]
 // Set by bookSlot() right after it opens the session modal on a Tentative
 // slot's claimed candidate - tells onSaveSession() which PlanningSlots item
@@ -2328,25 +2346,36 @@ async function loadAll(){
   if(notesAvailable){
     try{
       const [rawNS, rawNotes] = await Promise.all([listItems('notesSchema'), listItems('notes')]);
-      const ns = rawNS[0];
+      const ns = rawNS.find(x=>String(x.Title||'').trim().toLowerCase()!==CALL_SCHEMA_TITLE);
+      const cs = rawNS.find(x=>String(x.Title||'').trim().toLowerCase()===CALL_SCHEMA_TITLE);
+      callSchema = null;
+      if(cs){
+        callSchemaItemId = cs.id; callSchemaVersion = cs.SchemaVersion || 0;
+        try{ callSchema = JSON.parse(cs.SchemaJSON); }catch(e){ console.warn('Intake call notes schema is not valid JSON:', e.message); }
+      }
+      if(!callSchema || !Array.isArray(callSchema.SECTIONS)) callSchema = defaultCallSchema();
+      if(!callDirty || !callDraft) callDraft = JSON.parse(JSON.stringify(callSchema));
       if(ns){
         notesSchemaItemId = ns.id; notesSchemaVersion = ns.SchemaVersion || 0;
         try{ notesSchema = JSON.parse(ns.SchemaJSON); }catch(e){ console.warn('Session notes schema is not valid JSON:', e.message); }
       }
       if(!notesSchema || !Array.isArray(notesSchema.SECTIONS)) notesSchema = defaultNotesSchema();
       if(!notesDirty || !notesDraft) notesDraft = JSON.parse(JSON.stringify(notesSchema));
-      sessionNotes = rawNotes.map(n=>{
+      const allNotes = rawNotes.map(n=>{
         let rec = null;
         try{ rec = JSON.parse(n.NotesJSON||''); }catch(e){}
         const sid = rec && rec.session && rec.session.id!=null ? parseInt(rec.session.id,10) : parseInt(n.SessionId,10);
         return rec && !isNaN(sid) ? { id: n.id, sessionId: sid, record: rec } : null;
       }).filter(Boolean);
+      callNotes = allNotes.filter(n=>n.record.type==='FPHMIntakeCallNotes');
+      sessionNotes = allNotes.filter(n=>n.record.type!=='FPHMIntakeCallNotes');
     }catch(e){
       console.warn('Could not load session notes:', e.message);
-      sessionNotes = [];
+      sessionNotes = []; callNotes = [];
     }
-  } else if(!notesDraft){
-    notesDraft = defaultNotesSchema();
+  } else {
+    if(!notesDraft) notesDraft = defaultNotesSchema();
+    if(!callDraft) callDraft = defaultCallSchema();
   }
   pushDevices = null;
   if(listIds.reportNotes){
@@ -3688,7 +3717,8 @@ function renderCandidateCards(listBox, rows, isPre){
     const sentDate = sentDay ? new Date(sentDay+'T00:00') : null;
     const sentLabel = sentDate && !isNaN(sentDate) ? sentDate.toLocaleDateString(undefined,{month:'short',day:'numeric'}) : '';
     const intake = isPre ? null : submittedIntakeOf(s);
-    const summary = `${s.priority?'<span class="tag priority">Priority</span>':''}${sentAt?`<span class="tag linksent">Link sent${sentLabel?' '+escapeHtml(sentLabel):''}</span>`:''}${s.contacted?'<span class="tag contacted">Contacted</span>':''}${s.genderPref==='Same-sex' ? `<span class="tag">${escapeHtml(s.recipGender||'Same-sex')} only</span>` : ''}Waiting ${waiting} day${waiting===1?'':'s'}`;
+    const callNote = callNotesFor(s.id);
+    const summary = `${s.priority?'<span class="tag priority">Priority</span>':''}${callNote?'<span class="tag contacted">Call notes saved</span>':''}${sentAt?`<span class="tag linksent">Link sent${sentLabel?' '+escapeHtml(sentLabel):''}</span>`:''}${s.contacted?'<span class="tag contacted">Contacted</span>':''}${s.genderPref==='Same-sex' ? `<span class="tag">${escapeHtml(s.recipGender||'Same-sex')} only</span>` : ''}Waiting ${waiting} day${waiting===1?'':'s'}`;
     const linkSentBtn = isPre
       ? `<button class="icon-btn${sentAt?' success':''}" onclick="toggleIntakeLinkSent(${s.id})" title="${sentAt?'Mark intake link as not sent':'Mark intake link as sent'}" aria-pressed="${!!sentAt}" aria-label="${sentAt?'Mark intake link as not sent':'Mark intake link as sent'}: ${escapeHtml(s.recipName)}">${ICONS.mail}<span class="btn-label">${sentAt?`Link sent${sentLabel?' '+escapeHtml(sentLabel):''}`:'Mark link sent'}</span></button>`
       : '';
@@ -3698,6 +3728,7 @@ function renderCandidateCards(listBox, rows, isPre){
       ${s.notes?`<div class="notes">${escapeHtml(s.notes)}</div>`:''}
       ${renderIntakeLinkBlock(s)}
       <div class="toolbar" style="margin-top:10px;">
+        ${callNotesButtonHtml(s, isPre)}
         ${linkSentBtn}
         <button class="icon-btn${s.contacted?' success':''}" onclick="toggleContacted(${s.id})" title="${s.contacted?'Mark as not yet contacted':'Mark as contacted'}" aria-pressed="${s.contacted}" aria-label="${s.contacted?'Mark as not yet contacted':'Mark as contacted'}: ${escapeHtml(s.recipName)}">${ICONS.phone}<span class="btn-label">${s.contacted?'Contacted':'Contact'}</span></button>
         <button class="icon-btn flag-btn${s.priority?' active':''}" onclick="togglePriority(${s.id})" title="${s.priority?'Remove priority':'Flag as priority'}" aria-pressed="${s.priority}" aria-label="${s.priority?'Remove priority from':'Flag as priority'} ${escapeHtml(s.recipName)}">${ICONS.flag(s.priority)}<span class="btn-label">${s.priority?'Remove Priority':'Flag Priority'}</span></button>
@@ -7089,7 +7120,7 @@ function defaultTableColumns(){
     { id:'removed',   label:'Removed',    type:'yesno' }
   ];
 }
-function questionTypesForEditor(){ return activeEditor==='notes' ? QUESTION_TYPES.concat(GRID_TYPES, [TABLE_TYPE]) : QUESTION_TYPES; }
+function questionTypesForEditor(){ return activeEditor!=='intake' ? QUESTION_TYPES.concat(GRID_TYPES, [TABLE_TYPE]) : QUESTION_TYPES; }
 const TYPES_WITH_OPTIONS = ['radio','select','checkboxes'];
 
 /* One editor UI, two forms: the same DOM block (#intakeQuestionsView) is
@@ -7097,21 +7128,23 @@ const TYPES_WITH_OPTIONS = ['radio','select','checkboxes'];
    "Session Notes" sub-tab, and activeEditor says which schema it is
    currently editing. D() is the working draft for whichever that is, so
    every handler below works unchanged for both. */
-let activeEditor = 'intake'; // 'intake' | 'notes'
-function D(){ return activeEditor==='notes' ? notesDraft : schemaDraft; }
-function edDirty(){ return activeEditor==='notes' ? notesDirty : schemaDirty; }
+let activeEditor = 'intake'; // 'intake' | 'notes' | 'call' (intake call notes)
+function D(){ return activeEditor==='notes' ? notesDraft : activeEditor==='call' ? callDraft : schemaDraft; }
+function edDirty(){ return activeEditor==='notes' ? notesDirty : activeEditor==='call' ? callDirty : schemaDirty; }
 function edSetDirty(v){
-  if(activeEditor==='notes') notesDirty = v; else schemaDirty = v;
+  if(activeEditor==='notes') notesDirty = v; else if(activeEditor==='call') callDirty = v; else schemaDirty = v;
   const badge = $('#formEditorDirtyBadge');
   if(badge) badge.style.display = v ? 'inline-block' : 'none';
 }
 function showEditor(which){
   activeEditor = which;
   const view = $('#intakeQuestionsView');
-  const host = $(which==='notes' ? '#notesQuestionsHost' : '#intakeQuestionsHost');
+  const host = $(which!=='intake' ? '#notesQuestionsHost' : '#intakeQuestionsHost');
   if(view.parentNode!==host) host.appendChild(view);
-  const notes = which==='notes';
-  $('#formEditorHelp').textContent = notes
+  const notes = which!=='intake';
+  $('#formEditorHelp').textContent = which==='call'
+    ? 'Edit the questions an admin answers after the intake call with someone on the Pre-Intake list (the "Intake call notes" button on their card). Tick "Visible to prayer ministers" on any question whose answer the recipient\'s ministers should see with their session notes in My FPHM; the rest stay with admins. Each saved call keeps its own copy of the form.'
+    : notes
     ? 'Edit the questions prayer ministers answer in Session Notes (opened from a session card): sections, questions, answer types and "show only if" branching. Each saved note keeps its own copy of the form it was filled in with, so changing questions later never alters notes already written.'
     : "Edit the intake questionnaire's sections, questions and wording. Changes take effect for anyone opening the public form as soon as you save.";
   $('#formEditorIntro').hidden = notes;
@@ -7364,6 +7397,21 @@ function editorGroupRow(key, avatarText, name, countLabel, summaryHtml, bodyHtml
 }
 
 // Session Notes only: "Only on the recipient's first session" (2026-11-23).
+// Intake call notes only: whether ministers see this answer in My FPHM.
+function pmVisibleToggleHtml(sIdx, qIdx, q){
+  if(activeEditor!=='call') return '';
+  return `<div class="field"><label style="display:flex;align-items:center;gap:8px;font-weight:400;">
+      <input type="checkbox" ${q.pmVisible?'checked':''} onchange="setPmVisible(${sIdx},${qIdx},this.checked)"> Visible to prayer ministers
+    </label>
+    <p class="helptext" style="margin:4px 0 0;">Ticked: the recipient's ministers see this answer with their session notes in My FPHM. Unticked: only admins see it.</p></div>`;
+}
+window.setPmVisible = function(sIdx, qIdx, on){
+  const q = D().SECTIONS[sIdx].questions[qIdx];
+  if(on) q.pmVisible = true; else delete q.pmVisible;
+  markSchemaDirty();
+  renderFormEditor();
+};
+function pmVisTagHtml(q){ return q.pmVisible ? '<span class="tag pmvis">Visible to PMs</span>' : '<span class="tag adminonly">Admin only</span>'; }
 function firstSessionToggleHtml(kind, sIdx, qIdx, obj){
   if(activeEditor!=='notes') return '';
   const call = kind==='section' ? `setFirstSessionOnly(${sIdx},null,this.checked)` : `setFirstSessionOnly(${sIdx},${qIdx},this.checked)`;
@@ -7625,7 +7673,8 @@ function renderQuestionEditor(q, sIdx, qIdx, sec, opened){
   const hasOptions = TYPES_WITH_OPTIONS.includes(q.type);
   const wasOpen = opened.has(q.id) ? opened.get(q.id) : false;
   const visSummary = describeVisibleIf(q.visibleIf);
-  const summaryHtml = escapeHtml([q.required ? 'Required' : 'Optional', visSummary || 'Always shown', q.firstSessionOnly ? 'First session only' : null].filter(Boolean).join(' · '));
+  const summaryHtml = escapeHtml([q.required ? 'Required' : 'Optional', visSummary || 'Always shown', q.firstSessionOnly ? 'First session only' : null].filter(Boolean).join(' · '))
+    + (activeEditor==='call' ? ' ' + pmVisTagHtml(q) : '');
   const avatar = { text:'Ab', email:'@', number:'#', textarea:'¶', radio:'◉', select:'▾', checkboxes:'☑', choicegrid:'▦', checkboxgrid:'▦', rowtable:'▤' }[q.type] || '?';
   const actions = `
     <button class="icon-btn icon-btn-lg" title="Move up" onclick="moveQuestion(${sIdx},${qIdx},-1)" ${qIdx===0?'disabled':''}>${ICONS.arrowUp}</button>
@@ -7669,7 +7718,8 @@ function renderQuestionEditor(q, sIdx, qIdx, sec, opened){
       <div class="field"><label>Maximum</label><input type="number" value="${q.max??''}" oninput="updateQuestionField(${sIdx},${qIdx},'max',this.value===''?undefined:Number(this.value))"></div>
     </div>` : ''}
     ${visibleIfPickerHtml('question', sIdx, qIdx, q.visibleIf, candidateQuestions)}
-    ${firstSessionToggleHtml('question', sIdx, qIdx, q)}`;
+    ${firstSessionToggleHtml('question', sIdx, qIdx, q)}
+    ${pmVisibleToggleHtml(sIdx, qIdx, q)}`;
   return editorGroupRow(q.id, avatar, q.label||'(untitled question)', q.type, summaryHtml, body, wasOpen, actions);
 }
 
@@ -7822,7 +7872,8 @@ window.onVisibleIfValueChange = function(kind, sIdx, qIdx, value, isArray){
 async function saveFormSchema(){
   const msg = $('#formEditorMsg');
   msg.hidden = true;
-  const notes = activeEditor==='notes';
+  const notes = activeEditor!=='intake';
+  const call = activeEditor==='call';
   const draft = D();
   // Lightweight validation - catch the two mistakes most likely to
   // silently break the live form before they ever reach it.
@@ -7861,7 +7912,15 @@ async function saveFormSchema(){
     return;
   }
   try{
-    if(notes){
+    if(call){
+      if(!notesAvailable) throw new Error('The SessionNotesSchema / SessionNotes SharePoint lists have not been created yet.');
+      const fields = { Title: CALL_SCHEMA_TITLE, SchemaJSON: JSON.stringify(draft), SchemaVersion: callSchemaVersion+1 };
+      if(callSchemaItemId) await updateItem('notesSchema', callSchemaItemId, fields);
+      else { const r = await createItem('notesSchema', fields); callSchemaItemId = parseInt(r.id,10); }
+      callSchemaVersion += 1;
+      callSchema = JSON.parse(JSON.stringify(draft));
+      edSetDirty(false);
+    } else if(notes){
       if(!notesAvailable) throw new Error('The SessionNotesSchema / SessionNotes SharePoint lists have not been created yet.');
       const fields = { Title: 'schema', SchemaJSON: JSON.stringify(draft), SchemaVersion: notesSchemaVersion+1 };
       if(notesSchemaItemId) await updateItem('notesSchema', notesSchemaItemId, fields);
@@ -7878,7 +7937,9 @@ async function saveFormSchema(){
     }
     msg.hidden = false;
     msg.className = 'helptext';
-    msg.textContent = notes
+    msg.textContent = call
+      ? 'Saved — new intake call notes will use these questions. Calls already written keep the questions they were filled in with.'
+      : notes
       ? 'Saved — new session notes will use these questions. Notes already written keep the questions they were filled in with.'
       : 'Saved — the public form will use these changes immediately.';
     setTimeout(()=>{ msg.hidden = true; msg.className='errbox'; }, 4000);
@@ -7918,7 +7979,20 @@ function defaultNotesSchema(){
     { id:'summary', type:'textarea', label:'What happened during this session?', required:false }
   ] } ] };
 }
+function defaultCallSchema(){
+  return { SECTIONS: [ { id:'call', title:'Intake call', questions: [
+    { id:'call_summary', type:'textarea', label:'Notes from the intake call', required:false }
+  ] } ] };
+}
+// Settings > Session Notes has two forms: Session and Intake call.
+let notesSettingsForm = 'notes';
+window.switchNotesSettingsForm = function(which){
+  notesSettingsForm = which;
+  showNotesEditor();
+};
 function showNotesEditor(){
+  document.querySelectorAll('#notesFormSubtabs button').forEach(b=>b.classList.toggle('active', b.dataset.notesform===notesSettingsForm));
+  $('#notesFormSubtabs').hidden = !notesAvailable;
   const msg = $('#notesSetupMsg'), host = $('#notesQuestionsHost');
   if(!notesAvailable){
     msg.hidden = false;
@@ -7931,9 +8005,30 @@ function showNotesEditor(){
   }
   msg.hidden = true;
   host.hidden = false;
-  showEditor('notes');
+  showEditor(notesSettingsForm);
 }
 function sessionNotesFor(sessionId){ return sessionNotes.find(n=>n.sessionId===sessionId) || null; }
+function callNotesFor(sessionId){ return callNotes.find(n=>n.sessionId===sessionId) || null; }
+// "Intake call notes" on a Pre-Intake card (and on a Waiting card once
+// written, so they stay reachable after the form is linked).
+function callNotesButtonHtml(s, isPre){
+  if(!notesAvailable) return '';
+  const has = !!callNotesFor(s.id);
+  if(!isPre && !has) return '';
+  return `<button class="icon-btn${has?' success':''}" onclick="openCallNotes(${s.id})" title="Intake call notes" aria-label="${has?'View or edit':'Write'} intake call notes for ${escapeHtml(s.recipName)}">${ICONS.phone}<span class="btn-label">${has?'Intake call notes ✓':'Intake call notes'}</span></button>`;
+}
+// Call notes for a recipient by name (any of their records), newest first.
+function callNotesForRecipient(name){
+  const key = (name||'').trim().toLowerCase();
+  if(!key || !callNotes.length) return [];
+  return callNotes.map(n=>({ note:n, session: sessions.find(x=>x.id===n.sessionId) || null }))
+    .filter(x=>((x.session ? x.session.recipName : (x.note.record.session||{}).recipName)||'').trim().toLowerCase()===key)
+    .sort((a,b)=>String(b.note.record.savedAt||'').localeCompare(String(a.note.record.savedAt||'')));
+}
+function callNoteDateLabel(rec){
+  const d = rec.savedAt ? new Date(rec.savedAt) : null;
+  return d && !isNaN(d) ? fmtDate(new Date(d.getFullYear(), d.getMonth(), d.getDate())) : 'Date unknown';
+}
 // Not offered on the shared Drop-in / Training events - there's no single
 // session team to write notes about.
 function notesButtonHtml(s){
@@ -7957,11 +8052,18 @@ function earlierNotesFor(s){
 function renderEarlierNotes(s){
   const box = $('#notesEarlier');
   const list = earlierNotesFor(s);
-  box.hidden = !list.length;
-  box.innerHTML = list.length ? `<details class="notes-earlier"><summary>Notes from earlier sessions (${list.length})</summary><div class="notes-earlier-body">${
+  const calls = callNotesForRecipient(s.recipName);
+  const n = list.length + calls.length;
+  box.hidden = !n;
+  box.innerHTML = n ? `<details class="notes-earlier"><summary>Notes from earlier sessions (${n})</summary><div class="notes-earlier-body">${
     list.map(({note, session})=>`<div class="note-view">
       <h4>${escapeHtml(fmtDate(new Date(session.date+'T00:00')))}</h4>
       <p class="helptext">${escapeHtml(`Session #${sessionNumberOf(session)} · Team: ${ministerNamesOf(session)}`)}</p>
+      ${FPHM.renderNotesHtml(note.record)}
+    </div>`).join('')
+    + calls.map(({note})=>`<div class="note-view">
+      <h4>Intake call · ${escapeHtml(callNoteDateLabel(note.record))}</h4>
+      <p class="helptext">All answers. Ministers see only those marked "Visible to PMs".</p>
       ${FPHM.renderNotesHtml(note.record)}
     </div>`).join('')}</div></details>` : '';
 }
@@ -7975,10 +8077,11 @@ function recipientLinksRowFor(name){
   const linkedId = sessions.filter(s=>s.recipName.trim().toLowerCase()===key).map(s=>s.intakeResponseId).find(id=>id!=null);
   const intake = linkedId!=null ? intakeResponses.find(i=>i.id===linkedId) : null;
   const notes = notesForRecipient(name);
-  if(!intake && !notes.length) return '';
+  const hasNotes = notes.length || callNotesForRecipient(name).length;
+  if(!intake && !hasNotes) return '';
   return `<div class="recip-links-row">`
     + (intake ? `<button type="button" class="btn secondary" onclick="viewLinkedIntake(${intake.id})">View intake form</button>` : '')
-    + (notes.length ? `<button type="button" class="btn secondary" onclick="openRecipientNotes(${escapeHtml(JSON.stringify(name))})">View session notes</button>` : '')
+    + (hasNotes ? `<button type="button" class="btn secondary" onclick="openRecipientNotes(${escapeHtml(JSON.stringify(name))})">View session notes</button>` : '')
     + `</div>`;
 }
 function notesForRecipient(name){
@@ -7994,9 +8097,10 @@ function notesForRecipient(name){
 // One collapsible card per session, newest open (same as My FPHM).
 window.openRecipientNotes = function(name){
   const list = notesForRecipient(name);
-  if(!list.length) return;
+  const calls = callNotesForRecipient(name);
+  if(!list.length && !calls.length) return;
   $('#notesViewTitle').textContent = `Session notes: ${name}`;
-  const many = list.length > 1;
+  const many = list.length + calls.length > 1;
   $('#notesViewBody').innerHTML = list.map(({note, session}, i)=>{
     const rs = note.record.session||{};
     const date = session ? session.date : (rs.date||'');
@@ -8007,6 +8111,14 @@ window.openRecipientNotes = function(name){
       ${meta ? `<p class="nv-meta">${escapeHtml(meta)}</p>` : ''}`;
     if(!many) return `<article class="nv-card">${head}${FPHM.renderNotesHtml(note.record)}</article>`;
     return `<details class="nv-card nv-fold"${i===0?' open':''}>
+      <summary><span class="nv-fold-text">${head}</span><span class="nv-fold-chev" aria-hidden="true">${ICONS.chevron}</span></summary>
+      <div class="nv-fold-body">${FPHM.renderNotesHtml(note.record)}</div>
+    </details>`;
+  }).join('') + calls.map(({note}, i)=>{
+    const head = `<span class="nv-chip nv-chip-call">Intake call</span><h3 class="nv-date">${escapeHtml(callNoteDateLabel(note.record))}</h3>
+      <p class="nv-meta">All answers. Ministers see only those marked "Visible to PMs".</p>`;
+    if(!many) return `<article class="nv-card">${head}${FPHM.renderNotesHtml(note.record)}</article>`;
+    return `<details class="nv-card nv-fold"${!list.length && i===0?' open':''}>
       <summary><span class="nv-fold-text">${head}</span><span class="nv-fold-chev" aria-hidden="true">${ICONS.chevron}</span></summary>
       <div class="nv-fold-body">${FPHM.renderNotesHtml(note.record)}</div>
     </details>`;
@@ -8067,6 +8179,29 @@ window.openSessionNotes = function(sessionId){
   renderNotesForm();
   $('#notesModal').classList.add('open');
 };
+// Intake call notes for a Pre-Intake / Waiting record (2026-11-23).
+window.openCallNotes = function(sessionId){
+  const s = sessions.find(x=>x.id===sessionId);
+  if(!s) return;
+  const existing = callNotesFor(sessionId);
+  notesCtx = {
+    kind: 'call', session: s, existing,
+    schema: JSON.parse(JSON.stringify(existing ? existing.record.schema : (callSchema || defaultCallSchema()))),
+    formVersion: existing ? existing.record.formVersion : callSchemaVersion,
+    answers: existing ? JSON.parse(JSON.stringify(existing.record.answers||{})) : {},
+    firstSession: true
+  };
+  const savedOn = existing && existing.record.savedAt ? new Date(existing.record.savedAt) : null;
+  $('#btnNotesSave').hidden = false;
+  $('#btnNotesSave').textContent = 'Save call notes';
+  $('#notesTitle').textContent = 'Intake Call Notes';
+  $('#notesSub').textContent = `${s.recipName}${savedOn && !isNaN(savedOn) ? ' · saved '+savedOn.toLocaleDateString(undefined,{month:'short',day:'numeric'}) : ''}`;
+  $('#notesMsg').hidden = true;
+  $('#btnNotesDownload').hidden = true;
+  $('#notesEarlier').hidden = true;
+  renderNotesForm();
+  $('#notesModal').classList.add('open');
+};
 function renderNotesForm(){
   const c = notesCtx;
   const sections = c.schema.SECTIONS||[];
@@ -8074,7 +8209,9 @@ function renderNotesForm(){
     $('#notesBody').innerHTML = '<p class="helptext">This form has no questions yet — add some under Settings › Session Notes.</p>';
     return;
   }
-  $('#notesBody').innerHTML = sections.map((sec,si)=>`
+  const callHelp = c.kind==='call'
+    ? `<p class="helptext" style="margin:0 0 8px;">Answers marked <span class="tag pmvis">Visible to PMs</span> are shown to this person's prayer ministers with their session notes. Everything else stays with admins.</p>` : '';
+  $('#notesBody').innerHTML = callHelp + sections.map((sec,si)=>`
     <div class="nt-sec" data-si="${si}">
       <h3>${escapeHtml(sec.title||'')}</h3>
       ${sec.intro ? `<div class="section-intro">${escapeHtml(sec.intro)}</div>` : ''}
@@ -8158,7 +8295,7 @@ function notesQuestionHtml(q, si, qi){
   const id = `nq_${si}_${qi}`;
   const v = notesCtx.answers[q.id];
   const isChoice = ['radio','checkboxes'].includes(q.type);
-  const label = `<label class="qlabel"${isChoice?'':` for="${id}"`}>${escapeHtml(q.label||'')}${q.required?'<span class="required-mark">*</span>':''}</label>`;
+  const label = `<label class="qlabel"${isChoice?'':` for="${id}"`}>${escapeHtml(q.label||'')}${q.required?'<span class="required-mark">*</span>':''}${notesCtx.kind==='call' ? pmVisTagHtml(q) : ''}</label>`;
   const esc = o => JSON.stringify(o).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
   let input = '';
   if(q.type==='textarea'){
@@ -8387,9 +8524,10 @@ function notesRecord(answers){
 // Preview of the form as currently edited (including unsaved changes) - no
 // session, nothing is saved, answers are throwaway.
 window.openNotesPreview = function(){
-  notesCtx = { preview: true, session: null, existing: null, formVersion: 'draft',
-    schema: JSON.parse(JSON.stringify(notesDraft)), answers: {} };
-  $('#notesTitle').textContent = 'Preview: Session Notes';
+  const call = activeEditor==='call';
+  notesCtx = { preview: true, kind: call ? 'call' : 'session', session: null, existing: null, formVersion: 'draft',
+    schema: JSON.parse(JSON.stringify(D())), answers: {}, firstSession: true };
+  $('#notesTitle').textContent = call ? 'Preview: Intake Call Notes' : 'Preview: Session Notes';
   $('#notesSub').textContent = 'This is how the form looks right now, including unsaved changes. Nothing you enter here is saved.';
   $('#notesMsg').hidden = true;
   $('#btnNotesDownload').hidden = true;
@@ -8408,7 +8546,10 @@ window.saveSessionNotes = async function(){
     return;
   }
   const s = notesCtx.session;
-  const fields = { Title: `${s.recipName} — ${s.date}`, SessionId: s.id, NotesJSON: JSON.stringify(notesRecord(answers)) };
+  const call = notesCtx.kind==='call';
+  const fields = call
+    ? { Title: `Intake call — ${s.recipName}`, SessionId: s.id, NotesJSON: JSON.stringify(callRecord(answers)) }
+    : { Title: `${s.recipName} — ${s.date}`, SessionId: s.id, NotesJSON: JSON.stringify(notesRecord(answers)) };
   try{
     if(notesCtx.existing) await updateItem('notes', notesCtx.existing.id, fields);
     else await createItem('notes', fields);
@@ -8419,7 +8560,18 @@ window.saveSessionNotes = async function(){
     msg.textContent = 'Save failed: ' + e.message;
   }
 };
-window.closeSessionNotes = function(){ $('#notesModal').classList.remove('open'); notesCtx = null; };
+window.closeSessionNotes = function(){ $('#notesModal').classList.remove('open'); notesCtx = null; $('#btnNotesSave').textContent = 'Save Notes'; };
+function callRecord(answers){
+  const c = notesCtx, s = c.session;
+  return {
+    type: 'FPHMIntakeCallNotes',
+    formVersion: c.formVersion,
+    savedAt: new Date().toISOString(),
+    session: { id: s.id, recipName: s.recipName },
+    schema: c.schema,
+    answers
+  };
+}
 window.downloadSessionNotesJson = function(){
   if(!notesCtx || !notesCtx.existing) return;
   const rec = notesCtx.existing.record, s = notesCtx.session;
@@ -9698,6 +9850,11 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Nov 23, 2026', version: '2026-11-23.4', items: [
+    'New: intake call notes. Settings > Session Notes now has two tabs, "Session" (the session notes form, unchanged) and "Intake call", where you set the questions for your notes after the intake call. Open a question and tick "Visible to prayer ministers" if ministers should see that answer; the rest stay with admins. Each question shows "Visible to PMs" or "Admin only".',
+    'New: on a Pre-Intake card, tap "Intake call notes" after the call to fill in the form. Once saved, the card shows a green "Call notes saved" tag and the button reads "Intake call notes ✓" (it stays on the card after they move to the Waiting List). Admins see all the answers under "View session notes" and in "Notes from earlier sessions" when writing session notes.',
+    'New in My FPHM: a minister with a session with that person sees an "Intake call" card under "View session notes", showing only the answers marked "Visible to PMs". Note: the other answers are hidden on screen, not locked in SharePoint. Uses the existing Session Notes lists, so there is nothing to set up.'
+  ]},
   { date: 'Nov 23, 2026', version: '2026-11-23.3', items: [
     'Fixed: the "Link sent" date on Pre-Intake cards is saved as a plain date, so it never shows a day early or late. The IntakeLinkSentAt column in SharePoint can be a Date column (no time needed).'
   ]},
@@ -9711,9 +9868,6 @@ const CHANGE_LOG = [
   ]},
   { date: 'Nov 19, 2026', version: '2026-11-19.1', items: [
     'New: on the Statistics tab, a "Sections to include" box lets you tick which parts go in the report (Freedom Sessions summary, your note, the two charts, Sunday Drop-In, Journey to Freedom, and the two leader\'s copy pages). Anything unticked is left out of the report on screen, both Word downloads and Download charts, and the figure numbers close up so they never skip. Your choice is remembered on this device; Select all puts everything back.'
-  ]},
-  { date: 'Nov 13, 2026', version: '2026-11-13.9', items: [
-    'New: to find out why iPhones aren\'t showing notification alerts, each minister\'s device list on the Prayer Ministers tab now says whether the last alert to that device was accepted or REFUSED (with the reason), and a device whose alerts are refused counts as "Check". "Send app notification" also lists any device that refused it. This starts working once the Worker is updated.'
   ]}
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
@@ -9721,6 +9875,9 @@ const CHANGE_LOG = [
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Nov 13, 2026', version: '2026-11-13.9', items: [
+    'New: to find out why iPhones aren\'t showing notification alerts, each minister\'s device list on the Prayer Ministers tab now says whether the last alert to that device was accepted or REFUSED (with the reason), and a device whose alerts are refused counts as "Check". "Send app notification" also lists any device that refused it. This starts working once the Worker is updated.'
+  ]},
   { date: 'Nov 13, 2026', version: '2026-11-13.8', items: [
     'Changed: on a phone, error messages (for example "Please select at least 2 prayer ministers" or "Save failed") now pop up as a red message at the top of the screen instead of somewhere in the form where you might not see it. It disappears by itself after 3 seconds, or tap the × to close it sooner. Computers and tablets are unchanged.'
   ]},

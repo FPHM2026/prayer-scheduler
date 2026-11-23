@@ -268,6 +268,7 @@
      terracotta rule under it (2026-10-29, at the user's request). */
   .note-view{border:1px solid var(--border);border-left:4px solid var(--gold);border-radius:8px;background:#fff;padding:16px;margin-bottom:24px;box-shadow:0 1px 4px rgba(0,0,0,.06);overflow:hidden;}
   .note-view-chip{display:inline-block;font-size:var(--fs-xs);font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--gold-dark);margin-bottom:4px;}
+  .note-view-chip.note-view-chip-call{color:var(--ok);}
   .note-view-date{font-family:'Playfair Display',Georgia,serif;margin:0 0 4px;font-size:var(--fs-lg);color:var(--navy);line-height:1.25;}
   .note-view-meta{margin:0 0 16px;font-size:var(--fs-sm);color:var(--muted);}
   .note-fold{padding:0;}
@@ -876,7 +877,7 @@ async function deleteItem(key, itemId){
 /* =========================================================================
    DATA
 ========================================================================= */
-let ministers=[], sessions=[], blackouts=[], intakeResponses=[], sessionNotes=[], me=null;
+let ministers=[], sessions=[], blackouts=[], intakeResponses=[], sessionNotes=[], callNotes=[], me=null;
 let sessionNumberMap = new Map();
 
 async function loadAll(){
@@ -927,7 +928,11 @@ async function loadAll(){
       plPrivate: s.PrayerListPrivate===true
     };
   });
-  sessionNotes = await loadSessionNotes();
+  { const all = await loadSessionNotes();
+    // Intake call notes (2026-11-23) live in the same list; kept apart so they
+    // never count as a session's own notes.
+    callNotes = all.filter(n=>n.record.type==='FPHMIntakeCallNotes');
+    sessionNotes = all.filter(n=>n.record.type!=='FPHMIntakeCallNotes'); }
   blackouts = rawBlack.map(b => ({ id: b.id, ministerName: b.Title, date: (b.BlackoutDate||'').split('T')[0], endDate: b.EndDate ? b.EndDate.split('T')[0] : null, notes: b.Notes||'', createdByEmail: b._createdByEmail||'' }));
 
   const myEmail = (account.username||'').trim().toLowerCase();
@@ -956,7 +961,8 @@ async function loadSessionNotes(){
     // Unreadable or missing just leaves notesSchema null, which hides the
     // Write button; reading notes still works.
     try{
-      const ns = (await listItems('notesSchema'))[0];
+      // The admin app keeps the intake call form as a second item titled "intakecall".
+      const ns = (await listItems('notesSchema')).find(x=>String(x.Title||'').trim().toLowerCase()!=='intakecall');
       if(ns){
         const parsed = JSON.parse(ns.SchemaJSON||'');
         if(parsed && Array.isArray(parsed.SECTIONS)){ notesSchema = parsed; notesSchemaVersion = ns.SchemaVersion || 0; }
@@ -1541,10 +1547,11 @@ function mySessions(){ return sessions.filter(s=> s.ministers.some(m=>m.id===me.
 function recipientLinksRowFor(name){
   const match = findMyIntakeForRecipient(name);
   const notes = notesForRecipient(name);
-  if(!match && !notes.length) return '';
+  const calls = callNotesForRecipient(name);
+  if(!match && !notes.length && !calls.length) return '';
   return `<div class="intake-link-row">`
     + (match ? `<button type="button" class="btn secondary" onclick="openIntakeView(${match.id})">View intake form</button>` : '')
-    + (notes.length ? `<button type="button" class="btn secondary" onclick="openRecipientNotes(${escapeHtml(JSON.stringify(name))})">View session notes</button>` : '')
+    + (notes.length || calls.length ? `<button type="button" class="btn secondary" onclick="openRecipientNotes(${escapeHtml(JSON.stringify(name))})">View session notes</button>` : '')
     + `</div>`;
 }
 
@@ -1569,18 +1576,49 @@ function noteSortKey(x){
   const rs = x.note.record.session||{};
   return x.session ? sessionSortKey(x.session) : (rs.date||'')+' '+(rs.time||'');
 }
+// Intake call notes for this recipient (only if the minister has a session
+// with them), with just the answers the admin marked "Visible to PMs".
+// Hiding the rest is on screen only (Andrew's choice, 2026-11-23): ministers
+// can read the SessionNotes list (gotcha #11).
+function callNotesForRecipient(name){
+  if(!name || !callNotes.length) return [];
+  const key = name.trim().toLowerCase();
+  if(!mySessions().some(s=>s.recipName.trim().toLowerCase()===key)) return [];
+  return callNotes.map(n=>{
+    const s = sessions.find(x=>x.id===n.sessionId) || null;
+    const recip = s ? s.recipName : ((n.record.session||{}).recipName||'');
+    return { note: n, recip, shared: pmVisibleRecord(n.record) };
+  }).filter(x=>x.recip.trim().toLowerCase()===key && x.shared)
+    .sort((a,b)=>String(b.note.record.savedAt||'').localeCompare(String(a.note.record.savedAt||'')));
+}
+function pmVisibleRecord(rec){
+  const sections = ((rec.schema||{}).SECTIONS||[]).map(sec=>Object.assign({}, sec, { questions:(sec.questions||[]).filter(q=>q.pmVisible) }))
+    .filter(sec=>sec.questions.length);
+  if(!sections.length) return null;
+  const keep = {};
+  const a = rec.answers||{};
+  sections.forEach(sec=>sec.questions.forEach(q=>{ Object.keys(a).forEach(k=>{ if(k===q.id || k.startsWith(q.id+'__')) keep[k] = a[k]; }); }));
+  if(!Object.keys(keep).length) return null;
+  return { schema:{ SECTIONS: sections.map(sec=>Object.assign({}, sec, { visibleIf: undefined, questions: sec.questions.map(q=>Object.assign({}, q, { visibleIf: undefined })) })) }, answers: keep };
+}
+function callNoteDateLabel(rec){
+  const d = rec.savedAt ? new Date(rec.savedAt) : null;
+  return d && !isNaN(d) ? fmtDate(new Date(d.getFullYear(), d.getMonth(), d.getDate())) : 'Date unknown';
+}
 window.openRecipientNotes = function(name){
   const list = notesForRecipient(name);
-  if(!list.length) return;
-  showNotesView(`Session notes: ${name}`, "Notes from this person's sessions, newest first.", list);
+  const calls = callNotesForRecipient(name);
+  if(!list.length && !calls.length) return;
+  showNotesView(`Session notes: ${name}`, calls.length ? "Notes from this person's sessions, newest first, and from their intake call." : "Notes from this person's sessions, newest first.", list, calls);
 };
-function showNotesView(title, help, list){
+function showNotesView(title, help, list, calls){
+  calls = calls || [];
   $('#notesViewTitle').textContent = title;
   $('#notesViewHelp').textContent = help;
   $('#notesViewHelp').hidden = !help;
   // Several sessions: one collapsible row per session, newest open
   // (2026-10-29, at the user's request). One session: shown open, no toggle.
-  const many = list.length > 1;
+  const many = list.length + calls.length > 1;
   $('#notesViewBody').innerHTML = list.map(({note, session}, i)=>{
     const rs = note.record.session||{};
     const date = session ? session.date : (rs.date||'');
@@ -1594,6 +1632,14 @@ function showNotesView(title, help, list){
     return `<details class="note-view note-fold"${i===0?' open':''}>
       <summary><span class="note-fold-text">${head}</span><span class="note-fold-chev" aria-hidden="true">${ICONS.chevron}</span></summary>
       <div class="note-fold-body">${FPHM.renderNotesHtml(note.record)}</div>
+    </details>`;
+  }).join('') + calls.map(({note, shared}, i)=>{
+    const head = `<span class="note-view-chip note-view-chip-call">Intake call</span><h3 class="note-view-date">${escapeHtml(callNoteDateLabel(note.record))}</h3>
+      <p class="note-view-meta">What the admin shared from the intake call</p>`;
+    if(!many) return `<article class="note-view">${head}${FPHM.renderNotesHtml(shared)}</article>`;
+    return `<details class="note-view note-fold"${!list.length && i===0?' open':''}>
+      <summary><span class="note-fold-text">${head}</span><span class="note-fold-chev" aria-hidden="true">${ICONS.chevron}</span></summary>
+      <div class="note-fold-body">${FPHM.renderNotesHtml(shared)}</div>
     </details>`;
   }).join('');
   applyIntakeTextSize();
