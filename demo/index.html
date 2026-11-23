@@ -763,6 +763,7 @@
      them - the notes styling and the orange left edge for Priority. */
   .wl-body .notes{font-size:var(--fs-sm);white-space:pre-wrap;margin-top:6px;}
   .group.wl-priority{border-left:4px solid var(--primary);}
+  .tag.linksent{background:var(--ok-bg);color:var(--ok);}
   .flag-btn{color:var(--muted);}
   .flag-btn.active{color:var(--primary);}
   .flag-btn.active:hover{background:rgba(242,138,0,.14);color:var(--primary-dark);}
@@ -1005,12 +1006,18 @@
       <button class="active" data-schedfilter="all">All</button>
       <button data-schedfilter="tentative">Tentative <span id="schedFilterTentCount"></span></button>
       <button data-schedfilter="waiting">Waiting <span id="schedFilterWaitCount"></span></button>
+      <button data-schedfilter="preintake">Pre-Intake <span id="schedFilterPreCount"></span></button>
     </nav>
     <div class="section-title" id="slotsTitle" style="display:flex;align-items:baseline;gap:8px;margin:0 0 12px;"><h2 style="font-size:var(--fs-lg);margin:0;color:var(--navy);">Slots</h2></div>
     <div id="slotWeeks"></div>
-    <div class="section-title" id="unplacedTitle" style="display:flex;align-items:baseline;gap:8px;margin:26px 0 12px;"><h2 style="font-size:var(--fs-lg);margin:0;color:var(--navy);">Unplaced Candidates</h2><span class="helptext" id="unplacedCount" style="margin:0;"></span></div>
+    <div class="section-title" id="unplacedTitle" style="display:flex;align-items:baseline;gap:8px;margin:26px 0 12px;"><h2 style="font-size:var(--fs-lg);margin:0;color:var(--navy);">Waiting List</h2><span class="helptext" id="unplacedCount" style="margin:0;"></span></div>
+    <p class="helptext" id="unplacedHelp" style="margin:-4px 0 12px;">Intake form submitted and linked, not yet booked. Days waiting count from when the intake form was submitted.</p>
     <div id="unplacedList"></div>
-    <div class="no-results" id="unplacedNoResults" hidden>Everyone on the waiting list has been claimed onto a slot.</div>
+    <div class="no-results" id="unplacedNoResults" hidden>No one with a submitted intake form is waiting right now.</div>
+    <div class="section-title" id="preIntakeTitle" style="display:flex;align-items:baseline;gap:8px;margin:26px 0 12px;"><h2 style="font-size:var(--fs-lg);margin:0;color:var(--navy);">Pre-Intake</h2><span class="helptext" id="preIntakeCount" style="margin:0;"></span></div>
+    <p class="helptext" id="preIntakeHelp" style="margin:-4px 0 12px;">Waiting for a session but no intake form linked yet. Days waiting count from when they were added. Once their form is linked they move to the Waiting List.</p>
+    <div id="preIntakeList"></div>
+    <div class="no-results" id="preIntakeNoResults" hidden>No one is waiting on an intake form right now.</div>
   </section>
 
   <section class="panel" id="panel-schedule">
@@ -1599,7 +1606,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-11-23.1";
+const APP_VERSION = "2026-11-23.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -2213,6 +2220,7 @@ async function resolveSiteAndLists(){
     plPrivateColumnReady = !!(cols && Array.isArray(cols.value) && cols.value.some(c=>c.name===PL_PRIVATE_COLUMN));
     attendeesColumnReady = !!(cols && Array.isArray(cols.value) && cols.value.some(c=>c.name===ATTENDEES_COLUMN) && cols.value.some(c=>c.name===ATTENDEES_PROV_COLUMN));
     appNotifiedColumnReady = !!(cols && Array.isArray(cols.value) && cols.value.some(c=>c.name===APP_NOTIFIED_COLUMN));
+    intakeLinkSentColumnReady = !!(cols && Array.isArray(cols.value) && cols.value.some(c=>c.name===INTAKE_LINK_SENT_COLUMN));
   }catch(e){ console.warn('Could not check PrayerSessions columns:', e.message); }
 }
 
@@ -2294,6 +2302,12 @@ const ATTENDEES_PROV_COLUMN = 'AttendeesProvisional';
 // "sent" label on the card only lasts until the page is reloaded.
 const APP_NOTIFIED_COLUMN = 'AppNotifiedAt';
 let appNotifiedColumnReady = false;
+// When the admin sent a Pre-Intake person the intake form link (a
+// hand-made Date and Time column on PrayerSessions, blank = not sent).
+// Optional: until it exists the flag only lasts until the page reloads.
+const INTAKE_LINK_SENT_COLUMN = 'IntakeLinkSentAt';
+let intakeLinkSentColumnReady = false;
+const intakeLinkSentLocal = {};
 const appNotifiedLocal = {};
 let attendeesColumnReady = false;
 let prayerListDraft = null; // Set of minister ids ticked in Settings, null = not edited
@@ -2452,6 +2466,7 @@ async function loadAll(){
       // admin tab's count). Hand-made Yes/No column; reads false if missing.
       plPrivate: s[PL_PRIVATE_COLUMN]===true,
       appNotifiedAt: s[APP_NOTIFIED_COLUMN] || null,
+      intakeLinkSentAt: s[INTAKE_LINK_SENT_COLUMN] || null,
       attendees: (s[ATTENDEES_COLUMN]===null || s[ATTENDEES_COLUMN]===undefined || s[ATTENDEES_COLUMN]==='') ? null : Number(s[ATTENDEES_COLUMN]),
       attendeesProvisional: s[ATTENDEES_PROV_COLUMN]===true
     };
@@ -2516,6 +2531,7 @@ const ICONS = {
   flag: (filled) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="${filled?'currentColor':'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22V4a1 1 0 0 1 1-1h13.5a.5.5 0 0 1 .4.8l-3.6 4.7 3.6 4.7a.5.5 0 0 1-.4.8H5"/></svg>`,
   calendarPlus: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 14v6M9 17h6"/></svg>',
   power: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>',
+  mail: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22 6 12 13 2 6"/></svg>',
   phone: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>',
   eye: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
   eyeOff: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.6 18.6 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
@@ -3335,10 +3351,38 @@ function renderCompletedStats(){
 }
 
 /* ---- PLANNING (Waiting-status sessions) ---- */
+// Waiting List people (a submitted intake form is linked) count from the
+// day that form was submitted; Pre-Intake people count from when they
+// were added.
 function daysWaiting(s){
-  const added = s.added || s.date || isoDate(new Date());
-  return Math.max(0, Math.round((new Date() - new Date(added+'T00:00')) / 86400000));
+  const intake = submittedIntakeOf(s);
+  const from = (intake && (intake.submittedAt||'').split('T')[0]) || s.added || s.date || isoDate(new Date());
+  return Math.max(0, Math.round((new Date() - new Date(from+'T00:00')) / 86400000));
 }
+// The submitted intake form staff linked to this entry, or null. Only an
+// explicit link counts (a name-match suggestion doesn't), so someone stays
+// on Pre-Intake until their form is actually linked.
+function submittedIntakeOf(s){
+  if(!s || !s.intakeResponseId) return null;
+  const i = intakeResponses.find(x=>x.id===s.intakeResponseId);
+  return (i && i.submittedAt) ? i : null;
+}
+function intakeLinkSentAtOf(s){
+  return Object.prototype.hasOwnProperty.call(intakeLinkSentLocal, s.id) ? intakeLinkSentLocal[s.id] : (s.intakeLinkSentAt || null);
+}
+// Manual flag: the admin sent this Pre-Intake person the intake form link
+// (outside the app). Tapping again clears it.
+window.toggleIntakeLinkSent = async function(id){
+  const s = sessions.find(x=>x.id===id);
+  if(!s) return;
+  const at = intakeLinkSentAtOf(s) ? null : new Date().toISOString();
+  intakeLinkSentLocal[id] = at;
+  s.intakeLinkSentAt = at;
+  renderSchedPlan();
+  if(!intakeLinkSentColumnReady) return;
+  try{ await updateItem('sessions', id, { [INTAKE_LINK_SENT_COLUMN]: at }); }
+  catch(e){ notifyError('Could not save "intake link sent": ' + e.message); }
+};
 function renderPlanning(){
   const q = $('#planningSearch').value.trim().toLowerCase();
   const sortBy = $('#prospectSort').value;
@@ -3597,44 +3641,67 @@ function renderSchedPlanStats(){
 
 function renderSchedPlan(){
   // Filter tabs: show/hide whole sections, and keep the counts current.
-  const showSlots = schedFilter!=='waiting', showWaiting = schedFilter!=='tentative';
-  $('#slotsTitle').style.display = showSlots ? 'flex' : 'none'; $('#slotWeeks').hidden = !showSlots;
-  $('#unplacedTitle').style.display = showWaiting ? 'flex' : 'none'; $('#unplacedList').hidden = !showWaiting;
+  const showPre = schedFilter==='all' || schedFilter==='preintake';
+  const showWL = schedFilter==='all' || schedFilter==='waiting';
+  $('#slotsTitle').style.display = (schedFilter==='all' || schedFilter==='tentative') ? 'flex' : 'none'; $('#slotWeeks').hidden = !(schedFilter==='all' || schedFilter==='tentative');
+  $('#unplacedTitle').style.display = showWL ? 'flex' : 'none'; $('#unplacedList').hidden = !showWL; $('#unplacedHelp').hidden = !showWL;
+  $('#preIntakeTitle').style.display = showPre ? 'flex' : 'none'; $('#preIntakeList').hidden = !showPre; $('#preIntakeHelp').hidden = !showPre;
   const prev = schedFilter; schedFilter = 'tentative';
   const tent = slots.filter(isSlotVisible).length;
   schedFilter = prev;
   $('#schedFilterTentCount').textContent = '(' + tent + ')';
-  $('#schedFilterWaitCount').textContent = '(' + unplacedCandidates().length + ')';
+  const unplaced = unplacedCandidates();
+  $('#schedFilterWaitCount').textContent = '(' + unplaced.filter(s=>submittedIntakeOf(s)).length + ')';
+  $('#schedFilterPreCount').textContent = '(' + unplaced.filter(s=>!submittedIntakeOf(s)).length + ')';
   $('#schedFilterTabs').querySelectorAll('button').forEach(b=>b.classList.toggle('active', b.dataset.schedfilter===schedFilter));
   renderSlotWeeks(); renderUnplacedCandidates(); renderSchedPlanStats();
-  if(!showWaiting) $('#unplacedNoResults').hidden = true;
+  if(!showWL) $('#unplacedNoResults').hidden = true;
+  if(!showPre) $('#preIntakeNoResults').hidden = true;
 }
 
+// Unplaced candidates are split in two: the Waiting List (a submitted
+// intake form is linked) and Pre-Intake (no linked form yet). Same card for
+// both; Pre-Intake cards also get the "intake link sent" flag.
 function renderUnplacedCandidates(){
-  const rows = unplacedCandidates().slice().sort((a,b)=>{
+  const all = unplacedCandidates().slice().sort((a,b)=>{
     if(a.priority!==b.priority) return a.priority ? -1 : 1;
     return daysWaiting(b)-daysWaiting(a);
   });
-  $('#unplacedNoResults').hidden = rows.length>0;
-  $('#unplacedCount').textContent = rows.length ? `${rows.length} waiting` : '';
+  const wl = all.filter(s=>submittedIntakeOf(s)), pre = all.filter(s=>!submittedIntakeOf(s));
+  $('#unplacedNoResults').hidden = wl.length>0;
+  $('#unplacedCount').textContent = wl.length ? `${wl.length} waiting` : '';
+  $('#preIntakeNoResults').hidden = pre.length>0;
+  $('#preIntakeCount').textContent = pre.length ? `${pre.length} waiting` : '';
+  renderCandidateCards($('#unplacedList'), wl, false);
+  renderCandidateCards($('#preIntakeList'), pre, true);
+}
+function renderCandidateCards(listBox, rows, isPre){
   // Each waiting-list entry is a collapsible group (same groupRow/openState
   // accordion the Intake Forms and Blackout tabs use): collapsed shows just
   // the name, session number, tags and days waiting; expanded shows contact
   // info, notes, the intake link and the action buttons. Collapsed by
   // default so a long list scans quickly; open/closed state survives the
   // re-renders every save triggers (openState).
-  const listBox = $('#unplacedList');
   const opened = openState(listBox);
   listBox.innerHTML = rows.map(s=>{
     const waiting = daysWaiting(s);
     const num = sessionNumberOf(s);
     const key = 'wl-' + s.id;
-    const summary = `${s.priority?'<span class="tag priority">Priority</span>':''}${s.contacted?'<span class="tag contacted">Contacted</span>':''}${s.genderPref==='Same-sex' ? `<span class="tag">${escapeHtml(s.recipGender||'Same-sex')} only</span>` : ''}Waiting ${waiting} day${waiting===1?'':'s'}`;
+    const sentAt = isPre ? intakeLinkSentAtOf(s) : null;
+    const sentDate = sentAt ? new Date(sentAt) : null;
+    const sentLabel = sentDate && !isNaN(sentDate) ? sentDate.toLocaleDateString(undefined,{month:'short',day:'numeric'}) : '';
+    const intake = isPre ? null : submittedIntakeOf(s);
+    const summary = `${s.priority?'<span class="tag priority">Priority</span>':''}${sentAt?`<span class="tag linksent">Link sent${sentLabel?' '+escapeHtml(sentLabel):''}</span>`:''}${s.contacted?'<span class="tag contacted">Contacted</span>':''}${s.genderPref==='Same-sex' ? `<span class="tag">${escapeHtml(s.recipGender||'Same-sex')} only</span>` : ''}Waiting ${waiting} day${waiting===1?'':'s'}`;
+    const linkSentBtn = isPre
+      ? `<button class="icon-btn${sentAt?' success':''}" onclick="toggleIntakeLinkSent(${s.id})" title="${sentAt?'Mark intake link as not sent':'Mark intake link as sent'}" aria-pressed="${!!sentAt}" aria-label="${sentAt?'Mark intake link as not sent':'Mark intake link as sent'}: ${escapeHtml(s.recipName)}">${ICONS.mail}<span class="btn-label">${sentAt?`Link sent${sentLabel?' '+escapeHtml(sentLabel):''}`:'Mark link sent'}</span></button>`
+      : '';
     const body = `<div class="wl-body">
-      <div class="helptext" style="margin:0;">${escapeHtml(s.recipContact||'No contact info')} · added ${fmtShort(s.added||s.date)}</div>
+      <div class="helptext" style="margin:0;">${escapeHtml(s.recipContact||'No contact info')} · added ${fmtShort(s.added||s.date)}${intake?` · intake submitted ${fmtShort((intake.submittedAt||'').split('T')[0])}`:''}</div>
+      ${isPre && !intakeLinkSentColumnReady ? `<p class="helptext" style="margin:8px 0 0;">"Link sent" is only kept until the page reloads. To keep it, add an "${INTAKE_LINK_SENT_COLUMN}" (Date and Time) column to the PrayerSessions list in SharePoint.</p>` : ''}
       ${s.notes?`<div class="notes">${escapeHtml(s.notes)}</div>`:''}
       ${renderIntakeLinkBlock(s)}
       <div class="toolbar" style="margin-top:10px;">
+        ${linkSentBtn}
         <button class="icon-btn${s.contacted?' success':''}" onclick="toggleContacted(${s.id})" title="${s.contacted?'Mark as not yet contacted':'Mark as contacted'}" aria-pressed="${s.contacted}" aria-label="${s.contacted?'Mark as not yet contacted':'Mark as contacted'}: ${escapeHtml(s.recipName)}">${ICONS.phone}<span class="btn-label">${s.contacted?'Contacted':'Contact'}</span></button>
         <button class="icon-btn flag-btn${s.priority?' active':''}" onclick="togglePriority(${s.id})" title="${s.priority?'Remove priority':'Flag as priority'}" aria-pressed="${s.priority}" aria-label="${s.priority?'Remove priority from':'Flag as priority'} ${escapeHtml(s.recipName)}">${ICONS.flag(s.priority)}<span class="btn-label">${s.priority?'Remove Priority':'Flag Priority'}</span></button>
         <button class="icon-btn" onclick="editSession(${s.id})" title="Edit" aria-label="Edit ${escapeHtml(s.recipName)}">${ICONS.pencil}<span class="btn-label">Edit</span></button>
@@ -9634,6 +9701,10 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Nov 23, 2026', version: '2026-11-23.2', items: [
+    'New: on Schedule & Planning, people waiting for a session are split in two. "Waiting" (the Waiting List) is everyone whose submitted intake form is linked; their days waiting now count from the day the form was submitted. The new "Pre-Intake" tab is everyone with no intake form linked yet; their days count from when they were added. Linking someone\'s form moves them from Pre-Intake to the Waiting List.',
+    'New: on a Pre-Intake card, tap "Mark link sent" once you\'ve sent them the intake form link. It shows "Link sent" with the date (on the card and as a green tag when collapsed); tap again to undo. To keep this after a reload, add an "IntakeLinkSentAt" (Date and Time) column to the PrayerSessions list in SharePoint.'
+  ]},
   { date: 'Nov 23, 2026', version: '2026-11-23.1', items: [
     'New: a session notes question (or a whole section) can be set to show only on the recipient\'s first session. In Settings > Session Notes, open a question and tick "Only on the recipient\'s first session". On Session #2 and later it is hidden and nothing is saved for it. Works in the Scheduler and in My FPHM.',
     'Changed: a multiple choice grid with just one column (for example only "Yes") now shows a tick box on each row, and an unticked row means no. Use it for the sequences list by deleting "No" from its columns. Notes already saved keep showing their Yes and No answers as before.'
@@ -9646,9 +9717,6 @@ const CHANGE_LOG = [
   ]},
   { date: 'Nov 13, 2026', version: '2026-11-13.8', items: [
     'Changed: on a phone, error messages (for example "Please select at least 2 prayer ministers" or "Save failed") now pop up as a red message at the top of the screen instead of somewhere in the form where you might not see it. It disappears by itself after 3 seconds, or tap the × to close it sooner. Computers and tablets are unchanged.'
-  ]},
-  { date: 'Nov 13, 2026', version: '2026-11-13.7', items: [
-    'Changed: the main tab names are slightly larger, and every tab is still visible without scrolling.'
   ]}
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
@@ -9656,6 +9724,9 @@ const CHANGE_LOG = [
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Nov 13, 2026', version: '2026-11-13.7', items: [
+    'Changed: the main tab names are slightly larger, and every tab is still visible without scrolling.'
+  ]},
   { date: 'Nov 13, 2026', version: '2026-11-13.6', items: [
     'Changed: the main tabs are now one row of plain text tabs with an underline under the current one, instead of filled terracotta blocks. Every tab is always visible with no sideways scrolling: one row on a computer or tablet, two rows on most phones (it used to be four). On smaller screens the longer names are shortened, for example "Schedule" for Schedule & Planning and "Ministers" for Prayer Ministers.',
     'Changed: Refresh Data and Sign Out are smaller and look the same, so Sign Out is no longer the darkest thing on the page.',

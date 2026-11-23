@@ -127,7 +127,12 @@
   };
   const linkA = mkIntake(sessions.find(s=>s.fields.Status==='Scheduled').fields.RecipientName,'Submitted',6);
   sessions.find(s=>s.fields.Status==='Scheduled').fields.IntakeResponseId = linkA;
-  mkIntake(recipients[41],'Submitted',5); mkIntake(recipients[42],'Submitted',3); mkIntake(recipients[43],'Submitted',2);
+  mkIntake(recipients[41],'Submitted',5);
+  // Two waiting people have their submitted form linked (Waiting List); the
+  // rest have none linked yet (Pre-Intake), one of them already sent the link.
+  sessions.find(s=>s.id===waiting[2]).fields.IntakeResponseId = mkIntake(recipients[42],'Submitted',3);
+  sessions.find(s=>s.id===waiting[3]).fields.IntakeResponseId = mkIntake(recipients[43],'Submitted',2);
+  sessions.find(s=>s.id===waiting[4]).fields.IntakeLinkSentAt = dt(addDays(today,-1),'15:00');
   mkIntake(recipients[44],'InProgress',1); mkIntake(recipients[45],'InProgress',2); mkIntake(recipients[46],'Submitted',60);
   intake[intake.length-1].fields.Status = 'Archived';
 
@@ -171,7 +176,7 @@
       if((m = path.match(/^\/sites\/[^/]+:\/.+$/))) return json({ id:'demo-site' });
       if(/^\/sites\/demo-site\/lists\?/.test(path)) return json({ value: Object.keys(lists).map(n=>({ id:listIdByName[n], displayName:n })) });
       // Hand-made columns the app checks for before using them.
-      if(/^\/sites\/demo-site\/lists\/list-\w+\/columns/.test(path)) return json({ value: ['PrayerListAccess','PrayerListPrivate','Attendees','AttendeesProvisional'].map(name=>({ name })) });
+      if(/^\/sites\/demo-site\/lists\/list-\w+\/columns/.test(path)) return json({ value: ['PrayerListAccess','PrayerListPrivate','Attendees','AttendeesProvisional','IntakeLinkSentAt'].map(name=>({ name })) });
       if((m = path.match(/^\/sites\/demo-site\/lists\/list-(\w+)\/items\?/)) && method==='GET'){
         return json({ value: lists[m[1]].map(it=>({ id:String(it.id), createdDateTime: it.createdDateTime||'2026-01-02T09:00:00Z', createdBy: it.createdBy||{user:{email:'admin@demo.example'}}, fields: it.fields })) });
       }
