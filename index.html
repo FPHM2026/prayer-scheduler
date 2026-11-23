@@ -1592,7 +1592,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-11-19.1";
+const APP_VERSION = "2026-11-23.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -7292,11 +7292,26 @@ function editorGroupRow(key, avatarText, name, countLabel, summaryHtml, bodyHtml
   </div>`;
 }
 
+// Session Notes only: "Only on the recipient's first session" (2026-11-23).
+function firstSessionToggleHtml(kind, sIdx, qIdx, obj){
+  if(activeEditor!=='notes') return '';
+  const call = kind==='section' ? `setFirstSessionOnly(${sIdx},null,this.checked)` : `setFirstSessionOnly(${sIdx},${qIdx},this.checked)`;
+  return `<div class="field"><label style="display:flex;align-items:center;gap:8px;font-weight:400;">
+      <input type="checkbox" ${obj.firstSessionOnly?'checked':''} onchange="${call}"> Only on the recipient's first session
+    </label>
+    <p class="helptext" style="margin:4px 0 0;">Hidden on Session #2 and later, and nothing is saved for it there.</p></div>`;
+}
+window.setFirstSessionOnly = function(sIdx, qIdx, on){
+  const obj = qIdx===null ? D().SECTIONS[sIdx] : D().SECTIONS[sIdx].questions[qIdx];
+  if(on) obj.firstSessionOnly = true; else delete obj.firstSessionOnly;
+  markSchemaDirty();
+  renderFormEditor();
+};
 function renderSectionEditor(sec, sIdx, opened){
   const candidateQuestions = questionsBefore(sIdx, null).filter(q=>!GRID_TYPES.includes(q.type) && q.type!==TABLE_TYPE);
   const wasOpen = opened.has(sec.id) ? opened.get(sec.id) : false;
   const visSummary = describeVisibleIf(sec.visibleIf);
-  const summaryHtml = escapeHtml([visSummary || 'Always shown', sec.intro ? 'has intro text' : null].filter(Boolean).join(' · '));
+  const summaryHtml = escapeHtml([visSummary || 'Always shown', sec.firstSessionOnly ? 'First session only' : null, sec.intro ? 'has intro text' : null].filter(Boolean).join(' · '));
   const actions = `
     <button class="icon-btn icon-btn-lg" title="Move up" onclick="moveSection(${sIdx},-1)" ${sIdx===0?'disabled':''}>${ICONS.arrowUp}</button>
     <button class="icon-btn icon-btn-lg" title="Move down" onclick="moveSection(${sIdx},1)" ${sIdx===D().SECTIONS.length-1?'disabled':''}>${ICONS.arrowDown}</button>
@@ -7309,6 +7324,7 @@ function renderSectionEditor(sec, sIdx, opened){
       <textarea rows="2" oninput="updateSectionField(${sIdx},'intro',this.value)">${escapeHtml(sec.intro||'')}</textarea>
     </div>
     ${visibleIfPickerHtml('section', sIdx, null, sec.visibleIf, candidateQuestions)}
+    ${firstSessionToggleHtml('section', sIdx, null, sec)}
     <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px;">
       ${sec.questions.map((q,qIdx)=>renderQuestionEditor(q,sIdx,qIdx,sec,opened)).join('')}
     </div>
@@ -7504,7 +7520,8 @@ function gridEditorHtml(q, sIdx, qIdx){
   return `${modeSel}${rowsPart}
     <div class="field"><label>Columns (one per line)</label>
       <textarea rows="4" oninput="updateGridList(${sIdx},${qIdx},'columns',this.value)">${escapeHtml((q.columns||[]).join('\n'))}</textarea>
-      ${sortButtonsHtml(sIdx, qIdx, 'columns')}</div>
+      ${sortButtonsHtml(sIdx, qIdx, 'columns')}
+      ${q.type==='choicegrid' ? `<p class="helptext" style="margin:4px 0 0;">With just one column (for example only "Yes"), each row is a tick box: leave it unticked for no.</p>` : ''}</div>
     <div class="field"><label style="display:flex;align-items:center;gap:6px;font-weight:400;">
       <input type="checkbox" ${q.limitPerColumn?'checked':''} onchange="updateQuestionField(${sIdx},${qIdx},'limitPerColumn',this.checked)"> Limit to one response per column
     </label></div>
@@ -7537,7 +7554,7 @@ function renderQuestionEditor(q, sIdx, qIdx, sec, opened){
   const hasOptions = TYPES_WITH_OPTIONS.includes(q.type);
   const wasOpen = opened.has(q.id) ? opened.get(q.id) : false;
   const visSummary = describeVisibleIf(q.visibleIf);
-  const summaryHtml = escapeHtml([q.required ? 'Required' : 'Optional', visSummary || 'Always shown'].join(' · '));
+  const summaryHtml = escapeHtml([q.required ? 'Required' : 'Optional', visSummary || 'Always shown', q.firstSessionOnly ? 'First session only' : null].filter(Boolean).join(' · '));
   const avatar = { text:'Ab', email:'@', number:'#', textarea:'¶', radio:'◉', select:'▾', checkboxes:'☑', choicegrid:'▦', checkboxgrid:'▦', rowtable:'▤' }[q.type] || '?';
   const actions = `
     <button class="icon-btn icon-btn-lg" title="Move up" onclick="moveQuestion(${sIdx},${qIdx},-1)" ${qIdx===0?'disabled':''}>${ICONS.arrowUp}</button>
@@ -7580,7 +7597,8 @@ function renderQuestionEditor(q, sIdx, qIdx, sec, opened){
       <div class="field"><label>Minimum</label><input type="number" value="${q.min??''}" oninput="updateQuestionField(${sIdx},${qIdx},'min',this.value===''?undefined:Number(this.value))"></div>
       <div class="field"><label>Maximum</label><input type="number" value="${q.max??''}" oninput="updateQuestionField(${sIdx},${qIdx},'max',this.value===''?undefined:Number(this.value))"></div>
     </div>` : ''}
-    ${visibleIfPickerHtml('question', sIdx, qIdx, q.visibleIf, candidateQuestions)}`;
+    ${visibleIfPickerHtml('question', sIdx, qIdx, q.visibleIf, candidateQuestions)}
+    ${firstSessionToggleHtml('question', sIdx, qIdx, q)}`;
   return editorGroupRow(q.id, avatar, q.label||'(untitled question)', q.type, summaryHtml, body, wasOpen, actions);
 }
 
@@ -7962,7 +7980,10 @@ window.openSessionNotes = function(sessionId){
     // uses the current saved form.
     schema: JSON.parse(JSON.stringify(existing ? existing.record.schema : notesSchema)),
     formVersion: existing ? existing.record.formVersion : notesSchemaVersion,
-    answers: existing ? JSON.parse(JSON.stringify(existing.record.answers||{})) : {}
+    answers: existing ? JSON.parse(JSON.stringify(existing.record.answers||{})) : {},
+    // Questions/sections marked "first session only" show just on the
+    // recipient's Session #1 (2026-11-23, Peter's request).
+    firstSession: sessionNumberOf(s)===1
   };
   const lead = s.ministers.find(m=>m.role==='Lead');
   const leadName = lead ? (ministers.find(m=>m.id===lead.id)||{}).name : '';
@@ -8088,7 +8109,9 @@ function notesQuestionHtml(q, si, qi){
   } else if(GRID_TYPES.includes(q.type)){
     const rows = notesRowsOf(q), cols = q.columns||[];
     const ans = (v && typeof v==='object' && !Array.isArray(v)) ? v : {};
-    const isRadio = q.type==='choicegrid';
+    // A multiple choice grid with a single column (e.g. only "Yes") is a
+    // tick box per row: unticked means no answer, i.e. "No" (2026-11-23).
+    const isRadio = q.type==='choicegrid' && cols.length!==1;
     // "A notes box under each row" (added 2026-10-30): its own text per row,
     // saved as answers[id+'__rownotes'] = { rowLabel: text }.
     const rn = notesCtx.answers[q.id+'__rownotes'] || {};
@@ -8124,7 +8147,7 @@ window.notesGridSet = function(si, qi, ri, ci, checked){
   const q = notesQ(si,qi), row = notesRowsOf(q)[ri], col = q.columns[ci];
   const cur = notesCtx.answers[q.id];
   const a = (cur && typeof cur==='object' && !Array.isArray(cur)) ? cur : {};
-  if(q.type==='choicegrid'){ a[row] = col; }
+  if(q.type==='choicegrid'){ if(checked || (q.columns||[]).length!==1) a[row] = col; else delete a[row]; }
   else {
     const arr = Array.isArray(a[row]) ? a[row].slice() : [];
     const i = arr.indexOf(col);
@@ -8189,16 +8212,19 @@ window.notesOtherText = function(si, qi, text){
 };
 // Branching: show/hide sections and questions in place (no re-render, so
 // typing never loses focus) according to each visibleIf.
+// "Only on the recipient's first session": hidden (and not saved) on any
+// later session. The editor's preview has no session, so it shows them.
+function notesFirstOk(x){ return !x || !x.firstSessionOnly || !notesCtx.session || !!notesCtx.firstSession; }
 function notesApplyVisibility(){
   const a = notesCtx.answers;
   notesCtx.schema.SECTIONS.forEach((sec,si)=>{
     const secEl = $(`#notesBody .nt-sec[data-si="${si}"]`);
     if(!secEl) return;
-    secEl.hidden = !notesEvalCond(sec.visibleIf, a);
+    secEl.hidden = !notesEvalCond(sec.visibleIf, a) || !notesFirstOk(sec);
     (sec.questions||[]).forEach((q,qi)=>{
       const qEl = secEl.querySelector(`.nt-q[data-qi="${qi}"]`);
       if(qEl){
-        qEl.hidden = !notesEvalCond(q.visibleIf, a) || (!!q.rowsFrom && notesRowsOf(q).length===0);
+        qEl.hidden = !notesEvalCond(q.visibleIf, a) || !notesFirstOk(q) || (!!q.rowsFrom && notesRowsOf(q).length===0);
         const tb = qEl.querySelector('.nt-radio-text');
         if(tb) tb.hidden = !notesRadioTextVisible(q);
         if(q.type===TABLE_TYPE){
@@ -8215,9 +8241,9 @@ function notesApplyVisibility(){
 function notesVisibleAnswers(){
   const a = notesCtx.answers, out = {}, missing = [];
   notesCtx.schema.SECTIONS.forEach(sec=>{
-    if(!notesEvalCond(sec.visibleIf, a)) return;
+    if(!notesEvalCond(sec.visibleIf, a) || !notesFirstOk(sec)) return;
     (sec.questions||[]).forEach(q=>{
-      if(!notesEvalCond(q.visibleIf, a)) return;
+      if(!notesEvalCond(q.visibleIf, a) || !notesFirstOk(q)) return;
       const v = a[q.id];
       if(q.type===TABLE_TYPE){
         // Keep only known columns; the "Yes" text only when the answer is Yes;
@@ -8250,7 +8276,7 @@ function notesVisibleAnswers(){
           else if(Array.isArray(src[r])){ const keep = src[r].filter(c=>cols.includes(c)); if(keep.length) clean[r] = keep; }
         });
         if(q.rowsFrom && rows.length===0) return;
-        if(q.required && rows.some(r=>!(r in clean))){ missing.push(q.label + ' (every row)'); return; }
+        if(q.required && !(q.type==='choicegrid' && cols.length===1) && rows.some(r=>!(r in clean))){ missing.push(q.label + ' (every row)'); return; }
         if(Object.keys(clean).length) out[q.id] = clean;
         const gn = a[q.id + '__notes'];
         if(q.withNotes && gn && String(gn).trim()) out[q.id + '__notes'] = String(gn);
@@ -9601,6 +9627,10 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Nov 23, 2026', version: '2026-11-23.1', items: [
+    'New: a session notes question (or a whole section) can be set to show only on the recipient\'s first session. In Settings > Session Notes, open a question and tick "Only on the recipient\'s first session". On Session #2 and later it is hidden and nothing is saved for it. Works in the Scheduler and in My FPHM.',
+    'Changed: a multiple choice grid with just one column (for example only "Yes") now shows a tick box on each row, and an unticked row means no. Use it for the sequences list by deleting "No" from its columns. Notes already saved keep showing their Yes and No answers as before.'
+  ]},
   { date: 'Nov 19, 2026', version: '2026-11-19.1', items: [
     'New: on the Statistics tab, a "Sections to include" box lets you tick which parts go in the report (Freedom Sessions summary, your note, the two charts, Sunday Drop-In, Journey to Freedom, and the two leader\'s copy pages). Anything unticked is left out of the report on screen, both Word downloads and Download charts, and the figure numbers close up so they never skip. Your choice is remembered on this device; Select all puts everything back.'
   ]},
@@ -9612,12 +9642,6 @@ const CHANGE_LOG = [
   ]},
   { date: 'Nov 13, 2026', version: '2026-11-13.7', items: [
     'Changed: the main tab names are slightly larger, and every tab is still visible without scrolling.'
-  ]},
-  { date: 'Nov 13, 2026', version: '2026-11-13.6', items: [
-    'Changed: the main tabs are now one row of plain text tabs with an underline under the current one, instead of filled terracotta blocks. Every tab is always visible with no sideways scrolling: one row on a computer or tablet, two rows on most phones (it used to be four). On smaller screens the longer names are shortened, for example "Schedule" for Schedule & Planning and "Ministers" for Prayer Ministers.',
-    'Changed: Refresh Data and Sign Out are smaller and look the same, so Sign Out is no longer the darkest thing on the page.',
-    'Changed: cards have a lighter outline, so the content inside them stands out more. Form boxes keep their darker outline.',
-    'Changed: the initials in the round name badges are a little darker so they are easier to read, and several help lines under the tab titles are reworded more plainly.'
   ]}
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
@@ -9625,6 +9649,12 @@ const CHANGE_LOG = [
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Nov 13, 2026', version: '2026-11-13.6', items: [
+    'Changed: the main tabs are now one row of plain text tabs with an underline under the current one, instead of filled terracotta blocks. Every tab is always visible with no sideways scrolling: one row on a computer or tablet, two rows on most phones (it used to be four). On smaller screens the longer names are shortened, for example "Schedule" for Schedule & Planning and "Ministers" for Prayer Ministers.',
+    'Changed: Refresh Data and Sign Out are smaller and look the same, so Sign Out is no longer the darkest thing on the page.',
+    'Changed: cards have a lighter outline, so the content inside them stands out more. Form boxes keep their darker outline.',
+    'Changed: the initials in the round name badges are a little darker so they are easier to read, and several help lines under the tab titles are reworded more plainly.'
+  ]},
   { date: 'Nov 13, 2026', version: '2026-11-13.4', items: [
     'Changed: on a booked session card, "Send app notification" now turns green and says "Notification sent (date) at (time) — tap to re-send" once the team has been notified, whether you sent it from the card or it went out automatically when you booked or moved the session. To keep this after a reload, add a "AppNotifiedAt" (Date and Time) column to the PrayerSessions list in SharePoint; until then it shows only until the page is reloaded.'
   ]},

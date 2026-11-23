@@ -1013,7 +1013,10 @@ window.openSessionNotes = function(sessionId){
     // An existing note reopens with the form it was written with.
     schema: JSON.parse(JSON.stringify(existing ? existing.record.schema : notesSchema)),
     formVersion: existing ? existing.record.formVersion : notesSchemaVersion,
-    answers: existing ? JSON.parse(JSON.stringify(existing.record.answers||{})) : {}
+    answers: existing ? JSON.parse(JSON.stringify(existing.record.answers||{})) : {},
+    // Questions/sections marked "first session only" show just on the
+    // recipient's Session #1 (2026-11-23, Peter's request).
+    firstSession: sessionNumberOf(s)===1
   };
   $('#notesSub').textContent = `${s.recipName} · Session #${sessionNumberOf(s)} · ${fmtShort(s.date)}`;
   $('#notesMsg').hidden = true;
@@ -1146,7 +1149,9 @@ function notesQuestionHtml(q, si, qi){
   } else if(GRID_TYPES.includes(q.type)){
     const rows = notesRowsOf(q), cols = q.columns||[];
     const ans = (v && typeof v==='object' && !Array.isArray(v)) ? v : {};
-    const isRadio = q.type==='choicegrid';
+    // A multiple choice grid with a single column (e.g. only "Yes") is a
+    // tick box per row: unticked means no answer, i.e. "No" (2026-11-23).
+    const isRadio = q.type==='choicegrid' && cols.length!==1;
     // "A notes box under each row" (added 2026-10-30): its own text per row,
     // saved as answers[id+'__rownotes'] = { rowLabel: text }.
     const rn = notesCtx.answers[q.id+'__rownotes'] || {};
@@ -1182,7 +1187,7 @@ window.notesGridSet = function(si, qi, ri, ci, checked){
   const q = notesQ(si,qi), row = notesRowsOf(q)[ri], col = q.columns[ci];
   const cur = notesCtx.answers[q.id];
   const a = (cur && typeof cur==='object' && !Array.isArray(cur)) ? cur : {};
-  if(q.type==='choicegrid'){ a[row] = col; }
+  if(q.type==='choicegrid'){ if(checked || (q.columns||[]).length!==1) a[row] = col; else delete a[row]; }
   else {
     const arr = Array.isArray(a[row]) ? a[row].slice() : [];
     const i = arr.indexOf(col);
@@ -1247,16 +1252,19 @@ window.notesOtherText = function(si, qi, text){
 };
 // Branching: show/hide sections and questions in place (no re-render, so
 // typing never loses focus) according to each visibleIf.
+// "Only on the recipient's first session": hidden (and not saved) on any
+// later session. The editor's preview has no session, so it shows them.
+function notesFirstOk(x){ return !x || !x.firstSessionOnly || !notesCtx.session || !!notesCtx.firstSession; }
 function notesApplyVisibility(){
   const a = notesCtx.answers;
   notesCtx.schema.SECTIONS.forEach((sec,si)=>{
     const secEl = $(`#notesBody .nt-sec[data-si="${si}"]`);
     if(!secEl) return;
-    secEl.hidden = !notesEvalCond(sec.visibleIf, a);
+    secEl.hidden = !notesEvalCond(sec.visibleIf, a) || !notesFirstOk(sec);
     (sec.questions||[]).forEach((q,qi)=>{
       const qEl = secEl.querySelector(`.nt-q[data-qi="${qi}"]`);
       if(qEl){
-        qEl.hidden = !notesEvalCond(q.visibleIf, a) || (!!q.rowsFrom && notesRowsOf(q).length===0);
+        qEl.hidden = !notesEvalCond(q.visibleIf, a) || !notesFirstOk(q) || (!!q.rowsFrom && notesRowsOf(q).length===0);
         const tb = qEl.querySelector('.nt-radio-text');
         if(tb) tb.hidden = !notesRadioTextVisible(q);
         if(q.type===TABLE_TYPE){
@@ -1273,9 +1281,9 @@ function notesApplyVisibility(){
 function notesVisibleAnswers(){
   const a = notesCtx.answers, out = {}, missing = [];
   notesCtx.schema.SECTIONS.forEach(sec=>{
-    if(!notesEvalCond(sec.visibleIf, a)) return;
+    if(!notesEvalCond(sec.visibleIf, a) || !notesFirstOk(sec)) return;
     (sec.questions||[]).forEach(q=>{
-      if(!notesEvalCond(q.visibleIf, a)) return;
+      if(!notesEvalCond(q.visibleIf, a) || !notesFirstOk(q)) return;
       const v = a[q.id];
       if(q.type===TABLE_TYPE){
         // Keep only known columns; the "Yes" text only when the answer is Yes;
@@ -1308,7 +1316,7 @@ function notesVisibleAnswers(){
           else if(Array.isArray(src[r])){ const keep = src[r].filter(c=>cols.includes(c)); if(keep.length) clean[r] = keep; }
         });
         if(q.rowsFrom && rows.length===0) return;
-        if(q.required && rows.some(r=>!(r in clean))){ missing.push(q.label + ' (every row)'); return; }
+        if(q.required && !(q.type==='choicegrid' && cols.length===1) && rows.some(r=>!(r in clean))){ missing.push(q.label + ' (every row)'); return; }
         if(Object.keys(clean).length) out[q.id] = clean;
         const gn = a[q.id + '__notes'];
         if(q.withNotes && gn && String(gn).trim()) out[q.id + '__notes'] = String(gn);
