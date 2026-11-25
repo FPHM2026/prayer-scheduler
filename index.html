@@ -564,6 +564,10 @@
   .pl-name{font-family:'Playfair Display',Georgia,serif;font-size:var(--fs-lg);font-weight:700;color:var(--navy);overflow-wrap:anywhere;margin-right:8px;}
   .pl-meta{font-size:var(--fs-sm);color:var(--muted);margin-top:4px;overflow-wrap:anywhere;}
   .pl-meta strong{color:var(--text);font-weight:600;}
+  /* TEMPORARY: Missing Call Notes tab */
+  .cb-btn{flex:0 0 auto;align-self:center;}
+  #callBackfillSubtabs{margin-bottom:16px;}
+  @media (max-width:640px){ .cb-row{flex-wrap:wrap;} .cb-btn{flex:1 1 100%;margin-left:44px;} }
   .pl-overdue{color:#9a5b00;}
   .pl-private-btn{flex:0 0 auto;align-self:center;white-space:nowrap;}
   .tag.pl-private-tag{background:#ece7f3;color:#4b3a6b;}
@@ -948,6 +952,9 @@
   <button data-tab="intake">Intake<span class="tab-more"> Forms</span></button>
   <button data-tab="reports">Reports</button>
   <button data-tab="statistics">Statistics</button>
+  <!-- TEMPORARY (2026-11-25): backfill intake call notes. Remove this button,
+       #panel-callbackfill and the "MISSING CALL NOTES" script block when done. -->
+  <button data-tab="callbackfill" id="navCallBackfill" hidden><span class="tab-more">Missing </span>Call Notes</button>
   <button data-tab="messages" id="navMessages" hidden>Messages<span class="nav-badge" id="msgBadge" hidden></span></button>
   <button data-tab="settings">Settings</button>
   <!-- Moved to the end of the tab list 2026-09-27, at the user's request -
@@ -1060,6 +1067,20 @@
     <div class="errbox" id="prayerListPrivateSetup" hidden style="margin-bottom:16px;"></div>
     <div id="prayerListBox"></div>
     <div class="no-results" id="prayerListEmpty" hidden></div>
+  </section>
+
+  <!-- TEMPORARY (2026-11-25): see the note on #navCallBackfill. -->
+  <section class="panel" id="panel-callbackfill">
+    <p class="helptext" id="callBackfillHelp"></p>
+    <nav class="subtabs" aria-label="Who to show" id="callBackfillSubtabs">
+      <button class="active" data-cbfilter="all">Everyone</button>
+      <button data-cbfilter="current">Current only</button>
+    </nav>
+    <div class="search-row">
+      <div class="search-wrap"><input id="callBackfillSearch" placeholder="Search by recipient..." aria-label="Search people missing intake call notes"><button type="button" class="search-clear" aria-label="Clear search" hidden>&times;</button></div>
+    </div>
+    <div id="callBackfillBox"></div>
+    <div class="no-results" id="callBackfillEmpty" hidden></div>
   </section>
 
   <section class="panel" id="panel-completed">
@@ -1622,7 +1643,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-11-25.1";
+const APP_VERSION = "2026-11-25.2";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -2648,7 +2669,7 @@ function groupRow(key, avatarText, name, countLabel, summaryHtml, bodyHtml, wasO
   </div>`;
 }
 
-function renderAll(){ renderSchedule(); renderPlanning(); renderCompleted(); renderOverview(); renderBlackouts(); renderSchedPlan(); renderTimeWindowsSettings(); renderLocationsSettings(); renderIntake(); renderFormEditor(); renderPrayerList(); renderPrayerListSettings(); renderStatistics(); }
+function renderAll(){ renderSchedule(); renderPlanning(); renderCompleted(); renderOverview(); renderBlackouts(); renderSchedPlan(); renderTimeWindowsSettings(); renderLocationsSettings(); renderIntake(); renderFormEditor(); renderPrayerList(); renderPrayerListSettings(); renderStatistics(); renderCallBackfill(); }
 
 async function withLoading(btn, loadingText, fn){
   if(!btn) return fn();
@@ -2805,6 +2826,14 @@ function wireApp(){
   $('#prospectSort').addEventListener('change', renderPlanning);
   $('#completedSearch').addEventListener('input', renderCompleted);
   $('#prayerListSearch').addEventListener('input', renderPrayerList);
+  // TEMPORARY: Missing Call Notes tab.
+  $('#callBackfillSearch').addEventListener('input', renderCallBackfill);
+  wireSearchClear('callBackfillSearch');
+  $('#callBackfillSubtabs').querySelectorAll('button').forEach(b=>b.addEventListener('click', ()=>{
+    callBackfillFilter = b.dataset.cbfilter;
+    $('#callBackfillSubtabs').querySelectorAll('button').forEach(x=>x.classList.toggle('active', x===b));
+    renderCallBackfill();
+  }));
   wireSearchClear('prayerListSearch');
   $('#btnPlSelectAll').addEventListener('click', ()=>setPrayerListAccessAll(true));
   $('#btnPlSelectNone').addEventListener('click', ()=>setPrayerListAccessAll(false));
@@ -2890,6 +2919,68 @@ function prayerListEntries(){
     return ((a.next.date||'')+(a.next.time||'')).localeCompare((b.next.date||'')+(b.next.time||''));
   });
 }
+/* ---- MISSING CALL NOTES (TEMPORARY, 2026-11-25, at Andrew's request) ----
+   Lists every prayer recipient (name match, Drop-in/Training/Journey left
+   out) with no intake call notes yet, so an admin can back-fill them. Uses
+   the normal intake call notes form (openCallNotes). The note is attached
+   to the person's Waiting/Pre-Intake record if they have one (so it also
+   shows on that card), otherwise to their Session #1. A person drops off
+   once any of their records has call notes. To remove: delete this block,
+   #navCallBackfill, #panel-callbackfill, the wiring in wireApp() and the
+   renderCallBackfill() call in renderAll(). */
+let callBackfillFilter = 'all';
+function callBackfillEntries(){
+  const today = todayISO();
+  const people = sessions.filter(s=>!isGroupAppt(s.apptType) && s.recipName.trim());
+  return groupByRecipient(people)
+    .filter(g=>!callNotesForRecipient(g.name).length)
+    .map(g=>{
+      const sorted = g.sessions.slice().sort((a,b)=>sessionSortKey(a).localeCompare(sessionSortKey(b)));
+      const waiting = sorted.find(s=>s.status==='Waiting');
+      const dated = sorted.filter(s=>s.status!=='Waiting' && s.date);
+      const upcoming = dated.filter(s=>s.status==='Scheduled' && s.date>=today);
+      const done = dated.filter(s=>s.status==='Completed');
+      const target = waiting || sorted[0];
+      const current = !!waiting || dated.some(s=>s.status==='Scheduled');
+      const last = sorted[sorted.length-1];
+      return { key:g.key, name:g.name, target, waiting, upcoming, done, current, sortKey: sessionSortKey(last) };
+    })
+    .sort((a,b)=> b.sortKey.localeCompare(a.sortKey));
+}
+function renderCallBackfill(){
+  const nav = $('#navCallBackfill'), box = $('#callBackfillBox'), empty = $('#callBackfillEmpty');
+  if(!box) return;
+  nav.hidden = !notesAvailable;
+  if(!notesAvailable){ box.innerHTML = ''; return; }
+  const all = callBackfillEntries();
+  const nCurrent = all.filter(e=>e.current).length;
+  $('#callBackfillHelp').textContent = `${all.length} ${all.length===1?'person has':'people have'} no intake call notes yet (${nCurrent} current: waiting or with a booked session). Tap "Write call notes" to fill them in; a person drops off this list once saved. Newest activity first.`;
+  const q = $('#callBackfillSearch').value.trim().toLowerCase();
+  const list = all.filter(e=>(callBackfillFilter==='all' || e.current) && (!q || e.name.toLowerCase().includes(q)));
+  if(!list.length){
+    box.innerHTML = '';
+    empty.hidden = false;
+    empty.textContent = q ? 'No one matches your search.' : (all.length ? 'No current people are missing call notes. Choose "Everyone" to see the rest.' : 'Everyone has intake call notes.');
+    return;
+  }
+  empty.hidden = true;
+  box.innerHTML = `<div class="pl-list" role="list">${list.map((e,i)=>{
+    const bits = [];
+    if(e.waiting) bits.push(submittedIntakeOf(e.waiting) ? 'On the Waiting List' : 'Pre-Intake');
+    if(e.upcoming.length) bits.push(`Next session <strong>${escapeHtml(fmtShortDay(e.upcoming[0].date))}</strong>`);
+    if(e.done.length) bits.push(`${e.done.length} completed ${e.done.length===1?'session':'sessions'}, last ${escapeHtml(fmtShortDay(e.done[e.done.length-1].date))}`);
+    if(!bits.length) bits.push('No completed sessions yet');
+    return `<div class="pl-row cb-row" role="listitem">
+      <span class="pl-num" aria-hidden="true">${i+1}</span>
+      <div class="pl-main">
+        <div><span class="pl-name">${escapeHtml(e.name)}</span>${e.current?'<span class="tag first">Current</span>':''}</div>
+        <div class="pl-meta">${bits.join(' · ')}</div>
+      </div>
+      <button type="button" class="btn cb-btn" onclick="openCallNotes(${e.target.id})" aria-label="Write intake call notes for ${escapeHtml(e.name)}">Write call notes</button>
+    </div>`;
+  }).join('')}</div>`;
+}
+/* ---- end MISSING CALL NOTES ---- */
 function todayISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function renderPrayerList(){
   const box = $('#prayerListBox'), empty = $('#prayerListEmpty');
@@ -9904,6 +9995,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Nov 25, 2026', version: '2026-11-25.2', items: [
+    'New (temporary): a "Missing Call Notes" tab lists everyone who has no intake call notes yet, newest activity first, with a search box and an Everyone / Current only switch (current = waiting or with a booked session). Tap "Write call notes" to fill in the usual intake call notes form; the person drops off the list once saved. The notes go on their Pre-Intake/Waiting card if they have one, otherwise on their first session. The tab will be removed once the back-fill is done.'
+  ]},
   { date: 'Nov 25, 2026', version: '2026-11-25.1', items: [
     'Changed: on a Pre-Intake card, "Mark link sent" now opens a calendar so you can pick the day you actually sent the intake link (it starts on today; earlier days are fine, future days aren\'t). Tap "Link sent <date>" to change the date, or choose "Mark as not sent" to clear it.'
   ]},
@@ -9917,10 +10011,6 @@ const CHANGE_LOG = [
   ]},
   { date: 'Nov 23, 2026', version: '2026-11-23.3', items: [
     'Fixed: the "Link sent" date on Pre-Intake cards is saved as a plain date, so it never shows a day early or late. The IntakeLinkSentAt column in SharePoint can be a Date column (no time needed).'
-  ]},
-  { date: 'Nov 23, 2026', version: '2026-11-23.2', items: [
-    'New: on Schedule & Planning, people waiting for a session are split in two. "Waiting" (the Waiting List) is everyone whose submitted intake form is linked; their days waiting now count from the day the form was submitted. The new "Pre-Intake" tab is everyone with no intake form linked yet; their days count from when they were added. Linking someone\'s form moves them from Pre-Intake to the Waiting List.',
-    'New: on a Pre-Intake card, tap "Mark link sent" once you\'ve sent them the intake form link. It shows "Link sent" with the date (on the card and as a green tag when collapsed); tap again to undo. To keep this after a reload, add an "IntakeLinkSentAt" (Date) column to the PrayerSessions list in SharePoint.'
   ]}
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
@@ -9928,6 +10018,10 @@ const CHANGE_LOG = [
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Nov 23, 2026', version: '2026-11-23.2', items: [
+    'New: on Schedule & Planning, people waiting for a session are split in two. "Waiting" (the Waiting List) is everyone whose submitted intake form is linked; their days waiting now count from the day the form was submitted. The new "Pre-Intake" tab is everyone with no intake form linked yet; their days count from when they were added. Linking someone\'s form moves them from Pre-Intake to the Waiting List.',
+    'New: on a Pre-Intake card, tap "Mark link sent" once you\'ve sent them the intake form link. It shows "Link sent" with the date (on the card and as a green tag when collapsed); tap again to undo. To keep this after a reload, add an "IntakeLinkSentAt" (Date) column to the PrayerSessions list in SharePoint.'
+  ]},
   { date: 'Nov 23, 2026', version: '2026-11-23.1', items: [
     'New: a session notes question (or a whole section) can be set to show only on the recipient\'s first session. In Settings > Session Notes, open a question and tick "Only on the recipient\'s first session". On Session #2 and later it is hidden and nothing is saved for it. Works in the Scheduler and in My FPHM.',
     'Changed: a multiple choice grid with just one column (for example only "Yes") now shows a tick box on each row, and an unticked row means no. Use it for the sequences list by deleting "No" from its columns. Notes already saved keep showing their Yes and No answers as before.'
