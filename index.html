@@ -817,6 +817,31 @@
   .picker-row:hover{background:var(--cream);}
   .picker-row .pname{font-weight:600;}
   .picker-row .ptag{font-size:var(--fs-2xs);color:var(--muted);}
+  /* 2026-11-25.4: slot picker groups + Pre-Intake tag; minister card actions; Mark Completed first */
+  .picker-heading{font-weight:600;margin:0 0 8px;}
+  .picker-group-label{font-size:var(--fs-2xs);color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin:16px 0 8px;}
+  .picker-group-label:first-of-type{margin-top:0;}
+  .ptag-noform{display:table;margin-top:4px;font-size:var(--fs-2xs);background:#f3e7e0;color:#8a4a30;padding:2px 8px;border-radius:6px;font-weight:600;white-space:nowrap;}
+  .nav-compact{display:none;}
+  @media (max-width:640px){
+    nav[aria-label="Primary"] .nav-compact{display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;padding:4px 12px;}
+    nav[aria-label="Primary"] .nav-current{font-weight:700;color:var(--gold-dark);border-bottom:3px solid var(--gold);padding:8px 0 5px;}
+    nav[aria-label="Primary"] #navAllTabs{display:inline-flex;align-items:center;gap:4px;background:#fff;color:var(--navy);border:1px solid var(--navy);border-radius:8px;padding:6px 16px;min-height:40px;font-weight:600;}
+    nav[aria-label="Primary"]:not(.tabs-open) button[data-tab]{display:none;}
+    nav[aria-label="Primary"].tabs-open{padding-bottom:8px;}
+    #panel-schedplan > .helptext{display:none;}
+    #panel-schedplan > .toolbar{flex-direction:row;flex-wrap:wrap;gap:8px;}
+    #panel-schedplan > .toolbar > .split-btn{flex:1 1 100%;}
+    #panel-schedplan > .toolbar > .btn.secondary{flex:1 1 0;min-width:0;padding-left:8px;padding-right:8px;font-size:var(--fs-sm);}
+  }
+  .minister-actions{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px;}
+  .minister-actions button.ma-delete{color:var(--danger);border-color:var(--danger);margin-left:auto;}
+  .complete-row{margin-top:16px;}
+  .complete-row .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;}
+  @media (max-width:640px){
+    .minister-actions .btn{flex:1 1 100%;margin-left:0;}
+    .complete-row .btn{width:100%;}
+  }
   .picker-empty{font-size:var(--fs-xs);color:var(--muted);font-style:italic;padding:4px 0;}
   .cand-history{padding:8px 11px 10px;border-top:1px solid var(--border);}
   .history-empty{font-size:var(--fs-xs);color:var(--muted);font-style:italic;margin:0 0 8px;}
@@ -939,6 +964,12 @@
   </div>
 </header>
 <nav aria-label="Primary">
+  <!-- Phones only (2026-11-25.4): the current tab plus an "All tabs" button
+       that opens the full list, so the tabs don't take 3 rows. -->
+  <div class="nav-compact">
+    <span class="nav-current" id="navCurrent">Schedule</span>
+    <button type="button" id="navAllTabs" aria-expanded="false" onclick="toggleAllTabs()"><span aria-hidden="true">☰</span> All tabs<span class="nav-badge" id="navAllBadge" hidden></span></button>
+  </div>
   <!-- The old Schedule and Planning tabs (panel-schedule / panel-planning
        below) are kept fully intact but deliberately not linked here - the
        merged Schedule & Planning tab (panel-schedplan) replaces both, per
@@ -1643,7 +1674,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-11-25.3";
+const APP_VERSION = "2026-11-25.4";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -1827,6 +1858,8 @@ function renderAdminMessages(){
   const badge = $('#msgBadge');
   badge.hidden = !n;
   badge.textContent = n > 99 ? '99+' : String(n);
+  const allBadge = $('#navAllBadge');
+  if(allBadge){ allBadge.hidden = !n; allBadge.textContent = badge.textContent; }
   $('#navMessages').setAttribute('aria-label', n ? `Messages, ${n} unread` : 'Messages');
   try{
     if(n && navigator.setAppBadge) navigator.setAppBadge(n);
@@ -2748,7 +2781,7 @@ function wireApp(){
   syncNavHeight();
   window.addEventListener('resize', syncNavHeight);
   if(document.fonts && document.fonts.ready) document.fonts.ready.then(syncNavHeight);
-  document.querySelectorAll('nav[aria-label="Primary"] button').forEach(b=>b.addEventListener('click', ()=>switchTab(b.dataset.tab)));
+  document.querySelectorAll('nav[aria-label="Primary"] button[data-tab]').forEach(b=>b.addEventListener('click', ()=>switchTab(b.dataset.tab)));
   $('#btnRefresh').addEventListener('click', ()=>withLoading($('#btnRefresh'), 'Refreshing…', loadAll));
   $('#btnRefreshData').addEventListener('click', refreshDataKeepingPlace);
   $('#search').addEventListener('input', renderSchedule);
@@ -2887,14 +2920,31 @@ document.addEventListener('keydown', (e)=>{
 });
 
 function switchTab(tab){
-  document.querySelectorAll('nav[aria-label="Primary"] button').forEach(b=>{
+  document.querySelectorAll('nav[aria-label="Primary"] button[data-tab]').forEach(b=>{
     const active = b.dataset.tab===tab;
     b.classList.toggle('active', active);
-    if(active) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
+    if(active){
+      b.setAttribute('aria-current','page');
+      const cur = $('#navCurrent');
+      if(cur) cur.textContent = [...b.childNodes].filter(n=>!(n.classList && n.classList.contains('nav-badge'))).map(n=>n.textContent).join('').trim();
+    } else b.removeAttribute('aria-current');
   });
+  setAllTabsOpen(false);
   document.querySelectorAll('main .panel').forEach(p=>p.classList.toggle('active', p.id==='panel-'+tab));
   if(tab === 'messages'){ adminMessageTab = 'unread'; renderAdminMessages(); }
 }
+
+// Phone tab menu (2026-11-25.4). Above 640px the CSS ignores it.
+function setAllTabsOpen(open){
+  const nav = document.querySelector('nav[aria-label="Primary"]');
+  if(!nav) return;
+  nav.classList.toggle('tabs-open', open);
+  const b = $('#navAllTabs');
+  if(b){ b.setAttribute('aria-expanded', String(open)); b.firstElementChild.nextSibling.textContent = open ? ' Close' : ' All tabs'; }
+}
+window.toggleAllTabs = function(){
+  setAllTabsOpen(!document.querySelector('nav[aria-label="Primary"]').classList.contains('tabs-open'));
+};
 
 /* ---- PRAYER LIST ----
    One row per prayer recipient who has at least one Scheduled (booked)
@@ -4153,7 +4203,7 @@ function renderUnlinkedSessionCard(s){
     <div class="slot-header" style="cursor:default;">
       <span class="slot-header-top">
         <span class="slot-time">${s.time?`${fmt12(s.time)}–${fmt12(s.endTime)}`:''}</span>
-        <span class="slot-status booked">${escapeHtml(s.status)}</span>
+        <span class="slot-status booked">Booked</span>
       </span>
       <span class="slot-header-detail">
         <span class="slot-header-name">${escapeHtml(s.recipName)}</span>
@@ -4162,18 +4212,18 @@ function renderUnlinkedSessionCard(s){
       </span>
     </div>
     <div class="slot-body">
-      <div class="slot-detail-row"><strong>${escapeHtml(s.recipName)}</strong> ${s.recipContact?`<span class="helptext">${escapeHtml(s.recipContact)}</span>`:''}</div>
-      <div class="slot-detail-row">Team: ${escapeHtml(ministerNamesOf(s))||'<span class="helptext">None assigned</span>'}</div>
+      ${s.recipContact?`<div class="slot-detail-row helptext">${escapeHtml(s.recipContact)}</div>`:''}
+      ${ministerNamesOf(s) ? '' : '<div class="slot-detail-row">Team: <span class="helptext">None assigned</span></div>'}
       ${s.location?`<div class="slot-detail-row">${escapeHtml(sessionLocationDisplay(s))}</div>`:''}
       ${s.notes?`<div class="notes">${escapeHtml(s.notes)}</div>`:''}
       <div class="slot-detail-row">${waSectionHtml(s)}</div>
       ${!isGroupAppt(s.apptType) ? `<div class="slot-detail-row">${renderIntakeLinkBlock(s)}</div>` : ''}
-      <div class="toolbar" style="margin-top:10px;">
-        <button class="btn secondary" onclick="assignSlotToSession(${s.id},this)">Assign to a Slot</button>
+      ${s.status!=='Completed' ? `<div class="complete-row"><button class="btn" onclick="markComplete(${s.id})" aria-label="Mark session for ${escapeHtml(s.recipName)} as completed">${ICONS.checkCircle}Mark Completed</button></div>` : ''}
+      <div class="toolbar" style="margin-top:8px;">
+        <button class="icon-btn" onclick="assignSlotToSession(${s.id},this)">Assign to a Slot</button>
         ${notesButtonHtml(s)}
         <button class="icon-btn" onclick="addToCalendar(${s.id})" title="Add to Calendar" aria-label="Add session for ${escapeHtml(s.recipName)} to your calendar">${ICONS.calendarPlus}<span class="btn-label">Add to Calendar</span></button>
         <button class="icon-btn" onclick="editSession(${s.id})" title="Edit" aria-label="Edit session for ${escapeHtml(s.recipName)}">${ICONS.pencil}<span class="btn-label">Edit</span></button>
-        <button class="icon-btn success" onclick="markComplete(${s.id})" title="Mark Completed" aria-label="Mark session for ${escapeHtml(s.recipName)} as completed">${ICONS.checkCircle}<span class="btn-label">Mark Completed</span></button>
         <button class="icon-btn danger" onclick="deleteUnlinkedSession(${s.id})" title="Delete" aria-label="Delete session for ${escapeHtml(s.recipName)}">${ICONS.trash}<span class="btn-label">Delete</span></button>
       </div>
     </div>
@@ -4319,20 +4369,27 @@ function renderSlotPicker(sl){
   const cands = unplacedCandidates();
   const rb = remainingByGender(sl.date, sl.start, sl.end, sl.id);
   const blackedOut = blackedOutNamesListOn(sl.date);
-  const avail = `<div class="slot-meta">Available now: ${rb.all.length} PM${rb.all.length===1?'':'s'} (${rb.female.length}F, ${rb.male.length}M)</div>`
-    + (blackedOut.length ? `<div class="slot-meta">Unavailable (blackout): ${escapeHtml(blackedOut.join(', '))}</div>` : '');
-  if(!cands.length) return avail + `<div class="picker-empty">No one on the waiting list to claim yet.</div>`;
-  return avail + cands.map(c=>{
+  // The slot's header already shows "Available now" and any blackouts, so
+  // the body starts with the question instead (2026-11-25.4).
+  if(!cands.length) return `<div class="picker-empty">No one on the waiting list to claim yet.</div>`;
+  const candHtml = c=>{
     const num = sessionNumberOf(c);
     const isExpanded = openHistoryFor===(sl.id+':'+c.id);
+    const noForm = !onWaitingList(c);
     return `<div class="picker-cand">
       <button type="button" class="picker-row" onclick="toggleCandHistoryReal(${sl.id},${c.id})">
-        <span class="pname">${escapeHtml(c.recipName)}</span>
+        <span class="pname">${escapeHtml(c.recipName)}${noForm ? '<span class="ptag-noform">No intake form yet</span>' : ''}</span>
         <span class="ptag">Session #${num}${c.genderPref==='Same-sex' ? ` · ${escapeHtml(c.recipGender||'Same-sex')} only` : ''}${c.priority ? ' · Priority' : ''}</span>
       </button>
       ${isExpanded ? renderCandHistoryPickerReal(c, historyForRecipient(c.recipName, c.id), sl) : ''}
     </div>`;
-  }).join('');
+  };
+  const waiting = cands.filter(onWaitingList), pre = cands.filter(c=>!onWaitingList(c));
+  return `<div class="picker-heading">Who should take this slot?</div>`
+    + (waiting.length && pre.length ? `<div class="picker-group-label">Waiting List</div>` : '')
+    + waiting.map(candHtml).join('')
+    + (pre.length ? `<div class="picker-group-label">Pre-Intake (no intake form yet)</div>` : '')
+    + pre.map(candHtml).join('');
 }
 function renderCandHistoryPickerReal(c, hist, sl){
   return `<div class="cand-history">
@@ -4523,17 +4580,16 @@ function renderBookedBody(sl){
     return `<div class="picker-empty">This slot's linked session could not be found.</div>`;
   }
   return `
-    <div class="slot-detail-row"><strong>${escapeHtml(linked.recipName)}</strong> ${linked.recipContact?`<span class="helptext">${escapeHtml(linked.recipContact)}</span>`:''}</div>
-    <div class="slot-detail-row">Team: ${escapeHtml(ministerNamesOf(linked))}</div>
+    ${linked.recipContact?`<div class="slot-detail-row helptext">${escapeHtml(linked.recipContact)}</div>`:''}
     <div class="slot-detail-row">${escapeHtml(sessionLocationDisplay(linked))}</div>
     ${linked.notes?`<div class="notes">${escapeHtml(linked.notes)}</div>`:''}
     <div class="slot-detail-row">${waSectionHtml(linked)}</div>
     <div class="slot-detail-row">${renderIntakeLinkBlock(linked)}</div>
-    <div class="toolbar" style="margin-top:10px;">
+    ${linked.status!=='Completed' ? `<div class="complete-row"><button class="btn" onclick="markComplete(${linked.id})" aria-label="Mark session for ${escapeHtml(linked.recipName)} as completed">${ICONS.checkCircle}Mark Completed</button></div>` : ''}
+    <div class="toolbar" style="margin-top:8px;">
       ${notesButtonHtml(linked)}
       <button class="icon-btn" onclick="addToCalendar(${linked.id})" title="Add to Calendar" aria-label="Add session for ${escapeHtml(linked.recipName)} to your calendar">${ICONS.calendarPlus}<span class="btn-label">Add to Calendar</span></button>
       <button class="icon-btn" onclick="editBookedSession(${sl.id},${linked.id})" title="Edit" aria-label="Edit session for ${escapeHtml(linked.recipName)}">${ICONS.pencil}<span class="btn-label">Edit</span></button>
-      ${linked.status!=='Completed' ? `<button class="icon-btn success" onclick="markComplete(${linked.id})" title="Mark Completed" aria-label="Mark session for ${escapeHtml(linked.recipName)} as completed">${ICONS.checkCircle}<span class="btn-label">Mark Completed</span></button>` : ''}
       <button class="icon-btn danger" onclick="deleteBookedSession(${sl.id},${linked.id})" title="Delete" aria-label="Delete session for ${escapeHtml(linked.recipName)}">${ICONS.trash}<span class="btn-label">Delete</span></button>
     </div>`;
 }
@@ -5785,13 +5841,14 @@ function renderOverview(){
           </span>
           <span class="group-chevron">${ICONS.chevron}</span>
         </button>
-        <div class="sess-actions">
-          <button class="icon-btn${toActive?' success':''}" onclick="toggleMinisterStatus(${m.id})" title="${toActive?'Activate':'Deactivate'}" aria-label="${toActive?'Activate':'Deactivate'} ${escapeHtml(m.name)}">${ICONS.power}</button>
-          <button class="icon-btn" onclick="editMinister(${m.id})" title="Edit" aria-label="Edit ${escapeHtml(m.name)}">${ICONS.pencil}</button>
-          <button class="icon-btn danger" onclick="deleteMinister(${m.id})" title="Delete" aria-label="Delete ${escapeHtml(m.name)}">${ICONS.trash}</button>
-        </div>
       </div>
-      <div class="group-body"><div class="group-body-inner">${showNotif ? notifDevicesHtml(m.id) : ''}${body}</div></div>
+      <div class="group-body"><div class="group-body-inner">
+        <div class="minister-actions">
+          <button class="btn secondary" onclick="editMinister(${m.id})" aria-label="Edit ${escapeHtml(m.name)}">Edit</button>
+          <button class="btn secondary" onclick="toggleMinisterStatus(${m.id})" aria-label="${toActive?'Make active':'Make inactive'}: ${escapeHtml(m.name)}">${toActive?'Make active':'Make inactive'}</button>
+          <button class="btn secondary ma-delete" onclick="deleteMinister(${m.id})" aria-label="Delete ${escapeHtml(m.name)}">Delete</button>
+        </div>
+        ${showNotif ? notifDevicesHtml(m.id) : ''}${body}</div></div>
     </div>`;
   }).join('');
   if(showNotif && !rows.length && !q) noResults.textContent = overviewNotifFilter==='help' ? 'Everyone has notifications on.' : 'No ministers match this filter.';
@@ -10010,6 +10067,12 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Nov 25, 2026', version: '2026-11-25.4', items: [
+    'Changed (phones): the row of tabs is replaced by the name of the tab you\'re on and an "All tabs" button. Tap it to see every tab, tap a tab to go there. Messages shows its unread count on the button. On Schedule & Planning the help sentence is gone and "Add to Waiting List" / "Remove Unused Slots" sit side by side, so your slots show sooner. Tablets and computers are unchanged.',
+    'Changed: Prayer Ministers cards no longer have the small on/off, pencil and bin icons beside the name. Open a minister\'s card to find "Edit", "Make inactive" (or "Make active") and "Delete" buttons.',
+    'Changed: on a booked session card, "Mark Completed" is now the big orange button. "Assign to a Slot", Session Notes, Add to Calendar and Edit sit underneath, with Delete last. The name and team are no longer shown a second time inside the card, and a session booked without a slot now says "Booked" like the others instead of "Scheduled".',
+    'Changed: when you open an empty slot, it asks "Who should take this slot?" and lists Waiting List people first, then Pre-Intake people, each tagged "No intake form yet".'
+  ]},
   { date: 'Nov 25, 2026', version: '2026-11-25.3', items: [
     'Fixed: anyone who has already had a session (completed, or scheduled on a date that has passed) no longer shows on Pre-Intake, whether or not an intake form is linked. They show on the Waiting List instead, with days waiting counted from when they were added if there\'s no form. Drop-In, Training and Journey sessions don\'t count.'
   ]},
@@ -10021,11 +10084,6 @@ const CHANGE_LOG = [
   ]},
   { date: 'Nov 23, 2026', version: '2026-11-23.5', items: [
     'New: a "Yes/No toggle" answer type for the Session and Intake call notes forms (Settings > Session Notes, open a question, Answer type). It shows as an on/off switch that starts at No; switch it on for Yes. "Show only if" can use it: pick the toggle question and Yes or No. Works in My FPHM too when the Lead writes session notes.'
-  ]},
-  { date: 'Nov 23, 2026', version: '2026-11-23.4', items: [
-    'New: intake call notes. Settings > Session Notes now has two tabs, "Session" (the session notes form, unchanged) and "Intake call", where you set the questions for your notes after the intake call. Open a question and tick "Visible to prayer ministers" if ministers should see that answer; the rest stay with admins. Each question shows "Visible to PMs" or "Admin only".',
-    'New: on a Pre-Intake card, tap "Intake call notes" after the call to fill in the form. Once saved, the card shows a green "Call notes saved" tag and the button reads "Intake call notes ✓" (it stays on the card after they move to the Waiting List). Admins see all the answers under "View session notes" and in "Notes from earlier sessions" when writing session notes.',
-    'New in My FPHM: a minister with a session with that person sees an "Intake call" card under "View session notes", showing only the answers marked "Visible to PMs". Note: the other answers are hidden on screen, not locked in SharePoint. Uses the existing Session Notes lists, so there is nothing to set up.'
   ]}
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
@@ -10033,6 +10091,11 @@ const CHANGE_LOG = [
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Nov 23, 2026', version: '2026-11-23.4', items: [
+    'New: intake call notes. Settings > Session Notes now has two tabs, "Session" (the session notes form, unchanged) and "Intake call", where you set the questions for your notes after the intake call. Open a question and tick "Visible to prayer ministers" if ministers should see that answer; the rest stay with admins. Each question shows "Visible to PMs" or "Admin only".',
+    'New: on a Pre-Intake card, tap "Intake call notes" after the call to fill in the form. Once saved, the card shows a green "Call notes saved" tag and the button reads "Intake call notes ✓" (it stays on the card after they move to the Waiting List). Admins see all the answers under "View session notes" and in "Notes from earlier sessions" when writing session notes.',
+    'New in My FPHM: a minister with a session with that person sees an "Intake call" card under "View session notes", showing only the answers marked "Visible to PMs". Note: the other answers are hidden on screen, not locked in SharePoint. Uses the existing Session Notes lists, so there is nothing to set up.'
+  ]},
   { date: 'Nov 23, 2026', version: '2026-11-23.3', items: [
     'Fixed: the "Link sent" date on Pre-Intake cards is saved as a plain date, so it never shows a day early or late. The IntakeLinkSentAt column in SharePoint can be a Date column (no time needed).'
   ]},
