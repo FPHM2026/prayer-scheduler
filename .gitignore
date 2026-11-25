@@ -1,0 +1,5 @@
+# Per-developer files (Impeccable consent, local Claude settings)
+.impeccable/config.local.json
+.impeccable/cache/
+.claude/settings.local.json
+.impeccable/hook.cache.json
