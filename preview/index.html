@@ -1022,11 +1022,11 @@
     <div class="section-title" id="slotsTitle" style="display:flex;align-items:baseline;gap:8px;margin:0 0 12px;"><h2 style="font-size:var(--fs-lg);margin:0;color:var(--navy);">Slots</h2></div>
     <div id="slotWeeks"></div>
     <div class="section-title" id="unplacedTitle" style="display:flex;align-items:baseline;gap:8px;margin:26px 0 12px;"><h2 style="font-size:var(--fs-lg);margin:0;color:var(--navy);">Waiting List</h2><span class="helptext" id="unplacedCount" style="margin:0;"></span></div>
-    <p class="helptext" id="unplacedHelp" style="margin:-4px 0 12px;">Intake form submitted and linked, not yet booked. Days waiting count from when the intake form was submitted.</p>
+    <p class="helptext" id="unplacedHelp" style="margin:-4px 0 12px;">Intake form submitted and linked, or they've already had a session, and not yet booked. Days waiting count from when the intake form was submitted (or from when they were added if there's no form).</p>
     <div id="unplacedList"></div>
     <div class="no-results" id="unplacedNoResults" hidden>No one with a submitted intake form is waiting right now.</div>
     <div class="section-title" id="preIntakeTitle" style="display:flex;align-items:baseline;gap:8px;margin:26px 0 12px;"><h2 style="font-size:var(--fs-lg);margin:0;color:var(--navy);">Pre-Intake</h2><span class="helptext" id="preIntakeCount" style="margin:0;"></span></div>
-    <p class="helptext" id="preIntakeHelp" style="margin:-4px 0 12px;">Waiting for a session but no intake form linked yet. Days waiting count from when they were added. Once their form is linked they move to the Waiting List.</p>
+    <p class="helptext" id="preIntakeHelp" style="margin:-4px 0 12px;">New people waiting for a first session with no intake form linked yet. Days waiting count from when they were added. They move to the Waiting List once their form is linked. Anyone who has already had a session is always on the Waiting List.</p>
     <div id="preIntakeList"></div>
     <div class="no-results" id="preIntakeNoResults" hidden>No one is waiting on an intake form right now.</div>
   </section>
@@ -1650,7 +1650,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-11-25.2";
+const APP_VERSION = "2026-11-25.3";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -2973,7 +2973,7 @@ function renderCallBackfill(){
   empty.hidden = true;
   box.innerHTML = `<div class="pl-list" role="list">${list.map((e,i)=>{
     const bits = [];
-    if(e.waiting) bits.push(submittedIntakeOf(e.waiting) ? 'On the Waiting List' : 'Pre-Intake');
+    if(e.waiting) bits.push(onWaitingList(e.waiting) ? 'On the Waiting List' : 'Pre-Intake');
     if(e.upcoming.length) bits.push(`Next session <strong>${escapeHtml(fmtShortDay(e.upcoming[0].date))}</strong>`);
     if(e.done.length) bits.push(`${e.done.length} completed ${e.done.length===1?'session':'sessions'}, last ${escapeHtml(fmtShortDay(e.done[e.done.length-1].date))}`);
     if(!bits.length) bits.push('No completed sessions yet');
@@ -3486,7 +3486,7 @@ function renderCompletedStats(){
 }
 
 /* ---- PLANNING (Waiting-status sessions) ---- */
-// Waiting List people (a submitted intake form is linked) count from the
+// Waiting List people with a submitted intake form linked count from the
 // day that form was submitted; Pre-Intake people count from when they
 // were added.
 function daysWaiting(s){
@@ -3502,6 +3502,21 @@ function submittedIntakeOf(s){
   const i = intakeResponses.find(x=>x.id===s.intakeResponseId);
   return (i && i.submittedAt) ? i : null;
 }
+// Someone who has already had a real session (Completed, or Scheduled on
+// a date that's already passed) is never Pre-Intake, linked form or not -
+// they've been seen, so they belong on the Waiting List. Matched by name
+// like the rest of the app; Drop-in/Training/Journey don't count.
+function hadSessionAlready(s){
+  const key = (s && s.recipName || '').trim().toLowerCase();
+  if(!key) return false;
+  const today = isoDate(new Date());
+  return sessions.some(x=> x.id!==s.id && x.status!=='Waiting' && !isGroupAppt(x.apptType)
+    && (x.recipName||'').trim().toLowerCase()===key
+    && (x.status==='Completed' || (x.date && x.date<=today)));
+}
+// Waiting List = a submitted intake form is linked, or they've already
+// had a session. Everyone else unplaced is Pre-Intake.
+function onWaitingList(s){ return !!(submittedIntakeOf(s) || hadSessionAlready(s)); }
 function intakeLinkSentAtOf(s){
   return Object.prototype.hasOwnProperty.call(intakeLinkSentLocal, s.id) ? intakeLinkSentLocal[s.id] : (s.intakeLinkSentAt || null);
 }
@@ -3820,8 +3835,8 @@ function renderSchedPlan(){
   schedFilter = prev;
   $('#schedFilterTentCount').textContent = '(' + tent + ')';
   const unplaced = unplacedCandidates();
-  $('#schedFilterWaitCount').textContent = '(' + unplaced.filter(s=>submittedIntakeOf(s)).length + ')';
-  $('#schedFilterPreCount').textContent = '(' + unplaced.filter(s=>!submittedIntakeOf(s)).length + ')';
+  $('#schedFilterWaitCount').textContent = '(' + unplaced.filter(onWaitingList).length + ')';
+  $('#schedFilterPreCount').textContent = '(' + unplaced.filter(s=>!onWaitingList(s)).length + ')';
   $('#schedFilterTabs').querySelectorAll('button').forEach(b=>b.classList.toggle('active', b.dataset.schedfilter===schedFilter));
   renderSlotWeeks(); renderUnplacedCandidates(); renderSchedPlanStats();
   if(!showWL) $('#unplacedNoResults').hidden = true;
@@ -3836,7 +3851,7 @@ function renderUnplacedCandidates(){
     if(a.priority!==b.priority) return a.priority ? -1 : 1;
     return daysWaiting(b)-daysWaiting(a);
   });
-  const wl = all.filter(s=>submittedIntakeOf(s)), pre = all.filter(s=>!submittedIntakeOf(s));
+  const wl = all.filter(onWaitingList), pre = all.filter(s=>!onWaitingList(s));
   $('#unplacedNoResults').hidden = wl.length>0;
   $('#unplacedCount').textContent = wl.length ? `${wl.length} waiting` : '';
   $('#preIntakeNoResults').hidden = pre.length>0;
@@ -10002,6 +10017,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Nov 25, 2026', version: '2026-11-25.3', items: [
+    'Fixed: anyone who has already had a session (completed, or scheduled on a date that has passed) no longer shows on Pre-Intake, whether or not an intake form is linked. They show on the Waiting List instead, with days waiting counted from when they were added if there\'s no form. Drop-In, Training and Journey sessions don\'t count.'
+  ]},
   { date: 'Nov 25, 2026', version: '2026-11-25.2', items: [
     'New (temporary): a "Missing Call Notes" tab lists everyone who has no intake call notes yet, newest activity first, with a search box and an Everyone / Current only switch (current = waiting or with a booked session). Tap "Write call notes" to fill in the usual intake call notes form; the person drops off the list once saved. The notes go on their Pre-Intake/Waiting card if they have one, otherwise on their first session. The tab will be removed once the back-fill is done.'
   ]},
@@ -10015,9 +10033,6 @@ const CHANGE_LOG = [
     'New: intake call notes. Settings > Session Notes now has two tabs, "Session" (the session notes form, unchanged) and "Intake call", where you set the questions for your notes after the intake call. Open a question and tick "Visible to prayer ministers" if ministers should see that answer; the rest stay with admins. Each question shows "Visible to PMs" or "Admin only".',
     'New: on a Pre-Intake card, tap "Intake call notes" after the call to fill in the form. Once saved, the card shows a green "Call notes saved" tag and the button reads "Intake call notes ✓" (it stays on the card after they move to the Waiting List). Admins see all the answers under "View session notes" and in "Notes from earlier sessions" when writing session notes.',
     'New in My FPHM: a minister with a session with that person sees an "Intake call" card under "View session notes", showing only the answers marked "Visible to PMs". Note: the other answers are hidden on screen, not locked in SharePoint. Uses the existing Session Notes lists, so there is nothing to set up.'
-  ]},
-  { date: 'Nov 23, 2026', version: '2026-11-23.3', items: [
-    'Fixed: the "Link sent" date on Pre-Intake cards is saved as a plain date, so it never shows a day early or late. The IntakeLinkSentAt column in SharePoint can be a Date column (no time needed).'
   ]}
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
@@ -10025,6 +10040,9 @@ const CHANGE_LOG = [
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Nov 23, 2026', version: '2026-11-23.3', items: [
+    'Fixed: the "Link sent" date on Pre-Intake cards is saved as a plain date, so it never shows a day early or late. The IntakeLinkSentAt column in SharePoint can be a Date column (no time needed).'
+  ]},
   { date: 'Nov 23, 2026', version: '2026-11-23.2', items: [
     'New: on Schedule & Planning, people waiting for a session are split in two. "Waiting" (the Waiting List) is everyone whose submitted intake form is linked; their days waiting now count from the day the form was submitted. The new "Pre-Intake" tab is everyone with no intake form linked yet; their days count from when they were added. Linking someone\'s form moves them from Pre-Intake to the Waiting List.',
     'New: on a Pre-Intake card, tap "Mark link sent" once you\'ve sent them the intake form link. It shows "Link sent" with the date (on the card and as a green tag when collapsed); tap again to undo. To keep this after a reload, add an "IntakeLinkSentAt" (Date) column to the PrayerSessions list in SharePoint.'
