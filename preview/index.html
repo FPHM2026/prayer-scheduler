@@ -1573,6 +1573,21 @@
   </div>
 </div>
 
+<!-- "Link sent" date picker for a Pre-Intake card (2026-11-25): pick the
+     real send date (default today, past dates allowed), or clear it. -->
+<div class="modal-bg" id="linkSentModal">
+  <div class="modal small" role="dialog" aria-modal="true" aria-labelledby="linkSentTitle" style="position:relative;">
+    <button type="button" class="modal-x" aria-label="Cancel" title="Cancel" onclick="closeLinkSent()">&times;</button>
+    <h2 id="linkSentTitle" style="padding-right:32px;">When was the intake link sent?</h2>
+    <p id="linkSentWho" class="helptext" style="margin:0 0 16px;"></p>
+    <div class="field"><label for="linkSentDate">Date sent</label><input type="date" id="linkSentDate"></div>
+    <p class="errbox" role="alert" id="linkSentErr" hidden></p>
+    <div class="modal-actions" style="align-items:center;flex-wrap:wrap;">
+      <button type="button" class="link-btn" id="btnLinkSentClear" onclick="saveLinkSent(true)">Mark as not sent</button>
+      <button type="button" class="btn" onclick="saveLinkSent(false)">Save</button>
+    </div>
+  </div>
+</div>
 <div class="modal-bg" id="signOutModal">
   <div class="modal small" role="dialog" aria-modal="true" aria-labelledby="signOutTitle" style="position:relative;">
     <button type="button" class="modal-x" aria-label="Cancel" title="Cancel" onclick="document.getElementById('signOutModal').classList.remove('open')">&times;</button>
@@ -1614,7 +1629,7 @@
 <script>
 // Bump this string every time you publish a change — open tabs poll for it
 // and prompt the user to reload once it no longer matches what's deployed.
-const APP_VERSION = "2026-11-23.5";
+const APP_VERSION = "2026-11-25.1";
 document.querySelectorAll('.version-tag').forEach(el => el.textContent = 'v' + APP_VERSION);
 
 /* =========================================================================
@@ -3400,15 +3415,47 @@ function intakeLinkSentAtOf(s){
   return Object.prototype.hasOwnProperty.call(intakeLinkSentLocal, s.id) ? intakeLinkSentLocal[s.id] : (s.intakeLinkSentAt || null);
 }
 // Manual flag: the admin sent this Pre-Intake person the intake form link
-// (outside the app). Tapping again clears it.
-window.toggleIntakeLinkSent = async function(id){
+// (outside the app). Tapping the button opens a date picker (default today,
+// or the date already recorded) so the real send date can be entered; it
+// also offers "Mark as not sent" once a date exists.
+let linkSentEditingId = null;
+window.toggleIntakeLinkSent = function(id){
   const s = sessions.find(x=>x.id===id);
   if(!s) return;
-  // Date-only: today's local date at local midnight, the same way blackout
-  // dates are written, so a Date column never shifts by a day.
-  const at = intakeLinkSentAtOf(s) ? null : new Date(localIsoToday()+'T00:00').toISOString();
+  linkSentEditingId = id;
+  const cur = intakeLinkSentAtOf(s);
+  const today = localIsoToday();
+  const input = $('#linkSentDate');
+  input.max = today;
+  input.value = cur ? String(cur).split('T')[0] : today;
+  $('#linkSentWho').textContent = s.recipName || '';
+  $('#btnLinkSentClear').hidden = !cur;
+  $('#linkSentErr').hidden = true;
+  $('#linkSentModal').classList.add('open');
+  setTimeout(()=>input.focus(), 50);
+};
+window.closeLinkSent = function(){
+  $('#linkSentModal').classList.remove('open');
+  linkSentEditingId = null;
+};
+window.saveLinkSent = async function(clear){
+  const id = linkSentEditingId;
+  const s = sessions.find(x=>x.id===id);
+  if(!s){ closeLinkSent(); return; }
+  const day = $('#linkSentDate').value;
+  const err = $('#linkSentErr');
+  if(!clear){
+    let msg = '';
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(day)) msg = 'Please pick the date the link was sent.';
+    else if(day > localIsoToday()) msg = 'The date sent can\'t be in the future.';
+    if(msg){ err.textContent = msg; err.hidden = false; return; }
+  }
+  // Date-only: the chosen local date at local midnight, the same way
+  // blackout dates are written, so a Date column never shifts by a day.
+  const at = clear ? null : new Date(day+'T00:00').toISOString();
   intakeLinkSentLocal[id] = at;
   s.intakeLinkSentAt = at;
+  closeLinkSent();
   renderSchedPlan();
   if(!intakeLinkSentColumnReady) return;
   try{ await updateItem('sessions', id, { [INTAKE_LINK_SENT_COLUMN]: at }); }
@@ -3727,7 +3774,7 @@ function renderCandidateCards(listBox, rows, isPre){
     const callNote = callNotesFor(s.id);
     const summary = `${s.priority?'<span class="tag priority">Priority</span>':''}${callNote?'<span class="tag contacted">Call notes saved</span>':''}${sentAt?`<span class="tag linksent">Link sent${sentLabel?' '+escapeHtml(sentLabel):''}</span>`:''}${s.contacted?'<span class="tag contacted">Contacted</span>':''}${s.genderPref==='Same-sex' ? `<span class="tag">${escapeHtml(s.recipGender||'Same-sex')} only</span>` : ''}Waiting ${waiting} day${waiting===1?'':'s'}`;
     const linkSentBtn = isPre
-      ? `<button class="icon-btn${sentAt?' success':''}" onclick="toggleIntakeLinkSent(${s.id})" title="${sentAt?'Mark intake link as not sent':'Mark intake link as sent'}" aria-pressed="${!!sentAt}" aria-label="${sentAt?'Mark intake link as not sent':'Mark intake link as sent'}: ${escapeHtml(s.recipName)}">${ICONS.mail}<span class="btn-label">${sentAt?`Link sent${sentLabel?' '+escapeHtml(sentLabel):''}`:'Mark link sent'}</span></button>`
+      ? `<button class="icon-btn${sentAt?' success':''}" onclick="toggleIntakeLinkSent(${s.id})" title="${sentAt?'Change or clear the date the intake link was sent':'Record the date the intake link was sent'}" aria-pressed="${!!sentAt}" aria-label="${sentAt?'Change or clear the date the intake link was sent':'Record the date the intake link was sent'}: ${escapeHtml(s.recipName)}">${ICONS.mail}<span class="btn-label">${sentAt?`Link sent${sentLabel?' '+escapeHtml(sentLabel):''}`:'Mark link sent'}</span></button>`
       : '';
     const body = `<div class="wl-body">
       <div class="helptext" style="margin:0;">${escapeHtml(s.recipContact||'No contact info')} · added ${fmtShort(s.added||s.date)}${intake?` · intake submitted ${fmtShort((intake.submittedAt||'').split('T')[0])}`:''}</div>
@@ -9864,6 +9911,9 @@ function generateReport(){
    back in sync at that point.
 ========================================================================= */
 const CHANGE_LOG = [
+  { date: 'Nov 25, 2026', version: '2026-11-25.1', items: [
+    'Changed: on a Pre-Intake card, "Mark link sent" now opens a calendar so you can pick the day you actually sent the intake link (it starts on today; earlier days are fine, future days aren\'t). Tap "Link sent <date>" to change the date, or choose "Mark as not sent" to clear it.'
+  ]},
   { date: 'Nov 23, 2026', version: '2026-11-23.5', items: [
     'New: a "Yes/No toggle" answer type for the Session and Intake call notes forms (Settings > Session Notes, open a question, Answer type). It shows as an on/off switch that starts at No; switch it on for Yes. "Show only if" can use it: pick the toggle question and Yes or No. Works in My FPHM too when the Lead writes session notes.'
   ]},
@@ -9878,10 +9928,6 @@ const CHANGE_LOG = [
   { date: 'Nov 23, 2026', version: '2026-11-23.2', items: [
     'New: on Schedule & Planning, people waiting for a session are split in two. "Waiting" (the Waiting List) is everyone whose submitted intake form is linked; their days waiting now count from the day the form was submitted. The new "Pre-Intake" tab is everyone with no intake form linked yet; their days count from when they were added. Linking someone\'s form moves them from Pre-Intake to the Waiting List.',
     'New: on a Pre-Intake card, tap "Mark link sent" once you\'ve sent them the intake form link. It shows "Link sent" with the date (on the card and as a green tag when collapsed); tap again to undo. To keep this after a reload, add an "IntakeLinkSentAt" (Date) column to the PrayerSessions list in SharePoint.'
-  ]},
-  { date: 'Nov 23, 2026', version: '2026-11-23.1', items: [
-    'New: a session notes question (or a whole section) can be set to show only on the recipient\'s first session. In Settings > Session Notes, open a question and tick "Only on the recipient\'s first session". On Session #2 and later it is hidden and nothing is saved for it. Works in the Scheduler and in My FPHM.',
-    'Changed: a multiple choice grid with just one column (for example only "Yes") now shows a tick box on each row, and an unticked row means no. Use it for the sequences list by deleting "No" from its columns. Notes already saved keep showing their Yes and No answers as before.'
   ]}
 ];
 // Older entries, newest first. The Recent tab (CHANGE_LOG above) holds the
@@ -9889,6 +9935,10 @@ const CHANGE_LOG = [
 // five moves here rather than being deleted - see the block comment above
 // for the maintenance rule.
 const CHANGE_LOG_ARCHIVE = [
+  { date: 'Nov 23, 2026', version: '2026-11-23.1', items: [
+    'New: a session notes question (or a whole section) can be set to show only on the recipient\'s first session. In Settings > Session Notes, open a question and tick "Only on the recipient\'s first session". On Session #2 and later it is hidden and nothing is saved for it. Works in the Scheduler and in My FPHM.',
+    'Changed: a multiple choice grid with just one column (for example only "Yes") now shows a tick box on each row, and an unticked row means no. Use it for the sequences list by deleting "No" from its columns. Notes already saved keep showing their Yes and No answers as before.'
+  ]},
   { date: 'Nov 19, 2026', version: '2026-11-19.1', items: [
     'New: on the Statistics tab, a "Sections to include" box lets you tick which parts go in the report (Freedom Sessions summary, your note, the two charts, Sunday Drop-In, Journey to Freedom, and the two leader\'s copy pages). Anything unticked is left out of the report on screen, both Word downloads and Download charts, and the figure numbers close up so they never skip. Your choice is remembered on this device; Select all puts everything back.'
   ]},
